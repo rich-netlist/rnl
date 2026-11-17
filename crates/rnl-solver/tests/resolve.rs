@@ -210,7 +210,12 @@ fn check_with(file: &str, p: &LevelProblem, options: &SolverOptions) -> Resolved
     pairs.sort_unstable();
     assert_eq!(named, pairs, "{what}: {:?}", r.statements);
     assert_eq!(r, resolve(p, &options), "{what}: not deterministic");
-    let solved = solve(p, &options);
+    // a level of 0.4 within a fixed work: its lines layout searches on as long as nothing stops it
+    let solved = if p.version == "0.4" {
+        solve(p, &SolverOptions { run_limit: Some(rnl_solver::RunLimit::Work(1_000_000_000)), ..options.clone() })
+    } else {
+        solve(p, &options)
+    };
     assert_eq!(solved.report.kept, r.kept);
     for pl in &solved.solution.placements {
         if let Some((x, y)) = pl.at() {
@@ -310,23 +315,28 @@ fn t4_resolves_as_the_reference_says() {
     let align = |axis: Axis, members: Vec<PointRef>| FactKind::Align { axis, members };
     // {#M6 #M7} @ALIGN("x")
     let m6_m7 = find("ALIGN x of M6 and M7", &|f| f.kind == align(Axis::X, vec![origin("#M6"), origin("#M7")]));
-    // the ALIGN y of the $MIRROR_PAIR of M1 and M2
+    // {#M1 #M2} @ALIGN("y"), of priority normal, and the low ALIGN y of the $MIRRORED_LAYOUT of M1
+    // and M2 about M5, of the two and the usage's own point
     let mirror = find("ALIGN y of M1 and M2", &|f| {
-        f.kind == align(Axis::Y, vec![origin("#M1"), origin("#M2")])
-            && f.chain.iter().any(|&u| p.usages[u].definition == "$MIRROR_PAIR")
+        f.kind == align(Axis::Y, vec![origin("#M1"), origin("#M2")]) && f.priority == Priority::Normal
+    });
+    let layout = find("low ALIGN y of the mirrored layout of M1 and M2", &|f| {
+        matches!(&f.kind, FactKind::Align { axis: Axis::Y, members }
+            if members.len() == 3 && members[..2] == [origin("#M1"), origin("#M2")])
+            && f.chain.iter().any(|&u| p.usages[u].definition == "$MIRRORED_LAYOUT")
     });
     // {#VIP #VIN} @ALIGN("y", priority="low")
     let inputs = find("low ALIGN y of VIP and VIN", &|f| {
         f.kind == align(Axis::Y, vec![origin("#VIP"), origin("#VIN")]) && f.priority == Priority::Low
     });
     let discarded: Vec<usize> = r.discarded.iter().map(|d| d.fact).collect();
-    let mut expected = vec![m6_m7, mirror, inputs];
+    let mut expected = vec![m6_m7, mirror, inputs, layout];
     expected.sort_unstable();
     assert_eq!(discarded, expected, "{}", summary(p, &r));
     // and what each conflicts with: one minimal group each, every group it has (the draft 0.3, 8.5)
     let groups = |f: usize| r.discarded.iter().find(|d| d.fact == f).unwrap().groups.clone();
     let distance_m6_m7 = find("DISTANCE x of M6 and M7", &|f| {
-        matches!(&f.kind, FactKind::Distance { axis: Axis::X, sense: Sense::Either, min: Some(m), from, to, .. }
+        matches!(&f.kind, FactKind::Distance { axis: Axis::X, sense: Sense::Increasing, min: Some(m), from, to, .. }
             if *m == 2.0 && *from == vec![origin("#M6")] && *to == vec![origin("#M7")])
     });
     assert_eq!(groups(m6_m7), [vec![distance_m6_m7]]);
@@ -335,14 +345,15 @@ fn t4_resolves_as_the_reference_says() {
     };
     let (m1_y, m2_y) = (place("#M1", 0.0), place("#M2", 3.0));
     assert_eq!(groups(mirror), [vec![m1_y, m2_y]]);
+    assert_eq!(groups(layout), [vec![m1_y, m2_y]]);
     let vip_vin = find("DISTANCE y of VIP and VIN", &|f| {
         matches!(&f.kind, FactKind::Distance { axis: Axis::Y, sense: Sense::Increasing, min: Some(a), max: Some(b), .. }
             if *a == 6.0 && *b == 6.0)
     });
     assert_eq!(groups(inputs), [vec![vip_vin]]);
-    // the hints by statement name the statements of lines 37 to 40 of the file, each with the facts
-    // discarded because of it, as the table of the development report has them; line 40, which only
-    // the low fact loses, only with the hints of the facts of priority low (8.5, 7.6)
+    // the hints by statement name the statements of lines 36 to 39 of the file, each with the facts
+    // discarded because of it; the low facts only with the hints of the facts of priority low, and
+    // line 39, which only a low fact loses, only then (8.5, 7.6)
     let hints = |r: &Resolved| -> Vec<(String, u32, Vec<usize>, Vec<usize>)> {
         r.statements
             .iter()
@@ -352,17 +363,20 @@ fn t4_resolves_as_the_reference_says() {
             })
             .collect()
     };
-    let at = |line: u32, fact: usize, discarded: usize| {
-        ("T4-miller-conflicts.sp".to_string(), line, vec![fact], vec![discarded])
+    let at = |line: u32, fact: usize, discarded: &[usize]| {
+        ("T4-miller-conflicts.sp".to_string(), line, vec![fact], discarded.to_vec())
     };
-    assert_eq!(hints(&r), [at(37, m1_y, mirror), at(38, m2_y, mirror), at(39, distance_m6_m7, m6_m7)]);
+    assert_eq!(hints(&r), [at(36, m1_y, &[mirror]), at(37, m2_y, &[mirror]), at(38, distance_m6_m7, &[m6_m7])]);
     assert!(r.statements.keys().all(|s| s.chain.is_empty() && s.point.is_none()), "{:?}", r.statements);
-    // by default the low fact has its first group, which is all it has, without knowing it, and a
-    // note says why; with its hints asked for, the list is known to be complete, and line 40 is
-    // named; nothing else changes
-    let low = r.discarded.iter().find(|d| d.fact == inputs).unwrap();
-    assert!(!low.complete, "{low:?}");
-    let note = format!("[{inputs}] has its first group only, and is in no hint by statement");
+    // by default the low facts have their first group, which is all they have, without knowing it,
+    // and a note says why; with their hints asked for, the lists are known to be complete, and line
+    // 39 is named; nothing else changes
+    for low in [inputs, layout] {
+        let low = r.discarded.iter().find(|d| d.fact == low).unwrap();
+        assert!(!low.complete, "{low:?}");
+    }
+    let (first, second) = (inputs.min(layout), inputs.max(layout));
+    let note = format!("[{first}] and [{second}] have their first group only, and are in no hint by statement");
     assert!(
         r.notes.iter().any(|n| n.contains(" are listed only with --report ") && n.ends_with(&note)),
         "{:?}",
@@ -372,9 +386,11 @@ fn t4_resolves_as_the_reference_says() {
     assert!(all.discarded.iter().all(|d| d.complete), "{:?}", all.discarded);
     let same = |r: &Resolved| r.discarded.iter().map(|d| (d.fact, d.groups.clone())).collect::<Vec<_>>();
     assert_eq!(same(&all), same(&r));
+    let mut both = vec![mirror, layout];
+    both.sort_unstable();
     assert_eq!(
         hints(&all),
-        [at(37, m1_y, mirror), at(38, m2_y, mirror), at(39, distance_m6_m7, m6_m7), at(40, vip_vin, inputs)]
+        [at(36, m1_y, &both), at(37, m2_y, &both), at(38, distance_m6_m7, &[m6_m7]), at(39, vip_vin, &[inputs])]
     );
     assert!(all.notes.is_empty(), "{:?}", all.notes);
     assert_eq!((&all.kept, all.position(object(p, "#M2"))), (&r.kept, r.position(object(p, "#M2"))));

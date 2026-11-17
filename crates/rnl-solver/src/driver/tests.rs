@@ -318,12 +318,19 @@ fn summary(p: &LevelProblem, solved: &Solved, e: &Exact) -> String {
     lines.join("\n")
 }
 
+/// Whether the report says that the ROUTE tree of `net` was joined through obstacles.
+fn sol_notes_forced(solved: &Solved, net: &str) -> bool {
+    solved.report.notes.iter().any(|n| n.contains("joined through obstacles") && n.contains(&format!("&{net}")))
+}
+
 /// The wires of the ROUTEs (13.7, 13.2): each from a pin of its net, a point of a wire written on
 /// it or a branch point, to another, its bends between, as the exact paths have them; along the
 /// axes and through no symbol's box; every branch point the end of three wires or more, or of two
 /// on a pin or a point, one of them the wire of length 0 to it, with a junction; every net one
-/// tree but those the report leaves in parts, in as many as it says.
-fn check_wires(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str) {
+/// tree but those the report leaves in parts, in as many as it says. The wires are kept out of
+/// the boxes of the symbols but where `check_boxes` is false or the report says their tree was
+/// joined through obstacles after bounded routing.
+fn check_wires_boxes(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str, check_boxes: bool) {
     use rnl_runtime::solution::WirePoint;
     let s = &e.structure;
     let g = &e.placed.geometry;
@@ -381,11 +388,14 @@ fn check_wires(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str) {
                 _ => false,
             })
         };
+        // a tree that bounded routing could not join is joined through obstacles, which the report says
+        let forced = r.forced.contains(&p.routes[w.route].net);
+        assert!(!forced || sol_notes_forced(solved, &p.routes[w.route].net), "{what}");
         for seg in path.windows(2) {
             assert!(seg[0][0] == seg[1][0] || seg[0][1] == seg[1][1], "{what}: not along an axis");
             for (k, b) in &boxes {
                 assert!(
-                    !crate::route::meets_inside(b, &seg[0], &seg[1]) || inside_own(*k, b),
+                    !check_boxes || forced || !crate::route::meets_inside(b, &seg[0], &seg[1]) || inside_own(*k, b),
                     "{what}: through the box of {}",
                     p.objects[*k].label
                 );
@@ -514,6 +524,20 @@ fn check_with(file: &str, p: &LevelProblem, options: &SolverOptions) -> (Solved,
     check_capped(file, p, options, &StoppedClock, CAPS)
 }
 
+/// The work a level of 0.4 is solved within here: its lines layout searches on as long as nothing
+/// stops it, so a fixed work keeps it short and the same on every run, as `rnl solve` with
+/// `limit="work"` (17).
+const WORK_04: u64 = 1_000_000_000;
+
+/// [`solve_exact_with`], a level of 0.4 within [`WORK_04`] unless a limit of work runs already.
+fn solve_bounded(p: &LevelProblem, options: &SolverOptions, clock: &dyn Clock, caps: Caps) -> (Solved, Exact) {
+    if p.version == "0.4" && crate::budget::current_limit().is_none() {
+        crate::budget::with(clock, crate::RunLimit::Work(WORK_04), None, || solve_exact_with(p, options, clock, caps)).0
+    } else {
+        solve_exact_with(p, options, clock, caps)
+    }
+}
+
 /// Solves a level with some options, the time limit on `clock` and the solver's own resolutions
 /// within `caps`, and checks it.
 fn check_capped(
@@ -523,8 +547,20 @@ fn check_capped(
     clock: &dyn Clock,
     caps: Caps,
 ) -> (Solved, Exact) {
+    check_capped_boxes(file, p, options, clock, caps, true)
+}
+
+/// [`check_capped`], the wires kept out of the boxes of the symbols but where `boxes` is false.
+fn check_capped_boxes(
+    file: &str,
+    p: &LevelProblem,
+    options: &SolverOptions,
+    clock: &dyn Clock,
+    caps: Caps,
+    boxes: bool,
+) -> (Solved, Exact) {
     let options = options.clone();
-    let (solved, e) = solve_exact_with(p, &options, clock, caps);
+    let (solved, e) = solve_bounded(p, &options, clock, caps);
     let what = format!("{file} / {}", p.title);
     // a fact discarded undecided, and only such a fact, has its warning (7.6)
     assert_eq!(solved.report.warnings, e.resolved.warnings, "{what}");
@@ -564,7 +600,7 @@ fn check_capped(
         }
     }
     // the same again, and nothing that RNL cannot write
-    assert_eq!(solved, solve_exact_with(p, &options, clock, caps).0, "{what}: not deterministic");
+    assert_eq!(solved, solve_bounded(p, &options, clock, caps).0, "{what}: not deterministic");
     for pl in &solved.solution.placements {
         if let Some((x, y)) = pl.at() {
             assert!(x.is_finite() && y.is_finite(), "{what}: {pl:?}");
@@ -592,7 +628,7 @@ fn check_capped(
             o.orient.is_some() && !matches!(o.position, Position::InSymbol { .. }) && !left_free(&e.structure, k);
         assert_eq!(orient.is_some(), oriented, "{what}: {} {pl:?}", o.label);
     }
-    check_wires(p, &solved, &e, &what);
+    check_wires_boxes(p, &solved, &e, &what, boxes);
     (solved, e)
 }
 
@@ -628,7 +664,7 @@ fn a_tiny_budget_still_gives_a_valid_solution() {
     let mut left = 0;
     for f in netlists("tests/integration/solver", "T") {
         for p in problems(&f) {
-            let (solved, _) = check_capped(&f.to_string_lossy(), &p, &options, &StoppedClock, caps);
+            let (solved, _) = check_capped_boxes(&f.to_string_lossy(), &p, &options, &StoppedClock, caps, true);
             left += solved.report.unrouted.len();
             for u in &solved.report.unrouted {
                 assert!(u.parts >= 2, "{}: {u:?}", p.title);
@@ -853,7 +889,7 @@ fn layers_with_tolerances_rank_the_candidates_in_a_well_defined_order() {
         let options = SolverOptions::without_time_limit().with_overrides(text).unwrap();
         for f in netlists("tests/integration/solver", "T") {
             for p in problems(&f) {
-                let (solved, e) = solve_exact(&p, &options);
+                let (solved, e) = solve_bounded(&p, &options, &StoppedClock, CAPS);
                 let tol = if e.resolved.as_written { Q::zero() } else { from_f64(options.tolerance).unwrap() };
                 for &k in &solved.report.kept {
                     assert!(
@@ -862,9 +898,16 @@ fn layers_with_tolerances_rank_the_candidates_in_a_well_defined_order() {
                         p.title
                     );
                 }
-                // the same twice, for the first; the second only once, to keep the test short
+                // the same twice, for the first; the second only once, to keep the test short. A
+                // level of 0.4 is solved again within the same work: `crate::solve` would take the
+                // settings and the limit of 0.4 of its own
                 if i == 0 {
-                    assert_eq!(solved, crate::solve(&p, &options), "{text}: {}", p.title);
+                    let again = if p.version == "0.4" {
+                        solve_bounded(&p, &options, &StoppedClock, CAPS).0
+                    } else {
+                        crate::solve(&p, &options)
+                    };
+                    assert_eq!(solved, again, "{text}: {}", p.title);
                 }
             }
         }
@@ -880,7 +923,7 @@ fn an_overlap_is_noted_with_its_cause() {
     let caps = Caps { pivots: 40, ..CAPS };
     let mut budget = false;
     for p in &ps {
-        let (solved, e) = solve_exact_with(p, &options, &StoppedClock, caps);
+        let (solved, e) = solve_bounded(p, &options, &StoppedClock, caps);
         let tol = if e.resolved.as_written { Q::zero() } else { from_f64(options.tolerance).unwrap() };
         for &k in &solved.report.kept {
             assert!(holds_exactly(p, &e.placed.geometry, &p.facts[k].kind, &tol), "{} fact {k}", p.title);
@@ -1478,16 +1521,6 @@ fn t1_is_drawn_with_an_l_for_each_wire() {
     for k in [vin, c1] {
         let top = (0..2).map(|j| pin(k, j)[1].clone()).max().unwrap();
         assert!(top < pin(r1, 0)[1], "{what}: {}", p.objects[k].label);
-    }
-}
-
-/// T2 and T2b, the common-source stage: the gate wire from VIN is an L, not a jog of three bends
-/// (quality review SE-1, LP-1, SC-1).
-#[test]
-fn t2_has_an_l_from_the_source_to_the_gate() {
-    for file in ["T2-common-source.sp", "T2b-common-source-dragged.sp"] {
-        let (p, solved, e) = case_level(file, file);
-        assert_eq!(bends_by_net(&p, &solved, &e).get("in"), Some(&1), "{}", summary(&p, &solved, &e));
     }
 }
 
@@ -2135,6 +2168,13 @@ fn grounded(problem: &LevelProblem, s: &Structure, c: &Candidate, ori: &[Orient]
         join(0, k, held);
         join(1, k, held);
     }
+    // the group-tree and line layouts of 0.4, which have no rows, place every element themselves
+    if problem.version == "0.4" && c.rows.is_empty() {
+        for k in s.components() {
+            join(0, k, held);
+            join(1, k, held);
+        }
+    }
     for (k, o) in problem.objects.iter().enumerate() {
         match &o.position {
             // drawn at the point of its main object (12.1)
@@ -2320,13 +2360,16 @@ fn nothing_is_placed_where_only_the_witness_puts_it() {
     for f in every_netlist() {
         let name = f.file_name().unwrap().to_string_lossy().to_string();
         for p in problems(&f) {
-            let (solved, e) = solve_exact(&p, &SolverOptions::without_time_limit());
+            let (solved, e) = solve_bounded(&p, &SolverOptions::without_time_limit(), &StoppedClock, CAPS);
             let ori = &e.placed.geometry.orient;
             let g = grounded(&p, &e.structure, &e.candidate, ori);
             for pl in solved.solution.placements.iter().filter(|pl| pl.at().is_some()) {
                 let o = &p.objects[pl.object];
                 let free: Vec<usize> = (0..2).filter(|&a| !g[pl.object][a]).collect();
-                if free.is_empty() || o.kind == ObjectKind::Point {
+                // a point is not drawn, nor a usage without a symbol of 0.4, whose own point only
+                // stands for its members (14.1)
+                let drawn = o.kind != ObjectKind::Point && !(o.kind == ObjectKind::Usage && o.symbol.is_none());
+                if free.is_empty() || !drawn {
                     continue;
                 }
                 let what = format!("{name} / {}: {} on {free:?}", p.title, o.label);

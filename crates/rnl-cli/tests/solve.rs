@@ -32,6 +32,21 @@ fn unlimited() -> SolveOptions {
     SolveOptions { solver: SolverOptions::without_time_limit(), ..SolveOptions::default() }
 }
 
+/// The work a level of 0.4 of a case written for the solver is solved within: its lines layout
+/// searches on as long as nothing stops it, so a fixed work keeps the solve short and the same on
+/// every run, as `--solver-config limit="work"` (17).
+const WORK_04: u64 = 1_000_000_000;
+
+/// The options a case written for the solver is solved with: [`unlimited`], and a file of 0.4
+/// within [`WORK_04`]. A file of 0.2 keeps the options of its snapshot.
+fn for_case(f: &Path) -> SolveOptions {
+    let mut options = unlimited();
+    if std::fs::read_to_string(f).is_ok_and(|t| t.contains("@VERSION(\"0.4\")")) {
+        options.solver.run_limit = Some(rnl_solver::RunLimit::Work(WORK_04));
+    }
+    options
+}
+
 /// A clock that advances one second each time it is read: a time limit is out at the same point
 /// on every run (the draft 0.3, 8.5).
 #[derive(Default)]
@@ -273,7 +288,8 @@ fn check_read_back(run: &SolveRun, entry: &Path, files: &dyn Provider, what: &st
                 _ => None,
             })
             .collect();
-        // the constraints, by kind and priority, with the status each must read back with
+        // the constraints, by kind and priority, with the status each must read back with; the
+        // orientations, of an object or of a pin, are not among them
         let mut want: Vec<(String, &str, &str)> = p
             .facts
             .iter()
@@ -285,6 +301,7 @@ fn check_read_back(run: &SolveRun, entry: &Path, files: &dyn Provider, what: &st
                         | FactKind::PointCoordinate { .. }
                         | FactKind::Offset { .. }
                         | FactKind::Orient { .. }
+                        | FactKind::PinOrient { .. }
                 )
             })
             .map(|(k, f)| {
@@ -304,6 +321,11 @@ fn check_read_back(run: &SolveRun, entry: &Path, files: &dyn Provider, what: &st
             .filter(|c| c.status != "disabled")
             .map(|c| (c.kind.clone(), c.priority.as_str(), c.status.as_str()))
             .collect();
+        // the dots of the branch points, which the junction postprocessing of `rnl solve` adds to
+        // the record of a level of 0.4 after its solve, not among its facts (13.2): each attached
+        // to its point, on both axes
+        let dots = if p.version == "0.4" { level.record.matches("$JUNCTION @ATTACH").count() } else { 0 };
+        want.extend((0..2 * dots).map(|_| ("ALIGN".to_string(), "normal", "ok")));
         want.sort();
         got.sort();
         assert_eq!(got, want, "{what}");
@@ -317,7 +339,7 @@ fn every_case_solved_and_written_back_reads_back_whole() {
     let fs = FsProvider::new(&[]);
     for name in CASES {
         let f = case(name);
-        let run = solve(&f, &fs, &unlimited()).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let run = solve(&f, &fs, &for_case(&f)).unwrap_or_else(|e| panic!("{name}: {e}"));
         assert_eq!(run.errors, 0, "{name}");
         assert!(run.not_solved.is_empty(), "{name}: {:?}", run.not_solved);
         // every drawing level of the file, in one file
@@ -337,8 +359,9 @@ fn every_case_solved_and_written_back_reads_back_whole() {
             assert!(level.written.unsolved.is_empty(), "{name}: {:?}", level.written.unsolved);
             assert!(level.record.starts_with("@RNL(type=\"generated\""), "{name}");
             assert!(level.record.contains(&format!("hash=\"{}\"", level.hash)), "{name}");
-            let options = SolverOptions::without_time_limit().canonical();
-            assert!(level.hash.ends_with(&rnl_runtime::problem::options_digest(&options)));
+            // the options of its replay, which for a level of 0.4 name the work it took
+            let options = report.canonical_options.clone().unwrap_or_else(|| for_case(&f).solver.canonical());
+            assert!(level.hash.ends_with(&rnl_runtime::problem::options_digest(&options)), "{name}");
             // every level of the file was written back: its record is in the text, the last one
             // finished, the earlier ones as the levels after them found them
             assert!(run.files[0].text.contains(&level.hash), "{name}");
@@ -359,58 +382,62 @@ fn every_case_solved_and_written_back_reads_back_whole() {
 
 #[test]
 fn the_discarded_facts_of_t4_are_those_of_its_reference() {
-    // 00-brief.md of the brainstorm: {#M6 #M7} @ALIGN("x"), the ALIGN on y of the mirror pair M1
-    // M2, and the low {#VIP #VIN} @ALIGN("y")
-    let run = solve(&case("T4-miller-conflicts"), &FsProvider::new(&[]), &unlimited()).unwrap();
+    // {#M6 #M7} @ALIGN("x") against the DISTANCE of line 38, {#M1 #M2} @ALIGN("y") and the low ALIGN
+    // y of the $MIRRORED_LAYOUT of M1 and M2 against the places of lines 36 and 37, and the low
+    // {#VIP #VIN} @ALIGN("y") against the DISTANCE of line 39
+    let t4 = case("T4-miller-conflicts");
+    let run = solve(&t4, &FsProvider::new(&[]), &for_case(&t4)).unwrap();
     let level = &run.levels[0];
     let lines = rnl_cli::solve::report(level, false);
     let discarded: Vec<&str> = lines.iter().filter(|l| l.starts_with("  discarded ")).map(String::as_str).collect();
-    // each with its one minimal group (the draft 0.3, 8.5); the low one without its hint (7.6)
+    // each with its one minimal group (8.5); the low ones without their hints (7.6)
     assert_eq!(
         discarded,
         [
-            "  discarded [7] ALIGN x {#M6 #M7} (normal, T4-miller-conflicts.sp:28): it conflicts with [3]",
-            "  discarded [16] ALIGN y {#M1 #M2} (normal, rnl-std-layout.rnl:10, from $MIRROR_PAIR): it conflicts \
-             with [0] and [4]",
-            "  discarded [40] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:31): of priority low, which is \
+            "  discarded [7] ALIGN x {#M6 #M7} (normal, T4-miller-conflicts.sp:27): it conflicts with [3]",
+            "  discarded [23] ALIGN y {#M1 #M2} (normal, T4-miller-conflicts.sp:23): it conflicts with [0] and [4]",
+            "  discarded [54] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:30): of priority low, which is \
              expected; --report lists what it conflicts with (8.5)",
+            "  discarded [62] ALIGN y {#M1 #M2 a usage of $MIRRORED_LAYOUT} (low, rnl-std-semantics.rnl:120, from \
+             $MIRRORED_LAYOUT): of priority low, which is expected; --report lists what it conflicts with (8.5)",
         ]
     );
     // each followed by the facts it conflicts with
-    let at = lines.iter().position(|l| l.starts_with("  discarded [16]")).unwrap();
-    assert_eq!(lines[at + 1], "      [0] the y of #M1 = 0 (high, T4-miller-conflicts.sp:37)");
-    assert_eq!(lines[at + 2], "      [4] the y of #M2 = 3 (normal, T4-miller-conflicts.sp:38)");
-    let at = lines.iter().position(|l| l.starts_with("  discarded [40]")).unwrap();
+    let at = lines.iter().position(|l| l.starts_with("  discarded [23]")).unwrap();
+    assert_eq!(lines[at + 1], "      [0] the y of #M1 = 0 (high, T4-miller-conflicts.sp:36)");
+    assert_eq!(lines[at + 2], "      [4] the y of #M2 = 3 (normal, T4-miller-conflicts.sp:37)");
+    let at = lines.iter().position(|l| l.starts_with("  discarded [54]")).unwrap();
     assert!(!lines[at + 1].starts_with("      ["), "{lines:#?}");
     // then the statements of those groups, each with the facts discarded because of it; the one
-    // that only the low fact loses only with --report
+    // that only a low fact loses, and the low facts, only with --report
     let statements = [
-        "    T4-miller-conflicts.sp:37 [0] the y of #M1 = 0 took part in discarding [16]",
-        "    T4-miller-conflicts.sp:38 [4] the y of #M2 = 3 took part in discarding [16]",
-        "    T4-miller-conflicts.sp:39 [3] DISTANCE x either min=2 {#M6} {#M7} took part in discarding [7]",
-        "    T4-miller-conflicts.sp:40 [2] DISTANCE y increasing min=6 max=6 {#VIP} {#VIN} took part in discarding \
-         [40]",
+        "    T4-miller-conflicts.sp:36 [0] the y of #M1 = 0 took part in discarding [23]",
+        "    T4-miller-conflicts.sp:37 [4] the y of #M2 = 3 took part in discarding [23]",
+        "    T4-miller-conflicts.sp:38 [3] DISTANCE x increasing min=2 {#M6} {#M7} took part in discarding [7]",
     ];
     let head = lines.iter().position(|l| l == "  statements whose facts took part in discarding (8.5):").unwrap();
-    assert_eq!(lines[head + 1..head + 4], statements[..3], "{lines:#?}");
+    assert_eq!(lines[head + 1..head + 4], statements, "{lines:#?}");
     assert!(!lines[head + 4].starts_with("    "), "{lines:#?}");
     assert!(lines[0].starts_with(
-        "level T4-miller-conflicts.sp (file in T4-miller-conflicts.sp): 38 kept, 3 discarded of 41 facts"
+        "level T4-miller-conflicts.sp (file in T4-miller-conflicts.sp): 92 kept, 4 discarded of 96 facts"
     ));
-    // the middle point of $TAIL_CENTER is named through its usage, %tc::mid: the record holds it
     assert!(!lines.iter().any(|l| l == "  unsolved:"), "{lines:#?}");
-    assert!(level.record.contains("%tc::mid @PLACE("), "{}", level.record);
     assert!(lines.iter().any(|l| l.starts_with("  work: ")) && lines.iter().any(|l| l.starts_with("  time: ")));
-    // the solver gave the low fact its first group only, which a note says (8.5, 7.6), so that even
-    // the report of every fact leaves out its hints, and says that the solver did not seek them
-    let low = level.solved.report.discarded.iter().find(|d| d.fact == 40).unwrap();
-    assert_eq!((&low.groups, low.complete), (&vec![vec![2]], false));
+    // the solver gave the low facts their first group only, which a note says (8.5, 7.6), so that
+    // even the report of every fact leaves out their hints, and says that the solver did not seek
+    // them
+    for fact in [54, 62] {
+        let low = level.solved.report.discarded.iter().find(|d| d.fact == fact).unwrap();
+        assert!(!low.complete, "{low:?}");
+    }
+    let low = level.solved.report.discarded.iter().find(|d| d.fact == 54).unwrap();
+    assert_eq!(low.groups, vec![vec![2]]);
     let note = "    the minimal conflict groups of a fact of priority low discarded are listed only with --report \
-                (hints_for_low), as its hints may be left out (8.5, 7.6): [40] has its first group only, and is in \
-                no hint by statement";
+                (hints_for_low), as its hints may be left out (8.5, 7.6): [54] and [62] have their first group \
+                only, and are in no hint by statement";
     assert!(lines.iter().any(|l| l == note), "{lines:#?}");
     let every = rnl_cli::solve::report(level, true);
-    let unsought = "    discarded [40] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:31): of priority low, \
+    let unsought = "    discarded [54] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:30): of priority low, \
                     which is expected; the solver did not seek what it conflicts with (hints_for_low, which \
                     --report sets; 8.5)";
     assert!(every.iter().any(|l| l == unsought), "{every:#?}");
@@ -418,35 +445,49 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
     assert!(!every[at + 1].starts_with("        ["), "{every:#?}");
     // with --report the solver seeks them: every fact, in the order of 8.5, the same solution, and
     // no note
-    let options = SolveOptions {
-        solver: SolverOptions { hints_for_low: true, ..SolverOptions::without_time_limit() },
-        ..unlimited()
-    };
-    let reported = solve(&case("T4-miller-conflicts"), &FsProvider::new(&[]), &options).unwrap();
-    assert_eq!(reported.files, run.files);
+    let mut options = for_case(&t4);
+    options.solver.hints_for_low = true;
+    let reported = solve(&t4, &FsProvider::new(&[]), &options).unwrap();
+    // the same drawing, under a hash of its own, as the hints asked for are among the options of
+    // the hash
+    let unhashed = |r: &rnl_cli::solve::SolveRun| r.files[0].text.replace(&r.levels[0].hash, "");
+    assert_ne!(reported.levels[0].hash, run.levels[0].hash);
+    assert_eq!(unhashed(&reported), unhashed(&run));
     let level = &reported.levels[0];
     assert!(level.solved.report.discarded.iter().all(|d| d.complete), "{:?}", level.solved.report.discarded);
     let all = rnl_cli::solve::report(level, true);
     assert!(!all.iter().any(|l| l == note), "{all:#?}");
-    assert_eq!(all.iter().filter(|l| l.starts_with("    kept [")).count(), 38);
-    assert_eq!(all.iter().filter(|l| l.starts_with("    discarded [")).count(), 3);
-    assert!(all.iter().any(|l| l == "    kept [0] the y of #M1 = 0 (high, T4-miller-conflicts.sp:37)"), "{all:#?}");
-    // and the hints of the low fact, and of the statement that only it loses
-    let at = all.iter().position(|l| l.starts_with("    discarded [40]")).unwrap();
+    assert_eq!(all.iter().filter(|l| l.starts_with("    kept [")).count(), 92);
+    assert_eq!(all.iter().filter(|l| l.starts_with("    discarded [")).count(), 4);
+    assert!(all.iter().any(|l| l == "    kept [0] the y of #M1 = 0 (high, T4-miller-conflicts.sp:36)"), "{all:#?}");
+    // and the hints of the low facts, and of the statement that only a low fact loses
+    let at = all.iter().position(|l| l.starts_with("    discarded [54]")).unwrap();
     assert_eq!(
         all[at],
-        "    discarded [40] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:31): it conflicts with [2]"
+        "    discarded [54] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:30): it conflicts with [2]"
     );
     assert_eq!(
         all[at + 1],
-        "        [2] DISTANCE y increasing min=6 max=6 {#VIP} {#VIN} (normal, T4-miller-conflicts.sp:40)"
+        "        [2] DISTANCE y increasing min=6 max=6 {#VIP} {#VIN} (normal, T4-miller-conflicts.sp:39)"
     );
     let head = all.iter().position(|l| l == "  statements whose facts took part in discarding (8.5):").unwrap();
-    assert_eq!(all[head + 1..head + 5], statements, "{all:#?}");
+    assert_eq!(
+        all[head + 1..head + 5],
+        [
+            "    T4-miller-conflicts.sp:36 [0] the y of #M1 = 0 took part in discarding [23], [62]",
+            "    T4-miller-conflicts.sp:37 [4] the y of #M2 = 3 took part in discarding [23], [62]",
+            statements[2],
+            "    T4-miller-conflicts.sp:39 [2] DISTANCE y increasing min=6 max=6 {#VIP} {#VIN} took part in \
+             discarding [54]",
+        ],
+        "{all:#?}"
+    );
     // the command asks for them with --report
-    let t4 = path_str(&case("T4-miller-conflicts"));
+    let t4 = path_str(&t4);
     let out = path_str(&scratch("t4-report"));
-    let (code, stdout, _) = rnl(&["solve", &t4, "-o", &out, "--report", "--solver-options", "time_limit=none"]);
+    let work = format!("limit=\"work\",work={WORK_04}");
+    let (code, stdout, _) =
+        rnl(&["solve", &t4, "-o", &out, "--report", "--solver-options", "time_limit=none", "--solver-config", &work]);
     assert_eq!(code, 0, "{stdout}");
     assert!(stdout.contains(&format!("\n{}\n{}\n", all[at], all[at + 1])), "{stdout}");
     assert!(!stdout.contains(" are listed only with --report "), "{stdout}");
@@ -467,9 +508,9 @@ fn an_orientation_is_described_once() {
 #[test]
 fn a_solve_is_the_same_twice_and_again_on_its_own_output() {
     let fs = FsProvider::new(&[]);
-    let options = unlimited();
     for name in CASES {
         let f = case(name);
+        let options = for_case(&f);
         let a = solve(&f, &fs, &options).unwrap();
         let b = solve(&f, &fs, &options).unwrap();
         assert_eq!(a.files, b.files, "{name}: not the same twice");
@@ -1757,8 +1798,9 @@ fn check_undecided(level: &rnl_cli::solve::SolvedLevel, what: &str) {
         for u in &f.chain {
             assert!(w.contains(&p.usages[*u].definition), "{w}");
         }
-        let line =
-            format!("  discarded {}: not decided within the time limit of the solver (8.5)", describe_fact(p, *k));
+        // a level of 0.4 within the budget its solve shares (7.6)
+        let within = if p.version == "0.4" { "the shared solve budget" } else { "the time limit of the solver" };
+        let line = format!("  discarded {}: not decided within {within} (8.5)", describe_fact(p, *k));
         assert!(lines.contains(&line), "{what}: {line}\n{lines:#?}");
         assert!(lines.contains(&format!("  warning: {w}")), "{what}: {w}\n{lines:#?}");
     }
@@ -1882,11 +1924,15 @@ fn every_minimal_group_is_named_and_a_limit_that_cuts_them_says_the_list_is_not_
 
 #[test]
 fn a_case_whose_resolution_runs_out_of_time_keeps_what_it_decided() {
-    // T4 with 35 readings of the clock, of which the checks of its facts on their own take about
-    // 25 (the draft 0.3, 8.5): the facts decided by then are those of 8.5 as far as they go, two
-    // of them discarded, each later fact that needs a check is undecided, and every fact kept holds
+    // T4 within a work of a million, of which the resolution of 8.5 takes more: the facts decided
+    // by then are those of 8.5 as far as they go, three of them discarded, each later fact that
+    // needs a check is undecided, and every fact kept holds; a level of 0.4 is resolved within the
+    // work of its solve, which the clock of the solve does not cut (7.6)
     let fs = FsProvider::new(&[]);
-    let run = solve_with_clock(&case("T4-miller-conflicts"), &fs, &within(35.0), &Ticks::default()).unwrap();
+    let t4 = case("T4-miller-conflicts");
+    let mut cut = for_case(&t4);
+    cut.solver.run_limit = Some(rnl_solver::RunLimit::Work(1_000_000));
+    let run = solve(&t4, &fs, &cut).unwrap();
     let level = &run.levels[0];
     let r = &level.solved.report;
     assert!(!r.warnings.is_empty() && !r.kept.is_empty(), "{r:?}");
@@ -1896,13 +1942,13 @@ fn a_case_whose_resolution_runs_out_of_time_keeps_what_it_decided() {
     let first = r.discarded.iter().find(|d| d.undecided).unwrap().fact;
     // after it, a fact is kept, as the placement reached by then satisfies it, or undecided
     assert!(r.discarded.iter().filter(|d| d.fact > first).all(|d| d.undecided), "{r:?}");
-    let all = solve(&case("T4-miller-conflicts"), &fs, &unlimited()).unwrap();
+    let all = solve(&t4, &fs, &for_case(&t4)).unwrap();
     let whole = &all.levels[0].solved.report;
     // before the first fact left undecided, what is kept is what 8.5 keeps
     let before = |kept: &[usize]| kept.iter().copied().filter(|&k| k < first).collect::<Vec<_>>();
     assert_eq!(before(&r.kept), before(&whole.kept));
-    let again = solve_with_clock(&case("T4-miller-conflicts"), &fs, &within(35.0), &Ticks::default()).unwrap();
-    assert_eq!(again.files, run.files, "not the same on a fresh clock");
+    let again = solve(&t4, &fs, &cut).unwrap();
+    assert_eq!(again.files, run.files, "not the same twice");
     let lines = lines(&run, false);
     assert!(lines.iter().any(|l| l.starts_with("  warning: the fact [")), "{lines:#?}");
 }
