@@ -385,8 +385,8 @@
   };
 
   /* A pseudo-differential pair: two matched input transistors without a tail, drawn mirrored.
-     Places; routes nothing: mirrors left and right about a free axis and points sources or emitters
-     down for n-type devices and up for p-type devices, with gates or bases facing outwards. */
+     Places; routes nothing; no group, as the two sides are often drawn apart: mirrors left and right about a free axis
+     and points sources or emitters down for n-type and up for p-type devices, with gates or bases facing outwards. */
   $PSEUDO_DIFFERENTIAL_PAIR = @DEFINE(roles=[["left", "instance"], ["right", "instance"]]) {
     %axis = (_, _);
     {?left ?right} @AS $MATCHED;
@@ -915,8 +915,9 @@
   };
 
   /* A folded cascode: an input device folded into a common-gate transistor with its bias.
-     Routes; places nothing; a group: applies $COMMON_GATE to ?cascode and routes the folding node
-     joining ?source, ?cascode and ?bias. */
+     Routes; places nothing: applies $COMMON_GATE to ?cascode and routes the folding node
+     joining ?source, ?cascode and ?bias. No group: its devices often belong to other structures
+     too, such as the input pair and the mirrors of an amplifier. */
   $FOLDED_CASCODE = @DEFINE(
       roles=[
         ["source", ["instance", "usage"]],
@@ -924,7 +925,6 @@
         ["bias", ["instance", "usage"]]]) {
     ?cascode @AS $COMMON_GATE;
     {?source ?cascode ?bias} @ROUTE-OBJECT(priority="low");
-    {?source ?cascode ?bias} @GROUP;
   };
 
   /* A common-source amplifier: a FET input transistor and its load.
@@ -973,8 +973,8 @@
     {?stage ?compensation} @GROUP;
   };
 
-  /* A push-pull output stage: a pull-up driver in series with a pull-down driver.
-     Routes; places nothing; a group: applies $SERIES to ?pullup and ?pulldown. */
+  /* A push-pull output stage: the output transistors only, a pull-up in series with a pull-down; their bias and the
+     stage that drives them are not part of it. Routes; places nothing; a group: applies $SERIES to ?pullup and ?pulldown. */
   $PUSH_PULL_STAGE = @DEFINE(
       roles=[["pullup", ["instance", "usage"]], ["pulldown", ["instance", "usage"]]]) {
     {?pullup ?pulldown} @AS $SERIES;
@@ -989,9 +989,8 @@
     {?transconductor ?load} @GROUP;
   };
 
-  /* A degenerated amplifier stage: a transconductor, its load and its degeneration.
-     Routes; places nothing: applies $TRANSCONDUCTOR_Z_AMPLIFIER to ?transconductor and ?load and
-     routes shared nets with ?degenerator. */
+  /* A degenerated amplifier stage: a transconductor, its load and its degeneration. Routes; places nothing; a group,
+     around the group of $TRANSCONDUCTOR_Z_AMPLIFIER, which it applies to ?transconductor and ?load; routes ?degenerator. */
   $DEGENERATED_TRANSCONDUCTOR_Z_AMPLIFIER = @DEFINE(
       roles=[
         ["transconductor", ["instance", "usage"]],
@@ -999,6 +998,7 @@
         ["degenerator", ["instance", "usage"]]]) {
     ?transconductor(transconductor) ?load(load) @AS $TRANSCONDUCTOR_Z_AMPLIFIER;
     {?transconductor ?degenerator} @ROUTE-OBJECT(priority="low");
+    {?transconductor ?load ?degenerator} @GROUP;
   };
 
   /* ==============================================================================================
@@ -1180,8 +1180,8 @@
     {?a ?b} @ROUTE-OBJECT(priority="low");
   };
 
-  /* A shift register: a chain of flip-flops or latches.
-     Meaning only: places and routes nothing. */
+  /* A shift register: a chain of flip-flops or latches, often drawn overlapping, with clocks seldom wired.
+     Meaning only: places and routes nothing; no group. */
   $SHIFT_REGISTER = @DEFINE(roles=[["{stages}", ["instance", "usage"]]]) {
   };
 
@@ -1189,7 +1189,7 @@
      6. Passive networks, tanks and decoupling
      ============================================================================================== */
 
-  /* A divider of two branches in series, upper and lower.
+  /* A divider of two branches in series, upper and lower. No group, as one half often sits inside another structure.
      Routes; places nothing: applies $SERIES to ?upper and ?lower. */
   $DIVIDER = @DEFINE(roles=[["upper", ["instance", "usage"]], ["lower", ["instance", "usage"]]]) {
     {?upper ?lower} @AS $SERIES;
