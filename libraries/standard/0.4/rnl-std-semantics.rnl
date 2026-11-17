@@ -16,6 +16,9 @@
    on the usage moves the structure: on the row or the column of its members, and, for two sides
    mirrored about an axis, at the centre between them. A definition that places nothing leaves the
    point free.
+   A group of a definition holds the members of its usage only. Groups nest by containment; when two
+   groups share members and neither contains the other, the solver keeps one of them and a hint names
+   the other (11.5).
    Definitions assert what their circuit must be (15.3, 15.4) as violations that change nothing drawn:
    matching of types, models and geometry, shared nets on gates, bases, sources or emitters, connection
    to ground or supply rails, usage definitions, and series, parallel, star or loop topologies, with
@@ -936,10 +939,11 @@
   };
 
   /* An amplifier stage: a transconductor and its load.
-     Routes; places nothing: routes shared output nets between ?transconductor and ?load. */
+     Routes; places nothing; a group: routes shared output nets between ?transconductor and ?load. */
   $TRANSCONDUCTOR_Z_AMPLIFIER = @DEFINE(
       roles=[["transconductor", ["instance", "usage"]], ["load", ["instance", "usage"]]]) {
     {?transconductor ?load} @ROUTE-OBJECT(priority="low");
+    {?transconductor ?load} @GROUP;
   };
 
   /* A degenerated amplifier stage: a transconductor, its load and its degeneration.
