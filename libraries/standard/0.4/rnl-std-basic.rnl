@@ -563,14 +563,14 @@
   $BIAS = @DEFINE(roles=[["p", "net"]]) {};
   # @SELECT-USAGE(recursive=true) $BIAS => @SET-SYMBOL $BIAS_SYMBOL;
 
-  /* A port tag on a net, drawn at a point of its own with its pin facing left or right; its net must be a port of its level. */
+  /* A port tag on a net, drawn at a point of its own; its net must be a port of its level. */
   $IO_PORT = @DEFINE(roles=[["p", "net"]]) {
     ?p @ASSERT-NET(port=true, message="the net of an $IO_PORT is a port of its level");
-    ? @SELECT-PIN => @ORIENT(["right", "left"], priority="low"); };
+  };
   # @SELECT-USAGE(recursive=true) $IO_PORT => @SET-SYMBOL $IO_PORT_SYMBOL;
 
-  /* A net label: the name of a net on a short lead, drawn at a point of its own with its pin facing left or right; given a bus pin, such as a pin of a bundle (11.8), it keeps the pin and is one label on all its nets, showing their names (13.6). */
-  $NET_LABEL = @DEFINE(roles=[["p", ["net", "pin"]]]) { ? @SELECT-PIN => @ORIENT(["right", "left"], priority="low"); };
+  /* A net label: the name of a net on a short lead, drawn at a point of its own; given a bus pin, such as a pin of a bundle (11.8), it keeps the pin and is one label on all its nets, showing their names (13.6). */
+  $NET_LABEL = @DEFINE(roles=[["p", ["net", "pin"]]]) {};
   # @SELECT-USAGE(recursive=true) $NET_LABEL => @SET-SYMBOL $NET_LABEL_SYMBOL;
 
   /* A no-connect mark on a terminal or pin left unconnected on purpose; a terminal is kept as itself so a mark on a bus bit records which bit is open (12.6). */
