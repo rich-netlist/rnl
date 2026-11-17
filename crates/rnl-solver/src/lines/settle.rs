@@ -417,6 +417,7 @@ struct Level<'a> {
     tree: &'a Placed,
     nodes: &'a GroupTree,
     weights: (u64, u64),
+    reroute: bool,
     /// How the drawings rank after the rules (`lines_order`, `virtual_weight`).
     ranking: super::quality::Ranking,
     clear: &'a BTreeMap<usize, u8>,
@@ -600,6 +601,7 @@ pub(crate) fn settle(
         tree,
         nodes,
         weights: options.settings.lines_weights.pair(),
+        reroute: options.settings.reroute_nets,
         ranking: super::quality::Ranking::of(options),
         clear,
         hung: BTreeMap::new(),
@@ -3596,6 +3598,7 @@ impl Level<'_> {
             fixed,
             clip,
             lenient: !root,
+            reroute: self.reroute,
         };
         let span = crate::profile::span("lines", "route");
         ROUTED.with(|r| r.set(r.get() + 1));
@@ -4225,6 +4228,7 @@ pub(super) mod tests {
                 tree: &start.placed,
                 nodes: &s.tree,
                 weights: (1, 4),
+                reroute: false,
                 ranking: super::super::quality::Ranking::default(),
                 clear: &BTreeMap::new(),
                 hung: BTreeMap::new(),
@@ -4440,6 +4444,7 @@ pub(super) mod tests {
                 tree: &start.placed,
                 nodes: &s.tree,
                 weights: (1, 4),
+                reroute: false,
                 ranking: super::super::quality::Ranking::default(),
                 clear: &BTreeMap::new(),
                 hung: BTreeMap::new(),
@@ -4557,6 +4562,7 @@ pub(super) mod tests {
                 tree: &placed,
                 nodes: &s.tree,
                 weights: (1, 4),
+                reroute: false,
                 ranking: super::super::quality::Ranking::default(),
                 clear: &BTreeMap::new(),
                 hung: BTreeMap::new(),
@@ -4643,6 +4649,7 @@ pub(super) mod tests {
             tree: &placed,
             nodes: &s.tree,
             weights: (1, 4),
+            reroute: false,
             ranking: super::super::quality::Ranking::default(),
             clear: &BTreeMap::new(),
             hung: BTreeMap::new(),
@@ -4703,6 +4710,7 @@ pub(super) mod tests {
             tree: &start.placed,
             nodes: &arrangement.1,
             weights: (1, 4),
+            reroute: false,
             ranking: super::super::quality::Ranking::default(),
             clear: &BTreeMap::new(),
             hung: BTreeMap::new(),

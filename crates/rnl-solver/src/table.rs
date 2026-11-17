@@ -366,6 +366,13 @@ pub fn settings_table() -> SettingsTable {
              connected rather than in pieces joined by its name.",
         ),
         row(
+            "reroute_nets",
+            "layout",
+            SettingKind::Boolean,
+            "Route each net of three pins or more again, one wire at a time, and keep a wire routed again \
+             where the net then has fewer crossings and bends, or as many and is shorter. It takes longer.",
+        ),
+        row(
             "junction",
             "layout",
             SettingKind::String,

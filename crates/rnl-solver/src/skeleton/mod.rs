@@ -300,6 +300,114 @@ fn written(
     (placed, out)
 }
 
+/// Where two wires leave a branch of three the same way along one line, as a floor closed up leaves
+/// them,
+/// the shorter one's run ends at a bend. That bend becomes the branch: the longer wire starts there,
+/// and the third wire runs on to it, with a bend where the branch was unless it goes straight on.
+/// Only wires the solver routed, never a wire a file writes, are folded.
+pub(crate) fn folded(mut r: Routing, routed: &BTreeSet<usize>) -> Routing {
+    for _ in 0..64 {
+        if !fold_one(&mut r, routed) {
+            break;
+        }
+    }
+    r
+}
+
+fn way(a: &[Q; 2], b: &[Q; 2]) -> Option<(usize, bool)> {
+    if a == b {
+        None
+    } else if a[1] == b[1] {
+        Some((0, b[0] > a[0]))
+    } else if a[0] == b[0] {
+        Some((1, b[1] > a[1]))
+    } else {
+        None
+    }
+}
+
+type Oriented = (Vec<WirePoint>, Vec<[Q; 2]>);
+
+fn fold_one(r: &mut Routing, routed: &BTreeSet<usize>) -> bool {
+    let mut ends: BTreeMap<usize, Vec<(usize, bool)>> = BTreeMap::new();
+    for (i, w) in r.wires.iter().enumerate() {
+        let n = w.points.len();
+        if n < 2 || r.paths.get(i).is_none_or(|p| p.len() != n) {
+            continue;
+        }
+        if let WirePoint::Branch(b) = w.points[0] {
+            ends.entry(b).or_default().push((i, true));
+        }
+        if let WirePoint::Branch(b) = w.points[n - 1] {
+            ends.entry(b).or_default().push((i, false));
+        }
+    }
+    for (&b, at) in &ends {
+        if at.len() != 3
+            || at[0].0 == at[1].0
+            || at[0].0 == at[2].0
+            || at[1].0 == at[2].0
+            || at.iter().any(|(i, _)| !routed.contains(i))
+        {
+            continue;
+        }
+        let o: Vec<Oriented> = at
+            .iter()
+            .map(|&(i, start)| {
+                let (mut p, mut q) = (r.wires[i].points.clone(), r.paths[i].clone());
+                if !start {
+                    p.reverse();
+                    q.reverse();
+                }
+                (p, q)
+            })
+            .collect();
+        let ways: Vec<Option<(usize, bool)>> = o.iter().map(|(_, q)| way(&q[0], &q[1])).collect();
+        for (x, y) in [(0, 1), (0, 2), (1, 2)] {
+            let z = 3 - x - y;
+            let (Some(wx), Some(wy), Some(wz)) = (ways[x], ways[y], ways[z]) else { continue };
+            if wx != wy || wz == wx {
+                continue;
+            }
+            let len = |k: usize| (&o[k].1[1][wx.0] - &o[k].1[0][wx.0]).abs();
+            let (p, q) = if len(x) <= len(y) { (x, y) } else { (y, x) };
+            let same = len(p) == len(q);
+            let bend_next = |k: usize| o[k].0.len() >= 3 && matches!(o[k].0[1], WirePoint::Bend(_));
+            if !bend_next(p) || (same && !bend_next(q)) {
+                continue;
+            }
+            let there = o[p].1[1].clone();
+            let mut np: Oriented = (o[p].0[1..].to_vec(), o[p].1[1..].to_vec());
+            np.0[0] = WirePoint::Branch(b);
+            let mut nq: Oriented =
+                if same { (o[q].0[1..].to_vec(), o[q].1[1..].to_vec()) } else { (o[q].0.clone(), o[q].1.clone()) };
+            nq.0[0] = WirePoint::Branch(b);
+            nq.1[0] = there.clone();
+            let was = o[z].1[0].clone();
+            let mut nr: Oriented = o[z].clone();
+            nr.1[0] = there.clone();
+            if wz.0 != wx.0 {
+                nr.0.insert(1, WirePoint::Bend((to_f64(&was[0]), to_f64(&was[1]))));
+                nr.1.insert(1, was);
+            }
+            for (k, (mut pts, mut qs)) in [(p, np), (q, nq), (z, nr)] {
+                let (i, start) = at[k];
+                if !start {
+                    pts.reverse();
+                    qs.reverse();
+                }
+                r.wires[i].points = pts;
+                r.paths[i] = qs;
+            }
+            if let Some(branch) = r.branches.get_mut(b) {
+                branch.at = (to_f64(&there[0]), to_f64(&there[1]));
+            }
+            return true;
+        }
+    }
+    false
+}
+
 /// A wire's points with the bends that are no longer bends left out: a bend where the wire does not
 /// turn, or at the same place as the point before it.
 fn simplified(points: Vec<(WirePoint, [Q; 2])>) -> Vec<(WirePoint, [Q; 2])> {
@@ -618,6 +726,8 @@ pub(crate) fn compact_strict(
         return out;
     }
     let (p, r) = written(problem, s, placed, routing, &sk);
+    let routed: BTreeSet<usize> = sk.paths.iter().filter_map(|p| p.routed).collect();
+    let r = folded(r, &routed);
     out.failed_facts.clear();
     let g = &p.geometry;
     for &f in &s.kept {

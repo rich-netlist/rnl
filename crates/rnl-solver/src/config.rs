@@ -115,6 +115,11 @@ pub struct Settings {
     /// net, whose own pins are not all the pins the wire may end at. A level before 0.4 does not
     /// read it.
     pub join_trees: bool,
+    /// Whether the line layout's router routes each net of three parts or more again, a path at a
+    /// time (`reroute_nets`): each path is taken out once and the parts it joined joined again, the
+    /// net's own drawing kept where it has fewer crossings and bends weighed, or as many and is
+    /// shorter. False by default: it costs time, which a solve counts in its work.
+    pub reroute_nets: bool,
     /// The weights of a crossing and of a bend in the lines layout (`lines_weights`).
     pub lines_weights: LinesWeights,
     /// How much a virtual symbol counts in the rows and columns of the symbols (`virtual_weight`).
@@ -149,6 +154,7 @@ fn known(key: &str) -> bool {
                 | "spacing_x"
                 | "spacing_y"
                 | "join_trees"
+                | "reroute_nets"
                 | "tolerance"
                 | "grid"
                 | "beam"
@@ -205,6 +211,10 @@ fn apply(o: &mut SolverOptions, s: &SolverSetting) -> Result<(), String> {
         "join_trees" => {
             let Lit::Bool(value) = s.value else { return Err("join_trees must be a boolean".into()) };
             o.settings.join_trees = value;
+        }
+        "reroute_nets" => {
+            let Lit::Bool(value) = s.value else { return Err("reroute_nets must be a boolean".into()) };
+            o.settings.reroute_nets = value;
         }
         "lines_weights" => {
             let bad = || "lines_weights must be two integers, [crossing, bend]".to_string();
@@ -519,7 +529,7 @@ impl SolverOptions {
     /// Defaults in the syntax accepted by --solver-config.
     pub fn defaults_config() -> String {
         let d = Self::default();
-        format!("layout=\"lines\", spacing_x=0, spacing_y=0, lines_weights=[1, 4], lines_order=\"{}\", virtual_weight=0.5, join_trees=false, limit=\"time\", seconds=10, safety_seconds=30, tolerance={}, grid=1, beam={}, candidates={}, astar_expansions={}", d.settings.lines_order.canonical(), rnl_runtime::geom::fmt_num(d.tolerance), d.beam, d.budget.candidates, d.budget.astar_expansions)
+        format!("layout=\"lines\", spacing_x=0, spacing_y=0, lines_weights=[1, 4], lines_order=\"{}\", virtual_weight=0.5, join_trees=false, reroute_nets=false, limit=\"time\", seconds=10, safety_seconds=30, tolerance={}, grid=1, beam={}, candidates={}, astar_expansions={}", d.settings.lines_order.canonical(), rnl_runtime::geom::fmt_num(d.tolerance), d.beam, d.budget.candidates, d.budget.astar_expansions)
     }
     /// Parse tool settings using RNL literal syntax; reject invalid values before solving.
     pub fn with_config(&self, text: &str) -> Result<Self, String> {
@@ -688,6 +698,7 @@ impl SolverOptions {
             out.settings.layout = Layout::default();
             // its trees are its nets' already, and it does not read the setting
             out.settings.join_trees = false;
+            out.settings.reroute_nets = false;
             return (out, warnings, Vec::new());
         }
         if self.settings.legacy_alias {
@@ -762,6 +773,28 @@ mod tests {
         assert!(!tool.for_problem(&p).0.settings.join_trees);
         let err = SolverOptions::default().with_config("join_trees=1").unwrap_err();
         assert!(err.contains("join_trees must be a boolean"), "{err}");
+    }
+
+    /// `reroute_nets`, off by default, a boolean a file or a tool may give.
+    #[test]
+    fn reroute_nets_is_a_boolean_a_file_may_give() {
+        let settings = |text: &str| rnl_runtime::solver_settings::parse_overrides(text).unwrap();
+        let mut p = problem_of(Vec::new(), Vec::new());
+        p.version = "0.4".into();
+        p.solver_config = settings("reroute_nets=true");
+        let (o, warnings, errors) = SolverOptions::default().for_problem(&p);
+        assert!(o.settings.reroute_nets);
+        assert!(warnings.is_empty() && errors.is_empty(), "{warnings:?} {errors:?}");
+        assert!(!SolverOptions::default().settings.reroute_nets);
+        let tool = SolverOptions::default().with_config("reroute_nets=false").unwrap();
+        assert!(!tool.for_problem(&p).0.settings.reroute_nets);
+        let err = SolverOptions::default().with_config("reroute_nets=1").unwrap_err();
+        assert!(err.contains("reroute_nets must be a boolean"), "{err}");
+        assert!(SolverOptions::defaults_config().contains("reroute_nets=false"));
+        // a level before 0.4 is laid out in rows and does not read it
+        p.version = "0.3".into();
+        let on = SolverOptions::default().with_config("reroute_nets=true").unwrap();
+        assert!(!on.for_problem(&p).0.settings.reroute_nets);
     }
 
     /// The weights of a crossing and of a bend: two integers from 0 to 1000, not both 0, which a

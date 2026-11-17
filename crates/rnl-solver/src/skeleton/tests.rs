@@ -567,3 +567,54 @@ fn spacing_shrinks_to_its_floor_and_grows_only_as_far_as_retained_facts_allow() 
         }
     }
 }
+
+fn prototype_d_routing(lower: i64) -> Routing {
+    let q = |x: i64, y: i64| [int(x), int(y)];
+    let bend = |x: i64, y: i64| WirePoint::Bend((x as f64, y as f64));
+    let pin = |k: usize| WirePoint::Anchor(PointRef::Origin(k));
+    let mut r = Routing::default();
+    r.branches.push(rnl_runtime::solution::Branch { at: (0., 0.), junction: true });
+    let wires = vec![
+        (vec![pin(1), WirePoint::Branch(0)], vec![q(0, 5), q(0, 0)]),
+        (vec![WirePoint::Branch(0), bend(4, lower), pin(2)], vec![q(0, 0), q(4, lower), q(4, -3)]),
+        (vec![pin(3), bend(10, 0), WirePoint::Branch(0)], vec![q(10, 5), q(10, 0), q(0, 0)]),
+    ];
+    for (points, path) in wires {
+        r.wires.push(RoutedWire { route: 0, points });
+        r.paths.push(path);
+    }
+    r
+}
+
+/// Two wires leaving a branch the same way on one line are folded into a T at the end of
+/// the shorter one's run, and the third wire runs on to it with a bend where the branch was.
+#[test]
+fn prototype_d_folds_two_wires_on_one_line_into_a_t() {
+    let all: BTreeSet<usize> = (0..3).collect();
+    // a wire the file writes is not folded
+    let written = folded(prototype_d_routing(0), &[0, 1].into_iter().collect());
+    assert_eq!(written.paths, prototype_d_routing(0).paths);
+    let r = folded(prototype_d_routing(0), &all);
+    let q = |x: i64, y: i64| [int(x), int(y)];
+    assert_eq!(r.branches[0].at, (4., 0.));
+    assert_eq!(r.paths[0], vec![q(0, 5), q(0, 0), q(4, 0)]);
+    assert!(matches!(r.wires[0].points[1], WirePoint::Bend(_)));
+    assert_eq!(r.wires[0].points[2], WirePoint::Branch(0));
+    assert_eq!(r.paths[1], vec![q(4, 0), q(4, -3)]);
+    assert_eq!(r.wires[1].points[0], WirePoint::Branch(0));
+    assert_eq!(r.paths[2], vec![q(10, 5), q(10, 0), q(4, 0)]);
+    let bends = r.wires.iter().flat_map(|w| &w.points).filter(|p| matches!(p, WirePoint::Bend(_))).count();
+    assert_eq!(bends, 2);
+}
+
+/// A floor not closed up leaves the wires of its branch different ways: nothing is folded.
+#[test]
+fn prototype_d_leaves_a_branch_whose_wires_leave_it_different_ways() {
+    let mut before = prototype_d_routing(-1);
+    before.wires[1].points.insert(1, WirePoint::Bend((0., -1.)));
+    before.paths[1].insert(1, [int(0), int(-1)]);
+    let r = folded(before.clone(), &(0..3).collect());
+    assert_eq!(r.paths, before.paths);
+    assert_eq!(r.wires, before.wires);
+    assert_eq!(r.branches[0].at, (0., 0.));
+}

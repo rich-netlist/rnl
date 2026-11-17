@@ -240,6 +240,10 @@ mod tests {
             (json!("boolean"), json!(false))
         );
         assert_eq!(setting("join_trees")["in_file"], true);
+        let reroute = setting("reroute_nets");
+        assert_eq!((reroute["type"].clone(), reroute["default"].clone()), (json!("boolean"), json!(false)));
+        assert_eq!((reroute["in_file"].clone(), reroute["group"].clone()), (json!(true), json!("layout")));
+        assert!(reroute["what"].as_str().is_some_and(|w| w.contains("again")));
         assert_eq!(setting("objectives")["default"], rnl_solver::DEFAULT_LAYERS.join(","));
         // an array of whole numbers says how many, and what each is
         let weights = setting("lines_weights");
