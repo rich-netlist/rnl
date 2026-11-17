@@ -910,6 +910,10 @@ pub(crate) fn analyse(
             if let Some(host) = crate::beside::on_pin(problem, &kept, k) {
                 o.role = Role::Pinned;
                 pinned.insert(k, host);
+            } else if let Some(stub) = exact_stub(problem, &kept, k) {
+                // a pin the facts put exactly above or below another's: it hangs from that pin
+                o.role = Role::Pinned;
+                o.stub = Some(stub);
             }
         }
     }
@@ -1512,6 +1516,49 @@ pub(crate) fn hang(problem: &LevelProblem, k: usize) -> Option<Hang> {
         (x, 0) if x != 0 => Some(Hang::Beside),
         _ => None,
     }
+}
+
+/// Of a level of 0.4: where the facts kept put the pin of `k` from another object's pin, when
+/// they put it exactly: an ALIGN on x of the two pins, and DISTANCEs on y between them whose
+/// least and most are one ([`Stub`]; such as a supply or ground stub of the standard package
+/// with its gap as both, though no name is read).
+fn exact_stub(problem: &LevelProblem, kept: &[usize], k: usize) -> Option<Stub> {
+    let facts = || kept.iter().filter_map(|&f| problem.facts.get(f)).map(|f| &f.kind);
+    let pins = |refs: &[PointRef]| refs.iter().map(|r| r.pin_key()).collect::<Option<Vec<_>>>();
+    facts().find_map(|kind| {
+        let FactKind::Align { axis: Axis::X, members } = kind else { return None };
+        let [a, b] = pins(members)?.try_into().ok()?;
+        let (own, host) = if a.0 == k && b.0 != k {
+            (a, b)
+        } else if b.0 == k && a.0 != k {
+            (b, a)
+        } else {
+            return None;
+        };
+        // the rise of `own` over `host`, at least `lo` and at most `hi`
+        let (mut lo, mut hi): (Option<Q>, Option<Q>) = (None, None);
+        for kind in facts() {
+            let FactKind::Distance { axis: Axis::Y, sense, min, max, from, to } = kind else { continue };
+            let (Some(&[f]), Some(&[t])) = (pins(from).as_deref(), pins(to).as_deref()) else {
+                continue;
+            };
+            let sign = match (sense, (f, t) == (host, own), (f, t) == (own, host)) {
+                (Sense::Increasing, true, _) | (Sense::Decreasing, _, true) => 1,
+                (Sense::Decreasing, true, _) | (Sense::Increasing, _, true) => -1,
+                _ => continue,
+            };
+            let (least, most) = (min.and_then(from_f64), max.and_then(from_f64));
+            let (low, high) = if sign > 0 { (least, most) } else { (most.map(|m| -m), least.map(|m| -m)) };
+            if let Some(v) = low {
+                lo = Some(lo.map_or(v.clone(), |l| if v > l { v.clone() } else { l }));
+            }
+            if let Some(v) = high {
+                hi = Some(hi.map_or(v.clone(), |h| if v < h { v.clone() } else { h }));
+            }
+        }
+        let (Some(lo), Some(hi)) = (lo, hi) else { return None };
+        (lo == hi && own.1 == 0).then_some(Stub { host, rise: lo })
+    })
 }
 
 /// How far above the pin `host` the pin of stub `k` is, as a fact kept says: a DISTANCE on y

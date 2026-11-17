@@ -101,4 +101,7 @@ an object as any other. Only the first arrangement of the tree reads one rule: t
 a usage of one role makes, attached (12.1) to a terminal or a net, starts beside that
 terminal, or beside the pin of an instance or bundle on the net that a fact kept ties
 it to, else the first, on the side the pin leaves by. The search, the line layout, alignment, compaction and the
-order then take it as any other object.
+order then take it as any other object. An object whose kept facts fix one of its pins to
+another object's pin, on both axes or right above or below it at one distance (an ALIGN on x
+and DISTANCEs on y whose least and most are one), goes with that pin and is no element of
+the tree; again no name is read.

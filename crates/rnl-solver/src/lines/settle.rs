@@ -73,6 +73,7 @@ impl Drop for Counters {
 
 #[derive(Clone, Debug)]
 enum Rule {
+    Stub { pin: usize, rise: Q },
     Pinned { pin: usize, own: usize },
     Keep([Q; 2]),
     Beyond { pin: usize, b: [Q; 4], keep: [Q; 2] },
@@ -2136,7 +2137,9 @@ fn hanging(
             let b = text_box(text, &(int(0), int(0)), Orient::R0)?;
             Some((object, pin, b))
         });
-        let rule = if let Some(&((o, pin), own)) = s.pinned.get(&k) {
+        let rule = if let Some(stub) = &info.stub {
+            Some((stub.host.0, Rule::Stub { pin: stub.host.1, rise: stub.rise.clone() }))
+        } else if let Some(&((o, pin), own)) = s.pinned.get(&k) {
             Some((o, Rule::Pinned { pin, own }))
         } else if let Some((o, pin, b)) = beyond {
             let keep = [&at[k][0] - &at[o][0], &at[k][1] - &at[o][1]];
@@ -2182,6 +2185,11 @@ fn hanging(
 
 fn hung_offset(s: &Structure, k: usize, via: usize, rule: &Rule, ori: &[Orient]) -> Option<[Q; 2]> {
     match rule {
+        Rule::Stub { pin, rise } => {
+            let hp = s.pin_offset(via, *pin, ori[via])?;
+            let sp = s.pin_offset(k, 0, ori[k])?;
+            Some([&hp[0] - &sp[0], &hp[1] + rise - &sp[1]])
+        }
         Rule::Pinned { pin, own } => {
             let hp = s.pin_offset(via, *pin, ori[via])?;
             let op = s.pin_offset(k, *own, ori[k])?;

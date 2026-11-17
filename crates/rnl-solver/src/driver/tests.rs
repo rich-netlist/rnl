@@ -1759,6 +1759,47 @@ fn a_wire_between_two_rows_crosses_no_lead_of_a_stub() {
     }
 }
 
+/// A stub that the facts kept put exactly on a pin's line, at one rise (an ALIGN on x of the two
+/// pins and DISTANCEs on y whose least and most are one), hangs from that pin as a usage pinned
+/// to it, whatever its name; with a least rise alone, it does not.
+#[test]
+fn a_stub_held_at_one_rise_hangs_from_its_pin() {
+    let text = "* ex
+* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }
+                .model pch pmos level=1
+M1 out in vdd vdd pch
+* @RNL { &vdd @ADD-TO $SUPPLY_NET_SET }
+.end
+";
+    let structure = |p: &LevelProblem| {
+        let options = SolverOptions::without_time_limit();
+        let resolved = crate::resolve(p, &options);
+        crate::structure::analyse(p, &resolved, &options, CAPS, &mut crate::Work::default())
+    };
+    let mut p = problems_of(text).into_iter().next().unwrap();
+    let s = structure(&p);
+    assert!(s.language04);
+    assert!(s.objects.iter().all(|o| o.stub.is_none()));
+    // the least rise of each stub made its most too
+    let mut bounded = 0;
+    for f in &mut p.facts {
+        if let FactKind::Distance { axis: Axis::Y, min: Some(min), max, .. } = &mut f.kind {
+            *max = Some(*min);
+            bounded += 1;
+        }
+    }
+    assert!(bounded > 0);
+    let s = structure(&p);
+    let m1 = p.objects.iter().position(|o| o.label == "#M1").unwrap();
+    let stubs: Vec<usize> = (0..p.objects.len()).filter(|&k| s.objects[k].stub.is_some()).collect();
+    assert!(!stubs.is_empty());
+    for k in stubs {
+        let stub = s.objects[k].stub.as_ref().unwrap();
+        assert_eq!((s.objects[k].role, stub.host.0), (Role::Pinned, m1), "{}", p.objects[k].label);
+        assert!(stub.rise > Q::zero(), "{}: {}", p.objects[k].label, stub.rise);
+    }
+}
+
 /// The structure of the level with a title of a case of the solver, not solved.
 fn case_structure(file: &str, title: &str) -> (LevelProblem, Structure) {
     let ps = problems(&repo().join("tests/integration/solver").join(file));
