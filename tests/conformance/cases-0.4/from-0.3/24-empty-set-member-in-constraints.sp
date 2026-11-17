@@ -1,5 +1,5 @@
 * Empty collection items in 0.4 constraints
-*! Empty items are omitted; R1 and R2 remain for distribution, alignment and order. The x alignment needs a solver; repeated R1 in ORDER fails as self-contradicting.
+*! Empty items are omitted; R1 and R2 remain for distribution, alignment and order. The x alignment needs a solver; the ORDER takes R1 twice and holds trivially, with a too-few-places hint (14.1).
 * @RNL(type="header") {
 *   @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4")
 * }

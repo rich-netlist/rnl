@@ -41,6 +41,7 @@ impl Interp<'_> {
     }
 
     fn constraint_leaves(&mut self, s: SceneId, obj: ObjId, phase: usize, ctx: &Ctx) -> Vec<InputMember> {
+        let obj = self.positions_now(s, obj, phase, ctx);
         if !self.is_set(obj) {
             return vec![InputMember::plain(obj)];
         }
@@ -73,6 +74,7 @@ impl Interp<'_> {
         ctx: &Ctx,
         keep_failed: bool,
     ) -> Vec<InputMember> {
+        let obj = self.positions_now(s, obj, phase, ctx);
         self.materialize_constraint(obj);
         if !self.is_set(obj) {
             return vec![InputMember::plain(obj)];
@@ -302,6 +304,8 @@ impl Interp<'_> {
         }
         let pair = matches!(template.kind, ConstraintKind::Distance | ConstraintKind::OrientRelation);
         let (columns, collection) = if pair {
+            // the `::position` of a set known only now is a set like the others (6.5)
+            let args: Vec<ObjId> = args.iter().map(|&a| self.positions_now(s, a, phase, ctx)).collect();
             let columns: Vec<_> = args.iter().map(|a| self.constraint_leaves(s, *a, phase, ctx)).collect();
             if template.kind == ConstraintKind::OrientRelation && columns.iter().all(|c| c.len() > 1) {
                 let shown: Vec<_> = columns
@@ -319,6 +323,9 @@ impl Interp<'_> {
                 for member in &mut items {
                     member.depend_on(&parent.dependencies);
                 }
+            }
+            for item in &mut items {
+                item.object = self.positions_now(s, item.object, phase, ctx);
             }
             let collection = items.iter().any(|o| self.is_set(o.object));
             let columns: Vec<_> = items
@@ -357,6 +364,17 @@ impl Interp<'_> {
                 })
                 .collect();
         }
+        // a combination that takes one object twice is left out (14.1, 14.5)
+        if template.kind != ConstraintKind::OrientRelation && !combinations.is_empty() {
+            combinations.retain(|row| {
+                let mut seen = HashSet::new();
+                row.iter().all(|m| seen.insert(self.one_object(m.object)))
+            });
+            if combinations.is_empty() {
+                self.hint_at(ctx, codes::CONSTRAINT_EXPANSION_TOO_FEW_PLACES, format!("{kw} relates no two different objects once a combination that takes one object twice is left out, so its constraints hold trivially (14.1)"), seg.start);
+                return Ok(Expansion { atoms: Vec::new(), collection: true });
+            }
+        }
         let mut atoms = Vec::new();
         for row in combinations {
             let atom_ctx = ctx.with_dependencies(&[]);
@@ -388,6 +406,301 @@ impl Interp<'_> {
             atoms.push(atom);
         }
         Ok(Expansion { atoms, collection })
+    }
+
+    /// What an item of a constraint stands for in a level of 0.4 (14.1): a usage without a symbol,
+    /// its members, the objects that fill its roles, a usage among them in turn for its own members,
+    /// down to the objects that are not such usages, nets left out, as a GROUP takes them (11.5); any
+    /// other object, itself, and so is a usage whose body the statement is of, which `?` names
+    /// there: that is its own point (6.5). The usages it went through are added to `through`.
+    fn standing_for(
+        &mut self,
+        s: SceneId,
+        item: ObjId,
+        ctx: &Ctx,
+        chain: &[ObjId],
+        through: &mut Vec<ObjId>,
+    ) -> Vec<ObjId> {
+        let start = self.scene_value(item);
+        if !matches!(self.o(start), ObjData::Usage(_))
+            || self.scenes[s].symbol.contains_key(&start)
+            || chain.contains(&start)
+        {
+            return vec![item];
+        }
+        let mut out = Vec::new();
+        let mut active = HashSet::new();
+        let mut stack = vec![(start, false)];
+        while let Some((written, leaving)) = stack.pop() {
+            let object = self.scene_value(written);
+            if leaving {
+                active.remove(&object);
+                continue;
+            }
+            if self.is_failed(written) || self.is_failed(object) {
+                continue;
+            }
+            let children = if self.is_set(object) {
+                vec![object]
+            } else if let ObjData::Usage(usage) = self.o(object) {
+                if self.scenes[s].symbol.contains_key(&object) {
+                    out.push(object);
+                    continue;
+                }
+                if !through.contains(&object) {
+                    through.push(object);
+                }
+                usage.roles.iter().map(|(_, filler)| *filler).collect()
+            } else {
+                if !matches!(self.o(object), ObjData::Net { .. }) {
+                    out.push(object);
+                }
+                continue;
+            };
+            if !active.insert(object) {
+                continue;
+            }
+            stack.push((object, true));
+            let mut members = Vec::new();
+            for child in children {
+                for member in self.scene_input_members(s, child, Some(ctx)) {
+                    if !member.dependencies.iter().any(|dependency| self.is_failed(*dependency)) {
+                        members.push((member.object, false));
+                    }
+                }
+            }
+            stack.extend(members.into_iter().rev());
+        }
+        out
+    }
+
+    /// In a level of 0.4, once the symbols are known, a usage without a symbol among the items of
+    /// an ALIGN, ORDER, DISTRIBUTE or DISTANCE stands for its members (14.1): each expanded
+    /// constraint that has one becomes one for each combination of what its items stand for, each
+    /// a unit of its own as the combinations of a set are and in their order, the first in its
+    /// place and the others split off it. A combination that has an object more than once is left
+    /// out; a constraint with none left takes no part. The limit of expanded constraints holds for
+    /// each constraint so split.
+    pub(super) fn split_usage_constraints(&mut self, s: SceneId) {
+        if !self.follows_0_4(self.level_unit[self.scenes[s].level]) {
+            return;
+        }
+        for c in self.scenes[s].constraints.clone() {
+            if self.is_failed(c) {
+                continue;
+            }
+            let ObjData::Constraint(cd) = self.o(c).clone() else { continue };
+            let pair = cd.kind == ConstraintKind::Distance;
+            if cd.failed
+                || cd.table.is_some()
+                || !(pair
+                    || matches!(cd.kind, ConstraintKind::Align | ConstraintKind::Order | ConstraintKind::Distribute))
+            {
+                continue;
+            }
+            let Some(ctx) = cd.site.clone() else { continue };
+            let row: Vec<ObjId> = if pair {
+                cd.args.clone()
+            } else {
+                match self.o(cd.args[0]) {
+                    ObjData::Set(set) => set.items.iter().map(|(o, _)| *o).collect(),
+                    _ => vec![cd.args[0]],
+                }
+            };
+            let mut through = Vec::new();
+            let columns: Vec<Vec<ObjId>> =
+                row.iter().map(|&o| self.standing_for(s, o, &ctx, &cd.chain, &mut through)).collect();
+            if through.is_empty() {
+                continue;
+            }
+            self.hint_members_placed_apart(s, &cd, &row, &columns);
+            let columns: Vec<Vec<ObjId>> = columns.into_iter().filter(|c| !c.is_empty()).collect();
+            let kw = cd.kind.as_str();
+            let count = columns.iter().fold(1usize, |n, c| n.saturating_mul(c.len()));
+            if count > MAX_CONSTRAINTS {
+                self.diag_site(crate::diag::Severity::Error, codes::CONSTRAINT_EXPANSION_TOO_MANY, &cd.site, cd.off,
+                    format!("{kw} exceeds this implementation's limit of {MAX_CONSTRAINTS} expanded constraints in one statement once its usages stand for their members (3.7, 14.1)"));
+                self.constraint_mut(c).failed = true;
+                continue;
+            }
+            if columns.len() < 2 {
+                self.diag_site(crate::diag::Severity::Hint, codes::CONSTRAINT_EXPANSION_TOO_FEW_PLACES, &cd.site, cd.off,
+                    format!("{kw} has fewer than two items once its usages stand for their members, so its constraints hold trivially (14.1)"));
+            }
+            let mut rows = vec![Vec::new()];
+            if columns.len() >= 2 {
+                for column in &columns {
+                    rows = rows
+                        .into_iter()
+                        .flat_map(|row: Vec<ObjId>| {
+                            column.iter().map(move |o| {
+                                let mut next = row.clone();
+                                next.push(*o);
+                                next
+                            })
+                        })
+                        .collect();
+                }
+            } else {
+                rows.clear();
+            }
+            // a combination that takes one object twice is left out
+            rows.retain(|row| {
+                let mut seen = HashSet::new();
+                row.iter().all(|&o| seen.insert(self.one_object(o)))
+            });
+            if rows.is_empty() {
+                if columns.len() >= 2 {
+                    self.diag_site(crate::diag::Severity::Hint, codes::CONSTRAINT_EXPANSION_TOO_FEW_PLACES, &cd.site, cd.off,
+                        format!("{kw} relates no two different objects once its usages stand for their members, so its constraints hold trivially (14.1)"));
+                }
+                self.scenes[s].constraints.retain(|&x| x != c);
+                self.remove_from_collection(cd.name_owner, c);
+                continue;
+            }
+            let make_args = |this: &mut Self, row: Vec<ObjId>| -> Vec<ObjId> {
+                if pair {
+                    row
+                } else {
+                    vec![this.new_obj(ObjData::Set(Box::new(SetData::plain(
+                        row.into_iter().map(|o| (o, false)).collect(),
+                        true,
+                    ))))]
+                }
+            };
+            let mut rows = rows.into_iter();
+            let first = make_args(self, rows.next().unwrap());
+            self.constraint_mut(c).args = first;
+            let mut after = c;
+            for row in rows {
+                let mut data = cd.clone();
+                data.args = make_args(self, row);
+                data.name_owner = Some(cd.name_owner.unwrap_or(c));
+                let clone = self.new_obj(ObjData::Constraint(data));
+                self.split_from.insert(clone, self.split_from.get(&c).copied().unwrap_or(c));
+                let scene = &mut self.scenes[s];
+                // the later in the list is the earlier in the order of 8.5, as for the combinations of
+                // a set: each one split off goes before the one before it
+                let at = scene.constraints.iter().position(|&x| x == after).unwrap_or(scene.constraints.len());
+                scene.constraints.insert(at, clone);
+                if let Some(v) = scene.created.get(&c).cloned() {
+                    scene.created.insert(clone, v);
+                }
+                if let Some(v) = scene.created_order.get(&c).cloned() {
+                    scene.created_order.insert(clone, v);
+                }
+                if let Some(v) = scene.created_phase.get(&c).copied() {
+                    scene.created_phase.insert(clone, v);
+                }
+                if let Some(v) = scene.creation_sites.get(&c).cloned() {
+                    scene.creation_sites.insert(clone, v);
+                }
+                self.add_to_collection(cd.name_owner, after, clone);
+                after = clone;
+            }
+        }
+    }
+
+    /// An ALIGN, or a DISTRIBUTE of three items or more, whose item is a usage without a symbol
+    /// relates each member of the usage to the same other objects, so it holds only if they share
+    /// the coordinate of its axis. When the usage's own body places two of them apart on that
+    /// axis, the statement has the hint, which says that `::position` names the usage's own point
+    /// (6.5, 14.1). A statement of a package, which the document cannot rewrite, has none.
+    fn hint_members_placed_apart(&mut self, s: SceneId, cd: &ConstraintData, row: &[ObjId], columns: &[Vec<ObjId>]) {
+        let items = columns.iter().filter(|c| !c.is_empty()).count();
+        let firm = match cd.kind {
+            ConstraintKind::Align => items >= 2,
+            ConstraintKind::Distribute => items >= 3,
+            _ => false,
+        };
+        let Some(axis) = cd.params.axis else { return };
+        if !firm || cd.site.as_ref().is_some_and(|c| !self.units[c.unit].pkg().is_empty()) {
+            return;
+        }
+        for (item, column) in row.iter().zip(columns) {
+            let usage = self.scene_value(*item);
+            if column.len() < 2
+                || !matches!(self.o(usage), ObjData::Usage(_))
+                || self.scenes[s].symbol.contains_key(&usage)
+            {
+                continue;
+            }
+            let offsets: Vec<f64> = column.iter().filter_map(|&o| self.offset_in_body(s, o, usage, axis)).collect();
+            let apart = offsets.iter().any(|a| offsets.iter().any(|b| (a - b).abs() > self.tol));
+            if !apart {
+                continue;
+            }
+            let kw = cd.kind.as_str();
+            let name = self.label(usage);
+            let verb = if cd.kind == ConstraintKind::Align { "align" } else { "distribute" };
+            let advice = if name.starts_with('%') {
+                format!("to {verb} its own point write {name}::position")
+            } else {
+                format!("to {verb} its own point name it and write its ::position")
+            };
+            self.diag_site(crate::diag::Severity::Hint, codes::USAGE_MEMBERS_PLACED_APART, &cd.site, cd.off,
+                format!("{kw} stands for each member of {name}, and the definition of {name} places them apart in {axis}, so its constraints cannot all hold; {advice} (6.5, 14.1)"));
+        }
+    }
+
+    /// The coordinate of `object` in `axis` relative to the point of `usage`, as the facts of the
+    /// usage's body give it, through the points of the usages nested in it; none if they do not.
+    fn offset_in_body(&self, s: SceneId, object: ObjId, usage: ObjId, axis: char) -> Option<f64> {
+        let mut at = self.coordinate_object(object);
+        if let ObjData::Term { owner, .. } = self.o(at) {
+            at = self.bundle_field(*owner).unwrap_or(*owner);
+        }
+        let mut sum = 0.0;
+        for _ in 0..32 {
+            if at == usage {
+                return Some(sum);
+            }
+            let step = self.scenes[s].at_by_target.get(&at).into_iter().flatten().find_map(|&k| {
+                let f = &self.scenes[s].at[k];
+                match f.data {
+                    super::scene::FactData::RelativeCoord(a, v, base)
+                        if a == axis && f.chain.contains(&usage) && self.fact_priority(s, f) != Priority::Disabled =>
+                    {
+                        Some((v, self.coordinate_object(base)))
+                    }
+                    _ => None,
+                }
+            })?;
+            sum += step.0;
+            at = step.1;
+        }
+        None
+    }
+
+    /// The object a member of a constraint is, for leaving out a combination that takes one
+    /// object twice: the object it names, a `::position` by the object it is of (6.5, 14.1).
+    fn one_object(&self, member: ObjId) -> ObjId {
+        let object = self.scene_value(member);
+        match self.o(object) {
+            ObjData::Pos { parent } if !self.is_set(*parent) => self.scene_value(*parent),
+            _ => object,
+        }
+    }
+
+    /// Put `added` after `after` among the members of the collection `owner`, if any.
+    fn add_to_collection(&mut self, owner: Option<ObjId>, after: ObjId, added: ObjId) {
+        let Some(owner) = owner else { return };
+        if let ObjData::Set(set) = self.om(owner) {
+            if let SetKind::Constraints { members, .. } = &mut set.kind {
+                let at = members.iter().position(|&x| x == after).map_or(members.len(), |p| p + 1);
+                members.insert(at, added);
+            }
+        }
+    }
+
+    /// Take `removed` out of the members of the collection `owner`, if any.
+    fn remove_from_collection(&mut self, owner: Option<ObjId>, removed: ObjId) {
+        let Some(owner) = owner else { return };
+        if let ObjData::Set(set) = self.om(owner) {
+            if let SetKind::Constraints { members, .. } = &mut set.kind {
+                members.retain(|&x| x != removed);
+            }
+        }
     }
 
     /// A centred graphic contributes the point it was written on, not its bounding box (14.1).

@@ -158,6 +158,12 @@ impl Interp<'_> {
         let mut edits = HashSet::new();
         let mut selection = false;
         while let Some((o, counted)) = todo.pop() {
+            // the `::position` of a set depends on what the set does (6.5)
+            if let ObjData::NamedSubobject { parent, name, resolved: None, .. } = self.o(o) {
+                if name == "position" && self.is_set(*parent) {
+                    todo.push((*parent, counted));
+                }
+            }
             if !seen.insert((o, counted)) || !self.is_set(o) {
                 continue;
             }

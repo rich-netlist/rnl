@@ -315,12 +315,6 @@
           "priority": "normal"
         },
         {
-          "label": "%order_self",
-          "kind": "ORDER",
-          "status": "failed",
-          "priority": "normal"
-        },
-        {
           "label": "ORIENT-RELATION",
           "kind": "ORIENT-RELATION",
           "status": "unsolved",
@@ -410,18 +404,18 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL5005",
+      "name": "constraint-expansion-too-few-places",
+      "file": "24-empty-set-member-in-constraints.sp",
+      "line": 19,
+      "col": 18
+    },
+    {
+      "severity": "hint",
       "code": "RNL9500",
       "name": "constraint-needs-solver",
       "file": "24-empty-set-member-in-constraints.sp",
       "line": 18,
-      "col": 18
-    },
-    {
-      "severity": "error",
-      "code": "RNL5002",
-      "name": "constraint-self-contradiction",
-      "file": "24-empty-set-member-in-constraints.sp",
-      "line": 19,
       "col": 18
     },
     {

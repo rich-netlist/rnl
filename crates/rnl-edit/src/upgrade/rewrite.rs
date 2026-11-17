@@ -22,6 +22,61 @@ pub(super) struct Context {
     pub keep_generated: bool,
     /// The boxes of 0.3 kept as symbols of the file.
     pub boxes: super::default_boxes::DefaultBoxes,
+    /// The names of the usages of the files, such as `%dp`.
+    pub usage_names: BTreeSet<String>,
+}
+
+/// A usage named in the member list of an ALIGN, ORDER, DISTRIBUTE or DISTANCE counted by one
+/// point, its own; in 0.4 a usage without a symbol stands for its members there, and its point is
+/// `%u::position`, which is the same point for a usage with a symbol (6.5, 14.1). Statements at
+/// the top of a record only: a definition's body has names of its own.
+fn usage_positions(
+    source: &str,
+    record: &Record,
+    members: &[std::rc::Rc<Member>],
+    names: &BTreeSet<String>,
+) -> Result<Vec<Edit>, String> {
+    let mut edits = Vec::new();
+    let at = |r: &rnl_runtime::syntax::Ref, edits: &mut Vec<Edit>| -> Result<(), String> {
+        let named = r.prefix == '%' && r.path.is_empty() && r.sub.is_none() && r.places.is_none() && r.number.is_none();
+        if named
+            && r.name.as_ref().is_some_and(|n| names.contains(&format!("%{}", rnl_runtime::problem::written_name(n))))
+        {
+            edits.push(record_edit(source, record, r.end..r.end, "::position".into(), "usage-position-in-constraint")?);
+        }
+        Ok(())
+    };
+    for member in members {
+        for segment in &member.segments {
+            let Some(call) = &segment.call else { continue };
+            if !matches!(call.kw.as_str(), "ALIGN" | "ORDER" | "DISTRIBUTE" | "DISTANCE") {
+                continue;
+            }
+            for arg in &segment.args {
+                match &arg.obj {
+                    ObjExpr::Ref(r) => at(r, &mut edits)?,
+                    ObjExpr::Set(set) => {
+                        for item in &set.members {
+                            if !item.binds.is_empty() {
+                                continue;
+                            }
+                            if let [only] = item.segments.as_slice() {
+                                if only.call.is_none() {
+                                    for a in &only.args {
+                                        if let ObjExpr::Ref(r) = &a.obj {
+                                            at(r, &mut edits)?;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    Ok(edits)
 }
 
 fn pending(member: &Member) -> Option<(&'static str, &'static str)> {
@@ -232,6 +287,10 @@ pub(super) fn file(
             has_std |= body.members.iter().flat_map(|m| &m.segments).any(|s| uses_std(s, &context.owned_packages));
         }
         let mut error = None;
+        match usage_positions(source, record, &body.members, &context.usage_names) {
+            Ok(found) => edits.extend(found),
+            Err(e) => error = Some(e),
+        }
         let mut local_selection_spans = Vec::new();
         let mut symbol_spans = Vec::new();
         visit(&body.members, &mut |member| {

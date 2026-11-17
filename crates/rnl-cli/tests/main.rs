@@ -198,6 +198,7 @@ mod undefined_subckts;
 mod unused_names04;
 mod upgrade;
 mod upgrade_canvas;
+mod usage_members04;
 mod usage_membership_assertions04;
 mod usage_points;
 mod veriloga04;

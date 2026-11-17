@@ -2388,16 +2388,6 @@
    ]
   },
   {
-   "number": "RNL3309",
-   "name": "set-position-04",
-   "severity": "error",
-   "message": "a set has no position; give its members to a constraint (5.2, 14.1)",
-   "sections": [
-    "5.2",
-    "14.1"
-   ]
-  },
-  {
    "number": "RNL3310",
    "name": "set-places-wrong-kind",
    "severity": "error",
@@ -2743,8 +2733,18 @@
    "number": "RNL3517",
    "name": "usage-point-idle-04",
    "severity": "hint",
-   "message": "{usage} has no symbol, and its point is tied to nothing that is drawn: the constraints on it change nothing drawn (14.1)",
+   "message": "{usage} has no symbol, and no fact ties its ::position to what is drawn: this statement moves only that point, not its members; write {usage} to constrain its members (14.1)",
    "sections": [
+    "14.1"
+   ]
+  },
+  {
+   "number": "RNL3518",
+   "name": "usage-members-placed-apart",
+   "severity": "hint",
+   "message": "{constraint} stands for each member of {usage}, and the definition of {usage} places them apart in {axis}, so its constraints cannot all hold; to align its own point write {usage}::position (6.5, 14.1)",
+   "sections": [
+    "6.5",
     "14.1"
    ]
   },

@@ -9,7 +9,7 @@
       "name": "22-set-members-and-distribute.sp",
       "file": 0,
       "line": 0,
-      "status": "constraints: 7 needs-solver, 1 failed, 4 ok",
+      "status": "constraints: 7 needs-solver, 4 ok",
       "host": {
         "ports": [],
         "instances": [

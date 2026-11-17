@@ -101,7 +101,7 @@ fn line_results_complete_configured_junctions_and_replay_the_written_file() {
     );
     let original = original.replace(
         "*   %p = (0,0);",
-        "*   $GEN = @DEFINE(roles=[\"r\"],parameters=[[\"dy\",2],[\"direction\",\"left-to-right\"]]) {};\n*   $WRAP = @DEFINE(roles=[\"p\"]) { %items = # @SELECT-INSTANCE => @AS(dy=2) $GEN; %items @ALIGN(\"x\") };\n*   #R3 @AS $WRAP; # @SELECT-USAGE $GEN => @PLACE(8,9);\n*   %p = (0,0);",
+        "*   $GEN = @DEFINE(roles=[\"r\"],parameters=[[\"dy\",2],[\"direction\",\"left-to-right\"]]) {};\n*   $WRAP = @DEFINE(roles=[\"p\"]) { %items = # @SELECT-INSTANCE => @AS(dy=2) $GEN; %items::position @ALIGN(\"x\") };\n*   #R3 @AS $WRAP; # @SELECT-USAGE $GEN => @PLACE(8,9);\n*   %p = (0,0);",
     );
     let original = original.replace(
         "*   %p = (0,0);",

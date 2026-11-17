@@ -225,7 +225,7 @@ impl Usages {
             source,
             record,
             member.end..member.end,
-            format!("; {{{usage} {target}}} @ALIGN(\"x\"); {{{usage} {target}}} @ALIGN(\"y\")"),
+            format!("; {{{usage}::position {target}}} @ALIGN(\"x\"); {{{usage}::position {target}}} @ALIGN(\"y\")"),
             "usage-main-point",
         )?);
         Ok((edits, true))

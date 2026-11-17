@@ -4,7 +4,7 @@ use crate::diag::codes;
 
 use super::ctx::Ctx;
 use super::eval::R;
-use super::obj::{ObjData, ObjId, SceneId, Shape};
+use super::obj::{ObjData, ObjId, SceneId, SetData, SetKind, Shape};
 use super::Interp;
 
 impl Interp<'_> {
@@ -83,9 +83,64 @@ impl Interp<'_> {
         }
     }
 
+    /// In a file of 0.4 the `::position` of a set is the set of the `::position` of each member,
+    /// nested sets followed inward and nets left out (6.5). A set whose members are known only
+    /// where it is used, such as a selection or a UNION, gives a sub-object that a constraint
+    /// takes in when it is expanded, as it takes in the set itself (14.1).
+    pub(super) fn set_positions(&mut self, set: ObjId, ctx: &Ctx, off: usize) -> R<ObjId> {
+        let data = self.set(set);
+        if self.is_lazy(set) || !data.mods.is_empty() || !matches!(data.kind, SetKind::Plain) {
+            return Ok(self.new_obj(ObjData::NamedSubobject {
+                parent: set,
+                name: "position".to_owned(),
+                resolved: None,
+                site: std::rc::Rc::new(ctx.clone()),
+                off,
+            }));
+        }
+        let members: Vec<ObjId> = self.set(set).items.iter().map(|(o, _)| *o).collect();
+        self.positions_of(members, ctx, off)
+    }
+
+    /// The set of the `::position` of each of `members` (6.5).
+    pub(super) fn positions_of(&mut self, members: Vec<ObjId>, ctx: &Ctx, off: usize) -> R<ObjId> {
+        let mut items = Vec::new();
+        for member in members {
+            if self.is_failed(member) || matches!(self.o(self.scene_value(member)), ObjData::Net { .. }) {
+                continue;
+            }
+            let position = if self.is_set(member) {
+                self.set_positions(member, ctx, off)?
+            } else {
+                self.position_subobject(member, ctx, off)?
+            };
+            items.push((position, false));
+        }
+        Ok(self.new_obj(ObjData::Set(Box::new(SetData::plain(items, true)))))
+    }
+
+    /// The `::position` of a set whose members are known only now, as the set of the position of
+    /// each of them; any other object, itself (6.5).
+    pub(super) fn positions_now(&mut self, s: SceneId, object: ObjId, phase: usize, ctx: &Ctx) -> ObjId {
+        let ObjData::NamedSubobject { parent, name, resolved: None, .. } = self.o(object).clone() else {
+            return object;
+        };
+        if name != "position" || !self.is_set(parent) {
+            return object;
+        }
+        let members = self.written_items(s, parent, phase, ctx);
+        let site = match self.o(object) {
+            ObjData::NamedSubobject { site, off, .. } => Some((site.clone(), *off)),
+            _ => None,
+        };
+        let (site, off) = site.unwrap();
+        // a member without a position has its error where the reference is written
+        self.positions_of(members, &site, off).unwrap_or(object)
+    }
+
     pub(super) fn resolve_position_reference(&mut self, scene: SceneId, object: ObjId) {
         let ObjData::NamedSubobject { parent, .. } = self.o(object).clone() else { return };
-        if self.position_waits_for_role(parent) {
+        if self.position_waits_for_role(parent) || self.is_set(parent) {
             return;
         }
         let value = self.scene_value(parent);

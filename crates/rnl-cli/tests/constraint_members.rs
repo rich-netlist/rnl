@@ -190,10 +190,9 @@ fn an_empty_item_is_omitted_and_short_combinations_give_a_hint() {
 }
 
 #[test]
-fn repeated_members_fail_only_the_contradictory_combination() {
+fn a_combination_that_takes_one_object_twice_is_left_out() {
     let r = read("0.4", "{#R1 {#R1 #R2}} @ORDER(\"left-to-right\")");
-    assert_eq!(errors(&r).len(), 1);
-    assert_eq!(errors(&r)[0].0, codes::CONSTRAINT_SELF_CONTRADICTION);
+    assert_eq!(errors(&r), []);
     assert_eq!(orders(&r), [["#R1", "#R2"]]);
     let r = read("0.4", "{#R1 {#R2 #R2}} @ORDER(\"left-to-right\")");
     assert_eq!(errors(&r), []);
@@ -321,12 +320,21 @@ fn invalid_members_fail_only_their_own_combinations() {
     }
 }
 
+/// The `::position` of a set is the set of the `::position` of each member (6.5), and a
+/// combination that takes one object twice is left out (14.1).
 #[test]
-fn sets_have_no_position_in_0_4() {
-    for initial in ["{#R1 #R2}", "{#R1 #R2} @UNION", "# @SELECT-INSTANCE"] {
-        let r = read("0.4", &format!("%s = {initial}; {{%s::position #R3}} @ALIGN(\"x\")"));
-        assert!(errors(&r).iter().any(|(code, _)| *code == codes::SET_POSITION_04), "{:?}", errors(&r));
+fn the_position_of_a_set_is_the_position_of_each_member_in_0_4() {
+    for (initial, expected) in [
+        ("{#R1 #R2}", &[["#R1", "#R3"], ["#R2", "#R3"]][..]),
+        ("{#R1 #R2} @UNION", &[["#R1", "#R3"], ["#R2", "#R3"]]),
+        // all four instances, #R3 with itself left out
+        ("# @SELECT-INSTANCE", &[["#R1", "#R3"], ["#R2", "#R3"], ["#R4", "#R3"]]),
+    ] {
+        let r = read("0.4", &format!("%s = {initial}; {{%s::position #R3}} @ORDER(\"left-to-right\")"));
+        assert_eq!(errors(&r), [], "{initial}");
+        assert_eq!(orders(&r), expected, "{initial}");
     }
+    assert_eq!(rows("{{#R1 {#R2}}::position #R3} @ORDER(\"left-to-right\")"), [["#R1", "#R3"], ["#R2", "#R3"]]);
     let r = read("0.3", "%s = {#R1 #R2}; {%s::position #R3} @ALIGN(\"x\")");
     assert_eq!(errors(&r), []);
 }

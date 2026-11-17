@@ -635,12 +635,6 @@
         {
           "label": "%order_pair",
           "kind": "ORDER",
-          "status": "failed",
-          "priority": "normal"
-        },
-        {
-          "label": "%order_pair",
-          "kind": "ORDER",
           "status": "ok",
           "priority": "normal"
         },
@@ -719,14 +713,6 @@
       "name": "constraint-needs-solver",
       "file": "22-set-members-and-distribute.sp",
       "line": 24,
-      "col": 16
-    },
-    {
-      "severity": "error",
-      "code": "RNL5002",
-      "name": "constraint-self-contradiction",
-      "file": "22-set-members-and-distribute.sp",
-      "line": 25,
       "col": 16
     },
     {

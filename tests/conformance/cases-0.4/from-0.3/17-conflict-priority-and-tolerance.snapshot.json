@@ -9,7 +9,7 @@
       "name": "17-conflict-priority-and-tolerance.sp",
       "file": 0,
       "line": 0,
-      "status": "20 without a position; constraints: 2 failed, 3 ok, 2 needs-solver, 60 unsolved",
+      "status": "20 without a position; constraints: 1 failed, 3 ok, 2 needs-solver, 60 unsolved",
       "host": {
         "ports": [],
         "instances": [

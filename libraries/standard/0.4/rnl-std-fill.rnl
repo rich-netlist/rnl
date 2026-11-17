@@ -63,5 +63,5 @@
   /* The distance is measured from the one point of the column, so a level has one fact for each of its
      instances: with 10 port tags and 103 instances, 103 facts, where a fact for each tag would give 1030. */
   %port_instance_set = # @SELECT-INSTANCE(recursive=true);
-  %port_column_set %port_instance_set @DISTANCE("left-to-right", min=6, priority="low");
+  %port_column_set::position %port_instance_set @DISTANCE("left-to-right", min=6, priority="low");
 }

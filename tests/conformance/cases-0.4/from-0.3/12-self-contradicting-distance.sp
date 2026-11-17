@@ -1,6 +1,6 @@
 * A DISTANCE that contradicts itself, the example of 9.5
-*! Both roles of $DP_LAYOUT are filled by M1, so the DISTANCE it expands to wants M1 at least 4 from itself: it has no solution on its own, is an error, and only it is dropped (9.5, 8.5); the ALIGN holds as usual.
-*! Such a fact is reported before conflicts are resolved, takes no part in them, and is not handed to the solver.
+*! Both roles of $DP_LAYOUT are filled by M1, so the DISTANCE and the ALIGN it expands to would relate M1 to itself: a combination that takes one object twice is left out (14.1, 14.5).
+*! With none left, each holds trivially and has a too-few-places hint; neither takes part in conflicts or is handed to the solver.
 * @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4")}
 M1 d g 0 0 nch
 M2 d2 g 0 0 nch

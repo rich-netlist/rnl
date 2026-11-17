@@ -45,10 +45,14 @@ fn places_expand_ranges_in_order_and_keep_repeats() {
         order("%a = {#R1 #R2 #R3 #R4}; %a{end:1:2, 40, end-3} @ORDER(\"left-to-right\")"),
         ["#R4", "#R2", "#R1"]
     );
-    // Keeping the repeated position makes this strict order contradictory.
-    let repeated = errors(&read("0.4", "%a = {#R1 #R2}; %a{1,2,1} @ORDER(\"left-to-right\")"));
-    assert_eq!(repeated.len(), 1, "{repeated:?}");
-    assert_eq!(repeated[0].0, codes::CONSTRAINT_SELF_CONTRADICTION);
+    // The repeated position is kept, so the combination takes #R1 twice and is left out (14.1).
+    let r = read("0.4", "%a = {#R1 #R2}; %a{1,2,1} @ORDER(\"left-to-right\")");
+    assert_eq!(errors(&r), []);
+    assert!(
+        r.diagnostics().iter().any(|d| d.code == codes::CONSTRAINT_EXPANSION_TOO_FEW_PLACES),
+        "{:?}",
+        r.diagnostics()
+    );
     assert_eq!(order("%b = {#R1 #R2}; %a = {%b #R3}; %a{2:end} @ORDER(\"left-to-right\")"), ["#R2", "#R3"]);
 }
 

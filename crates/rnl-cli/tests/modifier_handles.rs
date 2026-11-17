@@ -231,7 +231,7 @@ fn released_versions_still_stop_at_a_missing_loose_input() {
 
 #[test]
 fn a_constraint_result_unpacks_before_the_modifier_target_is_recovered() {
-    let r = read("0.4", "%pair = #R1 {#R1 #R2} @DISTANCE(\"left-to-right\",min=0); %saved = %pair @ADD-TO(bad=1); %saved @PRIORITY(\"disabled\")");
+    let r = read("0.4", "%pair = (20,0) {#R1 #R2} @DISTANCE(\"left-to-right\",min=0); %saved = %pair @ADD-TO(bad=1); %saved @PRIORITY(\"disabled\")");
     assert_eq!(errors(&r), 1, "{:?}", r.diagnostics());
     assert_eq!(
         r.problems[0]

@@ -401,7 +401,7 @@ fn external_selector_constraint_referencing_new_dot_must_be_decidable() {
     let check = r#"* external selected point
 * @RNL(type="header") { @VERSION("0.4"); @SOLVER-CONFIG(junction="$DOT") }
 R1 a 0 1k
-* @RNL { $DOT = @DEFINE(roles=[["p","point"]]) { {? ?p} @ALIGN("x"); {? ?p} @ALIGN("y") }; %q=(_, _); %selected = # @SELECT-USAGE $DOT; {%selected %q} @ALIGN("x") }
+* @RNL { $DOT = @DEFINE(roles=[["p","point"]]) { {? ?p} @ALIGN("x"); {? ?p} @ALIGN("y") }; %q=(_, _); %selected = # @SELECT-USAGE $DOT; {%selected::position %q} @ALIGN("x") }
 * @RNL(type="generated",priority="high",author="test",hash="test") { %rt1=(0,0); $DOT @ATTACH %rt1 => @PLACE(0,0) }
 .end
 "#;
@@ -424,7 +424,7 @@ R1 a 0 1k
         interpreted.model.levels[0].constraints
     );
     let result = run(
-        r#"$DOT = @DEFINE(roles=[["p","point"]]) { {? ?p} @ALIGN("x"); {? ?p} @ALIGN("y") }; %q=(_, _); %selected = # @SELECT-USAGE $DOT; {%selected %q} @ALIGN("x")"#,
+        r#"$DOT = @DEFINE(roles=[["p","point"]]) { {? ?p} @ALIGN("x"); {? ?p} @ALIGN("y") }; %q=(_, _); %selected = # @SELECT-USAGE $DOT; {%selected::position %q} @ALIGN("x")"#,
     );
     assert!(result.is_err(), "external constraint references the new dot and an unresolved point: {result:?}");
 }
