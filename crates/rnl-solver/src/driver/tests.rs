@@ -1761,7 +1761,8 @@ fn a_wire_between_two_rows_crosses_no_lead_of_a_stub() {
 
 /// A stub that the facts kept put exactly on a pin's line, at one rise (an ALIGN on x of the two
 /// pins and DISTANCEs on y whose least and most are one), hangs from that pin as a usage pinned
-/// to it, whatever its name; with a least rise alone, it does not.
+/// to it, whatever its name, right above it; with a least rise alone, it hangs from it too, as a
+/// symbol attached to the element, and beyond it the way the pin leaves when it leaves sideways.
 #[test]
 fn a_stub_held_at_one_rise_hangs_from_its_pin() {
     let text = "* ex
@@ -1779,7 +1780,8 @@ M1 out in vdd vdd pch
     let mut p = problems_of(text).into_iter().next().unwrap();
     let s = structure(&p);
     assert!(s.language04);
-    assert!(s.objects.iter().all(|o| o.stub.is_none()));
+    let bounded: Vec<&crate::structure::Stub> = s.objects.iter().filter_map(|o| o.stub.as_ref()).collect();
+    assert!(!bounded.is_empty() && bounded.iter().all(|stub| !stub.run.is_zero()));
     // the least rise of each stub made its most too
     let mut bounded = 0;
     for f in &mut p.facts {
@@ -1797,6 +1799,7 @@ M1 out in vdd vdd pch
         let stub = s.objects[k].stub.as_ref().unwrap();
         assert_eq!((s.objects[k].role, stub.host.0), (Role::Pinned, m1), "{}", p.objects[k].label);
         assert!(stub.rise > Q::zero(), "{}: {}", p.objects[k].label, stub.rise);
+        assert!(stub.run.is_zero(), "{}", p.objects[k].label);
     }
 }
 

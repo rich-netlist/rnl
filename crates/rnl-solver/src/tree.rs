@@ -786,10 +786,10 @@ impl<'a> Tree<'a> {
         }
         for (j, info) in s.objects.iter().enumerate() {
             if let Some(stub) = &info.stub {
-                let (h, hp) = stub.host;
-                if let (Some(hpin), Some(sp)) = (s.pin_offset(h, hp, ori[h]), s.pin_offset(j, 0, ori[j])) {
+                let h = stub.host.0;
+                if let Some(at) = s.stub_at(j, ori[h], ori[j]) {
                     let base = g.origin[h].clone();
-                    g.origin[j] = [&base[0] + &hpin[0] - &sp[0], &base[1] + &hpin[1] + &stub.rise - &sp[1]];
+                    g.origin[j] = [&base[0] + &at[0], &base[1] + &at[1]];
                 }
             }
         }
@@ -1896,6 +1896,24 @@ impl<'a> Tree<'a> {
                 }
             };
             out.push(Tagged { kind: RelKind::Attachment, rel });
+        }
+        // a stub that hangs where no fact puts it on both axes (a [`crate::structure::Stub`] with a
+        // run, of a symbol attached to an element): held at its place from its host's pin
+        for (j, info) in s.objects.iter().enumerate() {
+            let Some(stub) = info.stub.as_ref().filter(|stub| !stub.run.is_zero()) else { continue };
+            let h = stub.host.0;
+            let (Some(p), Some(q), Some(at)) = (o(j), o(h), s.stub_at(j, ori[h], ori[j])) else { continue };
+            for (axis, v) in at.iter().enumerate() {
+                out.push(Tagged {
+                    kind: RelKind::Attachment,
+                    rel: Relation::Linear {
+                        axis,
+                        terms: vec![(p, one()), (q, -one())],
+                        lo: Some(v.clone()),
+                        hi: Some(v.clone()),
+                    },
+                });
+            }
         }
         for b in &arr.bound {
             let t = &b.tie;

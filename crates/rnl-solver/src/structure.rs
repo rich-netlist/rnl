@@ -156,11 +156,13 @@ pub(crate) struct SymbolInfo {
 
 /// A stub, such as `$GROUND_STUB` and `$SUPPLY_STUB` of the standard package: a supply or ground
 /// symbol made in a usage attached to a terminal, which hangs `rise` above the pin `host` (below for
-/// a negative `rise`), as its facts say ([`power`]).
+/// a negative `rise`), as its facts say ([`power`]), and `run` beyond it the way the pin leaves
+/// when it leaves sideways ([`Structure::stub_at`]).
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Stub {
     pub host: PinKey,
     pub rise: Q,
+    pub run: Q,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -823,6 +825,25 @@ impl Structure {
     }
 
     /// The direction a wire leaves a pin, turned by `o`.
+    /// Where the stub `j` goes from the origin of its host turned by `host`, itself turned by
+    /// `own`: its pin `rise` above the host's pin, and `run` beyond it the way that pin leaves
+    /// when it leaves sideways ([`Stub`]).
+    pub(crate) fn stub_at(&self, j: usize, host: Orient, own: Orient) -> Option<[Q; 2]> {
+        let stub = self.objects.get(j)?.stub.as_ref()?;
+        let (h, hp) = stub.host;
+        let (hpin, sp) = (self.pin_offset(h, hp, host)?, self.pin_offset(j, 0, own)?);
+        Some([&hpin[0] + &self.stub_run(j, host) - &sp[0], &hpin[1] + &stub.rise - &sp[1]])
+    }
+
+    /// How far the stub `j` goes beyond its host's pin on x, the host turned by `host`.
+    pub(crate) fn stub_run(&self, j: usize, host: Orient) -> Q {
+        let Some(stub) = self.objects.get(j).and_then(|o| o.stub.as_ref()) else { return Q::zero() };
+        match self.exit(stub.host.0, stub.host.1, host) {
+            Some((x, 0)) if x != 0 && !stub.run.is_zero() => int(x) * &stub.run,
+            _ => Q::zero(),
+        }
+    }
+
     pub(crate) fn exit(&self, k: usize, pin: usize, o: Orient) -> Option<(i64, i64)> {
         let (x, y) = self.pins(k).get(pin)?.dir?;
         let (a, b, c, d) = o.matrix();
@@ -925,6 +946,20 @@ pub(crate) fn analyse(
     if problem.version == "0.4" {
         for k in 0..objects.len() {
             objects[k].attach_host = attach_host(problem, &kept, &objects, &connections, k);
+        }
+        // the symbols attached to an element that the facts keep above or below a pin of it hang
+        // from that pin, within the group they make with the element
+        for k in 0..objects.len() {
+            let (Some(host), Some(e)) = (objects[k].attach_host, attached_element(problem, &objects, k)) else {
+                continue;
+            };
+            if host.0 != e {
+                continue;
+            }
+            if let Some(stub) = bounded_stub(problem, &kept, k, host) {
+                objects[k].role = Role::Pinned;
+                objects[k].stub = Some(stub);
+            }
         }
     }
     let power = power_pins(power, &mut connections);
@@ -1544,30 +1579,67 @@ fn exact_stub(problem: &LevelProblem, kept: &[usize], k: usize) -> Option<Stub> 
         } else {
             return None;
         };
-        // the rise of `own` over `host`, at least `lo` and at most `hi`
-        let (mut lo, mut hi): (Option<Q>, Option<Q>) = (None, None);
-        for kind in facts() {
-            let FactKind::Distance { axis: Axis::Y, sense, min, max, from, to } = kind else { continue };
-            let (Some(&[f]), Some(&[t])) = (pins(from).as_deref(), pins(to).as_deref()) else {
-                continue;
-            };
-            let sign = match (sense, (f, t) == (host, own), (f, t) == (own, host)) {
-                (Sense::Increasing, true, _) | (Sense::Decreasing, _, true) => 1,
-                (Sense::Decreasing, true, _) | (Sense::Increasing, _, true) => -1,
-                _ => continue,
-            };
-            let (least, most) = (min.and_then(from_f64), max.and_then(from_f64));
-            let (low, high) = if sign > 0 { (least, most) } else { (most.map(|m| -m), least.map(|m| -m)) };
-            if let Some(v) = low {
-                lo = Some(lo.map_or(v.clone(), |l| if v > l { v.clone() } else { l }));
-            }
-            if let Some(v) = high {
-                hi = Some(hi.map_or(v.clone(), |h| if v < h { v.clone() } else { h }));
+        let (Some(lo), Some(hi)) = rise_bounds(problem, kept, own, host) else { return None };
+        (lo == hi && own.1 == 0).then_some(Stub { host, rise: lo, run: Q::zero() })
+    })
+}
+
+/// How far the pin `own` rises over the pin `host` by the DISTANCEs on y between them that the
+/// facts kept hold, with a direction: at least the first, at most the second; none for a side no
+/// such fact bounds.
+fn rise_bounds(problem: &LevelProblem, kept: &[usize], own: PinKey, host: PinKey) -> (Option<Q>, Option<Q>) {
+    let pins = |refs: &[PointRef]| refs.iter().map(|r| r.pin_key()).collect::<Option<Vec<_>>>();
+    let (mut lo, mut hi): (Option<Q>, Option<Q>) = (None, None);
+    for kind in kept.iter().filter_map(|&f| problem.facts.get(f)).map(|f| &f.kind) {
+        let FactKind::Distance { axis: Axis::Y, sense, min, max, from, to } = kind else { continue };
+        let (Some(&[f]), Some(&[t])) = (pins(from).as_deref(), pins(to).as_deref()) else {
+            continue;
+        };
+        let sign = match (sense, (f, t) == (host, own), (f, t) == (own, host)) {
+            (Sense::Increasing, true, _) | (Sense::Decreasing, _, true) => 1,
+            (Sense::Decreasing, true, _) | (Sense::Increasing, _, true) => -1,
+            _ => continue,
+        };
+        let (least, most) = (min.and_then(from_f64), max.and_then(from_f64));
+        let (low, high) = if sign > 0 { (least, most) } else { (most.map(|m| -m), least.map(|m| -m)) };
+        if let Some(v) = low {
+            lo = Some(lo.map_or(v.clone(), |l| if v > l { v.clone() } else { l }));
+        }
+        if let Some(v) = high {
+            hi = Some(hi.map_or(v.clone(), |h| if v < h { v.clone() } else { h }));
+        }
+    }
+    (lo, hi)
+}
+
+/// Of a level of 0.4: a symbol attached to an element ([`attached_element`]) at the pin `host` of
+/// that element, which the facts kept keep on one side of the pin's height, above or below, with
+/// a bound on how far: it hangs from that pin `ATTACH_GAP` that way, or as near as the bounds
+/// allow, and `ATTACH_GAP` beyond the pin when the pin leaves sideways; as the symbols attached to
+/// an element are laid out within the group they make with it, on the side their facts put them.
+fn bounded_stub(problem: &LevelProblem, kept: &[usize], k: usize, host: PinKey) -> Option<Stub> {
+    let (lo, hi) = rise_bounds(problem, kept, (k, 0), host);
+    let gap = int(crate::search::ATTACH_GAP);
+    let rise = match (lo, hi) {
+        (Some(lo), hi) if !lo.is_negative() => {
+            let up = hi.map_or(gap.clone(), |h| if gap > h { h } else { gap.clone() });
+            if up < lo {
+                lo
+            } else {
+                up
             }
         }
-        let (Some(lo), Some(hi)) = (lo, hi) else { return None };
-        (lo == hi && own.1 == 0).then_some(Stub { host, rise: lo })
-    })
+        (lo, Some(hi)) if !hi.is_positive() => {
+            let down = lo.map_or(-gap.clone(), |l| if -gap.clone() < l { l } else { -gap.clone() });
+            if down > hi {
+                hi
+            } else {
+                down
+            }
+        }
+        _ => return None,
+    };
+    (!rise.is_zero()).then_some(Stub { host, rise, run: gap })
 }
 
 /// How far above the pin `host` the pin of stub `k` is, as a fact kept says: a DISTANCE on y
@@ -1740,7 +1812,7 @@ fn power(problem: &LevelProblem, kept: &[usize], objects: &mut [ObjectInfo]) -> 
         let rise = stub_rise(problem, kept, k, host).unwrap_or_else(|| if supply { gap } else { -gap });
         let rises = rise.is_positive();
         if let Some(o) = objects.get_mut(k) {
-            o.stub = Some(Stub { host, rise });
+            o.stub = Some(Stub { host, rise, run: Q::zero() });
         }
         if rises {
             p.supply_pins.insert(host);
