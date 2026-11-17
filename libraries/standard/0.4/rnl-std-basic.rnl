@@ -559,8 +559,8 @@
   $SUPPLY = @DEFINE(roles=[["p", "net"]]) { ? @SELECT-PIN => @ORIENT("down", priority="low"); };
   # @SELECT-USAGE(recursive=true) $SUPPLY => @SET-SYMBOL $SUPPLY_SYMBOL;
 
-  /* A bias voltage mark on a net, drawn at a point of its own with its pin facing down, the bar above the pin. */
-  $BIAS = @DEFINE(roles=[["p", "net"]]) { ? @SELECT-PIN => @ORIENT("down", priority="low"); };
+  /* A bias voltage mark on a net, drawn at a point of its own. */
+  $BIAS = @DEFINE(roles=[["p", "net"]]) {};
   # @SELECT-USAGE(recursive=true) $BIAS => @SET-SYMBOL $BIAS_SYMBOL;
 
   /* A port tag on a net, drawn at a point of its own with its pin facing left or right; its net must be a port of its level. */

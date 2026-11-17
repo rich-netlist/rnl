@@ -196,7 +196,7 @@ fn definition_shapes(version: &str) -> DefinitionShapes {
 fn without_pin_orient(name: &str, body: &str) -> Option<String> {
     let direction = match name {
         "$GROUND" => "\"up\"",
-        "$SUPPLY" | "$BIAS" => "\"down\"",
+        "$SUPPLY" => "\"down\"",
         "$IO_PORT" | "$NET_LABEL" => "[\"right\",\"left\"]",
         _ => return None,
     };
@@ -402,7 +402,6 @@ pub(super) fn definition_policies(input: &Interpretation) -> BTreeMap<(usize, St
                     policy.notice = Some(("standard-orientation", match target_name.as_str() {
                         "$GROUND" => "GROUND now turns its pin up at priority low, the package's default look; positions are unchanged (11.2, 16.3)",
                         "$SUPPLY" => "SUPPLY now turns its pin down at priority low, the package's default look; positions are unchanged (11.2, 16.3)",
-                        "$BIAS" => "BIAS now turns its pin down at priority low, the package's default look; positions are unchanged (11.2, 16.3)",
                         _ => "the definition now turns its pin left or right at priority low, the package's default look; positions are unchanged (11.2, 16.3)",
                     }));
                 }
