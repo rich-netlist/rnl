@@ -255,8 +255,8 @@ fn each_level_says_its_layout_and_the_settings_it_does_not_use() {
     // the top level lays out in lines, by default; amp in a tree, as its own SOLVER-CONFIG says
     let (top, amp) = (level(&c, "main.sp"), level(&c, "amp"));
     assert_eq!((top.layout.as_str(), amp.layout.as_str()), ("lines", "tree"));
-    // beam and candidates are of the rows layout only, the spacings and the weights of lines only;
-    // safety_seconds is shown only under the limits work and seed
+    // beam and candidates are of the rows layout only, the spacings, the weights and nudge_wires of
+    // lines only; safety_seconds is shown only under the limits work and seed
     assert_eq!(top.unused, ["beam", "candidates", "safety_seconds"]);
     assert_eq!(
         amp.unused,
@@ -265,6 +265,7 @@ fn each_level_says_its_layout_and_the_settings_it_does_not_use() {
             "candidates",
             "lines_order",
             "lines_weights",
+            "nudge_wires",
             "safety_seconds",
             "spacing_x",
             "spacing_y",
@@ -277,7 +278,7 @@ fn each_level_says_its_layout_and_the_settings_it_does_not_use() {
     assert_eq!(level(&rows, "main.sp").layout, "rows");
     assert_eq!(
         level(&rows, "main.sp").unused,
-        ["lines_order", "lines_weights", "safety_seconds", "spacing_x", "spacing_y", "virtual_weight"]
+        ["lines_order", "lines_weights", "nudge_wires", "safety_seconds", "spacing_x", "spacing_y", "virtual_weight"]
     );
     let work = check(MAIN, &[ToolSettings::Config("limit=\"work\",work=100".into())]);
     assert!(!level(&work, "main.sp").unused.contains(&"safety_seconds".to_string()));
