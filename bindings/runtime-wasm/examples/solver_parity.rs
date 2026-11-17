@@ -7,6 +7,11 @@ use rnl_runtime::{
 use rnl_solver::{RunLimit, SolverOptions};
 use std::{cell::RefCell, collections::BTreeMap};
 
+/// The work of the line layout's cases at which the smaller completes its line search and the
+/// larger runs out before it does and falls back: the first needs about 1.05e6 units, the second
+/// more than 1e7.
+const LINES_WORK: u32 = 3_000_000;
+
 fn record(case: u32, work: u32) -> (String, u64) {
     let n = if case % 2 == 0 { 2 } else { 4 };
     let mut text = "* solver parity\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n".to_string();
@@ -105,7 +110,7 @@ fn record(case: u32, work: u32) -> (String, u64) {
     let written = rnl_runtime::solution::write_record(&p, &solved.solution, rnl_solver::AUTHOR, &hash).record;
     if case >= 8 {
         let skeleton = solved.report.skeleton.as_ref().unwrap();
-        if work == 100_000_000 {
+        if work == LINES_WORK {
             if case == 8 {
                 assert!(!skeleton.fallback, "{:?}", solved.report.notes);
                 assert!(solved.report.notes.iter().any(|note| note.starts_with("lines, round 0:")));
@@ -155,7 +160,7 @@ fn main() {
         let limits: &[u32] = if case >= 10 {
             &[0]
         } else if case >= 8 {
-            &[0, 64, 4096, 100_000_000]
+            &[0, 64, 4096, LINES_WORK]
         } else {
             &[0, 64, 4096, 1_000_000]
         };
