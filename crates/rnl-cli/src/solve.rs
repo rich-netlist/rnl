@@ -922,6 +922,9 @@ fn pass(
             continue;
         }
         let mut junction_seconds = None;
+        // the record the dots were placed in, finished with the check of its numbers as their last
+        // trial read it: written as it is, not finished again
+        let mut numbered: Option<(String, String)> = None;
         if p.version == "0.4" && !written.junctions.is_empty() {
             watch(Mark::Stage("junctions"));
             if !report_available {
@@ -973,6 +976,7 @@ fn pass(
                     .push(format!("junction postprocessing: the dot at {} is not written: {why}", junction.target));
             }
             junction_seconds = Some(completion.elapsed.as_secs_f64());
+            numbered = Some((completion.record.clone(), completion.numbered));
             written.record = completion.record;
         }
         watch(Mark::Stage("write"));
@@ -981,7 +985,9 @@ fn pass(
         let want: Want = (path.clone(), host.file.clone(), r.doc.levels[r.doc.file_level(p.level)].section.clone());
         let (record, texts) = {
             let both = Layered { layers: vec![&memory, &files] };
-            let record = if p.version == "0.4" {
+            let record = if let Some((_, finished)) = numbered.filter(|(record, _)| *record == written.record) {
+                finished
+            } else if p.version == "0.4" {
                 rnl_view::finish_record_with_formats(&r.doc, &both, &options.formats, &runtime, p, &written.record)
             } else {
                 rnl_view::finish_record(&r.doc, &both, &runtime, p, &written.record)
