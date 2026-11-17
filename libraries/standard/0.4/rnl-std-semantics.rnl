@@ -566,7 +566,7 @@
   };
 
   /* A cross-coupled pair: two matched transistors cross-coupled in positive feedback, drawn mirrored.
-     Places and routes: mirrors left and right and routes their shared nets. Direct gate-to-drain or
+     Places and routes; a group: mirrors left and right and routes their shared nets. Direct gate-to-drain or
      base-to-collector identity is not asserted because an element such as a resistor, inductor or
      cascode may sit in series with a drain or collector. */
   $CROSS_COUPLED_PAIR = @DEFINE(roles=[["left", "instance"], ["right", "instance"]]) {
@@ -576,18 +576,18 @@
     {?left ?right ?} @ALIGN("y", priority="low");
     {?left ? ?right} @DISTRIBUTE("left-to-right", priority="low");
     {?left ?right} @ROUTE-OBJECT(priority="low");
+    {?left ?right} @GROUP;
     {?left ?right} @ASSERT-INSTANCE(same=["model", "w", "l", "nf", "m", "area"],
             message="the two sides of a $CROSS_COUPLED_PAIR are matched");
   };
 
   /* A low-side current mirror of n-type transistors, with sources or emitters pointing down.
-     Places and routes: aligns ref and out in one row with sources or emitters down, asserts n-type,
+     Places; routes nothing: aligns ref and out in one row with sources or emitters down, asserts n-type,
      shared gate or base net, one model and channel length, and parallel reference transistors. */
   $CURRENT_MIRROR_N = @DEFINE(roles=[["{ref}", "instance"], ["{out}", "instance"]]) {
     {?ref ?out ?} @ALIGN("y", priority="low");
     ?ref{1} {?out} @ORIENT-RELATION(["R0", "MY"], priority="low");
     ?ref{1} ?ref{2:end} @ORIENT-RELATION("R0", priority="low");
-    {?ref ?out} @ROUTE-OBJECT(priority="low");
     {?ref ?out} @SELECT-INSTANCE(type="nmos")
         => @SELECT-PIN(terminal="s")
         => @ORIENT("down", priority="low");
@@ -630,13 +630,12 @@
   };
 
   /* A high-side current mirror of p-type transistors, with sources or emitters pointing up.
-     Places and routes: aligns ref and out in one row with sources or emitters up, asserts p-type,
+     Places; routes nothing: aligns ref and out in one row with sources or emitters up, asserts p-type,
      shared gate or base net, one model and channel length, and parallel reference transistors. */
   $CURRENT_MIRROR_P = @DEFINE(roles=[["{ref}", "instance"], ["{out}", "instance"]]) {
     {?ref ?out ?} @ALIGN("y", priority="low");
     ?ref{1} {?out} @ORIENT-RELATION(["R0", "MY"], priority="low");
     ?ref{1} ?ref{2:end} @ORIENT-RELATION("R0", priority="low");
-    {?ref ?out} @ROUTE-OBJECT(priority="low");
     {?ref ?out} @SELECT-INSTANCE(type="nmos")
         => @SELECT-PIN(terminal="s")
         => @ORIENT("up", priority="low");
@@ -680,7 +679,7 @@
   };
 
   /* A low-side cascode current mirror: a mirror row at the bottom with a cascode row above it.
-     Places and routes; a group: applies $CURRENT_MIRROR_N to ref and out, places refcascode and
+     Places; routes nothing: applies $CURRENT_MIRROR_N to ref and out, places refcascode and
      outcascode in a row above them with sources or emitters down, and asserts n-type cascodes and
      cascode matching. */
   $CASCODE_CURRENT_MIRROR_N = @DEFINE(
@@ -699,8 +698,6 @@
     ?out{1} ?outcascode{1} @ORIENT-RELATION("R0", priority="low");
     ?refcascode{1} ?refcascode{2:end} @ORIENT-RELATION("R0", priority="low");
     ?outcascode{1} ?outcascode{2:end} @ORIENT-RELATION("R0", priority="low");
-    {?ref ?out ?refcascode ?outcascode} @ROUTE-OBJECT(priority="low");
-    {?ref ?out ?refcascode ?outcascode} @GROUP;
     {?refcascode ?outcascode} @SELECT-INSTANCE(type="nmos")
         => @SELECT-PIN(terminal="s")
         => @ORIENT("down", priority="low");
@@ -741,7 +738,7 @@
   };
 
   /* A high-side cascode current mirror: a mirror row at the top with a cascode row below it.
-     Places and routes; a group: applies $CURRENT_MIRROR_P to ref and out, places refcascode and
+     Places; routes nothing: applies $CURRENT_MIRROR_P to ref and out, places refcascode and
      outcascode in a row below them with sources or emitters up, and asserts p-type cascodes and
      cascode matching. */
   $CASCODE_CURRENT_MIRROR_P = @DEFINE(
@@ -760,8 +757,6 @@
     ?out{1} ?outcascode{1} @ORIENT-RELATION("R0", priority="low");
     ?refcascode{1} ?refcascode{2:end} @ORIENT-RELATION("R0", priority="low");
     ?outcascode{1} ?outcascode{2:end} @ORIENT-RELATION("R0", priority="low");
-    {?ref ?out ?refcascode ?outcascode} @ROUTE-OBJECT(priority="low");
-    {?ref ?out ?refcascode ?outcascode} @GROUP;
     {?refcascode ?outcascode} @SELECT-INSTANCE(type="nmos")
         => @SELECT-PIN(terminal="s")
         => @ORIENT("up", priority="low");
@@ -911,10 +906,12 @@
   };
 
   /* A cascode: a source device or sub-structure in series with a common-gate transistor.
-     Routes; places nothing: applies $COMMON_GATE to ?cascode and $SERIES to ?source and ?cascode. */
+     Routes; places nothing: applies $COMMON_GATE to ?cascode and $SERIES to ?source and ?cascode, and
+     routes their shared nets. */
   $CASCODE = @DEFINE(roles=[["source", ["instance", "usage"]], ["cascode", "instance"]]) {
     ?cascode @AS $COMMON_GATE;
     {?source ?cascode} @AS $SERIES;
+    {?source ?cascode} @ROUTE-OBJECT(priority="low");
   };
 
   /* A folded cascode: an input device folded into a common-gate transistor with its bias.
@@ -977,10 +974,11 @@
   };
 
   /* A push-pull output stage: a pull-up driver in series with a pull-down driver.
-     Routes; places nothing: applies $SERIES to ?pullup and ?pulldown. */
+     Routes; places nothing; a group: applies $SERIES to ?pullup and ?pulldown. */
   $PUSH_PULL_STAGE = @DEFINE(
       roles=[["pullup", ["instance", "usage"]], ["pulldown", ["instance", "usage"]]]) {
     {?pullup ?pulldown} @AS $SERIES;
+    {?pullup ?pulldown} @GROUP;
   };
 
   /* An amplifier stage: a transconductor and its load.
@@ -1078,10 +1076,11 @@
   };
 
   /* A switch of several throws that share one pole.
-     Meaning only: places and routes nothing; a group: applies $PASS_SWITCH to ?throws and asserts
-     that all throws meet at one shared pole net. */
+     Routes; places nothing; a group: applies $PASS_SWITCH to ?throws, routes their shared nets and
+     asserts that all throws meet at one shared pole net. */
   $MULTI_POLE_SWITCH = @DEFINE(roles=[["{throws}", ["instance", "usage"]]]) {
     ?throws @AS $PASS_SWITCH;
+    {?throws} @ROUTE-OBJECT(priority="low");
     {?throws} @GROUP;
     ?throws @ASSERT-TOPOLOGY("star", exclude=[["nmos", "g"], ["nmos", "b"], ["pmos", "g"],
             ["pmos", "b"], ["npn", "b"], ["npn", "s"], ["pnp", "b"], ["pnp", "s"], ["lpnp", "b"],
@@ -1096,26 +1095,24 @@
   };
 
   /* A switched-capacitor sampler: sampling switches with sampling capacitors.
-     Routes; places nothing; a group: routes shared nets between ?switch and ?capacitor. */
+     Routes; places nothing: routes shared nets between ?switch and ?capacitor. */
   $SC_SAMPLER = @DEFINE(
       roles=[["{switch}", ["instance", "usage"]], ["{capacitor}", ["instance", "usage"]]]) {
     {?switch ?capacitor} @ROUTE-OBJECT(priority="low");
-    {?switch ?capacitor} @GROUP;
   };
 
   /* A charge-sharing network: two capacitors or capacitor banks that share charge through a switch.
-     Routes; places nothing; a group: routes shared nets among ?a, ?switch and ?b. */
+     Routes; places nothing: routes shared nets among ?a, ?switch and ?b. */
   $CHARGE_SHARING = @DEFINE(
       roles=[
         ["a", ["instance", "usage"]],
         ["switch", ["instance", "usage"]],
         ["b", ["instance", "usage"]]]) {
     {?a ?switch ?b} @ROUTE-OBJECT(priority="low");
-    {?a ?switch ?b} @GROUP;
   };
 
   /* A chopper: a bridge of four switches that reverses the polarity of a signal.
-     Routes; places nothing; a group: applies $PASS_SWITCH and $MATCHED, routes the bridge nets, and
+     Routes; places nothing: applies $PASS_SWITCH and $MATCHED, routes the bridge nets, and
      asserts a four-switch loop alternating between ?straight and ?crossed. */
   $CHOPPER = @DEFINE(
       roles=[["{straight}", ["instance", "usage"]], ["{crossed}", ["instance", "usage"]]]) {
@@ -1123,7 +1120,6 @@
     ?straight @AS $MATCHED;
     ?crossed @AS $MATCHED;
     {?straight ?crossed} @ROUTE-OBJECT(priority="low");
-    {?straight ?crossed} @GROUP;
     {?straight{1} ?crossed{1} ?straight{2} ?crossed{2}} @ASSERT-TOPOLOGY("loop",
             exclude=[["nmos", "g"], ["nmos", "b"], ["pmos", "g"], ["pmos", "b"], ["npn", "b"],
             ["npn", "s"], ["pnp", "b"], ["pnp", "s"], ["lpnp", "b"], ["lpnp", "s"], ["njf", "g"],
@@ -1171,9 +1167,10 @@
   };
 
   /* A latch: a bistable core with the devices around it.
-     Meaning only: places and routes nothing; a group. */
-  $LATCH = @DEFINE(roles=[["{core}", ["instance", "usage"]], ["{others}", ["instance", "usage"]]]) {
-    {?core ?others} @GROUP;
+     Routes; places nothing; a group: routes shared nets among ?members. */
+  $LATCH = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
+    {?members} @ROUTE-OBJECT(priority="low");
+    {?members} @GROUP;
   };
 
   /* A latch of two cross-coupled inverters.
@@ -1303,7 +1300,9 @@
      ============================================================================================== */
 
   /* An oscillator made of its active and resonant or delay elements.
-     Meaning only: places and routes nothing. */
+     Routes; places nothing; a group: routes shared nets among ?members. */
   $OSCILLATOR = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
+    {?members} @ROUTE-OBJECT(priority="low");
+    {?members} @GROUP;
   };
 }
