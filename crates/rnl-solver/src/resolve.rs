@@ -1763,32 +1763,41 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
 
 /// The other minimal conflict groups of the facts of priority low discarded whose hints
 /// [`SolverOptions::hints_for_low`] asks for, sought after the resolution and whatever came of
-/// it, within a time limit of their own as long as the resolution's, and outside any budget of
-/// the level, so that a solve that reports them keeps and places what one that does not would;
-/// then the hints by statement again, with those facts in them. A fact whose groups were not all
-/// found in that time is not [`Discarded::complete`].
+/// it, outside the budget of the level, so that a solve that reports them keeps and places what
+/// one that does not would, in the same work; then the hints by statement again, with those
+/// facts in them. They are sought within a budget of their own of `allowance` work units, so that
+/// a replay by the work of the level finds the same; without one (a level of 0.3), within the
+/// time limit of the options, or else their safety limit. A fact whose groups were not all found
+/// so is not [`Discarded::complete`].
 pub(crate) fn seek_low_groups(
     problem: &LevelProblem,
     options: &SolverOptions,
     clock: &dyn Clock,
     resolved: &mut Resolved,
+    allowance: Option<u64>,
 ) {
     if resolved.low_unsought.is_empty() {
         return;
     }
     let unsought = std::mem::take(&mut resolved.low_unsought);
-    crate::budget::without(|| {
-        let deadline = Deadline::new(clock, options.time_limit);
+    let seek = |resolved: &mut Resolved, limit: Option<f64>| {
+        let deadline = Deadline::new(clock, limit);
         let limits = Limits::Time(&deadline);
         let n = problem.objects.len();
         // not the level's work: the work of a solve that reports them is that of one that does not
         let mut work = Work::default();
-        for f in unsought {
+        for &f in &unsought {
             let Some(d) = resolved.discarded.iter_mut().find(|d| d.fact == f) else { continue };
             let Some(first) = d.groups.first().cloned() else { continue };
             let before: Vec<usize> = resolved.kept.iter().copied().take_while(|&k| k < f).collect();
-            (d.groups, d.complete) = all_groups(&resolved.model, n, limits, f, &before, first, &mut work);
+            (d.groups, d.complete) = all_groups(&resolved.model, n, limits, d.fact, &before, first, &mut work);
         }
+    };
+    crate::budget::without(|| match allowance {
+        Some(units) => {
+            crate::budget::with(clock, crate::RunLimit::Work(units.max(1)), None, || seek(resolved, None));
+        }
+        None => seek(resolved, options.time_limit.or(options.safety_seconds)),
     });
     resolved.statements = statement_hints(problem, &resolved.discarded);
 }

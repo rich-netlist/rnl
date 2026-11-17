@@ -623,9 +623,11 @@ fn solve_exact_mode(
         ));
     }
     // the other groups of the facts of priority low, when asked for, once the level is laid out
-    // and outside its budget: asking for them changes nothing the solve keeps or places
+    // and outside its budget, in as much work again as the level took: asking for them changes
+    // nothing the solve keeps or places, and a replay by the work of the level finds the same
     let mut resolved = resolved;
-    crate::resolve::seek_low_groups(problem, options, clock, &mut resolved);
+    let allowance = crate::budget::active().then(crate::budget::consumed);
+    crate::resolve::seek_low_groups(problem, options, clock, &mut resolved, allowance);
     let report = SolveReport {
         fatal_written_wire: entry.written_path_error,
         fatal_annotation: entry.annotation_error.map(|error| error.index),

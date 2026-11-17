@@ -18,7 +18,7 @@ use crate::StoppedClock;
 /// the other groups of the facts of priority low, when asked for, as a solve seeks them.
 fn resolve(problem: &LevelProblem, options: &SolverOptions) -> Resolved {
     let mut r = super::resolve(problem, options, &StoppedClock);
-    super::seek_low_groups(problem, options, &StoppedClock, &mut r);
+    super::seek_low_groups(problem, options, &StoppedClock, &mut r, None);
     r
 }
 

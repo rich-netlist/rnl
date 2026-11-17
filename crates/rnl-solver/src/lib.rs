@@ -594,11 +594,14 @@ pub fn resolve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock
             let (mut resolved, report) =
                 budget::with(clock, limit, safety, || resolve::resolve(problem, &options, clock));
             resolved.budget = Some(report);
+            // the groups of the facts of priority low asked for, in as much work again
+            resolve::seek_low_groups(problem, &options, clock, &mut resolved, Some(report.work));
             resolved
         } else {
-            resolve::resolve(problem, &options, clock)
+            let mut resolved = resolve::resolve(problem, &options, clock);
+            resolve::seek_low_groups(problem, &options, clock, &mut resolved, None);
+            resolved
         };
-        resolve::seek_low_groups(problem, &options, clock, &mut resolved);
         resolved.warnings.extend(warnings);
         resolved.errors.extend(errors);
         resolved

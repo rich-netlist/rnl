@@ -929,16 +929,12 @@ fn the_groups_of_low_facts_asked_for_change_nothing_solved() {
                 #R3 #R2 @DISTANCE(\"left-to-right\", exact=4); \
                 #R1 #R2 @DISTANCE(\"left-to-right\", exact=12, priority=\"low\"); $WIRE_NET_SET @ROUTE }\n.end\n";
     let p = problems_of(text).into_iter().next().unwrap();
-    let solve = |hints_for_low: bool| {
-        let options = SolverOptions {
-            run_limit: Some(crate::RunLimit::Unlimited),
-            time_limit: None,
-            hints_for_low,
-            ..SolverOptions::default()
-        };
+    let solve = |hints_for_low: bool, limit: crate::RunLimit| {
+        let options =
+            SolverOptions { run_limit: Some(limit), time_limit: None, hints_for_low, ..SolverOptions::default() };
         crate::solve(&p, &options)
     };
-    let (without, with) = (solve(false), solve(true));
+    let (without, with) = (solve(false, crate::RunLimit::Unlimited), solve(true, crate::RunLimit::Unlimited));
     let low = |s: &Solved| {
         assert_eq!(s.report.discarded.len(), 1, "{:?}", s.report.discarded);
         s.report.discarded[0].clone()
@@ -951,6 +947,14 @@ fn the_groups_of_low_facts_asked_for_change_nothing_solved() {
     assert_eq!(with.report.budget.map(|b| b.work), without.report.budget.map(|b| b.work));
     assert!(without.report.notes.iter().any(|n| n.contains("listed only with --report")));
     assert!(!with.report.notes.iter().any(|n| n.contains("listed only with --report")));
+    // a limit of work that stops the level stops it where it would without them
+    let whole = solve(false, crate::RunLimit::Work(1 << 40)).report.budget.unwrap().work;
+    let stops = |limit: crate::RunLimit| solve(false, limit).report.budget.unwrap().reason == crate::StopReason::Work;
+    let half = (1..20).map(|k| crate::RunLimit::Work(whole >> k)).find(|&l| stops(l)).unwrap();
+    let (cut, cut_with) = (solve(false, half), solve(true, half));
+    assert_eq!(cut_with.solution, cut.solution);
+    assert_eq!(cut_with.report.budget, cut.report.budget);
+    assert_eq!(cut_with.report.budget.map(|b| b.reason), Some(crate::StopReason::Work));
 }
 
 /// The levels of a netlist given as text, read as the CLI reads a file.
