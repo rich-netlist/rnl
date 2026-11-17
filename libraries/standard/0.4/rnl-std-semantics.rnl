@@ -1212,14 +1212,14 @@
   };
 
   /* A pi network: a shunt branch, a series branch and another shunt branch.
-     Routes; places nothing; a group: asserts loop topology among ?shunt1, ?series and ?shunt2. */
+     Routes; places nothing: asserts loop topology among ?shunt1, ?series and ?shunt2. No group, as
+     neighbouring pi and T networks of a ladder often share a branch. */
   $PI_NETWORK = @DEFINE(
       roles=[
         ["shunt1", ["instance", "usage"]],
         ["series", ["instance", "usage"]],
         ["shunt2", ["instance", "usage"]]]) {
     {?shunt1 ?series ?shunt2} @ROUTE-OBJECT(priority="low");
-    {?shunt1 ?series ?shunt2} @GROUP;
     {?shunt1 ?series ?shunt2} @ASSERT-TOPOLOGY("loop", exclude=[["nmos", "g"], ["nmos", "b"],
             ["pmos", "g"], ["pmos", "b"], ["npn", "b"], ["npn", "s"], ["pnp", "b"], ["pnp", "s"],
             ["lpnp", "b"], ["lpnp", "s"], ["njf", "g"], ["pjf", "g"], ["nmf", "g"], ["pmf", "g"]],
@@ -1227,14 +1227,14 @@
   };
 
   /* A T network: a series branch, a shunt branch and another series branch.
-     Routes; places nothing; a group: asserts star topology among ?series1, ?shunt and ?series2. */
+     Routes; places nothing: asserts star topology among ?series1, ?shunt and ?series2. No group, as
+     neighbouring pi and T networks of a ladder often share a branch. */
   $T_NETWORK = @DEFINE(
       roles=[
         ["series1", ["instance", "usage"]],
         ["shunt", ["instance", "usage"]],
         ["series2", ["instance", "usage"]]]) {
     {?series1 ?shunt ?series2} @ROUTE-OBJECT(priority="low");
-    {?series1 ?shunt ?series2} @GROUP;
     {?series1 ?shunt ?series2} @ASSERT-TOPOLOGY("star", exclude=[["nmos", "g"], ["nmos", "b"],
             ["pmos", "g"], ["pmos", "b"], ["npn", "b"], ["npn", "s"], ["pnp", "b"], ["pnp", "s"],
             ["lpnp", "b"], ["lpnp", "s"], ["njf", "g"], ["pjf", "g"], ["nmf", "g"], ["pmf", "g"]],
