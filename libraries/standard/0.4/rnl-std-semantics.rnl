@@ -117,9 +117,9 @@
         ["left", ["instance", "usage"]],
         ["right", ["instance", "usage"]],
         ["axis", ["point", "instance", "usage"]]]) {
-    {?left ?right ?} @ALIGN("y", priority="low");
-    {?left ? ?right} @DISTRIBUTE("left-to-right", priority="low");
-    {?left ?axis ?right} @DISTRIBUTE("left-to-right", priority="low");
+    {?left::position ?right::position ?} @ALIGN("y", priority="low");
+    {?left::position ? ?right::position} @DISTRIBUTE("left-to-right", priority="low");
+    {?left::position ?axis::position ?right::position} @DISTRIBUTE("left-to-right", priority="low");
     ?left ?right @ORIENT-RELATION("MY", priority="low");
   };
 
@@ -132,9 +132,9 @@
         ["top", ["instance", "usage"]],
         ["bottom", ["instance", "usage"]],
         ["axis", ["point", "instance", "usage"]]]) {
-    {?top ?bottom ?} @ALIGN("x", priority="low");
-    {?top ? ?bottom} @DISTRIBUTE("top-to-bottom", priority="low");
-    {?top ?axis ?bottom} @DISTRIBUTE("top-to-bottom", priority="low");
+    {?top::position ?bottom::position ?} @ALIGN("x", priority="low");
+    {?top::position ? ?bottom::position} @DISTRIBUTE("top-to-bottom", priority="low");
+    {?top::position ?axis::position ?bottom::position} @DISTRIBUTE("top-to-bottom", priority="low");
     ?top ?bottom @ORIENT-RELATION("MX", priority="low");
   };
 
@@ -144,7 +144,7 @@
      branch moves with a tail or axis constraint, ordered from the top down. */
   $BRANCH = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
     ?members @AS $SERIES;
-    {?members ?} @ALIGN("x", priority="low");
+    {?members::position ?} @ALIGN("x", priority="low");
     ?members @ORDER("top-to-bottom", priority="low");
   };
 
@@ -153,7 +153,7 @@
      from left to right. */
   $BRANCH_HORIZONTAL = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
     ?members @AS $SERIES;
-    {?members ?} @ALIGN("y", priority="low");
+    {?members::position ?} @ALIGN("y", priority="low");
     ?members @ORDER("left-to-right", priority="low");
   };
 
@@ -189,7 +189,7 @@
      ?members from left to right. */
   $PARALLEL_HORIZONTAL = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
     ?members @AS $PARALLEL;
-    {?members ?} @ALIGN("y", priority="low");
+    {?members::position ?} @ALIGN("y", priority="low");
     ?members @ORDER("left-to-right", priority="low");
   };
 
@@ -198,7 +198,7 @@
      ?members from top to bottom. */
   $PARALLEL_VERTICAL = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
     ?members @AS $PARALLEL;
-    {?members ?} @ALIGN("x", priority="low");
+    {?members::position ?} @ALIGN("x", priority="low");
     ?members @ORDER("top-to-bottom", priority="low");
   };
 
@@ -440,12 +440,12 @@
     {?left ?right} @AS $MATCHED;
     {?tailleft ?tailright} @AS $MATCHED;
     ?left ?right @ORIENT-RELATION("MY", priority="low");
-    {?left ?tailleft} @ALIGN("x", priority="low");
-    {?right ?tailright} @ALIGN("x", priority="low");
+    {?left ?tailleft::position} @ALIGN("x", priority="low");
+    {?right ?tailright::position} @ALIGN("x", priority="low");
     {?left ?right ?} @ALIGN("y", priority="low");
     {?left ? ?right} @DISTRIBUTE("left-to-right", priority="low");
-    {?tailleft ?tailright} @ALIGN("y", priority="low");
-    {?left ?bridge ?right} @DISTRIBUTE("left-to-right", priority="low");
+    {?tailleft::position ?tailright::position} @ALIGN("y", priority="low");
+    {?left ?bridge::position ?right} @DISTRIBUTE("left-to-right", priority="low");
     {?left ?right ?tailleft ?tailright ?bridge} @ROUTE-OBJECT(priority="low");
     {?left ?right ?tailleft ?tailright ?bridge} @GROUP;
     {?left ?right} @ASSERT-INSTANCE(same=["model", "w", "l", "nf", "m", "area"],
@@ -513,12 +513,12 @@
     ?left ?right @ORIENT-RELATION("MY", priority="low");
     {?left ?right ?} @ALIGN("y", priority="low");
     {?left ? ?right} @DISTRIBUTE("left-to-right", priority="low");
-    {?degleft ?degright} @ALIGN("y", priority="low");
-    {?left ?degleft} @ALIGN("x", priority="low");
-    {?right ?degright} @ALIGN("x", priority="low");
+    {?degleft::position ?degright::position} @ALIGN("y", priority="low");
+    {?left ?degleft::position} @ALIGN("x", priority="low");
+    {?right ?degright::position} @ALIGN("x", priority="low");
     {?left ?degleft ?tail} @ORDER("top-to-bottom", priority="low");
     {?right ?degright ?tail} @ORDER("top-to-bottom", priority="low");
-    {?left ?tail ?right} @DISTRIBUTE("left-to-right", priority="low");
+    {?left ?tail::position ?right} @DISTRIBUTE("left-to-right", priority="low");
     {?left ?right ?degleft ?degright ?tail} @ROUTE-OBJECT(priority="low");
     {?left ?right ?degleft ?degright ?tail} @GROUP;
     {?left ?right} @ASSERT-INSTANCE(same=["model", "w", "l", "nf", "m", "area"],
@@ -801,7 +801,7 @@
      Places and routes; a group. */
   $TRANS_LINEAR_LOOP = @DEFINE(roles=[["{a}", ["instance", "usage"]], ["{b}", ["instance", "usage"]]]) {
     {?a ?b} @AS $PARALLEL;
-    {?a ?b ?} @ALIGN("x", priority="low");
+    {?a::position ?b::position ?} @ALIGN("x", priority="low");
     {?a ?b} @GROUP;
     {?a ?b} @ROUTE-OBJECT(priority="low");
   };
@@ -811,7 +811,7 @@
   $TRANS_LINEAR_LOOP_HORIZONTAL = @DEFINE(
       roles=[["{a}", ["instance", "usage"]], ["{b}", ["instance", "usage"]]]) {
     {?a ?b} @AS $PARALLEL;
-    {?a ?b ?} @ALIGN("y", priority="low");
+    {?a::position ?b::position ?} @ALIGN("y", priority="low");
     {?a ?b} @GROUP;
     {?a ?b} @ROUTE-OBJECT(priority="low");
   };
@@ -1049,7 +1049,7 @@
   $TRANSMISSION_GATE = @DEFINE(
       roles=[["pmos", ["instance", "usage"]], ["nmos", ["instance", "usage"]]]) {
     {?pmos ?nmos} @AS $PARALLEL;
-    {?pmos ?nmos ?} @ALIGN("x", priority="low");
+    {?pmos::position ?nmos::position ?} @ALIGN("x", priority="low");
     {?pmos ?nmos} @ORDER("top-to-bottom", priority="low");
     {?pmos ?nmos} @GROUP;
     ?pmos @SELECT-INSTANCE(type="*")
@@ -1064,7 +1064,7 @@
   $TRANSMISSION_GATE_HORIZONTAL = @DEFINE(
       roles=[["pmos", ["instance", "usage"]], ["nmos", ["instance", "usage"]]]) {
     {?pmos ?nmos} @AS $PARALLEL;
-    {?pmos ?nmos ?} @ALIGN("y", priority="low");
+    {?pmos::position ?nmos::position ?} @ALIGN("y", priority="low");
     {?pmos ?nmos} @ORDER("left-to-right", priority="low");
     {?pmos ?nmos} @GROUP;
     ?pmos @SELECT-INSTANCE(type="*")
