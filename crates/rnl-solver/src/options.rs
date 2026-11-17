@@ -502,7 +502,7 @@ impl Default for SolverOptions {
     }
 }
 
-const KEYS: [&str; 18] = [
+const KEYS: [&str; 19] = [
     "tolerance",
     "grid",
     "objectives",
@@ -514,6 +514,7 @@ const KEYS: [&str; 18] = [
     "spacing_x",
     "spacing_y",
     "join_trees",
+    "reroute_nets",
     "search",
     "report_hints",
     "junction_utf8",
@@ -595,6 +596,9 @@ impl SolverOptions {
         // named only when on, so that the text of the defaults is as it was
         if self.settings.join_trees {
             text.push_str(";join_trees=true");
+        }
+        if self.settings.reroute_nets {
+            text.push_str(";reroute_nets=true");
         }
         if let Some(junction) = &self.settings.junction {
             // UTF-8 hex keeps arbitrary quoted definition names independent of this format's
@@ -682,6 +686,9 @@ impl SolverOptions {
                 }
                 "join_trees" => {
                     options.settings.join_trees = value.parse().map_err(|_| "join_trees must be true or false")?
+                }
+                "reroute_nets" => {
+                    options.settings.reroute_nets = value.parse().map_err(|_| "reroute_nets must be true or false")?
                 }
                 "junction_utf8" => {
                     if value.len() % 2 != 0 || !value.is_ascii() {
@@ -840,6 +847,14 @@ mod tests {
         assert!(text.ends_with(";join_trees=true"), "{text}");
         assert_eq!(SolverOptions::parse(&text), Ok(joined));
         assert!(SolverOptions::parse("join_trees=yes").unwrap_err().contains("true or false"));
+        // each net routed again: named only when on
+        let mut again = options.clone();
+        again.settings.reroute_nets = true;
+        let text = again.canonical();
+        assert!(text.ends_with(";reroute_nets=true"), "{text}");
+        assert_eq!(SolverOptions::parse(&text), Ok(again));
+        assert!(!options.canonical().contains("reroute_nets"));
+        assert!(SolverOptions::parse("reroute_nets=yes").unwrap_err().contains("true or false"));
         // where the group-tree start stopped: named only when given, a work or false
         for (tree, written) in [(TreeWork::At(123), ";tree_work=123"), (TreeWork::Off, ";tree_work=false")] {
             let given =

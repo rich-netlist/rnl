@@ -15,6 +15,12 @@ const LEAD: u8 = 8;
 const AGAIN: usize = 3;
 const MOST_POINTS: usize = 1_500_000;
 const WHOLE_POINTS: usize = 250_000;
+/// The work of a step of `reroute_nets`, a point its searches expand, with its share of the
+/// comparisons that keep or drop a path routed again. The steps of the first routing are paid for
+/// within the compaction each drawing goes on to; these are on top of it. Measured on the examples
+/// of a local set (optimized build): such a step takes about 200 to 250 ns, and the line search
+/// admits about 22 to 62 units of work a nanosecond.
+const REROUTE_WORK: u64 = 9_000;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Owner {
     Side(usize, u8),
@@ -107,6 +113,9 @@ pub(crate) struct Input<'a> {
     pub fixed: Vec<(usize, Vec<[Q; 2]>)>,
     pub clip: Option<[Q; 4]>,
     pub lenient: bool,
+    /// `reroute_nets`: each path of a net routed in three parts or more is taken out once and the
+    /// parts it joined joined again, kept where the net's own drawing is cheaper.
+    pub reroute: bool,
 }
 #[derive(Clone, Debug, Default)]
 pub(crate) struct GroupIn {
@@ -448,6 +457,55 @@ fn groups_of_net(input: &Input, i: usize) -> Vec<usize> {
     out.sort_by_key(|&g| (Reverse(input.groups[g].depth), g));
     out
 }
+/// The ways the wires leave each point of a run of neighbouring points, one bit for each step.
+fn add_dirs(dirs: &mut BTreeMap<Pt, u8>, pts: &[Pt]) {
+    for w in pts.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        if let Some(d) = STEP.iter().position(|s| (a.0 + s.0, a.1 + s.1) == b) {
+            *dirs.entry(a).or_default() |= 1 << d;
+            *dirs.entry(b).or_default() |= 1 << ((d + 2) % 4);
+        }
+    }
+}
+/// The cost of a net's paths as drawn together: crossings and bends weighed, a point the wires
+/// leave two ways at a right angle a bend, a pin left other than its way out a bend; then the
+/// length, in steps, every step once.
+fn merged(
+    base: &BTreeMap<Pt, u8>,
+    paths: &[(Vec<Pt>, u32)],
+    anchors: &[(Pt, Option<(i64, i64)>)],
+    weights: (u64, u64),
+) -> (u64, usize) {
+    let mut dirs = base.clone();
+    let mut edges = BTreeSet::new();
+    let mut crossings = 0u64;
+    for (p, c) in paths {
+        crossings += u64::from(*c);
+        let pts = points_of(p);
+        add_dirs(&mut dirs, &pts);
+        for w in pts.windows(2) {
+            if w[0] != w[1] {
+                edges.insert((w[0].min(w[1]), w[0].max(w[1])));
+            }
+        }
+    }
+    let mut bends = 0u64;
+    for m in dirs.values() {
+        if m.count_ones() == 2 && *m != 0b0101 && *m != 0b1010 {
+            bends += 1;
+        }
+    }
+    for (p, exit) in anchors {
+        if let (Some(e), Some(m)) = (exit, dirs.get(p)) {
+            if let Some(d) = STEP.iter().position(|s| (i64::from(s.0), i64::from(s.1)) == *e) {
+                if m & (1 << d) == 0 {
+                    bends += 1;
+                }
+            }
+        }
+    }
+    (weights.0 * crossings + weights.1 * bends, edges.len())
+}
 fn route_net(
     input: &Input,
     scene: &Scene,
@@ -581,7 +639,39 @@ fn route_part(
         None => (0..input.groups.len()).collect(),
     };
     let holds = |r: &[(i32, i32); 2], p: &Pt| r[0].0 <= p.0 && p.0 <= r[0].1 && r[1].0 <= p.1 && p.1 <= r[1].1;
-    let mut paths: Vec<Vec<Pt>> = Vec::new();
+    let connect = |sources: &[(Pt, Option<(i64, i64)>)],
+                   tree: &BTreeMap<Pt, Option<usize>>,
+                   spent: &mut u64,
+                   counts: &mut Parts|
+     -> Result<Option<(Vec<Pt>, u32, u32)>, String> {
+        let barred: Vec<[(i32, i32); 2]> = inside
+            .iter()
+            .filter_map(|&c| region(c))
+            .filter(|b| !sources.iter().any(|(p, _)| holds(b, p)) && !tree.keys().any(|p| holds(b, p)))
+            .collect();
+        let bound = Bound { clip, barred };
+        let seek = |bound: &Bound, spent: &mut u64| match join(input, scene, lines, i, sources, tree, &at, bound, spent)
+        {
+            Err(_) if input.lenient => Ok(None),
+            other => other,
+        };
+        let mut found = seek(&bound, spent)?;
+        if found.is_none() && !bound.barred.is_empty() {
+            found = seek(&Bound { clip, barred: Vec::new() }, spent)?;
+            counts.through += usize::from(found.is_some());
+        }
+        if found.is_none() && group.is_some() && clip.is_some() {
+            let outer = scene.clip.map(|r| given(r, 1));
+            found = seek(&Bound { clip: outer, barred: Vec::new() }, spent)?;
+            counts.left += usize::from(found.is_some());
+        }
+        Ok(found)
+    };
+    let mut base_dirs: BTreeMap<Pt, u8> = BTreeMap::new();
+    for pts in &joins {
+        add_dirs(&mut base_dirs, pts);
+    }
+    let mut routed: Vec<(Vec<Pt>, u32)> = Vec::new();
     while !left.is_empty() {
         let gap = |r: usize| {
             let (anchors, points) = &parts[&r];
@@ -597,45 +687,123 @@ fn route_part(
         let touching = sources.iter().find(|(p, _)| tree.contains_key(p)).map(|(p, _)| *p);
         let found = match touching {
             Some(p) => Some((vec![p], 0, 0)),
-            None => {
-                let barred: Vec<[(i32, i32); 2]> = inside
-                    .iter()
-                    .filter_map(|&c| region(c))
-                    .filter(|b| !sources.iter().any(|(p, _)| holds(b, p)) && !tree.keys().any(|p| holds(b, p)))
-                    .collect();
-                let bound = Bound { clip, barred };
-                let seek = |bound: &Bound, spent: &mut u64| match join(
-                    input, scene, lines, i, &sources, &tree, &at, bound, spent,
-                ) {
-                    Err(_) if input.lenient => Ok(None),
-                    other => other,
-                };
-                let mut found = seek(&bound, spent)?;
-                if found.is_none() && !bound.barred.is_empty() {
-                    found = seek(&Bound { clip, barred: Vec::new() }, spent)?;
-                    counts.through += usize::from(found.is_some());
-                }
-                if found.is_none() && group.is_some() && clip.is_some() {
-                    let outer = scene.clip.map(|r| given(r, 1));
-                    found = seek(&Bound { clip: outer, barred: Vec::new() }, spent)?;
-                    counts.left += usize::from(found.is_some());
-                }
-                found
-            }
+            None => connect(&sources, &tree, spent, counts)?,
         };
         if found.is_none() && input.lenient {
             counts.failed += 1;
             continue;
         }
-        let Some((path, _, _)) = found else {
+        let Some((path, crossings, _)) = found else {
             return Err(format!("no way joins its pin {} to the rest", anchors.first().copied().unwrap_or(0)));
         };
         add(&mut tree, &parts[&r]);
-        for p in points_of(&path) {
+        let pts = points_of(&path);
+        for &p in &pts {
             tree.entry(p).or_insert(None);
         }
-        paths.push(path);
+        routed.push((path, crossings));
     }
+    // `reroute_nets`: each path once, the rest kept, the parts it left apart joined again as
+    // above; taken where the net's own drawing is cheaper.
+    if input.reroute && routed.len() >= 2 {
+        let _span = crate::profile::span("lines", "reroute");
+        let before = *spent;
+        let all: Vec<(Pt, Option<(i64, i64)>)> =
+            parts.values().flat_map(|(a, _)| a.iter().map(|&a| (at[a], net.anchors[a].exit))).collect();
+        let keys: Vec<usize> = parts.keys().copied().collect();
+        for _ in 0..routed.len() {
+            let round = *spent;
+            let out = routed.remove(0);
+            // the parts and the paths kept, joined where they share a point
+            let nodes: Vec<(Vec<usize>, Vec<Pt>)> = keys
+                .iter()
+                .map(|r| {
+                    let (a, p) = &parts[r];
+                    (a.clone(), a.iter().map(|&a| at[a]).chain(p.iter().copied()).collect())
+                })
+                .chain(routed.iter().map(|(p, _)| (Vec::new(), points_of(p))))
+                .collect();
+            let mut up: Vec<usize> = (0..nodes.len()).collect();
+            let mut seen: BTreeMap<Pt, usize> = BTreeMap::new();
+            for (k, (_, pts)) in nodes.iter().enumerate() {
+                for p in pts {
+                    match seen.get(p) {
+                        Some(&f) => unite(&mut up, k, f),
+                        None => {
+                            seen.insert(*p, k);
+                        }
+                    }
+                }
+            }
+            let mut comps: BTreeMap<usize, (Vec<usize>, BTreeSet<Pt>)> = BTreeMap::new();
+            for (k, (a, pts)) in nodes.iter().enumerate() {
+                let c = comps.entry(find(&mut up, k)).or_default();
+                c.0.extend(a.iter().copied());
+                c.1.extend(pts.iter().copied());
+            }
+            let start = comps.iter().find(|(_, c)| c.0.contains(&first)).map(|(k, _)| *k);
+            let Some(start) = start else {
+                routed.push(out);
+                continue;
+            };
+            let mut t2: BTreeMap<Pt, Option<usize>> = BTreeMap::new();
+            let put = |t: &mut BTreeMap<Pt, Option<usize>>, (a, pts): &(Vec<usize>, BTreeSet<Pt>)| {
+                for &x in a {
+                    t.insert(at[x], Some(x));
+                }
+                for &p in pts {
+                    t.entry(p).or_insert(None);
+                }
+            };
+            put(&mut t2, &comps[&start]);
+            let mut rest: Vec<usize> = comps.keys().copied().filter(|&k| k != start).collect();
+            let mut new: Vec<(Vec<Pt>, u32)> = Vec::new();
+            let mut ok = true;
+            while !rest.is_empty() {
+                let near = |q: Pt| t2.keys().map(|p| (p.0 - q.0).abs() + (p.1 - q.1).abs()).min().unwrap_or(0);
+                let gap = |k: usize| comps[&k].1.iter().map(|&q| near(q)).min().unwrap_or(0);
+                let j = (0..rest.len()).min_by_key(|&j| (gap(rest[j]), rest[j])).expect("rest");
+                let k = rest.remove(j);
+                let (a, pts) = &comps[&k];
+                let mut sources: Vec<(Pt, Option<(i64, i64)>)> =
+                    a.iter().map(|&x| (at[x], net.anchors[x].exit)).collect();
+                sources.extend(pts.iter().filter(|p| !a.iter().any(|&x| at[x] == **p)).map(|&p| (p, None)));
+                let touching = sources.iter().find(|(p, _)| t2.contains_key(p)).map(|(p, _)| *p);
+                let found = match touching {
+                    Some(p) => Some((vec![p], 0, 0)),
+                    None => connect(&sources, &t2, spent, counts)?,
+                };
+                let Some((path, crossings, _)) = found else {
+                    ok = false;
+                    break;
+                };
+                put(&mut t2, &comps[&k]);
+                let pts = points_of(&path);
+                for &p in &pts {
+                    t2.entry(p).or_insert(None);
+                }
+                new.push((path, crossings));
+            }
+            let mut with_out = routed.clone();
+            with_out.push(out.clone());
+            let mut candidate = routed.clone();
+            candidate.extend(new);
+            if ok
+                && merged(&base_dirs, &candidate, &all, input.weights)
+                    < merged(&base_dirs, &with_out, &all, input.weights)
+            {
+                routed = candidate;
+            } else {
+                routed.push(out);
+            }
+            let cost = (*spent - round).max(1).saturating_mul(REROUTE_WORK);
+            if !crate::budget::permit_weighted(crate::budget::Step::Route, cost) {
+                return Err("the shared solve budget stopped line routing".into());
+            }
+        }
+        crate::profile::add("reroute_expansions", *spent - before);
+    }
+    let mut paths: Vec<Vec<Pt>> = routed.into_iter().map(|(p, _)| p).collect();
     counts.inner += usize::from(group.is_some());
     // Certify the core's candidate before reserving it for subsequent trees.
     // Existing joins, fixed wires and multi-anchor trees retain their topology.
@@ -1661,6 +1829,7 @@ mod tests {
             fixed: vec![],
             clip: None,
             lenient: false,
+            reroute: false,
         }
     }
     /// Only the ratio of the weights matters: they are reduced by their greatest common divisor
@@ -1789,6 +1958,75 @@ mod tests {
         assert_eq!(report.work, 5);
         let complete = window(&lines, &scene, 0, &points, 0, &bound).unwrap();
         assert!(complete.barred.iter().any(|&cell| cell));
+    }
+
+    /// The bends of the first net as routed: the corners of its wires, and a pin a wire leaves
+    /// other than by its way out; a branch is no bend.
+    fn bends(layout: &Layout, made: &Routed) -> usize {
+        let anchors = &layout.nets[0].anchors;
+        let mut n = 0;
+        for w in &made.outs[0].wires {
+            n += w.vertices.len().saturating_sub(2);
+            let last = w.vertices.len() - 1;
+            for (end, at, next) in [(w.start, 0, 1), (w.end, last, last - 1)] {
+                let End::Anchor(a) = end else { continue };
+                let (p, q) = (&w.vertices[at], &w.vertices[next]);
+                let way = |k: usize| match q[k].cmp(&p[k]) {
+                    std::cmp::Ordering::Less => -1,
+                    std::cmp::Ordering::Equal => 0,
+                    std::cmp::Ordering::Greater => 1,
+                };
+                n += usize::from(anchors[a].exit.is_some_and(|e| e != (way(0), way(1))));
+            }
+        }
+        n
+    }
+
+    /// `reroute_nets`: a net of three pins, two above that leave downwards and one between them
+    /// below that leaves upwards, with or without a label beside the lower pin. The first wire is
+    /// joined before the second is known, and the lower pin is left sideways; routed again, the
+    /// net is a T, one bend fewer. A net of two pins is as it was.
+    #[test]
+    fn rerouting_a_net_of_three_pins_makes_it_a_t() {
+        let anchor = |x: i64, y: i64, exit: (i64, i64)| AnchorIn {
+            at: [int(x), int(y)],
+            exit: Some(exit),
+            owner: None,
+            connects_pin: true,
+            existing_junction: false,
+        };
+        let tail = |label: bool| Layout {
+            modern: true,
+            texts: if label { vec![[int(8), int(-1), int(12), int(3)]] } else { vec![] },
+            nets: vec![
+                NetIn {
+                    anchors: vec![anchor(0, 8, (0, -1)), anchor(16, 8, (0, -1)), anchor(7, 0, (0, 1))],
+                    joined: vec![],
+                    preferred: None,
+                },
+                NetIn {
+                    anchors: vec![anchor(-6, -4, (1, 0)), anchor(-2, -8, (0, 1))],
+                    joined: vec![],
+                    preferred: None,
+                },
+            ],
+            ..Default::default()
+        };
+        for label in [false, true] {
+            let layout = tail(label);
+            let with = |reroute: bool| {
+                let mut input = input(&layout);
+                input.reroute = reroute;
+                let made = route(&input);
+                assert!(made.failed.is_none(), "{label} {reroute}: {:?}", made.failed);
+                made
+            };
+            let (once, again) = (with(false), with(true));
+            assert_eq!((bends(&layout, &once), bends(&layout, &again)), (3, 2), "{label}");
+            assert_eq!(again.outs[0].branches, vec![[int(7), again.outs[0].branches[0][1].clone()]]);
+            assert!(again.crossings <= once.crossings);
+            assert_eq!(format!("{:?}", again.outs[1]), format!("{:?}", once.outs[1]));
+        }
     }
 
     #[test]

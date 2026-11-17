@@ -91,6 +91,7 @@ its previous semicolon syntax is also accepted during the transition.
 | `lines_weights` | two integers from 0 through 1000, `[crossing, bend]`, not both 0; the line layout ranks by crossing × crossings + bend × bends | `[1, 4]` | yes |
 | `virtual_weight` | number from 0 through 1; in the line layout's `symbol_lines`, a row or column of the symbols that only virtual symbols take counts this: the objects of usages, such as supply, ground or port symbols, whatever joins them; one an instance of the netlist or a bundle takes counts 1 | 0.5 | yes |
 | `lines_order` | the layers the line layout ranks by after its facts, false joins, annotations and rules, written as `objectives` writes layers but without tolerances; items `current`, `crossings_and_bends`, `hidden_ports`, `rail_heights`, `mirror_pairs`, `dots_near_pins`, `length`, `wire_lines`, `symbol_lines`, `area`; an item left out does not rank | `current,crossings_and_bends,symbol_lines+wire_lines*2,length,area` | yes |
+| `reroute_nets` | boolean; the line layout's router routes each net of three pins or more again, a wire at a time, and keeps a wire routed again where the net then has fewer crossings and bends, weighed by `lines_weights`, or as many and is shorter; it takes longer, and its searches count in the work | false | yes |
 | `junction` | definition name as a string; empty disables dots | unset | yes |
 | `tolerance` | finite nonnegative number | 0.000001 | yes |
 | `grid` | positive number, or `false` | 1 | yes |

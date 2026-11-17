@@ -713,7 +713,11 @@ impl Skeleton {
             // others. A wire drawn straight has no such piece, and is a lead like any other.
             let bent =
                 seg.default_auto && [seg.a, seg.b].iter().any(|&v| matches!(self.vertices[v].key, Key::Bend(..)));
-            let least = if self.collapses(i).is_some() || self.z_middle(i) || (self.strict && !self.lead_or_floor(i)) {
+            let least = if self.collapses(i).is_some()
+                || self.z_middle(i)
+                || (self.strict && !self.lead_or_floor(i))
+                || self.floor_at_branch(i)
+            {
                 Q::zero()
             } else if self.whole && !bent {
                 least_lead
@@ -1333,9 +1337,53 @@ impl Skeleton {
         self.vertices[a].spot != self.vertices[b].spot && ((leads(a) && branch(b)) || (leads(b) && branch(a)))
     }
 
+    /// A floor of a routed wire, not a lead, between a branch of three and a bend, each of its two
+    /// arms, which leave it the same way, running to a bend. It may close up: the two arms then lie
+    /// on one line, and [`super::folded`] makes them a T, one bend fewer.
+    pub(crate) fn floor_at_branch(&self, seg: usize) -> bool {
+        if !self.strict {
+            return false;
+        }
+        let s = &self.segs[seg];
+        let Some(along) = s.along else { return false };
+        if !s.routed {
+            return false;
+        }
+        let (pa, pb) = (self.vertices[s.a].spot, self.vertices[s.b].spot);
+        if pa == pb {
+            return false;
+        }
+        let (sa, sb) = (self.side(seg, pa), self.side(seg, pb));
+        if sa == 0 || sa != sb {
+            return false;
+        }
+        let plain = |sp: usize| {
+            let spot = &self.spots[sp];
+            spot.pins.is_empty() && !spot.point && spot.segs.len() == 2
+        };
+        let branch = |sp: usize| {
+            let spot = &self.spots[sp];
+            spot.pins.is_empty() && spot.point && spot.segs.len() == 3
+        };
+        // the arm at a spot: the one segment there across the floor; its far end a bend
+        let arm_to_bend = |sp: usize| {
+            let arms: Vec<usize> = self.spots[sp]
+                .segs
+                .iter()
+                .copied()
+                .filter(|&o| o != seg && self.segs[o].along.is_some() && self.segs[o].along != Some(along))
+                .collect();
+            arms.len() == 1 && plain(self.vertices[self.other_end(arms[0], sp)].spot)
+        };
+        ((branch(pa) && plain(pb)) || (branch(pb) && plain(pa))) && arm_to_bend(pa) && arm_to_bend(pb)
+    }
+
     pub(crate) fn saves(&self, seg: usize) -> u8 {
         if self.collapses(seg).is_some() || self.z_middle(seg) {
             return 2;
+        }
+        if self.floor_at_branch(seg) {
+            return 1;
         }
         let s = &self.segs[seg];
         if s.along.is_none() || self.lead_or_floor(seg) {
