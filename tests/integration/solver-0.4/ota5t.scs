@@ -1,0 +1,78 @@
+// Five-transistor OTA with its bias mirror, and a testbench
+// An NMOS input pair M1/M2 loaded by the PMOS mirror M3/M4; its tail M5 is mirrored from the reference current IREF
+// through M6. The top level is an open-loop testbench with two antiphase input sources.
+// @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4") }
+simulator lang=spectre
+
+model nch mos1 type=n vto=0.5 kp=200u lambda=0.1
+model pch mos1 type=p vto=-0.5 kp=80u lambda=0.1
+
+subckt ota5t inp inn out vdd vss
+IREF (vdd nb) isource dc=20u
+M6 (nb nb vss vss) nch w=4u l=1u
+M5 (tail nb vss vss) nch w=8u l=1u
+M1 (x inp tail vss) nch w=10u l=0.5u
+M2 (out inn tail vss) nch w=10u l=0.5u
+M3 (x x vdd vdd) pch w=10u l=0.5u
+M4 (out x vdd vdd) pch w=10u l=0.5u
+// @RNL {
+//   &vdd @ADD-TO $SUPPLY_NET_SET;
+//   &vss @ADD-TO $GROUND_NET_SET;
+//   $IO_PORT @ATTACH &inp => %p_inp;
+//   $IO_PORT @ATTACH &inn => %p_inn;
+//   $IO_PORT @ATTACH &out => %p_out;
+//   %routed_nets = # @SELECT-NET;
+//   %routed_nets @ROUTE-NET;
+//
+//   /* the static currents (15.2), for the solver to draw them downwards; not criteria */
+//   {#IREF:p #M6:d #M5:d #M1:d #M2:d #M3:s #M4:s} @CURRENT("in");
+//   {#IREF:n #M6:s #M5:s #M1:s #M2:s #M3:d #M4:d} @CURRENT("out");
+//
+//   /* what the circuit is: an NMOS pair M1/M2 loaded by the PMOS mirror M3/M4, its tail M5 mirrored from IREF through M6 */
+//   %dp = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;
+//   %cm_load = {#M3}(ref) {#M4}(out) @AS $CURRENT_MIRROR_P;
+//   %cm_bias = {#M6}(ref) {#M5}(out) @AS $CURRENT_MIRROR_N;
+//   %amp = %dp(transconductor) %cm_load(load) @AS $TRANSCONDUCTOR_Z_AMPLIFIER;
+//
+//   /* the amplifier and its signal ports are one block */
+//   %amp_group = %amp %p_inp %p_inn %p_out @GROUP;
+//   %diode_connected = {#M3 #M6} @AS $DIODE_CONNECTED;
+//   %bias = {#IREF #M6} @AS $BIAS_CIRCUIT;
+//   %flow_ota = {%dp %cm_load}(path) {&inp &inn}(source) {&out}(load) @AS $SIGNAL_FLOW;
+//
+//   /* the supply-to-ground paths, each a branch from the top down: the bias branch and the two sides of the pair
+//      (the tail M5 is the pair's) */
+//   %br_bias = {#IREF #M6} @AS $BRANCH;
+//   %br_left = {#M3 #M1} @AS $BRANCH;
+//   %br_right = {#M4 #M2} @AS $BRANCH;
+//
+//   /* the bias branch stands left of the pair, the output on the right */
+//   %stage_order = {%br_bias %amp %p_out} @ORDER("left-to-right");
+//
+//   /* the block symbol drawn for the instances of ota5t */
+//   # @SET-SYMBOL(terminals=[[1, "inp"], [2, "inn"], [3, "out"], [4, "vp"], [5, "vn"]]) $OPAMP_SUPPLY
+// }
+ends ota5t
+
+VDD (vdd 0) vsource dc=1.8
+VIP (inp 0) vsource dc=0.9 mag=0.5
+VIN (inn 0) vsource dc=0.9 mag=0.5 phase=180
+XU1 (inp inn out vdd 0) ota5t
+CL (out 0) capacitor c=1p
+// @RNL {
+//   &vdd @ADD-TO $SUPPLY_NET_SET;
+//   %routed_nets = # @SELECT-NET;
+//   {$GROUND_NET_SET $SUPPLY_NET_SET $BIAS_NET_SET} @REMOVE-FROM %routed_nets;
+//   %routed_nets @ROUTE-NET;
+//
+//   /* what the circuit is: the OTA driven by two antiphase sources, loaded by CL */
+//   %flow = {#XU1}(path) {#VIP #VIN}(source) {#CL}(load) @AS $SIGNAL_FLOW;
+//
+//   /* from left to right the two input sources (VIP, to the upper pin, first), the amplifier and the load; the supply
+//      source stands at least 4 to the left */
+//   %testbench_order = {#VIP #VIN #XU1 #CL} @ORDER("left-to-right");
+//   %supply_distance = #VDD {#VIP #VIN #XU1 #CL} @DISTANCE("left-to-right", min=4);
+//
+//   /* only the sources and the load are turned */
+//   %upright_parts = {#VDD #VIP #VIN #CL} @ORIENT("R0");
+// }

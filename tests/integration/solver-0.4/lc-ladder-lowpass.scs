@@ -1,0 +1,42 @@
+// Fifth-order Butterworth LC ladder low-pass, 50 ohm, 100 MHz, with source and load
+// Doubly terminated: source resistor RS, shunt C1, series L2, shunt C3, series L4, shunt C5, load RL.
+// @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-PACKAGE(name="rnl-std-semantics", version="0.4"); @VERSION("0.4")}
+simulator lang=spectre
+
+VS (src 0) vsource dc=0 mag=2
+RS (src in) resistor r=50
+C1 (in 0) capacitor c=19.7p
+L2 (in n2) inductor l=128.8n
+C3 (n2 0) capacitor c=63.7p
+L4 (n2 out) inductor l=128.8n
+C5 (out 0) capacitor c=19.7p
+RL (out 0) resistor r=50
+// @RNL {
+//   #VS @SET-SYMBOL $SINE_VOLTAGE_SOURCE;
+//   $NET_LABEL @ATTACH &out => %pout;
+//   %routed_nets = # @SELECT-NET;
+//   %routed_nets @ROUTE-NET;
+//
+//   /* what the circuit is: a doubly terminated fifth-order LC ladder, shunt C1, series L2, shunt C3, series L4, shunt C5,
+//      between the source resistor RS and the load RL */
+//   %pi1 = #C1(shunt1) #L2(series) #C3(shunt2) @AS $PI_NETWORK;
+//   %pi2 = #C3(shunt1) #L4(series) #C5(shunt2) @AS $PI_NETWORK;
+//   %t1 = #L2(series1) #C3(shunt) #L4(series2) @AS $T_NETWORK;
+//   {#C1 #C5} @AS $MATCHED_CAPACITOR;
+//   {#L2 #L4} @AS $MATCHED;
+//   {#RS #RL} @AS $MATCHED_RESISTOR;
+//   %flow = {#RS #C1 #L2 #C3 #L4 #C5}(path) {#VS}(source) {#RL %pout}(load) @AS $SIGNAL_FLOW;
+//
+//   /* no branch here (nothing carries DC): the ladder is laid out by hand.
+//      The series path is one row, lying: source resistor, L2, L4 */
+//   %series_row = {#RS #L2 #L4} @ALIGN("y");
+//
+//   /* from left to right the source, the series parts alternating with the shunt capacitors, the load and the output
+//      tag; the shunt capacitors and the load in one row below the series row */
+//   %ladder_order = {#VS #RS #C1 #L2 #C3 #L4 #C5 #RL %pout} @ORDER("left-to-right");
+//   %shunt_row = {#C1 #C3 #C5 #RL} @ALIGN("y");
+//   %shunt_below_series = {#C1 #C3 #C5} {#RS #L2 #L4} @DISTANCE("bottom-to-top", min=3);
+//
+//   /* the source and the load stand upright */
+//   %upright_parts = {#VS #RL} @ORIENT("R0");
+// }

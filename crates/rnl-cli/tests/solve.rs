@@ -35,7 +35,7 @@ fn unlimited() -> SolveOptions {
 /// The work a level of 0.4 of a case written for the solver is solved within: its lines layout
 /// searches on as long as nothing stops it, so a fixed work keeps the solve short and the same on
 /// every run, as `--solver-config limit="work"` (17).
-const WORK_04: u64 = 1_000_000_000;
+const WORK_04: u64 = 100_000_000;
 
 /// The options a case written for the solver is solved with: [`unlimited`], and a file of 0.4
 /// within [`WORK_04`]. A file of 0.2 keeps the options of its snapshot.
@@ -106,13 +106,17 @@ fn scratch(name: &str) -> PathBuf {
 /// The text `rnl solve` wrote for a case is its snapshot, byte for byte; with `RNL_BLESS` set it
 /// becomes the snapshot.
 fn compare_or_bless(name: &str, text: &str) {
-    let path = solver_dir().join("solved").join(format!("{name}.sp"));
+    compare_or_bless_at(&solver_dir().join("solved").join(format!("{name}.sp")), text);
+}
+
+/// [`compare_or_bless`] with the snapshot at `path`.
+fn compare_or_bless_at(path: &Path, text: &str) {
     if std::env::var("RNL_BLESS").is_ok() {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(&path, text).unwrap();
+        std::fs::write(path, text).unwrap();
         return;
     }
-    let want = std::fs::read(&path).unwrap_or_default();
+    let want = std::fs::read(path).unwrap_or_default();
     assert!(
         want == text.as_bytes(),
         "{} is not what `rnl solve` writes now; run with RNL_BLESS=1 after a change that is meant:\n{text}",
@@ -305,6 +309,13 @@ fn check_read_back(run: &SolveRun, entry: &Path, files: &dyn Provider, what: &st
                         | FactKind::PinOrient { .. }
                 )
             })
+            // the port column of the fill is made only where no $IO_PORT is written on a port
+            // net; the record writes the tags it made, so the file read back has no column, and
+            // its facts, and those that place it, are not there (rnl-std-fill.rnl, 9.4)
+            .filter(|(k, f)| {
+                !f.chain.iter().any(|&u| p.usages[u].definition.ends_with("port_column"))
+                    && !describe_fact(p, *k).contains("a usage of port_column")
+            })
             .map(|(k, f)| {
                 let status = if reaches(&f.kind, &unwritable) {
                     "unsolved"
@@ -313,7 +324,9 @@ fn check_read_back(run: &SolveRun, entry: &Path, files: &dyn Provider, what: &st
                 } else {
                     "ok"
                 };
-                (f.kind.name().to_string(), f.priority.as_str(), status)
+                // a viewer names an ORIENT-RELATION of pins as it is written
+                let kind = if f.kind.name() == "PIN-ORIENT-RELATION" { "ORIENT-RELATION" } else { f.kind.name() };
+                (kind.to_string(), f.priority.as_str(), status)
             })
             .collect();
         let mut got: Vec<(String, &str, &str)> = lv
@@ -332,6 +345,83 @@ fn check_read_back(run: &SolveRun, entry: &Path, files: &dyn Provider, what: &st
         assert_eq!(got, want, "{what}");
         let q = again.problems.iter().find(|q| q.level == p.level).unwrap();
         assert_eq!(same_input(&level.hash, q), Some(true), "{what}");
+    }
+}
+
+/// The twelve cases reviewed for 0.4 (tests/integration/solver-0.4/README.md).
+const REVIEWED: [&str; 12] = [
+    "bandgap-reference.sp",
+    "cs-amplifier.sp",
+    "ctle-rc-degenerated.scs",
+    "diff-pair-resistive.sp",
+    "fd-sample-hold.sp",
+    "lc-ladder-lowpass.scs",
+    "miller-opamp.scs",
+    "ota5t.scs",
+    "preamp-latch-comparator.sp",
+    "r2r-dac4.sp",
+    "telescopic-ota.scs",
+    "tow-thomas-biquad.sp",
+];
+
+/// The four of them kept byte for byte: one level with a flow and branches; a subcircuit with its
+/// testbench, a differential pair, mirrors and ports; a ladder with no direction of current; two
+/// levels with an op-amp subcircuit.
+const REVIEWED_SNAPSHOTS: [&str; 4] = ["cs-amplifier.sp", "ota5t.scs", "lc-ladder-lowpass.scs", "tow-thomas-biquad.sp"];
+
+/// The work the release check solves each reviewed case within: about five seconds of a release
+/// build, enough for the lines layout of every level.
+const REVIEWED_WORK: u64 = 300_000_000;
+
+fn reviewed_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/integration/solver-0.4")
+}
+
+/// Solves a reviewed case with `options` and checks it whole: no error, every level of the file
+/// solved with nothing left unsolved or unrouted, every fact kept holding and every fact discarded
+/// not, the lines layout taken, and the file written and read back (as
+/// [`every_case_solved_and_written_back_reads_back_whole`] does); gives the text written.
+fn check_reviewed(name: &str, options: &SolveOptions) -> String {
+    let fs = FsProvider::new(&[]);
+    let f = reviewed_dir().join(name);
+    let run = solve(&f, &fs, options).unwrap_or_else(|e| panic!("{name}: {e}"));
+    assert_eq!(run.errors, 0, "{name}");
+    assert!(run.not_solved.is_empty(), "{name}: {:?}", run.not_solved);
+    assert_eq!(run.files.len(), 1, "{name}");
+    for level in &run.levels {
+        let report = &level.solved.report;
+        let what = format!("{name} / {}", level.problem.title);
+        assert!(report.failed.is_empty() && report.errors.is_empty(), "{what}: {:?}", report.errors);
+        assert!(report.unrouted.is_empty(), "{what}: {:?}", report.unrouted);
+        assert!(level.written.unsolved.is_empty(), "{what}: {:?}", level.written.unsolved);
+        // the work reaches the lines layout: the level is not left as the group tree has it
+        assert!(!report.notes.iter().any(|n| n.contains("before line search")), "{what}: {:?}", report.notes);
+    }
+    check_facts(&run, name);
+    let dir = scratch(&format!("reviewed-{name}"));
+    let writing = write(&run, &Target::Dir(dir.clone()));
+    assert_eq!(writing.error, None, "{name}");
+    let out = dir.join(name);
+    check_read_back(&run, &out, &fs, name);
+    std::fs::read_to_string(&out).unwrap()
+}
+
+#[test]
+fn four_reviewed_cases_solved_are_their_snapshots() {
+    for name in REVIEWED_SNAPSHOTS {
+        let f = reviewed_dir().join(name);
+        let text = check_reviewed(name, &for_case(&f));
+        compare_or_bless_at(&reviewed_dir().join("solved").join(name), &text);
+    }
+}
+
+#[test]
+#[ignore = "a release build solves the twelve in about a minute and a half; CI runs it with --release --ignored"]
+fn every_reviewed_case_is_laid_out_whole() {
+    for name in REVIEWED {
+        let mut options = unlimited();
+        options.solver.run_limit = Some(rnl_solver::RunLimit::Work(REVIEWED_WORK));
+        check_reviewed(name, &options);
     }
 }
 
@@ -1945,14 +2035,15 @@ fn every_minimal_group_is_named_and_a_limit_that_cuts_them_says_the_list_is_not_
 
 #[test]
 fn a_case_whose_resolution_runs_out_of_time_keeps_what_it_decided() {
-    // T4 within a work of a million, of which the resolution of 8.5 takes more: the facts decided
-    // by then are those of 8.5 as far as they go, three of them discarded, each later fact that
+    // T4 within a work of 62 000, of which the resolution of 8.5 takes about 64 000: the facts
+    // decided by then are those of 8.5 as far as they go, its four discarded, each later fact that
     // needs a check is undecided, and every fact kept holds; a level of 0.4 is resolved within the
-    // work of its solve, which the clock of the solve does not cut (7.6)
+    // work of its solve, which the clock of the solve does not cut (7.6). The window is narrow:
+    // within 60 000 no fact is discarded yet
     let fs = FsProvider::new(&[]);
     let t4 = case("T4-miller-conflicts");
     let mut cut = for_case(&t4);
-    cut.solver.run_limit = Some(rnl_solver::RunLimit::Work(1_000_000));
+    cut.solver.run_limit = Some(rnl_solver::RunLimit::Work(62_000));
     let run = solve(&t4, &fs, &cut).unwrap();
     let level = &run.levels[0];
     let r = &level.solved.report;

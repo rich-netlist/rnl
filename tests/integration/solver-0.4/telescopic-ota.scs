@@ -1,0 +1,118 @@
+// Telescopic cascode OTA with a cascode mirror load, single-ended, and its testbench
+// An NMOS input pair with NMOS cascodes, loaded by a PMOS cascode current mirror; three bias sources set the cascodes
+// and the load. The top level is an open-loop testbench.
+// @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4") }
+simulator lang=spectre
+
+model nch mos1 type=n vto=0.5 kp=200u lambda=0.1
+model pch mos1 type=p vto=-0.5 kp=80u lambda=0.1
+
+subckt telescopic inp inn out vdd vss vbn vbp vbt
+M1 (xa inp tail vss) nch w=10u l=0.5u
+M2 (xb inn tail vss) nch w=10u l=0.5u
+M3 (outn vbn xa vss) nch w=10u l=0.5u
+M4 (out vbn xb vss) nch w=10u l=0.5u
+M5 (outn vbp ya vdd) pch w=20u l=0.5u
+M6 (out vbp yb vdd) pch w=20u l=0.5u
+M7 (ya outn vdd vdd) pch w=20u l=1u
+M8 (yb outn vdd vdd) pch w=20u l=1u
+M9 (tail vbt vss vss) nch w=20u l=1u
+// @RNL {
+//   &vdd @ADD-TO $SUPPLY_NET_SET;
+//   &vss @ADD-TO $GROUND_NET_SET;
+//   {&vbn &vbp &vbt} @ADD-TO $BIAS_NET_SET;
+//   $IO_PORT @ATTACH &inp => %p_inp;
+//   $IO_PORT @ATTACH &inn => %p_inn;
+//   $IO_PORT @ATTACH &out => %p_out;
+//
+//   %routed_nets = # @SELECT-NET;
+//   %routed_nets @ROUTE-NET;
+//
+//   /* the static currents (15.2), for the solver to draw them downwards; not criteria */
+//   {#M1:d #M2:d #M3:d #M4:d #M9:d #M5:s #M6:s #M7:s #M8:s} @CURRENT("in");
+//   {#M1:s #M2:s #M3:s #M4:s #M9:s #M5:d #M6:d #M7:d #M8:d} @CURRENT("out");
+//
+//   /* what the circuit is: an NMOS pair M1/M2 with NMOS cascodes M3/M4, loaded by a PMOS cascode current mirror M5-M8;
+//      the gate pins of the cascodes face the center */
+//   %dp = #M1(left) #M2(right) #M9(tail) @AS $DIFFERENTIAL_PAIR_N;
+//   %cas_l = #M1(source) #M3(cascode) @AS $CASCODE;
+//   %nmos_cascode_mirror = #M3(left) #M4(right) #M9(axis) @AS $MIRRORED_LAYOUT;
+//   %m3_gate_orient = #M3:g @ORIENT("left");
+//   %cas_r = #M2(source) #M4(cascode) @AS $CASCODE;
+//   %pmos_cascode_mirror = #M5(left) #M6(right) #M9(axis) @AS $MIRRORED_LAYOUT;
+//   %m5_gate_orient = #M5:g @ORIENT("left");
+//   %cm = {#M7}(ref) {#M8}(out) {#M5}(refcascode) {#M6}(outcascode) @AS $CASCODE_CURRENT_MIRROR_P;
+//   %load_mirror = #M7(left) #M8(right) #M9(axis) @AS $MIRRORED_LAYOUT;
+//   %m7_gate_orient = #M7:g @ORIENT("right");
+//   %load_group = {#M7 #M8 #M5 #M6} @GROUP;
+//   %input_group = {#M1 #M2 #M3 #M4 #M9} @GROUP;
+//   %tail_gate_orient = #M9:g @ORIENT("left");
+//   %flow_ota = {%dp %cas_l %cas_r %cm}(path) {&inp &inn}(source) {&out}(load) @AS $SIGNAL_FLOW;
+//
+//   /* the two sides are branches from the top down: the PMOS load, the PMOS cascode, the NMOS cascode and the input
+//      transistor; the tail below the pair is the pair's own */
+//   %br_left = {#M7 #M5 #M3 #M1} @AS $BRANCH;
+//   %br_right = {#M8 #M6 #M4 #M2} @AS $BRANCH;
+//
+//   /* the amplifier core with its signal ports; the bias ports stay outside */
+//   %core_group = %dp %br_left %br_right %p_inp %p_inn %p_out @GROUP;
+//
+//   /* from left to right the input port, the two branches, the output port */
+//   %port_order = {%p_inp %dp {%p_inn %p_out}} @ORDER("left-to-right");
+//
+//   /* the block symbol drawn for the instances: bias pins along the bottom */
+//   $TELESCOPIC_SYM = @DEFINE-SYMBOL(box=[-8, -8, 8, 8]) {
+//     (-8, 2) @PIN(terminal="inp", direction="left");
+//     (-8, -2) @PIN(terminal="inn", direction="left");
+//     (8, 0) @PIN(terminal="out", direction="right");
+//     (0, 8) @PIN(terminal="vdd", direction="up");
+//     (-6, -8) @PIN(terminal="vbt", direction="down");
+//     (-2, -8) @PIN(terminal="vbn", direction="down");
+//     (2, -8) @PIN(terminal="vbp", direction="down");
+//     (6, -8) @PIN(terminal="vss", direction="down");
+//     @LINE {(-7, 7.5) (7, 0) (-7, -7.5) (-7, 7.5)};
+//     @LINE {(-8, 2) (-7, 2)};
+//     @LINE {(-8, -2) (-7, -2)};
+//     @LINE {(7, 0) (8, 0)};
+//     @LINE {(0, 3.75) (0, 8)};
+//     @LINE {(-6, -6.96) (-6, -8)};
+//     @LINE {(-2, -4.82) (-2, -8)};
+//     @LINE {(2, -2.68) (2, -8)};
+//     @LINE {(6, -0.54) (6, -8)};
+//     @LINE {(-6.4, 2) (-5.6, 2)};
+//     @LINE {(-6, 2.4) (-6, 1.6)};
+//     @LINE {(-6.4, -2) (-5.6, -2)};
+//     ? @TEXT("${name}", key="name") => @PLACE(1.5, 5)
+//   };
+//   # @SET-SYMBOL $TELESCOPIC_SYM
+// }
+ends telescopic
+
+VDD (vdd 0) vsource dc=1.8
+VBN (vbn 0) vsource dc=1.1
+VBP (vbp 0) vsource dc=0.8
+VBT (vbt 0) vsource dc=0.64
+VIP (inp 0) vsource dc=0.9 mag=0.5
+VIN (inn 0) vsource dc=0.9 mag=0.5 phase=180
+XU1 (inp inn out vdd 0 vbn vbp vbt) telescopic
+CL (out 0) capacitor c=2p
+// @RNL {
+//   &vdd @ADD-TO $SUPPLY_NET_SET;
+//   {&vbt &vbn &vbp} @ADD-TO $BIAS_NET_SET;
+//   %routed_nets = # @SELECT-NET;
+//   %routed_nets @ROUTE-NET;
+//
+//   /* what the circuit is: the OTA driven by two sources, loaded by CL, with three bias sources */
+//   %flow = {#XU1}(path) {#VIP #VIN}(source) {#CL}(load) @AS $SIGNAL_FLOW;
+//
+//   /* from left to right the supply source, the input sources (VIP first), the amplifier and the load */
+//   %testbench_order = {#VDD #VIP #VIN #XU1 #CL} @ORDER("left-to-right");
+//
+//   /* the three bias sources in one row below the amplifier, in the order of its bias pins: vbt, vbn, vbp */
+//   %bias_row = {#VBT #VBN #VBP} @ALIGN("y");
+//   %bias_order = {#VBT #VBN #VBP} @ORDER("left-to-right");
+//   %bias_below = {#XU1 {#VBT #VBN #VBP}} @ORDER("top-to-bottom");
+//
+//   /* only the sources and the load are oriented */
+//   %upright_parts = {#VDD #VIP #VIN #VBT #VBN #VBP #CL} @ORIENT("R0")
+// }

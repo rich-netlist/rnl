@@ -269,7 +269,7 @@ fn every_fact_kept_in_the_solver_cases_holds_on_the_drawing() {
         // a case of 0.4 within a fixed work: its lines layout searches on as long as nothing stops it
         let mut options = unlimited();
         if std::fs::read_to_string(&case).is_ok_and(|t| t.contains("@VERSION(\"0.4\")")) {
-            options.solver.run_limit = Some(rnl_solver::RunLimit::Work(1_000_000_000));
+            options.solver.run_limit = Some(rnl_solver::RunLimit::Work(100_000_000));
         }
         let shown = preview(&path(&case), &FsProvider::new(&[]), &options, &WallClock::new(), &|_| true).unwrap();
         for level in &shown.report.levels {

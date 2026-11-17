@@ -22,7 +22,7 @@ VIN in 0 DC 0.6 AC 1
 *   {#VDD #VIN} @ORIENT("R0")
 * }
 * @RNL(author="rnl-editor 0.1") { #VIN @PLACE(x=-4, priority="high")}
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:7e5f62816c3ac64c.8f59b260a417cb37", numbering="e01fe77925c0d466") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:7e5f62816c3ac64c.f0060f7d29d4b0a9", numbering="e01fe77925c0d466") {
 *   %ground_stub_M1_s = $GROUND_STUB @ATTACH(gap=3) #M1::s;
 *   %ground_stub_VDD_n = $GROUND_STUB @ATTACH(gap=3) #VDD::n;
 *   %ground_stub_VIN_n = $GROUND_STUB @ATTACH(gap=3) #VIN::n;

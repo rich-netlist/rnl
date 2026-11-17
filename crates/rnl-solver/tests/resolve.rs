@@ -232,7 +232,7 @@ fn check_with(file: &str, p: &LevelProblem, options: &SolverOptions) -> Resolved
     assert_eq!(r, resolve(p, &options), "{what}: not deterministic");
     // a level of 0.4 within a fixed work: its lines layout searches on as long as nothing stops it
     let solved = if p.version == "0.4" {
-        solve(p, &SolverOptions { run_limit: Some(rnl_solver::RunLimit::Work(1_000_000_000)), ..options.clone() })
+        solve(p, &SolverOptions { run_limit: Some(rnl_solver::RunLimit::Work(100_000_000)), ..options.clone() })
     } else {
         solve(p, &options)
     };

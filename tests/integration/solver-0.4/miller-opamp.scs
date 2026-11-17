@@ -1,0 +1,82 @@
+// Two-stage Miller-compensated op-amp, in a unity-gain buffer testbench
+// A five-transistor OTA first stage, a PMOS common-source second stage M6/M7 and the compensation RZ + CC,
+// biased by a mirror of IREF. The top level connects it as a unity-gain buffer.
+// @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4") }
+simulator lang=spectre
+
+model nch mos1 type=n vto=0.5 kp=200u lambda=0.1
+model pch mos1 type=p vto=-0.5 kp=80u lambda=0.1
+
+subckt miller2 inp inn out vdd vss
+IREF (vdd nb) isource dc=20u
+M8 (nb nb vss vss) nch w=4u l=1u
+M5 (tail nb vss vss) nch w=8u l=1u
+M1 (x inn tail vss) nch w=10u l=0.5u
+M2 (y inp tail vss) nch w=10u l=0.5u
+M3 (x x vdd vdd) pch w=10u l=0.5u
+M4 (y x vdd vdd) pch w=10u l=0.5u
+M6 (out y vdd vdd) pch w=40u l=0.5u
+M7 (out nb vss vss) nch w=16u l=1u
+RZ (y z) resistor r=2k
+CC (z out) capacitor c=3p
+// @RNL {
+//   &vdd @ADD-TO $SUPPLY_NET_SET;
+//   &vss @ADD-TO $GROUND_NET_SET;
+//   $IO_PORT @ATTACH &inn => %p_inn;
+//   $IO_PORT @ATTACH &inp => %p_inp;
+//   $IO_PORT @ATTACH &out => %p_out;
+//   %routed_nets = # @SELECT-NET;
+//   %routed_nets @ROUTE-NET;
+//
+//   /* the static currents (15.2), for the solver to draw them downwards; not criteria */
+//   {#IREF:p #M8:d #M5:d #M1:d #M2:d #M7:d #M3:s #M4:s #M6:s} @CURRENT("in");
+//   {#IREF:n #M8:s #M5:s #M1:s #M2:s #M7:s #M3:d #M4:d #M6:d} @CURRENT("out");
+//
+//   /* what the circuit is: an OTA first stage, a common-source second stage M6/M7, the compensation RZ + CC, biased by a mirror of IREF */
+//   %dp = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;
+//   %cm_load = {#M3}(ref) {#M4}(out) @AS $CURRENT_MIRROR_P;
+//   %cm_bias = {#M8}(ref) {#M5 #M7}(out) @AS $CURRENT_MIRROR_N;
+//   %amp1 = %dp(transconductor) %cm_load(load) @AS $TRANSCONDUCTOR_Z_AMPLIFIER;
+//   %diode_connected = {#M3 #M8} @AS $DIODE_CONNECTED;
+//   %bias = {#IREF #M8} @AS $BIAS_CIRCUIT;
+//   %cs2 = #M6(input) #M7(load) @AS $COMMON_SOURCE_AMPLIFIER;
+//   %comp = {#RZ #CC} @AS $BRANCH_HORIZONTAL;
+//   %miller = %cs2(stage) %comp(compensation) @AS $MILLER_AMPLIFIER;
+//   %casc = {%dp %cs2} @AS $CASCADE;
+//   %flow_op = {%dp %cs2}(path) {&inp &inn}(source) {&out}(load) @AS $SIGNAL_FLOW;
+//
+//   /* the supply-to-ground paths, each a branch from the top down: the bias branch, the two sides of the pair (the
+//      tail M5 is the pair's) and the second stage; the compensation is a branch from the left to the right */
+//   %br_bias = {#IREF #M8} @AS $BRANCH;
+//   %br_left = {#M3 #M1} @AS $BRANCH;
+//   %br_right = {#M4 #M2} @AS $BRANCH;
+//   %br_out = {#M6 #M7} @AS $BRANCH;
+//
+//   /* from left to right the bias branch, the first stage, the compensation, the second stage and the output port */
+//   %stage_order = {%br_bias %amp1 %comp %br_out %p_out} @ORDER("left-to-right");
+//
+//   /* the block symbol drawn for the instances of miller2: the inverting input on top */
+//   # @SET-SYMBOL(terminals=[[1, "inp"], [2, "inn"], [3, "out"], [4, "vp"], [5, "vn"]]) $OPAMP_INVERTED_SUPPLY
+// }
+ends miller2
+
+VDD (vdd 0) vsource dc=1.8
+VIN (in 0) vsource dc=0.9 mag=1
+XU1 (in out out vdd 0) miller2
+CL (out 0) capacitor c=2p
+// @RNL {
+//   &vdd @ADD-TO $SUPPLY_NET_SET;
+//
+//   /* the feedback from the output over the amplifier to the inverting input is how the reference draws it, not a
+//      criterion: on which side a wire runs cannot be checked from the placement (G1), so the case states it as an
+//      objective */
+//   %routed_nets = # @SELECT-NET;
+//   %routed_nets @ROUTE-NET;
+//
+//   /* from left to right the input source, the amplifier and the load; the supply source stands at least 4 to the left */
+//   %testbench_order = {#VIN #XU1 #CL} @ORDER("left-to-right");
+//   %supply_distance = #VDD {#VIN #XU1 #CL} @DISTANCE("left-to-right", min=4);
+//
+//   /* only the sources and the load are turned */
+//   %upright_parts = {#VDD #VIN #CL} @ORIENT("R0");
+// }

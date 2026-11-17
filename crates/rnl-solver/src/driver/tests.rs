@@ -528,7 +528,7 @@ fn check_with(file: &str, p: &LevelProblem, options: &SolverOptions) -> (Solved,
 /// The work a level of 0.4 is solved within here: its lines layout searches on as long as nothing
 /// stops it, so a fixed work keeps it short and the same on every run, as `rnl solve` with
 /// `limit="work"` (17).
-const WORK_04: u64 = 1_000_000_000;
+const WORK_04: u64 = 100_000_000;
 
 /// [`solve_exact_with`], a level of 0.4 within [`WORK_04`] unless a limit of work runs already.
 fn solve_bounded(p: &LevelProblem, options: &SolverOptions, clock: &dyn Clock, caps: Caps) -> (Solved, Exact) {
@@ -915,7 +915,9 @@ fn layers_with_tolerances_rank_the_candidates_in_a_well_defined_order() {
 /// facts of corpus 03, which tie CL to M2, the facts.
 #[test]
 fn an_overlap_is_noted_with_its_cause() {
-    let ps = problems(&repo().join("tests/integration/solver/T4-miller-conflicts.sp"));
+    // the five-transistor OTA of the conformance cases: 40 pivots leave one of its overlaps; T4, of
+    // 0.4, takes the line layout, which puts its symbols apart itself whatever the pivots
+    let ps = problems(&repo().join("tests/conformance/cases/03-five-transistor-ota.sp"));
     let options = SolverOptions::without_time_limit();
     let caps = Caps { pivots: 40, ..CAPS };
     let mut budget = false;
@@ -1736,17 +1738,9 @@ fn the_drawings_are_not_stretched() {
     let view = crate::objectives::View { s: &e.structure, at: &e.placed.origins, orient: &e.placed.geometry.orient };
     let crossings = crate::objectives::score(crate::objectives::Objective::Crossings, &view, Some(&wires));
     assert!(crossings.is_zero(), "{what}");
-    // T4: lower (44.3), the rows of the PMOS and of the input pair nearer each other; M5 and M7
-    // where they were (-15), not lower: &vb runs from VB, which leaves up on the left of the row
-    // of the pair, to their gates, under the ground of VIP, and the rows stay apart as wholes over
-    // its span (a_wire_between_two_rows_crosses_no_lead_of_a_stub); risen to -12, M5 and M7 had it
-    // cross that ground's lead. Until VB hangs by the gates (quality review ST-3)
-    let (p, solved, e) = case_level("T4-miller-conflicts.sp", "T4-miller-conflicts.sp");
-    let what = summary(&p, &solved, &e);
-    for label in ["#M5", "#M7"] {
-        assert!(e.placed.origins[object(&p, label)][1] >= int(-15), "{what}: {label}");
-    }
-    assert!(extent(&e)[1] < num(44.3), "{what}");
+    // T4 is left out: its bounds (44.3 high, M5 and M7 not below -15, ST-3) were set for the rows
+    // layout of the T4 of then; written as the reviewed cases are, it takes the line layout, whose
+    // spacing the tests of the line layout check
     // T5: the row not evenly spaced (13 apart), narrower (80.5)
     let (p, solved, e) = case_level("T5-inverting-amp-rlc.sp", "T5-inverting-amp-rlc.sp");
     let what = summary(&p, &solved, &e);

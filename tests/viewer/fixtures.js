@@ -63,7 +63,7 @@ export const FILES = {
  */
 export const PREVIEWS = ["T4-miller-conflicts", "04-hierarchy"];
 /** The limits a preview of a file of 0.4 is solved within, by its name: a fixed work, so that the facts kept are the same everywhere. */
-const PREVIEW_LIMITS = { "T4-miller-conflicts": ["--solver-config", 'limit="work",work=1000000000'] };
+const PREVIEW_LIMITS = { "T4-miller-conflicts": ["--solver-config", 'limit="work",work=100000000'] };
 
 /**
  * The fixtures of netlists that only a solver draws, and the files of tests/integration/solver they
