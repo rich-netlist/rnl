@@ -64,13 +64,16 @@ struct Move {
     at: [Q; 2],
 }
 
-/// The pass. None when no move is taken, or when the budget stops it, which `super::engine` does
-/// again past the limit.
+/// The pass. It moves and routes on the drawing before its merge (`pre`), where the wires keep the
+/// room the merge takes from them, and merges each move once, after all its routing. None when no
+/// move is taken, or when the budget stops it, which `super::engine` does again past the limit.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn nudge(
     problem: &LevelProblem,
     s: &Structure,
     options: &SolverOptions,
     made: &Strict,
+    pre: &(Placed, Routing),
     clear: &BTreeMap<usize, u8>,
     work: &mut Work,
     notes: &mut Vec<String>,
@@ -87,6 +90,7 @@ pub(super) fn nudge(
         Some(rank.entry(problem, s, options, placed, routing, objectives, &[]).layers)
     };
     let mut current = made.clone();
+    let mut before = pre.clone();
     let mut now = key(&current.placed, &current.routing)?;
     if crate::budget::stopped() {
         return None;
@@ -95,19 +99,20 @@ pub(super) fn nudge(
     let mut routed: Option<track::Routed> = None;
     let mut tally = Tally::new(problem.objects.len());
     let (mut considered, mut tried) = (0usize, 0usize);
+    let mut alone = (0usize, 0usize);
     let mut said = Vec::new();
     for _ in 0..ROUNDS {
-        let bent = bent(s, &current.placed, &current.routing, ranking.weights)?;
-        let moves = moves(problem, s, &current.placed, &current.routing, &bent);
-        let held = holding(problem, s, options, &current.placed.geometry)?;
-        let mut best: Option<(Vec<Q>, Strict, track::Routed, Move)> = None;
+        let bent = bent(s, &before.0, &before.1, ranking.weights)?;
+        let moves = moves(problem, s, &before.0, &before.1, &bent);
+        let held = holding(problem, s, options, &before.0.geometry)?;
+        let mut best: Option<(Vec<Q>, Moved, Move)> = None;
         let mut evaluated = 0;
         for m in moves {
             if evaluated == TRIES {
                 break;
             }
             considered += 1;
-            let Some(g) = fits(problem, s, options, &current.placed, &m, &held) else {
+            let Some(g) = fits(problem, s, options, &before.0, &m, &held) else {
                 if crate::budget::stopped() {
                     return None;
                 }
@@ -116,24 +121,26 @@ pub(super) fn nudge(
             evaluated += 1;
             tried += 1;
             let crossed = &bent[m.wire].1;
-            let again = again(problem, s, options, &current, g, &m, crossed, clear, &mut tally, work);
+            let next =
+                again(problem, s, options, &before, &current.levels, g, &m, crossed, clear, &key, &mut tally, work);
             if crate::budget::stopped() {
                 return None;
             }
-            let Some((strict, r)) = again else {
+            let Some((strict, r, pre, (routed_alone, kept_alone))) = next else {
                 continue;
             };
+            alone = (alone.0 + routed_alone, alone.1 + kept_alone);
             let Some(k) = key(&strict.placed, &strict.routing) else { continue };
             if crate::budget::stopped() {
                 return None;
             }
             if k < now && best.as_ref().is_none_or(|b| k < b.0) {
-                best = Some((k, strict, r, m));
+                best = Some((k, (strict, r, pre, (routed_alone, kept_alone)), m));
             }
         }
-        let Some((k, strict, r, m)) = best else { break };
-        let before = super::quality::lab_order(problem, s, &current.placed, &current.routing, &ranking, None);
-        let after = super::quality::lab_order(problem, s, &strict.placed, &strict.routing, &ranking, None);
+        let Some((k, (strict, r, pre, _), m)) = best else { break };
+        let was = super::quality::lab_order(problem, s, &current.placed, &current.routing, &ranking, None);
+        let is = super::quality::lab_order(problem, s, &strict.placed, &strict.routing, &ranking, None);
         said.push(format!(
             "lines: {} moved {} by {}, for a wire of {}: {} crossings and {} bends, {} weighed, before {} and {}, {}",
             m.unit.iter().map(|&k| problem.objects[k].label.as_str()).collect::<Vec<_>>().join(", "),
@@ -144,24 +151,27 @@ pub(super) fn nudge(
                 (_, false) => "down",
             },
             crate::rational::fmt(&m.by.abs()),
-            problem.routes.get(current.routing.wires[m.wire].route).map_or("", |r| r.net.as_str()),
-            after.crossings,
-            after.bends,
-            after.cb,
-            before.crossings,
-            before.bends,
-            before.cb
+            problem.routes.get(before.1.wires[m.wire].route).map_or("", |r| r.net.as_str()),
+            is.crossings,
+            is.bends,
+            is.cb,
+            was.crossings,
+            was.bends,
+            was.cb
         ));
-        (now, current, routed) = (k, strict, Some(r));
+        (now, current, routed, before) = (k, strict, Some(r), pre);
     }
     if crate::budget::stopped() {
         return None;
     }
     notes.push(format!(
-        "lines: the ends of the wires that bend or cross: {} moved, {} of {} moves routed and merged again",
+        "lines: the ends of the wires that bend or cross: {} moved, {} of {} moves routed and merged again; of the \
+         nets they routed again that cross a wire, {} of {} routed once more alone kept",
         said.len(),
         tried,
-        considered
+        considered,
+        alone.1,
+        alone.0
     ));
     let routed = routed?;
     notes.extend(said);
@@ -641,35 +651,62 @@ fn fits(
     Some(g)
 }
 
-/// A move routed and merged: the nets it touches routed again, with those whose wires now run
-/// within a wire's gap of what it moved, those of the wires the wire it is for crosses, and those
-/// drawn with an X, whose diagonals the router does not read; the other nets' wires kept as they
-/// are drawn. None when the routing or the merge fails, or the merge leaves a wire nearer a symbol
-/// than its gap. Its work is charged as the line search charges a candidate's.
-#[allow(clippy::too_many_arguments)]
-fn again(
-    problem: &LevelProblem,
-    s: &Structure,
-    options: &SolverOptions,
-    current: &Strict,
-    g: Geometry,
-    m: &Move,
-    crossed: &BTreeSet<usize>,
-    clear: &BTreeMap<usize, u8>,
-    tally: &mut Tally,
-    work: &mut Work,
-) -> Option<(Strict, track::Routed)> {
-    let origins = s.origins(problem, &g);
+/// The layout the line router reads of a drawing: every object, the preferred candidate of each
+/// route the solver completes, as the line search gives them.
+fn layout(problem: &LevelProblem, s: &Structure, g: &Geometry, origins: &[[Q; 2]]) -> Option<Layout> {
     let objects: BTreeSet<usize> = (0..problem.objects.len()).collect();
-    let (mut layout, pins, written_net, refs) = settle::layout_of(problem, s, &g, &origins, &objects, true).ok()?;
+    let (mut layout, pins, written_net, refs) = settle::layout_of(problem, s, g, origins, &objects, true).ok()?;
     for (i, route) in problem.routes.iter().enumerate() {
         if settle::complete_auto_route(route, &refs[i]) {
             layout.nets[i].preferred = crate::route::default_candidate(&layout, i);
         }
     }
-    let was = &current.placed.origins;
+    Some((layout, pins, written_net, refs))
+}
+
+/// What [`settle::layout_of`] gives: the layout, the pins, the net each written path is of, the
+/// points each route's anchors are.
+type Layout =
+    (crate::route::Layout, Vec<(usize, usize, [Q; 2], Option<(i64, i64)>)>, Vec<Option<usize>>, Vec<Vec<PointRef>>);
+
+/// A move's drawing: merged, as the router routed it, before its merge, and how many nets were
+/// routed once more alone and how many of those kept.
+type Moved = (Strict, track::Routed, (Placed, Routing), (usize, usize));
+
+/// A move routed and merged. On the drawing before its merge (`pre`), moved as `g` has it, the nets
+/// the move touches are routed again, with those whose wires now run within a wire's gap of what it
+/// moved, those of the wires the wire it is for crosses, and those drawn with an X; the other nets'
+/// wires kept as they are drawn there. Then each net routed again that crosses a wire is routed once
+/// more on its own, every other wire kept: the router routes the nets one at a time, those of more
+/// pins first, and a net routed before another does not see that one's wires. That routing is kept
+/// where the drawing then ranks strictly before by the line layout's key (`key`), its crossings and
+/// bends weighed, then its lines and its length. Only then is the drawing merged, once, so that the
+/// merge does not take the room a wire routed after it would have run in. As the line layout's
+/// rounds do (`super::engine`), a merge that leaves wires nearer a symbol than their gap is routed
+/// once more with the sides of those symbols kept clear. With the drawing before the merge, and how
+/// many nets were routed once more alone and how many kept. None when the routing or the merge
+/// fails, or the merge leaves a wire nearer a symbol than its gap. Its work is charged as the line
+/// search charges a candidate's.
+#[allow(clippy::too_many_arguments)]
+fn again(
+    problem: &LevelProblem,
+    s: &Structure,
+    options: &SolverOptions,
+    pre: &(Placed, Routing),
+    levels: &[(crate::structure::PinKey, crate::structure::PinKey)],
+    g: Geometry,
+    m: &Move,
+    crossed: &BTreeSet<usize>,
+    clear: &BTreeMap<usize, u8>,
+    key: &dyn Fn(&Placed, &Routing) -> Option<Vec<Q>>,
+    tally: &mut Tally,
+    work: &mut Work,
+) -> Option<Moved> {
+    let origins = s.origins(problem, &g);
+    let read = layout(problem, s, &g, &origins)?;
+    let was = &pre.0.origins;
     let mut nets: BTreeSet<usize> = BTreeSet::new();
-    for (i, net) in layout.nets.iter().enumerate() {
+    for (i, net) in read.0.nets.iter().enumerate() {
         if net.anchors.iter().any(|a| a.owner.is_some_and(|k| was.get(k) != origins.get(k))) {
             nets.insert(i);
         }
@@ -687,12 +724,11 @@ fn again(
         }
     }
     let widened: Vec<[Q; 4]> = taken.iter().map(|b| [&b[0] - &gap, &b[1] - &gap, &b[2] + &gap, &b[3] + &gap]).collect();
-    let routing = &current.routing;
+    let routing = &pre.1;
     if !permit(BudgetStep::Structure, routing.wires.len().saturating_mul(widened.len().max(1))) {
         return None;
     }
     for (w, (wire, path)) in routing.wires.iter().zip(&routing.paths).enumerate() {
-        let diagonal = path.windows(2).any(|p| p[0][0] != p[1][0] && p[0][1] != p[1][1]);
         let runs_in = path.windows(2).any(|p| {
             let seg = [
                 p[0][0].clone().min(p[1][0].clone()),
@@ -702,52 +738,48 @@ fn again(
             ];
             widened.iter().any(|b| seg[0] < b[2] && b[0] < seg[2] && seg[1] < b[3] && b[1] < seg[3])
         });
-        if diagonal || runs_in || crossed.contains(&w) || w == m.wire {
+        if diagonal(path) || runs_in || crossed.contains(&w) || w == m.wire {
             nets.insert(wire.route);
         }
     }
-    let fixed: Vec<(usize, Vec<[Q; 2]>)> = routing
-        .wires
-        .iter()
-        .zip(&routing.paths)
-        .filter(|(wire, path)| !nets.contains(&wire.route) && path.len() >= 2)
-        .map(|(wire, path)| (wire.route, path.clone()))
-        .collect();
     let placed = Placed {
         geometry: g,
         origins,
-        dropped: current.placed.dropped.clone(),
+        dropped: pre.0.dropped.clone(),
         overlaps: Vec::new(),
         optimised: true,
         undecided: false,
     };
-    // as the line layout's rounds do (`super::engine`): a merge that leaves wires nearer a symbol
-    // than their gap is routed once more with the sides of those symbols kept clear
+    let weights = options.settings.lines_weights.pair();
+    let mut alone = (0usize, 0usize);
     let mut kept_clear = clear.clone();
     for _ in 0..ROUTINGS {
-        let input = track::Input {
-            layout: &layout,
-            pins: pins.clone(),
-            written_net: written_net.clone(),
-            groups: Vec::new(),
-            weights: options.settings.lines_weights.pair(),
-            budget: settle::STEPS,
-            full: [BTreeSet::new(), BTreeSet::new()],
-            kept_clear: kept_clear.clone(),
-            fixed: fixed.clone(),
-            clip: None,
-            lenient: false,
-            reroute: options.settings.reroute_nets,
-        };
-        let routed = track::route(&input);
-        tally.charge(work, Step::Route, 1);
-        tally.charge(work, Step::Expansion, routed.expansions);
-        if routed.failed.is_some() || crate::budget::stopped() {
-            return None;
+        let mut r = route(options, &read, kept(routing, |i| !nets.contains(&i)), &kept_clear, tally, work)?;
+        let mut drawn = settle::routing_of(problem, &r, &read.3);
+        let mut k = key(&placed, &drawn);
+        for &i in &nets {
+            let Some(bent) = bent(s, &placed, &drawn, weights) else { break };
+            if !drawn.wires.iter().zip(&bent).any(|(w, b)| w.route == i && !b.1.is_empty()) {
+                continue;
+            }
+            alone.0 += 1;
+            let once = route(options, &read, kept(&drawn, |j| j != i), &kept_clear, tally, work);
+            if crate::budget::stopped() {
+                return None;
+            }
+            let Some(once) = once else { continue };
+            let other = settle::routing_of(problem, &once, &read.3);
+            let other_key = key(&placed, &other);
+            if crate::budget::stopped() {
+                return None;
+            }
+            if other_key.is_some() && (k.is_none() || other_key < k) {
+                (r, drawn, k) = (once, other, other_key);
+                alone.1 += 1;
+            }
         }
-        let routing = settle::routing_of(problem, &routed, &refs);
         let relaxations = work.astar_expansions;
-        let mut made = compact_strict(problem, s, &placed, &routing, options, work, None, &current.levels);
+        let mut made = compact_strict(problem, s, &placed, &drawn, options, work, None, levels);
         super::written::defaults(problem, s, &made.placed, &mut made.routing, None, false);
         tally.charge(work, Step::Merge, 1);
         tally.charge(work, Step::MergePivotRow, made.pivot_rows);
@@ -756,13 +788,63 @@ fn again(
             return None;
         }
         if made.conflicts.is_empty() {
-            return Some((made, routed));
+            return Some((made, r, (placed, drawn), alone));
         }
         for (&k, &sides) in &made.sides {
             *kept_clear.entry(k).or_default() |= sides;
         }
     }
     None
+}
+
+/// Whether a wire's path has a diagonal, as an X has.
+fn diagonal(path: &[[Q; 2]]) -> bool {
+    path.windows(2).any(|p| p[0][0] != p[1][0] && p[0][1] != p[1][1])
+}
+
+/// The wires of `routing` kept as they are drawn: those of the nets `keep` takes, but a net's with
+/// a diagonal, which the router does not read.
+fn kept(routing: &Routing, keep: impl Fn(usize) -> bool) -> Vec<(usize, Vec<[Q; 2]>)> {
+    let x: BTreeSet<usize> =
+        routing.wires.iter().zip(&routing.paths).filter(|(_, p)| diagonal(p)).map(|(w, _)| w.route).collect();
+    routing
+        .wires
+        .iter()
+        .zip(&routing.paths)
+        .filter(|(w, p)| keep(w.route) && !x.contains(&w.route) && p.len() >= 2)
+        .map(|(w, p)| (w.route, p.clone()))
+        .collect()
+}
+
+/// The drawing read as `read`, routed by the line router, the wires of `fixed` kept, its work
+/// charged. None when it fails, or the budget stops it.
+fn route(
+    options: &SolverOptions,
+    read: &Layout,
+    fixed: Vec<(usize, Vec<[Q; 2]>)>,
+    kept_clear: &BTreeMap<usize, u8>,
+    tally: &mut Tally,
+    work: &mut Work,
+) -> Option<track::Routed> {
+    let (layout, pins, written_net, _) = read;
+    let input = track::Input {
+        layout,
+        pins: pins.clone(),
+        written_net: written_net.clone(),
+        groups: Vec::new(),
+        weights: options.settings.lines_weights.pair(),
+        budget: settle::STEPS,
+        full: [BTreeSet::new(), BTreeSet::new()],
+        kept_clear: kept_clear.clone(),
+        fixed,
+        clip: None,
+        lenient: false,
+        reroute: options.settings.reroute_nets,
+    };
+    let routed = track::route(&input);
+    tally.charge(work, Step::Route, 1);
+    tally.charge(work, Step::Expansion, routed.expansions);
+    (routed.failed.is_none() && !crate::budget::stopped()).then_some(routed)
 }
 
 #[cfg(test)]
@@ -876,7 +958,8 @@ CC z out 1p
         for cutoff in [ticks / 2, 3 * ticks / 4, ticks] {
             let (timed, used) = crate::budget::with(&Ticks::default(), RunLimit::Time(cutoff as f64), None, run);
             let pass = timed.0.notes.iter().find(|n| n.starts_with("lines: the ends of the wires that bend or cross"));
-            routed.push(pass.is_some_and(|n| !n.contains(" 0 of ")));
+            // "{moved} moved, {tried} of {considered} moves routed ...": a move routed when tried is not 0
+            routed.push(pass.is_some_and(|n| n.split(", ").nth(1).is_some_and(|t| !t.starts_with("0 of "))));
             let (work, _) = crate::budget::with(&StoppedClock, RunLimit::Work(used.work), None, run);
             assert_eq!(snapshot(timed), snapshot(work), "cutoff {cutoff} of {ticks}, work {}", used.work);
         }

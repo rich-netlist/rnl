@@ -514,6 +514,7 @@ pub(crate) fn unused_by_layout(o: &SolverOptions) -> Vec<SettingProblem> {
         ("lines_weights", o.settings.lines_weights != d.settings.lines_weights),
         ("virtual_weight", o.settings.virtual_weight != d.settings.virtual_weight),
         ("lines_order", o.settings.lines_order != d.settings.lines_order),
+        ("nudge_wires", o.settings.nudge_wires != d.settings.nudge_wires),
     ];
     let table = crate::table::settings_table();
     let mut out = Vec::new();
@@ -1050,6 +1051,7 @@ mod tests {
             ("lines_weights", "[2, 3]"),
             ("virtual_weight", "0.25"),
             ("lines_order", "\"area\""),
+            ("nudge_wires", "false"),
         ];
         let table = crate::table::settings_table();
         for row in table.settings.iter().filter(|r| applies_to(r.applies).is_some()) {

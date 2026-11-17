@@ -196,14 +196,14 @@ pub(crate) fn lay_out(
         Ok(made) => made,
         Err(why) => return fallback(laid, notes, why, work),
     };
-    let Made { made, routed, groups, mine, lists, kept, clear } = made;
+    let Made { made, routed, groups, mine, lists, kept, clear, before: unmerged } = made;
     // `nudge_wires`: the end of a bent wire moved where the wire may run straight (`super::nudge`),
     // before the drawing made is said and compared. It is done whatever the budget left, as the
     // spacing below is: once the budget is spent, or when a limit stops it, past the limit, from the
     // same drawing
     let (made, routed, mine) = if options.settings.nudge_wires {
         let run = |work: &mut Work, said: &mut Vec<String>| {
-            super::nudge::nudge(problem, s, options, &made, &clear, work, said)
+            super::nudge::nudge(problem, s, options, &made, &unmerged, &clear, work, said)
         };
         let mut said = Vec::new();
         let once = (!crate::budget::stopped()).then(|| run(work, &mut said));
@@ -345,6 +345,8 @@ struct Made {
     kept: bool,
     /// the sides of the symbols the round that made the drawing kept clear of wires
     clear: BTreeMap<usize, u8>,
+    /// the drawing before its merge, as the round routed it (`super::nudge` moves and routes on it)
+    before: (Placed, Routing),
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -422,7 +424,6 @@ fn attempt(
             routed.again.0,
             routed.expansions
         ));
-        let _ = (placed, routing);
         let Some(made) = made else {
             let why = "the settled level has no completed compaction".to_string();
             return if cut { previous(last, notes, why) } else { Err(why) };
@@ -436,7 +437,16 @@ fn attempt(
             return previous(last, notes, format!("budget exhausted in routing round {attempt}"));
         }
         if made.conflicts.is_empty() {
-            return Ok(Made { made, routed, groups, mine: quality, lists, kept: false, clear: kept_clear });
+            return Ok(Made {
+                made,
+                routed,
+                groups,
+                mine: quality,
+                lists,
+                kept: false,
+                clear: kept_clear,
+                before: (placed, routing),
+            });
         }
         if attempt + 1 == ROUNDS {
             return Err(format!("{} wires cannot keep their gaps where they run", made.conflicts.len()));
@@ -460,7 +470,19 @@ fn attempt(
                 made.conflicts.len()
             ));
         }
-        last = Some((Made { made, routed, groups, mine: quality, lists, kept: true, clear: kept_clear }, attempt));
+        last = Some((
+            Made {
+                made,
+                routed,
+                groups,
+                mine: quality,
+                lists,
+                kept: true,
+                clear: kept_clear,
+                before: (placed, routing),
+            },
+            attempt,
+        ));
     }
     Err("no round kept every gap".to_string())
 }
