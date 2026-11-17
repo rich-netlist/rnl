@@ -120,10 +120,10 @@ fn idle_hints_follow_facts_not_roles_and_skip_disabled_or_discarded_links() {
     let base = format!("{SYMBOL} $D = @DEFINE(roles=[\"a\"]) {{}}; %u = #R1 @AS $D; %v = #R2 @AS $D; %p = (_, _); {{%u %p}} @ALIGN(\"x\");");
     for (tail, count) in [
         ("", 1),
-        ("{%p #R1} @ALIGN(\"x\")", 0),
+        ("{%p #R1} @ALIGN(\"x\")", 1),
         ("{%p #R1} @ALIGN(\"y\")", 1),
         ("{%p #R1} @ALIGN(\"x\",priority=\"disabled\")", 1),
-        ("{%p %v} @ALIGN(\"x\"); {%v #R2} @ALIGN(\"x\")", 0),
+        ("{%p %v} @ALIGN(\"x\"); {%v #R2} @ALIGN(\"x\")", 3),
         ("%p @PLACE(0,0,priority=\"high\"); #R1 @PLACE(2,2,priority=\"high\"); {%p #R1} @ALIGN(\"x\",priority=\"low\")", 1),
         ("&a @WIRE {%u::position (3,4)}", 0),
         ("%u::position @CIRCLE(radius=1)", 0),
@@ -272,4 +272,34 @@ fn body_place_replaces_symbol_text_coordinates_and_later_text_offsets_replace_it
         assert_eq!(solved.solution.placements.iter().find(|p| p.object == text).unwrap().at(), Some(expected));
         assert_eq!(r.diagnostics().iter().filter(|d| d.code == codes::USAGE_POINT_IDLE_04).count(), idle);
     }
+}
+
+/// A statement that places a usage whose point nothing of its own ties to its members moves only
+/// that point, not the members: each such statement has the hint, which says to constrain the
+/// members with `::members` (14.1). A usage whose body ties its point to its members has none.
+#[test]
+fn a_statement_that_places_only_the_point_of_a_usage_has_the_hint() {
+    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nR1 a 0 1k\nR2 b 0 1k\nR3 c 0 1k\nR4 d 0 1k\nR5 e 0 1k\n\
+                * @RNL {\n\
+                *   $S = @DEFINE-SYMBOL { (-1,-1) (1,1) @RECTANGLE }; {#R1 #R2 #R3 #R4 #R5} @SET-SYMBOL $S;\n\
+                *   $LOOP = @DEFINE(roles=[\"a\", \"b\"]) {};\n\
+                *   $PAIR = @DEFINE(roles=[\"a\", \"b\"]) { {?a ?b ?} @ALIGN(\"y\"); {?a ? ?b} @DISTRIBUTE(\"left-to-right\") };\n\
+                *   %loop = #R2(a) #R3(b) @AS $LOOP;\n\
+                *   %pair = #R4(a) #R5(b) @AS $PAIR;\n\
+                *   {#R1 %loop %pair} @ORDER(\"left-to-right\");\n\
+                *   {#R1 %loop} @ALIGN(\"y\")\n\
+                * }\n.end\n";
+    let files = MemoryProvider::new().with("t.sp", text);
+    let r = interpret_file(Path::new("t.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    assert_eq!(errors(&r), [], "{:?}", r.diagnostics());
+    let hints: Vec<(u32, String)> = r
+        .diagnostics()
+        .iter()
+        .filter(|d| d.code == codes::USAGE_POINT_IDLE_04)
+        .map(|d| (d.loc.as_ref().unwrap().line, d.message.clone()))
+        .collect();
+    let message =
+        "%loop has no symbol, and no fact ties its point to what is drawn: this statement moves only that point, \
+                   not its members; write %loop::members to constrain its members (14.1)";
+    assert_eq!(hints, [(14, message.to_string()), (15, message.to_string())]);
 }

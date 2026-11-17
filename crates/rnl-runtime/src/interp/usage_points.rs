@@ -134,7 +134,11 @@ impl Interp<'_> {
     }
 
     /// Only actual positional facts connect a usage point to a drawing. Role membership and
-    /// the ancestry of an expanded body do not. Follow each axis separately and transitively.
+    /// the ancestry of an expanded body do not, and neither does a statement that places the usage
+    /// itself, one that has it as an item and is not of its own body: that statement moves the
+    /// point and nothing the point is tied to. Follow each axis separately and transitively. Each
+    /// statement that places a usage without a symbol whose point is then tied to nothing drawn
+    /// has the hint, which says to constrain its members instead (14.1).
     pub(super) fn hint_idle_usage_points(&mut self, s: SceneId) {
         if !self.scenes[s].usages.iter().any(|&u| self.usage_own_point(u)) {
             return;
@@ -147,6 +151,13 @@ impl Interp<'_> {
         };
         let mut candidates = Vec::new();
         let mut seen = HashSet::new();
+        // a usage without a symbol that a statement other than one of its own body places
+        let placed = |this: &Self, o: ObjId, chain: &[ObjId]| {
+            matches!(this.o(o), ObjData::Usage(_))
+                && this.usage_own_point(o)
+                && !this.scenes[s].symbol.contains_key(&o)
+                && !chain.contains(&o)
+        };
         for c in self.scenes[s].constraints.clone() {
             let ObjData::Constraint(cd) = self.o(c).clone() else { continue };
             if cd.failed
@@ -155,32 +166,38 @@ impl Interp<'_> {
             {
                 continue;
             }
+            let key = |o: ObjId| (o, cd.site.as_ref().map(std::rc::Rc::as_ptr), cd.off);
             if let Some(rows) = &cd.table {
                 for &point in rows.points() {
                     let object = self.position_owner(point);
-                    if matches!(self.o(object), ObjData::Usage(_))
-                        && self.usage_own_point(object)
-                        && seen.insert(object)
-                    {
+                    if placed(self, object, &cd.chain) && seen.insert(key(object)) {
                         candidates.push((object, cd.site.clone(), cd.off));
                     }
                 }
                 for (axis, from, to) in rows.orders(crate::problem::Axis::of(cd.params.axis.unwrap_or('y'))) {
                     let axis = if axis == crate::problem::Axis::X { 'x' } else { 'y' };
-                    link(self.position_owner(*from), self.position_owner(*to), axis);
+                    let (from, to) = (self.position_owner(*from), self.position_owner(*to));
+                    if !placed(self, from, &cd.chain) && !placed(self, to, &cd.chain) {
+                        link(from, to, axis);
+                    }
                 }
                 continue;
             }
             let members = self.leaves(s, &cd.args);
             let axis = cd.params.axis.unwrap_or('x');
             let members: Vec<_> = members.into_iter().map(|o| self.position_owner(o)).collect();
+            let mut tied = Vec::new();
             for &o in &members {
-                if matches!(self.o(o), ObjData::Usage(_)) && self.usage_own_point(o) && seen.insert(o) {
-                    candidates.push((o, cd.site.clone(), cd.off));
+                if placed(self, o, &cd.chain) {
+                    if seen.insert(key(o)) {
+                        candidates.push((o, cd.site.clone(), cd.off));
+                    }
+                } else {
+                    tied.push(o);
                 }
-                if let Some(&first) = members.first() {
-                    link(first, o, axis);
-                }
+            }
+            for &o in &tied {
+                link(tied[0], o, axis);
             }
         }
         for &k in &self.scenes[s].relative_kept {
@@ -245,9 +262,19 @@ impl Interp<'_> {
             }
         }
         for (usage, site, off) in candidates {
+            // a statement of a package, which the document cannot rewrite, has no hint
+            if site.as_ref().is_some_and(|c| !self.units[c.unit].pkg().is_empty()) {
+                continue;
+            }
             if !drawn.contains(&(usage, 'x')) && !drawn.contains(&(usage, 'y')) {
+                let name = self.label(usage);
+                let advice = if name.starts_with('%') {
+                    format!("write {name}::members to constrain its members")
+                } else {
+                    "name it and write its ::members to constrain its members".to_string()
+                };
                 self.diag_site(Severity::Hint, codes::USAGE_POINT_IDLE_04, &site, off,
-                    format!("{} has no symbol, and its point is tied to nothing that is drawn: the constraints on it change nothing drawn (14.1)", self.label(usage)));
+                    format!("{name} has no symbol, and no fact ties its point to what is drawn: this statement moves only that point, not its members; {advice} (14.1)"));
             }
         }
     }
