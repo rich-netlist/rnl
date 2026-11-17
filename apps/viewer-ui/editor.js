@@ -281,8 +281,8 @@ export async function applyChanges(ask = true) {
         m("Solve the netlist again with these changes?"),
         m("Yes applies the changes and shows a new preview. No applies them and closes the preview. Cancel goes on editing."),
       ],
-      action: "Yes",
-      others: ["No"],
+      action: tr("Yes"),
+      others: [tr("No")],
     });
     if (choice === null || !editing || !doc) return false;
     if (choice === "Yes") again = kind;
