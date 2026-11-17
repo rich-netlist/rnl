@@ -100,8 +100,9 @@ In a level of 0.4 the solver tells no supply, ground or port: the symbol a usage
 an object as any other. Only the first arrangement of the tree reads one rule: the symbol
 a usage of one role makes, attached (12.1) to a terminal or a net, starts beside that
 terminal, or beside the pin of an instance or bundle on the net that a fact kept ties
-it to, else the first, on the side the pin leaves by. The search, the line layout, alignment, compaction and the
-order then take it as any other object. An object whose kept facts fix one of its pins to
+it to, else the first, on the side the pin leaves by: next to the pin's owner in the list of
+the group that owner is in, not beside the whole group. The search, the line layout, alignment,
+compaction and the order then take it as any other object, the search as an item of that list. An object whose kept facts fix one of its pins to
 another object's pin, on both axes or right above or below it at one distance (an ALIGN on x
 and DISTANCEs on y whose least and most are one), goes with that pin and is no element of
 the tree; again no name is read.

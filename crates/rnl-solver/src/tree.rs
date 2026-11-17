@@ -1084,9 +1084,10 @@ impl<'a> Tree<'a> {
         for node in self.groups.post_order() {
             let mut items = self.node_items(arr, node);
             // an object attached by a usage of one role starts beside the pin it is attached to
-            // ([`crate::structure::ObjectInfo::attach_host`]): next to the item of this group that
-            // holds the pin's owner, on the side the pin leaves by
-            let mut beside: Vec<(usize, Item, (Dir, bool))> = Vec::new();
+            // ([`crate::structure::ObjectInfo::attach_host`]): next to the pin's owner, in the list
+            // of the group that owner is in, on the side the pin leaves by; the search then moves
+            // it as any item of that list
+            let mut beside: Vec<(usize, usize, Item, (Dir, bool))> = Vec::new();
             for &k in &self.leaves {
                 let Some(host) = self.s.objects[k].attach_host else { continue };
                 if self.node_of.get(&k) != Some(&node) || host.0 == k {
@@ -1105,10 +1106,10 @@ impl<'a> Tree<'a> {
                         Some((0, -1)) => (Dir::Column, false),
                         _ => (Dir::Row, false),
                     };
-                    beside.push((k, carrier, at));
+                    beside.push((k, host.0, carrier, at));
                 }
             }
-            items.retain(|it| !beside.iter().any(|(k, _, _)| *it == Item::Leaf(*k)));
+            items.retain(|it| !beside.iter().any(|(k, ..)| *it == Item::Leaf(*k)));
             let list = if items.is_empty() {
                 None
             } else {
@@ -1117,14 +1118,29 @@ impl<'a> Tree<'a> {
                 let y = |it: &Item| ykey(&snapshot, it);
                 Some(self.cut(&snapshot, items, &k, &y))
             };
-            arr.lists[node] = list.map(|mut list| {
-                for (k, carrier, (dir, first)) in beside {
-                    if !set_beside(&mut list, &carrier, Item::Leaf(k), dir, first) {
-                        list = Item::List(Dir::Row, vec![list, Item::Leaf(k)]);
-                    }
+            let mut list = list;
+            for (k, host, carrier, (dir, first)) in beside {
+                // the host in a group within this one: beside it in that group's list
+                let inner = match (&carrier, self.node_of.get(&host)) {
+                    (Item::Group(_), Some(&m)) if m != node => arr.lists[m]
+                        .as_mut()
+                        .is_some_and(|l| set_beside(l, &Item::Leaf(host), Item::Leaf(k), dir, first)),
+                    _ => false,
+                };
+                if inner {
+                    continue;
                 }
-                list
-            });
+                list = Some(match list {
+                    Some(mut l) => {
+                        if !set_beside(&mut l, &carrier, Item::Leaf(k), dir, first) {
+                            l = Item::List(Dir::Row, vec![l, Item::Leaf(k)]);
+                        }
+                        l
+                    }
+                    None => Item::Leaf(k),
+                });
+            }
+            arr.lists[node] = list;
         }
     }
 
