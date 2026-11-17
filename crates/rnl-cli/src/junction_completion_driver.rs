@@ -28,18 +28,16 @@ pub struct Context<'a> {
     pub on_interpret: Option<&'a dyn Fn()>,
 }
 
-fn read(ctx: &Context<'_>, record: &str) -> Result<Interpretation, String> {
+/// The finisher of the records of the level of `ctx`, for the trials of its dots one after another.
+fn finisher<'a>(ctx: &Context<'a>) -> rnl_view::RecordFinisher<'a> {
+    rnl_view::RecordFinisher::new(&ctx.original.doc, ctx.files, ctx.formats, ctx.runtime, ctx.problem)
+}
+
+fn read(ctx: &Context<'_>, finisher: &rnl_view::RecordFinisher<'_>, record: &str) -> Result<Interpretation, String> {
     // Numeric references are inactive until their record has a valid check. Prepare each
     // complete candidate, including its appended PLACE statements, in the same package
     // environment as the normal reading. Keep the caller's raw record and byte spans intact.
-    let numbered = rnl_view::finish_record_with_formats(
-        &ctx.original.doc,
-        ctx.files,
-        ctx.formats,
-        ctx.runtime,
-        ctx.problem,
-        record,
-    );
+    let numbered = finisher.finish(record);
     if let Some(observe) = ctx.on_interpret {
         observe();
     }
@@ -371,7 +369,8 @@ fn complete_within(
         return Err("first-pass decisions could not all be written".into());
     }
     let record = &written.record;
-    let before = read(ctx, record)?;
+    let finisher = finisher(ctx);
+    let before = read(ctx, &finisher, record)?;
     // what only helps the solve, once for every trial below
     let auxiliary = crate::junction_completion_problem::auxiliary(ctx.problem);
     if let Some(why) = lost(ctx.problem, &before, &auxiliary.points) {
@@ -493,7 +492,7 @@ fn complete_within(
             };
             trial.insert_str(plan.end, &place);
         }
-        let after = read(ctx, &trial)?;
+        let after = read(ctx, &finisher, &trial)?;
         let after_problem =
             after.problems.iter().find(|p| p.level == ctx.problem.level).ok_or("trial problem missing")?;
         let added = added_fact_indices(

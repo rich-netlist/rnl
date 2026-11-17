@@ -447,7 +447,37 @@ pub fn finish_record_with_formats(
     problem: &LevelProblem,
     record: &str,
 ) -> String {
-    rnl_runtime::solution::finish_record(doc, &Workspace::with_formats(files, formats), options, problem, record)
+    RecordFinisher::new(doc, files, formats, options, problem).finish(record)
+}
+
+/// [`finish_record_with_formats`] for records of the solver of one level one after another, such
+/// as the trials of the dots of a level (13.2): the objects of the level's authored records are
+/// counted once ([`rnl_runtime::solution::LevelFinisher`]).
+pub struct RecordFinisher<'a> {
+    level: rnl_runtime::solution::LevelFinisher<'a>,
+    files: Workspace<'a>,
+}
+
+impl<'a> RecordFinisher<'a> {
+    /// The finisher of the records of the level of `problem`, read from `doc` with `files`,
+    /// `formats` and `options`, as [`finish_record_with_formats`] takes them.
+    pub fn new(
+        doc: &'a HostDocument,
+        files: &'a dyn Provider,
+        formats: &BTreeMap<String, String>,
+        options: &Options,
+        problem: &'a LevelProblem,
+    ) -> RecordFinisher<'a> {
+        RecordFinisher {
+            level: rnl_runtime::solution::LevelFinisher::new(doc, options, problem),
+            files: Workspace::with_formats(files, formats),
+        }
+    }
+
+    /// The record finished, as [`finish_record_with_formats`] gives it.
+    pub fn finish(&self, record: &str) -> String {
+        self.level.finish(&self.files, record)
+    }
 }
 
 /// What a drawing level still lacks without a solver: objects without a position, and the

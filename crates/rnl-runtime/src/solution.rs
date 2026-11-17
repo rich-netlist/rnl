@@ -47,12 +47,14 @@
 //!   a viewer that does not solve draws it there all the same. An object that the record reaches
 //!   has them written all the same, with the record's priority (14.8).
 
+use std::cell::RefCell;
 use std::fmt;
 
-use crate::diag::{codes, Code, Sink};
+use crate::diag::{codes, Code};
 use crate::geom::{fmt_num, Orient, Pt, TOL};
 use crate::host::{HostDocument, Record, Seg};
 use crate::interp::obj::Priority;
+use crate::interp::{interpret_numbering, AuthoredCounts};
 use crate::numbering::level_check;
 use crate::problem::*;
 use crate::source::Provider;
@@ -1151,21 +1153,48 @@ pub fn finish_record(
     p: &LevelProblem,
     record: &str,
 ) -> String {
-    let ast = parse_record_features(record, true, crate::interp::unit::keeps_0_4(&p.version));
-    let uses_numbers = ast.body.as_ref().is_some_and(|b| b.members.iter().any(|m| uses_number(m)));
-    if !p.follows_0_3() || !uses_numbers {
-        return record.to_string();
+    LevelFinisher::new(doc, options, p).finish(files, record)
+}
+
+/// [`finish_record`] for records of the solver of one level one after another, such as the trials
+/// of the dots of a level (13.2). The document read again with each record in place of the level's
+/// records of the solver counts the objects of the authored records first, reading the document
+/// without its records of the solver (5.9); that reading is the same for every record of the
+/// level, so it is made once, for the first record that uses a number. Every call is given the
+/// same `files`.
+pub struct LevelFinisher<'a> {
+    doc: &'a HostDocument,
+    options: Options,
+    p: &'a LevelProblem,
+    counts: RefCell<AuthoredCounts>,
+}
+
+impl<'a> LevelFinisher<'a> {
+    /// The finisher of the records of the level of `p`, read from `doc` with `options`, as
+    /// [`finish_record`] takes them.
+    pub fn new(doc: &'a HostDocument, options: &Options, p: &'a LevelProblem) -> LevelFinisher<'a> {
+        let options = Options { generated: true, problems: false, ..options.clone() };
+        LevelFinisher { doc, options, p, counts: RefCell::default() }
     }
-    let mut doc = doc.clone();
-    let Some(level) = doc.levels.get_mut(p.level) else { return record.to_string() };
-    let file = level.file.clone();
-    level.records.retain(|r| r.file != file || record_type(r) != "generated");
-    level.records.push(placed(record, &file, level.end_line.max(1)));
-    let options = Options { generated: true, problems: false, ..options.clone() };
-    let read = crate::interpret(doc, files, &options, Sink::new());
-    match level_check(&read, p.level) {
-        Some(check) => with_numbering(record, check),
-        None => record.to_string(),
+
+    /// The record finished, as [`finish_record`] gives it.
+    pub fn finish(&self, files: &dyn Provider, record: &str) -> String {
+        let p = self.p;
+        let ast = parse_record_features(record, true, crate::interp::unit::keeps_0_4(&p.version));
+        let uses_numbers = ast.body.as_ref().is_some_and(|b| b.members.iter().any(|m| uses_number(m)));
+        if !p.follows_0_3() || !uses_numbers {
+            return record.to_string();
+        }
+        let mut doc = self.doc.clone();
+        let Some(level) = doc.levels.get_mut(p.level) else { return record.to_string() };
+        let file = level.file.clone();
+        level.records.retain(|r| r.file != file || record_type(r) != "generated");
+        level.records.push(placed(record, &file, level.end_line.max(1)));
+        let read = interpret_numbering(doc, files, &self.options, &mut self.counts.borrow_mut());
+        match level_check(&read, p.level) {
+            Some(check) => with_numbering(record, check),
+            None => record.to_string(),
+        }
     }
 }
 

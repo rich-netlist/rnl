@@ -1068,9 +1068,46 @@ impl<'p> Interp<'p> {
 ///   The checks given are those of the reading before, where every number is read: the text as
 ///   written.
 pub fn interpret(doc: HostDocument, provider: &dyn Provider, options: &Options, sink: Sink) -> Interpretation {
+    interpret_counted(doc, provider, options, sink, &mut AuthoredCounts::default(), true)
+}
+
+/// The objects of the authored records of each level as the reading of a document without its
+/// records of the solver counted them (5.9), which a reading of the document with its records of
+/// the solver takes. A reading of the same document with other records of the solver in a level,
+/// the same files read, would count the same: [`interpret_numbering`] takes them from the reading
+/// before instead.
+#[derive(Clone, Default)]
+pub struct AuthoredCounts(Option<Rc<HashMap<LevelId, AuthoredCount>>>);
+
+/// [`interpret`] for the checks of the numbers of the levels (5.9), [`Interpretation::numbering`]:
+/// the objects of the authored records as `counts` has them, when it has them, and `counts` given
+/// those this reading counts. The reading again that a record of the solver without `numbering`, or
+/// whose `numbering` is out of date, takes is not made: the checks are those of the reading before
+/// it, which this gives. So the rest of the interpretation is not that of [`interpret`] where such a
+/// record is read.
+pub(crate) fn interpret_numbering(
+    doc: HostDocument,
+    provider: &dyn Provider,
+    options: &Options,
+    counts: &mut AuthoredCounts,
+) -> Interpretation {
+    interpret_counted(doc, provider, options, Sink::new(), counts, false)
+}
+
+/// [`interpret`], the objects of the authored records taken from `counts` and given to it, and the
+/// reading again for the records of the solver whose numbers do not hold made when `recheck`.
+fn interpret_counted(
+    doc: HostDocument,
+    provider: &dyn Provider,
+    options: &Options,
+    sink: Sink,
+    counts: &mut AuthoredCounts,
+    recheck: bool,
+) -> Interpretation {
     let host = sink.clone();
-    let mut run = NumberRun::default();
+    let mut run = NumberRun { authored: counts.0.clone(), ..NumberRun::default() };
     let mut out = read(doc, provider, options, sink, &host, &mut run);
+    counts.0 = run.authored.clone();
     for _ in 0..3 {
         let same = run.own.as_ref().is_some_and(|own| **own == out.own);
         if !out.forward && (run.own.is_none() || same) {
@@ -1079,7 +1116,7 @@ pub fn interpret(doc: HostDocument, provider: &dyn Provider, options: &Options, 
         run.own = Some(Rc::new(std::mem::take(&mut out.own)));
         out = read(out.doc, provider, options, host.clone(), &host, &mut run);
     }
-    if !out.recheck.is_empty() {
+    if recheck && !out.recheck.is_empty() {
         let recheck = std::mem::take(&mut out.recheck);
         let numbering = std::mem::take(&mut out.numbering);
         let mut again = NumberRun { refuse: recheck.refuse, stale: recheck.stale, ..run };
