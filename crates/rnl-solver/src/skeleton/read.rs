@@ -1421,8 +1421,11 @@ impl Skeleton {
         [s.a, s.b].iter().any(|&v| self.spots[self.vertices[v].spot].pins.contains(&pin))
     }
 
+    /// The bends of the wires: the plain spots where a wire turns at a right angle and the pins a
+    /// wire leaves other than by their way out. An X that two nets swap by counts two, as the line
+    /// layout's order prices it, and the corners of its diagonals none.
     pub(crate) fn bends(&self, none: &BTreeSet<usize>) -> usize {
-        let mut count = 0;
+        let mut count = 2 * self.crosses.len();
         for (sp, spot) in self.spots.iter().enumerate() {
             let live: Vec<usize> = spot.segs.iter().copied().filter(|g| !none.contains(g)).collect();
             let corner = spot.vertices.iter().any(|&v| self.corner(v));

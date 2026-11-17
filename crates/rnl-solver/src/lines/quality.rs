@@ -451,6 +451,12 @@ pub(super) fn lab_measure(
             if *sa || *sb {
                 if let Some(at) = through(a0, a1, b0, b1) {
                     crossings += 1;
+                    // An X, two diagonals of two wires that cross, as compaction draws two nets
+                    // that swap: one crossing and two bends, as the corners of its diagonals
+                    // count none. The two jogs it stands for would count four.
+                    if *sa && *sb {
+                        bends += 2;
+                    }
                     if let (Some(r), Some(_)) = (ra, rb) {
                         if *r == 0 {
                             xs.insert(at[0].clone());
@@ -663,6 +669,30 @@ mod tests {
         // an instance's row is not weighed: with no symbol_lines in the order nothing is weighed
         let off = lab_order(&p, &s, &placed, &routing, &ranking("lines_order=\"length\""), None);
         assert_eq!(off.crosses_weighed, int(off.crosses as i64));
+    }
+
+    /// Two nets that swap drawn as an X, two diagonals that cross, count one crossing and two
+    /// bends; drawn as two jogs that cross once, one crossing and four bends.
+    #[test]
+    fn an_x_counts_one_crossing_and_two_bends() {
+        use rnl_runtime::solution::{RoutedWire, WirePoint};
+        let (p, s, placed, routing) = port::tests::fixture();
+        let with = |paths: [[[i64; 2]; 4]; 2]| {
+            let mut r = routing.clone();
+            for (route, path) in paths.into_iter().enumerate() {
+                let points = path.iter().map(|xy| WirePoint::Bend((xy[0] as f64, xy[1] as f64))).collect();
+                r.wires.push(RoutedWire { route, points });
+                r.paths.push(path.iter().map(|xy| xy.map(int)).collect());
+                r.drawn.push(r.wires.len() - 1);
+            }
+            lab_order(&p, &s, &placed, &r, &Ranking::default(), None)
+        };
+        let base = lab_order(&p, &s, &placed, &routing, &Ranking::default(), None);
+        let x = with([[[20, 2], [22, 2], [24, 0], [26, 0]], [[20, 0], [22, 0], [24, 2], [26, 2]]]);
+        let jogs = with([[[20, 2], [23, 2], [23, 0], [26, 0]], [[20, -1], [24, -1], [24, 3], [26, 3]]]);
+        assert_eq!((x.crossings - base.crossings, x.bends - base.bends), (1, 2));
+        assert_eq!((jogs.crossings - base.crossings, jogs.bends - base.bends), (1, 4));
+        assert!(x < jogs);
     }
 
     #[test]
