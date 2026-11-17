@@ -109,6 +109,6 @@ the tree; again no name is read. The symbols of usages of one role attached to a
 (to one of its terminals, or made in such a usage, as the ground of a stub is) make one group
 with it, and each group the element is in takes them in, so that this group nests in it. Within
 it, a symbol the facts keep above or below the pin it is attached at, with a bound on how far,
-hangs from that pin on that side, one grid unit away, and one unit beyond the pin the way the
-pin leaves when it leaves sideways, unless a fact aligns the two pins on x; one that another fact
-reaches on x does not hang. The others are items of the group's list.
+hangs from that pin on that side, the solver's attach gap (2 units) away or as near as the
+bounds allow, and as far beyond the pin the way the pin leaves when it leaves sideways, unless
+a fact aligns the two pins on x; one that another fact reaches on x does not hang. The others are items of the group's list.

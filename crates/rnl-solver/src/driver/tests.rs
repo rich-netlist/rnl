@@ -1759,48 +1759,45 @@ fn a_wire_between_two_rows_crosses_no_lead_of_a_stub() {
     }
 }
 
-/// A stub that the facts kept put exactly on a pin's line, at one rise (an ALIGN on x of the two
-/// pins and DISTANCEs on y whose least and most are one), hangs from that pin as a usage pinned
-/// to it, whatever its name, right above it; with a least rise alone, it hangs from it too, as a
-/// symbol attached to the element, right above it too while a fact aligns the two pins on x.
+/// A supply made in a usage of one role attached to a terminal, whatever its name, hangs from that
+/// terminal's pin as the facts of the usage say, as a usage pinned to it: with a bound on how far
+/// above alone, the solver's gap above and beyond the pin the way it leaves when it leaves sideways; with
+/// the two pins aligned on x too, right above it; at one rise and aligned (an ALIGN on x and a
+/// DISTANCE on y whose least and most are one), right above it at that rise. The usage is written
+/// here, so that the test reads no stub of the standard package.
 #[test]
 fn a_stub_held_at_one_rise_hangs_from_its_pin() {
-    let text = "* ex
-* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }
-                .model pch pmos level=1
-M1 out in vdd vdd pch
-* @RNL { &vdd @ADD-TO $SUPPLY_NET_SET }
-.end
-";
-    let structure = |p: &LevelProblem| {
+    let solve = |facts: &str| {
+        let text = format!(
+            "* ex\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }}\n\
+             .model pch pmos level=1\nM1 out in vdd vdd pch\n\
+             * @RNL {{ $UP = @DEFINE(roles=[[\"t\", \"pin\"]], parameters=[[\"gap\", 3]]) {{ %s = $SUPPLY @ATTACH ?t::net; \
+             ?t::net @WIRE {{?t %s::pin}}; {facts} }}; $UP @ATTACH #M1:s }}\n.end\n"
+        );
+        let p = problems_of(&text).into_iter().next().unwrap();
         let options = SolverOptions::without_time_limit();
-        let resolved = crate::resolve(p, &options);
-        crate::structure::analyse(p, &resolved, &options, CAPS, &mut crate::Work::default())
+        let resolved = crate::resolve(&p, &options);
+        let s = crate::structure::analyse(&p, &resolved, &options, CAPS, &mut crate::Work::default());
+        assert!(s.language04);
+        let m1 = p.objects.iter().position(|o| o.label == "#M1").unwrap();
+        let stubs: Vec<usize> = (0..p.objects.len()).filter(|&k| s.objects[k].stub.is_some()).collect();
+        assert_eq!(stubs.len(), 1, "{facts}");
+        let k = stubs[0];
+        let stub = s.objects[k].stub.clone().unwrap();
+        assert_eq!((s.objects[k].role, stub.host.0), (Role::Pinned, m1), "{facts}");
+        (stub.rise, stub.run)
     };
-    let mut p = problems_of(text).into_iter().next().unwrap();
-    let s = structure(&p);
-    assert!(s.language04);
-    let bounded: Vec<&crate::structure::Stub> = s.objects.iter().filter_map(|o| o.stub.as_ref()).collect();
-    assert!(!bounded.is_empty() && bounded.iter().all(|stub| stub.run.is_zero()));
-    // the least rise of each stub made its most too
-    let mut bounded = 0;
-    for f in &mut p.facts {
-        if let FactKind::Distance { axis: Axis::Y, min: Some(min), max, .. } = &mut f.kind {
-            *max = Some(*min);
-            bounded += 1;
-        }
-    }
-    assert!(bounded > 0);
-    let s = structure(&p);
-    let m1 = p.objects.iter().position(|o| o.label == "#M1").unwrap();
-    let stubs: Vec<usize> = (0..p.objects.len()).filter(|&k| s.objects[k].stub.is_some()).collect();
-    assert!(!stubs.is_empty());
-    for k in stubs {
-        let stub = s.objects[k].stub.as_ref().unwrap();
-        assert_eq!((s.objects[k].role, stub.host.0), (Role::Pinned, m1), "{}", p.objects[k].label);
-        assert!(stub.rise > Q::zero(), "{}: {}", p.objects[k].label, stub.rise);
-        assert!(stub.run.is_zero(), "{}", p.objects[k].label);
-    }
+    let bound = "?t %s::pin @DISTANCE(\"bottom-to-top\", max=?gap, priority=\"low\")";
+    let aligned = "{?t %s::pin} @ALIGN(\"x\", priority=\"low\")";
+    let exact = "?t %s::pin @DISTANCE(\"bottom-to-top\", exact=?gap, priority=\"low\")";
+    // the gap of the usage, 3, is more than the solver's own: it hangs that much above
+    let gap = int(crate::search::ATTACH_GAP);
+    let (rise, run) = solve(bound);
+    assert!(rise == gap && run == gap, "{rise} {run}");
+    let (rise, run) = solve(&format!("{bound}; {aligned}"));
+    assert!(rise == gap && run.is_zero(), "{rise} {run}");
+    let (rise, run) = solve(&format!("{exact}; {aligned}"));
+    assert!(rise == int(3) && run.is_zero(), "{rise} {run}");
 }
 
 /// The structure of the level with a title of a case of the solver, not solved.
