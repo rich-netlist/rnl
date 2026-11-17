@@ -65,13 +65,13 @@ fn a_level_of_0_4_prints_its_tree_of_groups() {
     assert_eq!((code, err.as_str()), (0, ""));
     let want = "g.sp · language 0.4 · 2 groups, 4 outside the tree
   (level) · #R4 #R5 #R6 · 3 devices
-    %block · #R3 + 1 virtual · 1 device (written at g.sp:11)
-      %again · #R1 #R2 · 2 devices (written at g.sp:13)
+    %block · #R3 + 1 virtual · 1 device (written at g.sp:12)
+      %again · #R1 #R2 · 2 devices (written at g.sp:14)
   outside the tree:
-    %cross · CROSSES %block: they share #R3 and neither holds the other · #R3 #R4 · 2 devices (written at g.sp:10)
-    %pair · the members of %again, which stands for it · #R1 #R2 · 2 devices (written at g.sp:12)
-    %off · turned off by PRIORITY · #R5 #R6 · 2 devices (written at g.sp:14)
-    %e · no member with a place of its own · also &a · 0 devices (written at g.sp:16)
+    %cross · CROSSES %block: they share #R3 and neither holds the other · #R3 #R4 · 2 devices (written at g.sp:11)
+    %pair · the members of %again, which stands for it · #R1 #R2 · 2 devices (written at g.sp:13)
+    %off · turned off by PRIORITY · #R5 #R6 · 2 devices (written at g.sp:15)
+    %e · no member with a place of its own · also &a · 0 devices (written at g.sp:17)
 ";
     assert_eq!(out, want);
 }
@@ -86,12 +86,12 @@ fn a_level_of_0_3_lists_its_groups_flat() {
     assert_eq!(code, 0);
     let want = "g.sp · language 0.3 · 6 groups; no tree of groups before 0.4, each with all its members
   (level) · 4 virtual: $GROUND(&0) $GROUND(&0) $GROUND(&0) $GROUND(&0) · 0 devices
-  %cross · #R3 #R4 · 2 devices (written at g.sp:10)
-  %block · #R1 #R2 #R3 + 1 virtual: %g · 3 devices (written at g.sp:11)
-  %pair · #R1 #R2 · 2 devices (written at g.sp:12)
-  %again · #R1 #R2 · 2 devices (written at g.sp:13)
-  %off · turned off by PRIORITY · #R5 #R6 · 2 devices (written at g.sp:14)
-  %e · also &a · 0 devices (written at g.sp:16)
+  %cross · #R3 #R4 · 2 devices (written at g.sp:11)
+  %block · #R1 #R2 #R3 + 1 virtual: %g · 3 devices (written at g.sp:12)
+  %pair · #R1 #R2 · 2 devices (written at g.sp:13)
+  %again · #R1 #R2 · 2 devices (written at g.sp:14)
+  %off · turned off by PRIORITY · #R5 #R6 · 2 devices (written at g.sp:15)
+  %e · also &a · 0 devices (written at g.sp:17)
 ";
     assert_eq!(out, want);
 }
@@ -112,7 +112,7 @@ fn json_and_level() {
     assert_eq!((block["id"].as_str(), block["name"].as_str()), (Some("%block"), Some("%block")));
     assert_eq!(block["devices"], serde_json::json!(["#R3"]));
     assert_eq!(block["virtual"], serde_json::json!([{"id": "%g", "label": "%g"}]));
-    assert_eq!(block["source"], serde_json::json!({"kind": "written", "at": "g.sp:11"}));
+    assert_eq!(block["source"], serde_json::json!({"kind": "written", "at": "g.sp:12"}));
     assert_eq!(block["groups"][0]["id"], "%again");
     assert_eq!(block["groups"][0]["devices"], serde_json::json!(["#R1", "#R2"]));
     let outside: Vec<(&str, &str)> = level["outside"]

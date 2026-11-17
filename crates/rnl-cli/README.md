@@ -142,13 +142,13 @@ $ rnl explain site/examples/ota5t.sp '#M1'
 $ rnl groups g.sp
 g.sp · language 0.4 · 2 groups, 4 outside the tree
   (level) · #R4 #R5 #R6 · 3 devices
-    %block · #R3 + 1 virtual · 1 device (written at g.sp:11)
-      %again · #R1 #R2 · 2 devices (written at g.sp:13)
+    %block · #R3 + 1 virtual · 1 device (written at g.sp:12)
+      %again · #R1 #R2 · 2 devices (written at g.sp:14)
   outside the tree:
-    %cross · CROSSES %block: they share #R3 and neither holds the other · #R3 #R4 · 2 devices (written at g.sp:10)
-    %pair · the members of %again, which stands for it · #R1 #R2 · 2 devices (written at g.sp:12)
-    %off · turned off by PRIORITY · #R5 #R6 · 2 devices (written at g.sp:14)
-    %e · no member with a place of its own · also &a · 0 devices (written at g.sp:16)
+    %cross · CROSSES %block: they share #R3 and neither holds the other · #R3 #R4 · 2 devices (written at g.sp:11)
+    %pair · the members of %again, which stands for it · #R1 #R2 · 2 devices (written at g.sp:13)
+    %off · turned off by PRIORITY · #R5 #R6 · 2 devices (written at g.sp:15)
+    %e · no member with a place of its own · also &a · 0 devices (written at g.sp:17)
 ```
 
 `snapshot` prints the snapshot of [`rnl-view`](../rnl-view/README.md#snapshots): the host circuit and the model of each drawing level, by ids a transaction can write back. `catalog` prints the catalog of [`rnl-view`](../rnl-view/README.md#catalog): the symbols, with their pins, boxes and labels, the ordinary definitions and the sets of the bundled packages and of those in the directories `--package-dir` gives, each package file read as `rnl check PACKAGE.rnl` reads it; of each name the newest version, every version with `--all-versions`, and only the names `--package` gives, when it gives any. It is the catalog the WebAssembly core gives for a catalog request. `write` writes the ops into the netlist with [`rnl-edit`](../rnl-edit/README.md) and saves the result as OUT, reading the netlist under the name of OUT when the request names no `file`, so that a Spectre netlist saved without the `.scs` suffix gets its header where Spectre reads it (2.2); `rnl check OUT` then says how it reads.

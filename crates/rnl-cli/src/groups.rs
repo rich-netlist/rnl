@@ -7,7 +7,7 @@
 //! turns off. A level of a language before 0.4 has no tree of groups: each group is listed with all
 //! its members. Nothing is judged here; `rnl check` has the hint of a crowded node.
 
-use rnl_runtime::diag::{codes, Code};
+use rnl_runtime::diag::{codes, Code, Loc};
 use rnl_runtime::group_nodes::{applied_at, group_name, held, label, member_ids, statement_at, tree, Held, Node};
 use rnl_runtime::model::{GroupInfo, GroupPlace, LevelView, UsageOrigin};
 use rnl_runtime::Interpretation;
@@ -18,7 +18,13 @@ use serde_json::{json, Value};
 /// (`group_nodes::applied_at`), or else where its GROUP is.
 fn source(r: &Interpretation, lv: &LevelView, k: usize) -> (String, Value) {
     let g = &lv.groups[k];
-    let at = g.source.as_ref().map(|(a, _)| format!("{}:{}", a.file, a.line)).unwrap_or_else(|| "-".into());
+    // where a statement is written: its span begins after the end of the one before it
+    let written_at = |(start, end): &(Loc, Loc)| {
+        let text = r.sources.iter().find(|(f, _)| *f == start.file).map_or("", |(_, t)| t.as_str());
+        let at = statement_at(text, start, end);
+        format!("{}:{}", at.file, at.line)
+    };
+    let at = g.source.as_ref().map(written_at).unwrap_or_else(|| "-".into());
     match &g.origin {
         UsageOrigin::Written if g.id.starts_with('%') => {
             (format!("written at {at}"), json!({"kind": "written", "at": at}))
@@ -36,11 +42,7 @@ fn source(r: &Interpretation, lv: &LevelView, k: usize) -> (String, Value) {
         }
         UsageOrigin::Body => {
             let written = |file: &str| r.doc.sources.iter().any(|(f, _)| f == file);
-            let applied = applied_at(lv, k, &written).map(|(start, end)| {
-                let text = r.sources.iter().find(|(f, _)| *f == start.file).map_or("", |(_, t)| t.as_str());
-                let at = statement_at(text, start, end);
-                format!("{}:{}", at.file, at.line)
-            });
+            let applied = applied_at(lv, k, &written).map(written_at);
             // a usage that a rule of a package makes, up the chain, is written in no file
             let mut rule = None;
             let mut usage = g.parent.as_ref();
