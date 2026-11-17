@@ -23,7 +23,7 @@ let preferences = new Map();
 const activeSettings = new WeakMap();
 let shown = false;
 let groupsShown = false; // the frames of the groups: the Solve panel's Group frames, apart from the usages' View > Show Usages
-let duplicatesHidden = false; // the Usage panel's Hide duplicate usages: of the usages of the same devices one frame is drawn
+let duplicatesHidden = false; // the Usage panel's Hide duplicate usages: of the usages that frame the same objects one frame is drawn
 let currentsShown = false;
 let currentLayer = null;
 let revision = 0;
@@ -71,26 +71,29 @@ function newScope() {
 const chosen =() => selectedAsUsage ? usages().find(u => u.object === selected) : null;
 /** Whether a usage's frame is shown by its own switches: Show Usages, or Group frames for a group, and its own check. */
 const ownVisible = u => (isGroup(u) ? groupsShown : shown) && setting(u).visible;
-const deviceKeys = new WeakMap();
+const framedKeys = new WeakMap();
 /**
- * The devices a usage stands for, as a key: the instances that fill its roles, a usage among them for its own devices in
- * turn, nets, pins and points left out; the same devices, the same key; "" for none.
+ * The objects a usage's frame goes round, as a key: those that fill its roles, instances, pins and points alike, nets
+ * left out; a usage among them for the objects it goes round in turn, and itself too when it has a symbol of its own, as
+ * a port, which is drawn; the same objects, the same key; "" for none.
  */
-function deviceKey(u) {
-  if (deviceKeys.has(u)) return deviceKeys.get(u);
+function framedKey(u) {
+  if (framedKeys.has(u)) return framedKeys.get(u);
   const by = usageByObject();
-  const devices = new Set();
+  const framed = new Set();
   const seen = new Set([u.object]);
   const take = (x) => {
     for (const r of x.roles) for (const o of r.objects ?? []) {
       const inner = by.get(o);
-      if (inner) { if (!seen.has(o)) { seen.add(o); take(inner); } }
-      else if (doc.objects[o]?.kind === "instance") devices.add(o);
+      if (inner) {
+        if (inner.has_symbol) framed.add(o);
+        if (!seen.has(o)) { seen.add(o); take(inner); }
+      } else if (doc.objects[o] && doc.objects[o].kind !== "net") framed.add(o);
     }
   };
   take(u);
-  const key = [...devices].sort((a, b) => a - b).join(",");
-  deviceKeys.set(u, key);
+  const key = [...framed].sort((a, b) => a - b).join(",");
+  framedKeys.set(u, key);
   return key;
 }
 const byObjects = new WeakMap();
@@ -102,14 +105,14 @@ function usageByObject() {
 }
 let duplicateCache = { all: null, revision: -1, on: false, drawn: new Map() };
 /**
- * With Hide duplicate usages on, the usage drawn in the place of each other one of the same devices (`deviceKey`): of the
- * usages of a level that draw nothing of their own (no symbol, wire or annotation, as $MATCHED or $SERIES; not a group)
- * and are shown by their own switches, those of the same devices are one set, of which one frame is drawn. It is the last
- * one written (the order of the Document's usages, in which a usage made inside a definition follows the one it is made
- * in), and then the outermost usage of the set that it is made inside (`parent`, through any number of definitions): of a
- * definition that makes another usage of its own devices, as $DIFFERENTIAL_PAIR makes $MATCHED, the outer one; of two
- * usages written over the same devices, the later. Usages of other devices are drawn as before. By the usage's object,
- * for each usage not drawn; empty while the mode is off.
+ * With Hide duplicate usages on, the usage drawn in the place of each other one that frames the same objects (`framedKey`):
+ * of the usages of a level that draw nothing of their own (no symbol, wire or annotation, as $MATCHED or $SERIES; not a
+ * group) and are shown by their own switches, those that frame the same objects are one set, of which one frame is drawn.
+ * It is the last one written (the order of the Document's usages, in which a usage made inside a definition follows the
+ * one it is made in), and then the outermost usage of the set that it is made inside (`parent`, through any number of
+ * definitions): of a definition that makes another usage of its own objects, as $DIFFERENTIAL_PAIR makes $MATCHED, the
+ * outer one; of two usages written over the same objects, the later. Usages of other objects are drawn as before. By the
+ * usage's object, for each usage not drawn; empty while the mode is off.
  */
 function duplicates() {
   const all = usages();
@@ -120,7 +123,7 @@ function duplicates() {
     const sets = new Map();
     for (const u of all) {
       if (isGroup(u) || (u.has_drawing ?? u.has_symbol) || !ownVisible(u)) continue;
-      const key = deviceKey(u);
+      const key = framedKey(u);
       if (!key) continue;
       if (!sets.has(key)) sets.set(key, []);
       sets.get(key).push(u);
