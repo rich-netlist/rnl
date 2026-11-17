@@ -645,8 +645,7 @@
   @ALIAS("NMOS管", "nmos", definition="$CMOS_INVERTER_HORIZONTAL");
   @ALIAS("上拉网络", "pullup", definition="$CMOS_GATE");
   @ALIAS("下拉网络", "pulldown", definition="$CMOS_GATE");
-  @ALIAS("核心", "core", definition="$LATCH");
-  @ALIAS("外围", "others", definition="$LATCH");
+  @ALIAS("成员", "members", definition="$LATCH");
   @ALIAS("反相器甲", "a", definition="$INVERTER_LATCH");
   @ALIAS("反相器乙", "b", definition="$INVERTER_LATCH");
   @ALIAS("各级", "stages", definition="$SHIFT_REGISTER");
