@@ -24,6 +24,8 @@ const USAGE: &str = concat!(
   rnl view FILE [options]           print the Document a viewer shows, as JSON
   rnl explain FILE REF [options]    print the usages and groups the object REF is in, such as #M1, &vdd,
                                     #M5:d or %dp1, written as RNL refers to it
+  rnl groups FILE [options]         print the tree of groups of each level, with the parts each group
+                                    holds directly
   rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
   rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back
   rnl solver-defaults [--json] [--layout NAME]
@@ -111,6 +113,19 @@ explain options:
   written · where it comes from (written, a rule, a definition's body, written back by a solver) ·
   in effect, failed, overridden or disabled, with the reason; the usages that contain it follow,
   indented. A failed application, which made no usage, is listed too
+groups options:
+  --level TITLE       only the level with this title: a subcircuit name, or the file name
+  --all               name each virtual part too, not only count them
+  --json              print the trees as JSON, every virtual part named
+  each level is a tree, as the solver lays it out (11.5): the level, (level), with the parts in no
+  group, then each group under the smallest group that holds it, a line for each: its name, the
+  devices it holds directly, those of no group under it, and how many virtual parts (usages with a
+  symbol of their own: ports, grounds, dots), then its number of devices and, in brackets, where it
+  is written. A group a definition's body makes is named by the usage and the definition,
+  %amp1 · $TRANSCONDUCTOR_Z_AMPLIFIER, and where the file applies it. The groups outside the tree follow: one with the members of
+  another, one that CROSSES another (they share members and neither holds the other), one with no
+  member with a place of its own, one turned off. A level before 0.4 has no tree; its groups are
+  listed each with all its members. rnl check hints at a node of more than 20 devices
 snapshot options:
   --parts LIST        the parts to give, of drawing, host and model; host,model by default
 catalog options (the packages are those of --package-dir and the bundled ones, each read as rnl
@@ -181,6 +196,8 @@ struct Args {
     json: bool,
     /// `solver-defaults`' `--layout`.
     layout: Option<String>,
+    /// `groups`' `--all`: name every virtual part.
+    all: bool,
     /// `view`'s `--bind` and `--param`.
     bind: Option<rnl_view::Bind>,
 }
@@ -237,13 +254,14 @@ fn unknown_encoding(text: String) -> Said {
 }
 
 /// The commands, as `run` takes them.
-const COMMANDS: [&str; 16] = [
+const COMMANDS: [&str; 17] = [
     "solver-defaults",
     "check",
     "dump",
     "problem",
     "view",
     "explain",
+    "groups",
     "snapshot",
     "formats",
     "catalog",
@@ -265,6 +283,7 @@ fn parse_args() -> Result<Args, Said> {
     let mut positional = Vec::new();
     let mut written_options = Vec::new();
     let mut json = false;
+    let mut all = false;
     let mut layout = None;
     let mut constraints = false;
     let mut bind_subckt: Option<String> = None;
@@ -378,6 +397,7 @@ fn parse_args() -> Result<Args, Said> {
             }
             "--all-versions" => all_versions = true,
             "--json" => json = true,
+            "--all" => all = true,
             "--layout" => {
                 let layouts = rnl_cli::solver_table::layouts();
                 let named = layouts.join(", ");
@@ -422,7 +442,7 @@ fn parse_args() -> Result<Args, Said> {
             continue;
         }
         let commands: &[&str] = match option.as_str() {
-            "--level" => &["problem", "solve", "preview", "explain", "replace-records"],
+            "--level" => &["problem", "solve", "preview", "explain", "groups", "replace-records"],
             "--parts" => &["snapshot"],
             "--author" => &["write"],
             "--report" => &["solve", "upgrade"],
@@ -433,6 +453,7 @@ fn parse_args() -> Result<Args, Said> {
             "--previous" | "--solver-input" => &["problem"],
             "--png" | "--scale" | "--net-names" => &["render"],
             "--layout" => &["solver-defaults"],
+            "--all" => &["groups"],
             "--primitives" | "--no-svg" | "--status" => &["view", "snapshot"],
             "--flylines" => &["view", "snapshot", "render"],
             "--hints" => &["view"],
@@ -472,8 +493,9 @@ fn parse_args() -> Result<Args, Said> {
     if json && command == "solve" && !solver.check {
         return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "--json is an option of solve only with --check"));
     }
-    if json && !matches!(command.as_str(), "explain" | "solve" | "solver-defaults") {
-        return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "--json is an option of explain and solver-defaults"));
+    if json && !matches!(command.as_str(), "explain" | "groups" | "solve" | "solver-defaults") {
+        let text = "--json is an option of explain, groups and solver-defaults";
+        return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, text));
     }
     if constraints && command != "view" {
         let text = "--constraints is an option of view; rnl problem prints what a solver reads";
@@ -547,6 +569,7 @@ fn parse_args() -> Result<Args, Said> {
         reference,
         json,
         layout,
+        all,
         bind,
     })
 }
@@ -770,6 +793,18 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
                 println!("{}", serde_json::to_string_pretty(&rnl_cli::explain::json(&doc, &found)).unwrap());
             } else {
                 for line in rnl_cli::explain::lines(&doc, &found) {
+                    println!("{line}");
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        "groups" => {
+            let r = interpret(args, &provider)?;
+            let levels = rnl_cli::groups::levels(&r, args.level.as_deref())?;
+            if args.json {
+                println!("{}", serde_json::to_string_pretty(&rnl_cli::groups::json(&r, &levels)).unwrap());
+            } else {
+                for line in rnl_cli::groups::lines(&r, &levels, args.all) {
                     println!("{line}");
                 }
             }

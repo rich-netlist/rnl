@@ -4957,6 +4957,15 @@
    ]
   },
   {
+   "number": "RNL9406",
+   "name": "crowded-node",
+   "severity": "hint",
+   "message": "{level}: {n} devices directly in {this level|the group {group}}, in no group under it; consider grouping its functional blocks with GROUP (more than 20 devices in one node of the tree of groups, 11.5)",
+   "sections": [
+    "11.5"
+   ]
+  },
+  {
    "number": "RNL9500",
    "name": "constraint-needs-solver",
    "severity": "hint",

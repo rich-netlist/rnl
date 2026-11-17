@@ -64,6 +64,44 @@ impl Interp<'_> {
         Model { levels, failed: None, language, packages }
     }
 
+    /// The hint of a node of the tree of groups of a level of 0.4 that holds more than
+    /// [`crate::group_nodes::CROWDED`] devices directly (11.5): on the level, at its first line, or
+    /// on the group, at its GROUP or, for a group the body of a definition makes, at the statement
+    /// of the document that applies the definition ([`crate::group_nodes::applied_at`]).
+    pub(crate) fn hint_crowded_nodes(&mut self, model: &Model) {
+        for lv in &model.levels {
+            for (group, n) in crate::group_nodes::crowded(lv) {
+                let level_loc = crate::diag::Loc::line(lv.file.clone(), lv.line.max(1));
+                let (place, loc) = match group {
+                    None => ("this level".to_string(), level_loc),
+                    Some(k) => {
+                        let g = &lv.groups[k];
+                        let written = |file: &str| self.doc.sources.iter().any(|(f, _)| f == file);
+                        let at = crate::group_nodes::applied_at(lv, k, &written).or(g.source.as_ref());
+                        let name = crate::group_nodes::group_name(lv, k);
+                        (format!("the group {name}"), at.map_or(level_loc, |(start, end)| self.written_at(start, end)))
+                    }
+                };
+                self.sink.hint(
+                    crate::diag::codes::CROWDED_NODE,
+                    format!(
+                        "{}: {n} devices directly in {place}, in no group under it; consider grouping its functional blocks \
+                         with GROUP (more than {} devices in one node of the tree of groups, 11.5)",
+                        lv.title,
+                        crate::group_nodes::CROWDED
+                    ),
+                    Some(loc),
+                );
+            }
+        }
+    }
+
+    /// Where a statement from `start` to `end` begins as written ([`crate::group_nodes::statement_at`]).
+    fn written_at(&self, start: &crate::diag::Loc, end: &crate::diag::Loc) -> crate::diag::Loc {
+        let text = self.doc.sources.iter().chain(&self.pkg_sources).find(|(f, _)| *f == start.file);
+        text.map_or_else(|| start.clone(), |(_, text)| crate::group_nodes::statement_at(text, start, end))
+    }
+
     // ---- ids for the editor interface (rnl-dev notes/rnl-editor-interface, 3.2)
 
     /// Where the statement that made an object is, `@file:line:col`, for the objects that keep it.

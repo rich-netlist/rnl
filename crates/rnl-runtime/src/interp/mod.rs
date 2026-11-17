@@ -992,6 +992,7 @@ impl<'p> Interp<'p> {
             self.check_auto_wire_geometry();
         }
         let model = self.build_model();
+        self.hint_crowded_nodes(&model);
         let (problems, results) =
             if self.want_problems && self.package_main.is_none() { self.build_problems() } else { Default::default() };
         // the numbers and their checks (5.9); a reading that counts the objects of the authored
