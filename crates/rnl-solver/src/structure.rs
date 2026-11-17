@@ -163,6 +163,9 @@ pub(crate) struct Stub {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct ObjectInfo {
     pub hung_from: Option<PinKey>,
+    /// Of a level of 0.4: the pin it starts beside in the first arrangement of the tree layout
+    /// and nowhere else ([`attach_host`]).
+    pub attach_host: Option<PinKey>,
     pub role: Role,
     pub device: Device,
     pub symbol: Option<usize>,
@@ -902,41 +905,11 @@ pub(crate) fn analyse(
     let witness = resolved.witness.geometry.clone();
     let kept = resolved.kept.clone();
     let mut objects = object_infos(problem, &model, &kept);
-    let mut power = power(problem, &kept, &mut objects);
-    if problem.version == "0.4" {
-        for (k, object) in objects.iter_mut().enumerate() {
-            if object.role == Role::Port && object.own {
-                object.hung_from = crate::tree_hang::host(problem, k);
-            }
-        }
-    }
+    let power = power(problem, &kept, &mut objects);
     let mut connections = connections(problem, &model);
     if problem.version == "0.4" {
-        let untied: Vec<_> = (0..objects.len())
-            .filter(|&k| {
-                let o = &objects[k];
-                matches!(o.role, Role::Supply | Role::Ground)
-                    && o.own
-                    && !o.fact_touched
-                    && o.stub.is_none()
-                    && o.symbol.is_some()
-            })
-            .map(|k| (k, attach_pins(&objects, &connections, k)))
-            .collect();
-        for (k, pins) in untied {
-            match objects[k].role {
-                _ if pins.is_empty() => {
-                    objects[k].role = Role::Element;
-                    power.supply.retain(|&j| j != k);
-                    power.ground.retain(|&j| j != k);
-                }
-                Role::Supply => {
-                    power.supply_pins.extend(pins.iter().copied());
-                    power.supply_up.extend(pins);
-                }
-                Role::Ground => power.ground_pins.extend(pins),
-                _ => {}
-            }
+        for k in 0..objects.len() {
+            objects[k].attach_host = attach_host(problem, &objects, &connections, k);
         }
     }
     let power = power_pins(power, &mut connections);
@@ -1443,7 +1416,9 @@ fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<Ob
         .enumerate()
         .map(|(k, o)| {
             let own = matches!(o.position, Position::Own { .. });
-            let role = match (o.kind, hang(problem, k)) {
+            // a level of 0.4 tells no supply, ground or port: such a symbol is an object as any other
+            let hung = if problem.version == "0.4" { None } else { hang(problem, k) };
+            let role = match (o.kind, hung) {
                 (ObjectKind::Point, _) => Role::Point,
                 (ObjectKind::Annotation, _) => Role::Other,
                 (ObjectKind::Text, _) => Role::Text,
@@ -1469,6 +1444,7 @@ fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<Ob
                 own,
                 stub: None,
                 hung_from: None,
+                attach_host: None,
                 fact_touched: touched[k][0] || touched[k][1],
                 fact_axes: touched[k],
                 left_free: false,
@@ -1563,6 +1539,32 @@ fn stub_rise(problem: &LevelProblem, kept: &[usize], k: usize, host: PinKey) -> 
             None
         }
     })
+}
+
+/// The pin that an object a usage of one role makes, attached (12.1) to a terminal or a net,
+/// starts beside in the first arrangement of the tree layout: the terminal, or of the net the pin
+/// of the instance or bundle first in the netlist. Only that arrangement reads it; the search,
+/// the lines, the alignments, compaction and the order take the object as any other.
+fn attach_host(problem: &LevelProblem, objects: &[ObjectInfo], connections: &Connections, k: usize) -> Option<PinKey> {
+    let o = &objects[k];
+    let object = problem.objects.get(k)?;
+    if o.role != Role::Element || !o.own || o.symbol.is_none() || object.kind != ObjectKind::Usage {
+        return None;
+    }
+    let usage = problem.usages.get(object.usage?)?;
+    let ([role], Some(true)) = (usage.roles.as_slice(), usage.object.map(|j| j == k)) else { return None };
+    let [member] = role.members.as_slice() else { return None };
+    let of_netlist = |p: &PinKey| {
+        objects.get(p.0).is_some_and(|o| o.role == Role::Element)
+            && problem.objects.get(p.0).is_some_and(|o| matches!(o.kind, ObjectKind::Instance | ObjectKind::Bundle))
+    };
+    match member {
+        Filler::Terminal { object, pin: Some(pin), .. } | Filler::Pin { object, pin } => {
+            Some((*object, *pin)).filter(of_netlist)
+        }
+        Filler::Net(n) => connections.nets.iter().find(|x| x.name == *n)?.pins.iter().copied().filter(of_netlist).min(),
+        _ => None,
+    }
 }
 
 /// The supply and ground symbols ([`Role::Supply`], [`Role::Ground`]: those that hang above and

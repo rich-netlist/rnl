@@ -1221,8 +1221,28 @@ impl<'a> Tree<'a> {
         key: &dyn Fn(&Arrangement, &Item) -> Q,
         ykey: &dyn Fn(&Arrangement, &Item) -> Q,
     ) {
+        let ori = orientations(self.s, &arr.values, &arr.ways);
         for node in self.groups.post_order() {
-            let items = self.node_items(arr, node);
+            let mut items = self.node_items(arr, node);
+            // an object attached by a usage of one role starts beside the pin it is attached to
+            // ([`crate::structure::ObjectInfo::attach_host`]): next to the item of this group that
+            // holds the pin's owner, on the side the pin leaves by
+            let mut beside: Vec<(usize, Item, Option<(i64, i64)>)> = Vec::new();
+            for &k in &self.leaves {
+                let Some(host) = self.s.objects[k].attach_host else { continue };
+                if self.node_of.get(&k) != Some(&node) || host.0 == k {
+                    continue;
+                }
+                let carrier = items.iter().find(|it| match it {
+                    Item::Leaf(j) => *j == host.0,
+                    Item::Group(c) => self.node_of.get(&host.0).is_some_and(|n| self.subtree(*c).contains(n)),
+                    Item::List(..) => false,
+                });
+                if let Some(carrier) = carrier.cloned() {
+                    beside.push((k, carrier, self.s.exit(host.0, host.1, ori[host.0])));
+                }
+            }
+            items.retain(|it| !beside.iter().any(|(k, _, _)| *it == Item::Leaf(*k)));
             let list = if items.is_empty() {
                 None
             } else {
@@ -1231,7 +1251,20 @@ impl<'a> Tree<'a> {
                 let y = |it: &Item| ykey(&snapshot, it);
                 Some(self.cut(&snapshot, items, &k, &y, Outer::Both))
             };
-            arr.lists[node] = list;
+            arr.lists[node] = list.map(|mut list| {
+                for (k, carrier, exit) in beside {
+                    let (dir, first) = match exit {
+                        Some((-1, 0)) => (Dir::Row, true),
+                        Some((0, 1)) => (Dir::Column, true),
+                        Some((0, -1)) => (Dir::Column, false),
+                        _ => (Dir::Row, false),
+                    };
+                    if !set_beside(&mut list, &carrier, Item::Leaf(k), dir, first) {
+                        list = Item::List(Dir::Row, vec![list, Item::Leaf(k)]);
+                    }
+                }
+                list
+            });
         }
     }
 
@@ -2493,6 +2526,20 @@ impl<'a> Tree<'a> {
         let _ = arr;
         let _phase = crate::profile::span("tree", "coordinates");
         place_tree(self.problem, self.s, orient, rels, pull, self.options, work)
+    }
+}
+
+/// Puts `new` beside the item `carrier` within `item`, before it (left of it in a row, above it
+/// in a column) or after it; whether `carrier` was found.
+fn set_beside(item: &mut Item, carrier: &Item, new: Item, dir: Dir, first: bool) -> bool {
+    if item == carrier {
+        let old = std::mem::replace(item, Item::Leaf(0));
+        *item = Item::List(dir, if first { vec![new, old] } else { vec![old, new] });
+        return true;
+    }
+    match item {
+        Item::List(_, items) => items.iter_mut().any(|it| set_beside(it, carrier, new.clone(), dir, first)),
+        _ => false,
     }
 }
 
