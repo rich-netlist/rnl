@@ -3,3 +3,6 @@ crates/rnl-render/fonts/*.metrics binary
 
 # The logo regression check compares the renderer's LF output byte for byte.
 brand/*.svg text eol=lf
+
+# Frozen data of the gallery of the packages, written by site/gallery/build.mjs: kept as written.
+site/gallery/frozen/*.js text eol=lf -diff linguist-generated

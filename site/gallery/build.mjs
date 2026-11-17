@@ -2,7 +2,7 @@
 // file under libraries/, read with package-file.mjs, and every symbol drawn by the core as
 // WebAssembly, the same core the web viewer runs.
 //
-//   node site/gallery/build.mjs [--core DIR] [--out DIR] [--libraries DIR] [--spec DIR] [--drafts]
+//   node site/gallery/build.mjs [--core DIR] [--out DIR] [--libraries DIR] [--spec DIR] [--frozen DIR] [--drafts]
 //
 // --core is the built binding, bindings/runtime-wasm/dist/ by default (node bindings/runtime-wasm/
 // build.mjs, or node apps/web/build.mjs, writes it); --out is the built site, site/dist/ by default;
@@ -11,6 +11,11 @@
 // says by a file RELEASED (scripts/spec/README.md): libraries/standard/0.4/ is left out until
 // spec/0.4/RELEASED exists. --spec is the spec/ directory (spec/ by default, or the one beside --libraries),
 // and --drafts shows the series that are not released too, to look at them.
+// A series that is archived is not drawn again: its data is kept in site/gallery/frozen/, a file for each group as
+// this build writes it (standard-0.3.js), drawn once by the core of the time, and the build copies it into the
+// site as it is. A frozen group is shown whether or not libraries/ still holds its package files, and replaces the
+// group read from there. --frozen is the directory of those files (site/gallery/frozen/ by default); to draw such
+// a series from its package files again, point --frozen at an empty directory (site/gallery/frozen/README.md).
 // It writes into OUT/gallery/: index.js, the list of the groups of packages, and one file for each
 // group, such as standard-0.2.js. A group is a directory of package files: libraries/standard/0.2/
 // is the standard series 0.2. They are scripts rather than JSON so that the page also works opened
@@ -30,12 +35,13 @@ import { publicGalleryPackages } from "./public-packages.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
-const usage = "usage: node site/gallery/build.mjs [--core DIR] [--out DIR] [--libraries DIR] [--spec DIR] [--drafts]";
+const usage = "usage: node site/gallery/build.mjs [--core DIR] [--out DIR] [--libraries DIR] [--spec DIR] [--frozen DIR] [--drafts]";
 
 let coreDir = join(root, "bindings", "runtime-wasm", "dist");
 let out = join(root, "site", "dist");
 let libraries = join(root, "libraries");
 let specDir = null;
+let frozenDir = join(here, "frozen");
 let drafts = false;
 const args = process.argv.slice(2);
 for (let i = 0; i < args.length; i++) {
@@ -43,6 +49,7 @@ for (let i = 0; i < args.length; i++) {
   else if (args[i] === "--out" && args[i + 1]) out = args[++i];
   else if (args[i] === "--libraries" && args[i + 1]) libraries = args[++i];
   else if (args[i] === "--spec" && args[i + 1]) specDir = args[++i];
+  else if (args[i] === "--frozen" && args[i + 1]) frozenDir = args[++i];
   else if (args[i] === "--drafts") drafts = true;
   else {
     console.error(usage);
@@ -80,10 +87,21 @@ const posix = (p) => p.split(sep).join("/");
 /** Whether the standard of a series is released: spec/<series>/RELEASED (scripts/spec/build.py reads the same file). */
 const released = (series) => statSync(join(specDir ?? join(libraries, "..", "spec"), series, "RELEASED"), { throwIfNoEntry: false })?.isFile() ?? false;
 
+/** The frozen groups: the data of each file of the directory, as a group's file holds it (RNLGallery.group({...});). */
+const frozen = (statSync(frozenDir, { throwIfNoEntry: false })?.isDirectory() ? readdirSync(frozenDir).sort() : [])
+  .filter((name) => name.endsWith(".js"))
+  .map((name) => {
+    const text = readFileSync(join(frozenDir, name), "utf8");
+    const data = JSON.parse(/^RNLGallery\.group\((.*)\);\s*$/s.exec(text)?.[1] ?? "null");
+    if (!data || data.id + ".js" !== name) throw new Error(`${join(frozenDir, name)}: not the file of the group ${name.slice(0, -3)}`);
+    return { id: data.id, dir: data.dir, kind: data.kind, series: data.series, packages: [], frozen: data };
+  });
+const isFrozen = (rel) => frozen.some((g) => g.dir === rel);
+
 const groups = groupDirs(libraries).map(({ dir, files }) => {
   const rel = posix(join("libraries", relative(libraries, dir)));
   return { dir, files, rel, m: /^libraries\/standard\/([^/]+)$/.exec(rel) };
-}).filter(({ rel, m }) => {
+}).filter(({ rel }) => !isFrozen(rel)).filter(({ rel, m }) => {
   if (!m || drafts || released(m[1])) return true;
   console.log(`${rel}: not shown, since spec/${m[1]}/RELEASED does not exist (--drafts shows it)`);
   return false;
@@ -102,6 +120,7 @@ const groups = groupDirs(libraries).map(({ dir, files }) => {
     packages,
   };
 });
+groups.push(...frozen);
 const publicCatalog = args.includes("--libraries") ? { packages: [], provenance: null } : await publicGalleryPackages();
 for (const pkg of publicCatalog.packages) {
   const rel = `libraries/${pkg.path.slice(0, pkg.path.lastIndexOf("/"))}`;
@@ -122,7 +141,7 @@ groups.sort((a, b) => {
 // that the gallery draws what libraries/ holds even when the core bundles another state of it.
 const workspace = {};
 const packageDirs = [];
-for (const g of groups) {
+for (const g of groups.filter((g) => !g.frozen)) {
   packageDirs.push(`/${g.dir}`);
   for (const p of g.packages) workspace[`/${p.path}`] = p.text;
 }
@@ -426,7 +445,7 @@ mkdirSync(target, { recursive: true });
 if (publicCatalog.provenance) writeFileSync(join(target, "catalog-provenance.json"), JSON.stringify(publicCatalog.provenance, null, 2) + "\n");
 const index = [];
 for (const group of groups) {
-  const data = groupData(group);
+  const data = group.frozen ?? groupData(group);
   writeFileSync(join(target, `${group.id}.js`), `RNLGallery.group(${JSON.stringify(data)});\n`);
   index.push({
     id: data.id,

@@ -28,7 +28,7 @@ function shown(released, flags) {
     }
     const out = join(dir, "out");
     mkdirSync(out);
-    execFileSync(process.execPath, [join(root, "site", "gallery", "build.mjs"), "--out", out, "--libraries", join(dir, "libraries"), ...flags(dir)], { stdio: "pipe" });
+    execFileSync(process.execPath, [join(root, "site", "gallery", "build.mjs"), "--out", out, "--libraries", join(dir, "libraries"), "--frozen", join(dir, "no-frozen"), ...flags(dir)], { stdio: "pipe" });
     const text = readFileSync(join(out, "gallery", "index.js"), "utf8");
     return JSON.parse(text.slice(text.indexOf("(") + 1, text.lastIndexOf(")"))).groups.map((g) => g.id);
   } finally {

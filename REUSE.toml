@@ -13,6 +13,12 @@ path = ["spec/**", "docs/**"]
 SPDX-FileCopyrightText = "2026 many-question"
 SPDX-License-Identifier = "CC-BY-4.0"
 
+# The frozen data of the archived standard series in the gallery of the packages: drawn from their libraries.
+[[annotations]]
+path = "site/gallery/frozen/**"
+SPDX-FileCopyrightText = "2026 many-question"
+SPDX-License-Identifier = "CC0-1.0"
+
 # Data: standard libraries and test corpora.
 [[annotations]]
 path = ["libraries/**", "tests/**"]
