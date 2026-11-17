@@ -13,6 +13,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use rnl_runtime::geom::{fmt_num, Orient};
+use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::model::{SymbolOrigin, UsageOrigin};
 use rnl_runtime::problem::{
     Axis, FactKind, LevelProblem, ObjectKind, OrientSlot, PointRef, Position, Reference, Sense, Slot,
@@ -469,10 +470,13 @@ fn without_look(category: &str, value: &Value) -> Value {
 struct Items {
     items: BTreeMap<Key, Value>,
     seen: BTreeMap<Key, usize>,
+    /// The facts that turn a pin at priority low in the body of a definition of the bundled standard
+    /// packages (11.2): the default look of the package, as its symbols are.
+    package_look: BTreeSet<Key>,
 }
 
 impl Items {
-    fn put(&mut self, file: &str, level: &str, category: &str, key: &str, value: Value) {
+    fn put(&mut self, file: &str, level: &str, category: &str, key: &str, value: Value) -> Key {
         let base = (file.to_string(), level.to_string(), category.to_string(), key.to_string());
         let count = self.seen.entry(base.clone()).or_default();
         *count += 1;
@@ -480,7 +484,8 @@ impl Items {
         if *count > 1 {
             full.3 = format!("{key}#{count}");
         }
-        self.items.insert(full, value);
+        self.items.insert(full.clone(), value);
+        full
     }
 }
 
@@ -791,7 +796,16 @@ fn snapshot(
     boxes: &BTreeSet<String>,
     turned: &Turned,
 ) -> Items {
-    let mut out = Items { items: BTreeMap::new(), seen: BTreeMap::new() };
+    let mut out = Items { items: BTreeMap::new(), seen: BTreeMap::new(), package_look: BTreeSet::new() };
+    let mut package_look = Vec::new();
+    // the files of the bundled standard packages, by path and by the name a fact's source gives
+    let bundled = rnl_view::bundled();
+    let standard_files: BTreeSet<&str> = read
+        .sources
+        .iter()
+        .filter(|(path, text)| path.starts_with(rnl_view::BUNDLED_DIR) || bundled.files.values().any(|b| b == text))
+        .flat_map(|(path, _)| [path.as_str(), path.rsplit(['/', '\\']).next().unwrap_or(path)])
+        .collect();
     let pinmaps: BTreeMap<String, Pins> = read.problems.iter().map(|p| (p.title.clone(), pins(read, p))).collect();
     for level in &read.doc.levels {
         if !level.circuit {
@@ -966,9 +980,15 @@ fn snapshot(
                 continue;
             }
             let (kind, mixed) = turned_fact(&item.kind, &turn_of, &offset_of);
+            let packaged = matches!(item.kind, FactKind::PinOrient { .. })
+                && item.priority == Priority::Low
+                && item.source.as_ref().is_some_and(|s| standard_files.contains(s.file.as_str()));
             for text in facts(&names, &kind) {
                 let text = if mixed { format!("{text} (turned symbols)") } else { text };
-                put("facts", &format!("{text} {:?}", item.priority), json!(text));
+                let key = put("facts", &format!("{text} {:?}", item.priority), json!(text));
+                if packaged {
+                    package_look.push(key);
+                }
             }
         }
         // An object drawn at a point (0.3) is the same as one with a point of its own that two
@@ -1020,6 +1040,7 @@ fn snapshot(
             put("groups", &members.join(","), json!(members));
         }
     }
+    out.package_look.extend(package_look);
     out
 }
 
@@ -1039,7 +1060,7 @@ pub(super) fn compare(
     let bare = bare_usages(after);
     let boxed = default_boxed(before);
     let mut before = renamed_keys(snapshot(before, &added, &boxed, boxes, &Turned::new()).items, &keys);
-    let after = snapshot(after, &added, &boxed, boxes, turned).items;
+    let Items { items: after, package_look, .. } = snapshot(after, &added, &boxed, boxes, turned);
     let mut differences = Vec::new();
     let mut look = Vec::new();
     let mut by_rule = Vec::new();
@@ -1093,7 +1114,11 @@ pub(super) fn compare(
         // the free point of its own that 0.4 gives a usage without a symbol, which draws nothing
         let bare_point =
             old.is_none() && category == "positions" && bare.get(&level).is_some_and(|ids| ids.contains(&item));
-        let only_look = only_look || package_text || fill || bare_point;
+        // a pin that a definition of the standard package turns at priority low, which 0.3 left to
+        // the solver: the package's default look (11.2)
+        let packaged =
+            old.is_none() && package_look.contains(&(file.clone(), level.clone(), category.clone(), item.clone()));
+        let only_look = only_look || package_text || fill || bare_point || packaged;
         let ids = rules.get(&level).unwrap_or(&no_ids);
         // The upgrade writes a default that 0.3 had by itself (`@ATTACH(gap=2)`) as a parameter,
         // so that the drawing stays: the object is the same but for parameters it did not list.
