@@ -649,7 +649,7 @@ mod tests {
     #[test]
     fn an_x_counts_one_crossing_and_two_bends() {
         use rnl_runtime::solution::{RoutedWire, WirePoint};
-        let (p, s, placed, routing) = port::tests::fixture();
+        let (p, s, placed, routing) = reads::tests::fixture();
         let with = |paths: [[[i64; 2]; 4]; 2]| {
             let mut r = routing.clone();
             for (route, path) in paths.into_iter().enumerate() {
