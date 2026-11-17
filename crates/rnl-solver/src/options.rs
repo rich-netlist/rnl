@@ -500,7 +500,7 @@ impl Default for SolverOptions {
     }
 }
 
-const KEYS: [&str; 19] = [
+const KEYS: [&str; 20] = [
     "tolerance",
     "grid",
     "objectives",
@@ -513,6 +513,7 @@ const KEYS: [&str; 19] = [
     "spacing_y",
     "join_trees",
     "reroute_nets",
+    "nudge_wires",
     "search",
     "report_hints",
     "junction_utf8",
@@ -597,6 +598,10 @@ impl SolverOptions {
         }
         if self.settings.reroute_nets {
             text.push_str(";reroute_nets=true");
+        }
+        // on by default: named only when off, so that the text of the defaults is as it was
+        if !self.settings.nudge_wires {
+            text.push_str(";nudge_wires=false");
         }
         if let Some(junction) = &self.settings.junction {
             // UTF-8 hex keeps arbitrary quoted definition names independent of this format's
@@ -687,6 +692,9 @@ impl SolverOptions {
                 }
                 "reroute_nets" => {
                     options.settings.reroute_nets = value.parse().map_err(|_| "reroute_nets must be true or false")?
+                }
+                "nudge_wires" => {
+                    options.settings.nudge_wires = value.parse().map_err(|_| "nudge_wires must be true or false")?
                 }
                 "junction_utf8" => {
                     if value.len() % 2 != 0 || !value.is_ascii() {
@@ -853,6 +861,14 @@ mod tests {
         assert_eq!(SolverOptions::parse(&text), Ok(again));
         assert!(!options.canonical().contains("reroute_nets"));
         assert!(SolverOptions::parse("reroute_nets=yes").unwrap_err().contains("true or false"));
+        // the ends of bent wires moved: on by default, named only when off
+        let mut still = options.clone();
+        still.settings.nudge_wires = false;
+        let text = still.canonical();
+        assert!(text.ends_with(";nudge_wires=false"), "{text}");
+        assert_eq!(SolverOptions::parse(&text), Ok(still));
+        assert!(!options.canonical().contains("nudge_wires"));
+        assert!(SolverOptions::parse("nudge_wires=no").unwrap_err().contains("true or false"));
         // where the group-tree start stopped: named only when given, a work or false
         for (tree, written) in [(TreeWork::At(123), ";tree_work=123"), (TreeWork::Off, ";tree_work=false")] {
             let given =

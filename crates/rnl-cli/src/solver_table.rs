@@ -244,6 +244,10 @@ mod tests {
         assert_eq!((reroute["type"].clone(), reroute["default"].clone()), (json!("boolean"), json!(false)));
         assert_eq!((reroute["in_file"].clone(), reroute["group"].clone()), (json!(true), json!("layout")));
         assert!(reroute["what"].as_str().is_some_and(|w| w.contains("again")));
+        let nudge = setting("nudge_wires");
+        assert_eq!((nudge["type"].clone(), nudge["default"].clone()), (json!("boolean"), json!(true)));
+        assert_eq!((nudge["in_file"].clone(), nudge["group"].clone()), (json!(true), json!("layout")));
+        assert_eq!(nudge["applies"], json!({"layout": ["lines"]}));
         assert_eq!(setting("objectives")["default"], rnl_solver::DEFAULT_LAYERS.join(","));
         // an array of whole numbers says how many, and what each is
         let weights = setting("lines_weights");
