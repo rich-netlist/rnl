@@ -190,6 +190,7 @@ impl ProfileObserver for Writer {
             }
             ProfileEvent::Begin { category, name } => {
                 let now = self.elapsed();
+                let mut outer = true;
                 let parent = state.stack.last().copied();
                 if let Some(level) = state.levels.last_mut() {
                     let candidate_id = parent.and_then(|i| {
@@ -202,6 +203,9 @@ impl ProfileObserver for Writer {
                     let id = level.spans.len();
                     if category == "stage" {
                         level.current_stage = Some(name.clone());
+                        // a stage within another, such as a step of the lines layout that a level
+                        // takes many times, waits for the throttled checkpoint
+                        outer = stage_of(&level.spans, parent).is_none();
                     }
                     level.spans.push(Span {
                         id,
@@ -217,7 +221,7 @@ impl ProfileObserver for Writer {
                     });
                     state.stack.push(id);
                 }
-                force = category == "stage" || category == "resolve_phase";
+                force = (category == "stage" && outer) || category == "resolve_phase";
                 checkpoint = true;
             }
             ProfileEvent::End => {
