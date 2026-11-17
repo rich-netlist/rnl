@@ -236,6 +236,9 @@ fn within(p: &[Q; 2], a: &[Q; 2], b: &[Q; 2]) -> bool {
     cross.is_zero() && dot > Q::zero() && dot < length
 }
 
+/// A written wire, its points with where they are, and whether its route is written again.
+type WrittenPath = (usize, Vec<(WirePoint, [Q; 2])>, bool);
+
 pub(crate) fn finish(
     problem: &LevelProblem,
     g: &Geometry,
@@ -272,7 +275,6 @@ pub(crate) fn finish(
             routing.drawn.insert(j + 1, d);
         }
     }
-    type WrittenPath = (usize, Vec<(WirePoint, [Q; 2])>, bool);
     let mut written: Vec<WrittenPath> = Vec::new();
     for (w, wire) in problem.wires.iter().enumerate() {
         let auto = wire.mode == "auto" && wire.default_auto;
@@ -307,11 +309,6 @@ pub(crate) fn finish(
         }
         written.push((w, points, rewrite));
     }
-    let routes: Vec<WireRoute> = written
-        .iter()
-        .filter(|(_, _, rewrite)| *rewrite)
-        .map(|(w, points, _)| WireRoute { wire: *w, points: points.iter().map(|p| p.0.clone()).collect() })
-        .collect();
     type Segment = ([Q; 2], [Q; 2]);
     type Tree = (usize, usize);
     let mut segs: BTreeMap<Tree, Vec<Segment>> = BTreeMap::new();
@@ -387,6 +384,7 @@ pub(crate) fn finish(
     type SharedAnchor = (WirePoint, BTreeSet<(i64, i64)>, BTreeSet<Tree>);
     let mut shared: BTreeMap<AnchorKey, SharedAnchor> = BTreeMap::new();
     let mut covered = BTreeSet::new();
+    let mut bends: Vec<(usize, [Q; 2])> = Vec::new();
     for ((net, at), there) in &at_place {
         let mut ways: BTreeSet<(i64, i64)> = BTreeSet::new();
         for (a, b) in segs.get(net).into_iter().flatten() {
@@ -422,12 +420,15 @@ pub(crate) fn finish(
         let point = there.iter().find(|q| matches!(q, WirePoint::Anchor(PointRef::Origin(_))));
         let pin =
             there.iter().find(|q| matches!(q, WirePoint::Anchor(PointRef::Pin { .. } | PointRef::SymbolPin { .. })));
+        covered.extend(there.iter().filter_map(anchor_key));
         junctions.push(match (point, pin, branches.first()) {
             (Some(q), _, _) | (None, Some(q), _) => q.clone(),
             (None, None, Some(&b)) => WirePoint::Branch(b),
-            (None, None, None) => WirePoint::Bend((to_f64(&at[0]), to_f64(&at[1]))),
+            (None, None, None) => {
+                bends.push((net.0, at.clone()));
+                continue;
+            }
         });
-        covered.extend(there.iter().filter_map(anchor_key));
     }
     junctions.extend(
         shared
@@ -457,10 +458,89 @@ pub(crate) fn finish(
                     branch.junction = true;
                 }
             }
-            WirePoint::Bend(at) => routing.branches.push(rnl_runtime::solution::Branch { at, junction: true }),
+            WirePoint::Bend(_) => {}
         }
     }
+    for (tree, at) in bends {
+        branch_at_bend(problem, &mut routing, &mut written, tree, &at);
+    }
+    let routes: Vec<WireRoute> = written
+        .iter()
+        .filter(|(_, _, rewrite)| *rewrite)
+        .map(|(w, points, _)| WireRoute { wire: *w, points: points.iter().map(|p| p.0.clone()).collect() })
+        .collect();
     (routing, routes, anchors)
+}
+
+/// A junction where the wires routed of the tree `route` meet three ways or more at none of their
+/// ends, at a bend of one of them: a branch point at `at`, and each wire of the tree that passes
+/// `at` cut in two there, so that the point ends the wires it joins, as one on a wire routed is
+/// ([`finish`]); a written wire of the tree that passes it takes it as a point of its path, as it
+/// takes a branch point that a wire routed ends at. Where no wire routed passes it, as where only
+/// written wires meet, whose connections stay as their author wrote them, no branch point is made:
+/// one that no wire ends at joins nothing.
+fn branch_at_bend(
+    problem: &LevelProblem,
+    routing: &mut Routing,
+    written: &mut [WrittenPath],
+    route: usize,
+    at: &[Q; 2],
+) {
+    let b = routing.branches.len();
+    let end = WirePoint::Branch(b);
+    let mut made = false;
+    let mut i = 0;
+    while i < routing.wires.len() {
+        let (w, path) = (&routing.wires[i], &routing.paths[i]);
+        let n = path.len();
+        // the part of the wire before `at` ends at `s`, and the part after it starts at `rest`:
+        // past a vertex of the wire at `at`, or inside a segment
+        let cut = (w.route == route && w.points.len() == n)
+            .then(|| {
+                (1..n).find_map(|k| {
+                    if k + 1 < n && path[k] == *at {
+                        Some((k, k + 1))
+                    } else {
+                        inside(at, &path[k - 1], &path[k]).then_some((k, k))
+                    }
+                })
+            })
+            .flatten();
+        let Some((s, rest)) = cut else {
+            i += 1;
+            continue;
+        };
+        let (w, path) = (w.clone(), path.clone());
+        routing.wires[i] = RoutedWire { route, points: [&w.points[..s], std::slice::from_ref(&end)].concat() };
+        routing.paths[i] = [&path[..s], std::slice::from_ref(at)].concat();
+        routing
+            .wires
+            .insert(i + 1, RoutedWire { route, points: [std::slice::from_ref(&end), &w.points[rest..]].concat() });
+        routing.paths.insert(i + 1, [std::slice::from_ref(at), &path[rest..]].concat());
+        if let Some(&d) = routing.drawn.get(i) {
+            routing.drawn.insert(i + 1, d);
+        }
+        made = true;
+        i += 1;
+    }
+    if !made {
+        return;
+    }
+    routing.branches.push(rnl_runtime::solution::Branch { at: (to_f64(&at[0]), to_f64(&at[1])), junction: true });
+    for (w, points, rewrite) in written.iter_mut() {
+        let wire = &problem.wires[*w];
+        if wire.bus || problem.routes.get(route).is_none_or(|r| !r.wires.contains(w)) {
+            continue;
+        }
+        let n = points.len();
+        if let Some(bend) = points[1..n.saturating_sub(1)].iter_mut().find(|p| p.1 == *at) {
+            bend.0 = end.clone();
+            *rewrite = true;
+        } else if let Some(s) = points.windows(2).position(|s| inside(at, &s[0].1, &s[1].1)) {
+            points.insert(s + 1, (end.clone(), at.clone()));
+            *rewrite = true;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -562,6 +642,72 @@ mod tests {
         let (out, _, dots) = finish(&p, &g, joined);
         assert_eq!(out.wires.len(), 3);
         assert_eq!(dots, vec![PointRef::Origin(2)]);
+    }
+
+    /// Wires of one tree that meet three ways at a bend, none ending there, as the joins made through
+    /// what is in the way can (`route::finish_net`): the junction there is a branch point that the
+    /// wires through it end at, cut in two, whether a wire bends there or runs straight through.
+    #[test]
+    fn a_junction_at_a_bend_is_a_branch_point_the_wires_through_it_end_at() {
+        let mut p = problem_of(vec![point(); 4], vec![]);
+        p.version = "0.4".into();
+        p.routes = vec![route(vec![])];
+        let anchor = |i| WirePoint::Anchor(PointRef::Origin(i));
+        let at = |x: i64, y: i64| [int(x), int(y)];
+        // both bend at (0, 0): four ways; or one bends there and the other runs through it: three
+        let cases = [
+            (
+                [(-2, 0), (0, 2), (2, 0), (0, -2)],
+                vec![
+                    (vec![anchor(0), WirePoint::Bend((0., 0.)), anchor(1)], vec![at(-2, 0), at(0, 0), at(0, 2)]),
+                    (vec![anchor(2), WirePoint::Bend((0., 0.)), anchor(3)], vec![at(2, 0), at(0, 0), at(0, -2)]),
+                ],
+            ),
+            (
+                [(-2, 0), (0, 2), (2, 0), (5, 5)],
+                vec![
+                    (vec![anchor(0), WirePoint::Bend((0., 0.)), anchor(1)], vec![at(-2, 0), at(0, 0), at(0, 2)]),
+                    (vec![anchor(2), anchor(0)], vec![at(2, 0), at(-2, 0)]),
+                ],
+            ),
+        ];
+        for (places, wires) in cases {
+            let g = geometry(&places);
+            let routing = Routing {
+                wires: wires.iter().map(|(points, _)| RoutedWire { route: 0, points: points.clone() }).collect(),
+                paths: wires.iter().map(|(_, path)| path.clone()).collect(),
+                drawn: vec![0; wires.len()],
+                ..Default::default()
+            };
+            let (out, _, dots) = finish(&p, &g, routing);
+            assert!(dots.is_empty(), "{dots:?}");
+            assert_eq!(out.branches, vec![Branch { at: (0., 0.), junction: true }]);
+            assert_eq!(out.wires.len(), 4, "{out:?}");
+            assert_eq!((out.paths.len(), out.drawn.len()), (4, 4));
+            for (w, path) in out.wires.iter().zip(&out.paths) {
+                assert_eq!(w.points.len(), path.len(), "{out:?}");
+                let ends = [w.points.first(), w.points.last()];
+                assert_eq!(ends.iter().filter(|e| **e == Some(&WirePoint::Branch(0))).count(), 1, "{out:?}");
+                assert!(w.points[1..w.points.len() - 1].iter().all(|q| matches!(q, WirePoint::Bend(_))), "{out:?}");
+                let k = if w.points[0] == WirePoint::Branch(0) { 0 } else { path.len() - 1 };
+                assert_eq!(path[k], at(0, 0));
+            }
+        }
+        // a written wire of the tree that runs through the junction takes it among its points
+        p.wires = vec![wire(vec![PointRef::Origin(1), PointRef::Origin(3)], "straight")];
+        p.routes[0].wires = vec![0];
+        let g = geometry(&[(-2, 0), (0, 2), (2, 0), (0, -2)]);
+        let routing = Routing {
+            wires: vec![RoutedWire { route: 0, points: vec![anchor(0), WirePoint::Bend((0., 0.)), anchor(2)] }],
+            paths: vec![vec![at(-2, 0), at(0, 0), at(2, 0)]],
+            drawn: vec![0],
+            ..Default::default()
+        };
+        let (out, written, _) = finish(&p, &g, routing);
+        assert_eq!(out.branches, vec![Branch { at: (0., 0.), junction: true }]);
+        assert_eq!(out.wires.len(), 2, "{out:?}");
+        assert_eq!(written.len(), 1, "{written:?}");
+        assert_eq!(written[0].points, vec![anchor(1), WirePoint::Branch(0), anchor(3)]);
     }
 
     #[test]
