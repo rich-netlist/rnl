@@ -279,14 +279,14 @@ R11 g0c1r1 g1c0r1 1k
     let p = problems("/w/bands.sp", &files).into_iter().find(|p| p.title == "bands").unwrap();
     // inside the first trial of the group dissolved, before it placed anything: another solver moves
     // the window, and it is found again from the work at which the level first tries both (here
-    // about 64950000000) to the last at which it has a batch of each half only (about
-    // 70750000000); this is its middle, so that a small change of the work before it keeps the stop inside. The group-tree
+    // about 118000000) to the last at which it has a batch of each half only (about
+    // 130000000); this is its middle, so that a small change of the work before it keeps the stop inside. The group-tree
     // start of the lines layout refines as it did when the window was first found, before its
     // allowance was a share of the limit. The window was found with the line layout's order of then,
     // which it is given
     let mut options = SolverOptions::default()
         .with_config(
-            r#"limit="work", work=67850000000, tree_work=false, lines_order="current,crossings_and_bends,mirror_pairs,dots_near_pins,length,symbol_lines+wire_lines,area""#,
+            r#"limit="work", work=124000000, tree_work=false, lines_order="current,crossings_and_bends,mirror_pairs,dots_near_pins,length,symbol_lines+wire_lines,area""#,
         )
         .unwrap();
     // the objectives the window was found with: crowding, the last default layer, ranks the

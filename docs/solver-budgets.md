@@ -163,7 +163,7 @@ Weights are integers, multiplied by at least one input unit per checkpoint:
 | Operation | Weight | Size multiplier |
 | --- | --- | --- |
 | Resolution/model encoding | 8 | objects, model reconstruction size, or one encoded pair |
-| Simplex pivot | 16 | variables × tableau rows |
+| Simplex pivot | 2 | tableau rows, plus the terms the pivot writes: the rows the entering variable occurs in × (the terms of its row + 1) |
 | Candidate estimate | 32 | elements |
 | Placement | 32 | objects |
 | Routing | 1 | A* expansion, grid cells, per-tree anchor pairs, or route count at a candidate boundary |
@@ -173,10 +173,9 @@ The units are a replay protocol, not a promise that every unit takes the same ti
 rational arithmetic and input shape affect cost. Changing the checkpoint sequence or
 weights requires re-calibration and work counts from the new solver build.
 
-The public `solver_parity` example supplies two synthetic circuits. Initial native debug
-calibration ran each three times; all eight runs per repetition finished below 0.012 seconds.
-With a requested million units, the two examples admitted 243750 and 997848 units; with
-4096 units, they admitted 4056 and 3032. A partly affordable operation is not admitted, so
+The public `solver_parity` example supplies two synthetic circuits. In a native debug build,
+with a requested million units, the two examples admitted 48666 and 999984 units, in about
+0.01 and 0.4 seconds; with 4096 units, they admitted 3153 and 4084. A partly affordable operation is not admitted, so
 the count can be below the requested limit. These small examples calibrate the accounting
 and replay checks; they do not establish a runtime bound for arbitrary circuits.
 

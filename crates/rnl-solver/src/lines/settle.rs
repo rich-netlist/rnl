@@ -4413,8 +4413,8 @@ pub(super) mod tests {
                 &Stop::default(),
             )
         };
-        // enough work to start the line search, which needs some 640,000 units to finish
-        let (result, report) = crate::budget::with(&StoppedClock, RunLimit::Work(50_000), None, run);
+        // enough work to start the line search, which needs some 13,000 units to finish
+        let (result, report) = crate::budget::with(&StoppedClock, RunLimit::Work(1_000), None, run);
         assert_eq!(report.reason, crate::StopReason::Work);
         assert_eq!(result.err().as_deref(), Some("budget exhausted before the line search made a complete solution"));
     }
