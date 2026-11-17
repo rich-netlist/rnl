@@ -115,7 +115,8 @@ test('Export SVG draws the whole level with the usages and current directions th
 });
 
 test('Export SVG sets nested frames out as the page does: each frame outside the ones in it, no two titles on one another, all in the image', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('usages-shown', 'true')); // kept on: the usage frames are off to begin with
+  // kept on: the frames of the usages and of the groups are off to begin with
+  await page.addInitScript(() => { localStorage.setItem('usages-shown', 'true'); localStorage.setItem('groups-shown', 'true'); });
   await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
   await expect(page.locator('#menubar')).toBeVisible();
   await page.locator('#file-input').setInputFiles({ name: 'ota-groups.sp', mimeType: 'text/plain', buffer: fs.readFileSync(path.join(import.meta.dirname, '..', 'inputs', 'ota-groups.sp')) });

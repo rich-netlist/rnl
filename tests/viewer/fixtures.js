@@ -28,6 +28,7 @@ export const FILES = {
   "definitions-choice": "tests/viewer/inputs/definitions-choice.sp",
   "subckt-params": "tests/viewer/inputs/subckt-params.sp",
   "ota-nested-usages": "tests/viewer/inputs/ota-nested-usages.sp",
+  "nested-usages-04": "tests/viewer/inputs/nested-usages-04.sp",
   "usage-deep": "tests/viewer/inputs/usage-deep.sp",
   "usage-ota5t": "site/examples/ota5t.sp",
   "package-pkg": "tests/viewer/inputs/acme.pkg",
