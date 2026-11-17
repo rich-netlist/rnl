@@ -936,6 +936,12 @@ CC z out 1p
         assert_eq!(crossed, [vec![1], vec![0], vec![3], vec![2]]);
     }
 
+    /// The work of the runs of the amplifier below: enough for its line search to make a few
+    /// drawings and for the pass to route a move, as 2e7 is and 1e7 is not, with some room; far
+    /// from what the search takes to end, which a test cannot wait for. It is counted in the units
+    /// of the solver's work: a change of what a step is charged moves it.
+    const AMPLIFIER_WORK: u64 = 50_000_000;
+
     /// With the pass on, as by default, a run of time cut in the line search, with the pass then run past the
     /// limit, replays alike by the work it reports; and at the last cut the pass routed at least
     /// one move of the amplifier. (The amplifier's search does not end within a test's time, so
@@ -952,7 +958,7 @@ CC z out 1p
         };
         // the clock's readings in a run of the work at which the search has made a few drawings
         let clock = Ticks::default();
-        crate::budget::with(&clock, RunLimit::Work(10_000_000_000), Some(f64::MAX), run);
+        crate::budget::with(&clock, RunLimit::Work(AMPLIFIER_WORK), Some(f64::MAX), run);
         let ticks = clock.reads() as usize;
         let mut routed = Vec::new();
         for cutoff in [ticks / 2, 3 * ticks / 4, ticks] {
@@ -974,7 +980,7 @@ CC z out 1p
         off.settings.nudge_wires = false;
         let allowance = crate::tree::Allowance { ns: 250_000, work: None };
         let run = |options: &SolverOptions| {
-            let limit = RunLimit::Work(10_000_000_000);
+            let limit = RunLimit::Work(AMPLIFIER_WORK);
             crate::budget::with(&StoppedClock, limit, None, || {
                 super::super::engine::lay_out(&p, &s, options, &mut Work::default(), &Stop::default(), Some(allowance))
             })
