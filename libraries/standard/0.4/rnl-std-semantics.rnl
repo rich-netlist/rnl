@@ -224,10 +224,9 @@
   };
 
   /* A bias circuit: the devices or structures that make the bias of other parts, such as a current
-     reference. A group: places and routes nothing; marks no net (the bias marks of the fill come
+     reference. Meaning only: places and routes nothing; marks no net (the bias marks of the fill come
      from $BIAS_NET_SET). */
   $BIAS_CIRCUIT = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
-    {?members} @GROUP;
   };
 
   /* A feedback loop: a forward path and a feedback network.
