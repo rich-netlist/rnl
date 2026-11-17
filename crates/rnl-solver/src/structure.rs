@@ -80,6 +80,9 @@ pub(crate) enum Role {
     Ground,
     /// One that hangs beside its pin, such as `$IO_PORT`'s ([`hang`]).
     Port,
+    /// Of a level of 0.4: a symbol of a usage that the facts kept put with a pin on another
+    /// object's pin on both axes ([`Structure::pinned`]): it goes with that pin, not as an element.
+    Pinned,
     Point,
     Text,
     /// A virtual part drawn at the point of its main object (12.1) that is none of the above.
@@ -693,7 +696,7 @@ impl Structure {
     /// symbol and a place, but those that the solution leaves free.
     pub(crate) fn components(&self) -> impl Iterator<Item = usize> + '_ {
         self.objects.iter().enumerate().filter_map(|(k, o)| {
-            let component = matches!(o.role, Role::Element | Role::Supply | Role::Ground | Role::Port);
+            let component = matches!(o.role, Role::Element | Role::Supply | Role::Ground | Role::Port | Role::Pinned);
             (component && o.symbol.is_some() && !o.left_free).then_some(k)
         })
     }
@@ -895,6 +898,21 @@ pub(crate) fn analyse(
     let witness = resolved.witness.geometry.clone();
     let kept = resolved.kept.clone();
     let mut objects = object_infos(problem, &model, &kept);
+    // of a level of 0.4: the symbols of usages that the facts kept put with a pin on another
+    // object's pin on both axes go with that pin ([`Role::Pinned`]), not as elements of their own
+    let mut pinned = BTreeMap::new();
+    if problem.version == "0.4" {
+        for (k, o) in objects.iter_mut().enumerate() {
+            let usage = problem.objects.get(k).is_some_and(|x| x.kind == ObjectKind::Usage);
+            if o.role != Role::Element || o.symbol.is_none() || !usage {
+                continue;
+            }
+            if let Some(host) = crate::beside::on_pin(problem, &kept, k) {
+                o.role = Role::Pinned;
+                pinned.insert(k, host);
+            }
+        }
+    }
     let power = power(problem, &kept, &mut objects);
     let mut connections = connections(problem, &model);
     if problem.version == "0.4" {
@@ -1011,7 +1029,6 @@ pub(crate) fn analyse(
         }
     }
     let mut pin_pairs = Vec::new();
-    let mut pinned = BTreeMap::new();
     let mut pin_texts: BTreeMap<PinKey, Vec<[Q; 4]>> = BTreeMap::new();
     if language04 {
         for &f in &kept {
@@ -1029,12 +1046,6 @@ pub(crate) fn analyse(
                     }
                 }
                 pin_pairs.push((from.object, to.object, pairs));
-            }
-        }
-        for (k, o) in objects.iter().enumerate().filter(|(_, o)| o.role != Role::Element && o.symbol.is_some()) {
-            let _ = o;
-            if let Some(host) = crate::beside::on_pin(problem, &kept, k) {
-                pinned.insert(k, host);
             }
         }
         // Main's text anchors already describe the renderer's position. Use those offsets,
@@ -2056,7 +2067,7 @@ fn group_tree(problem: &LevelProblem, objects: &[ObjectInfo], elements: &[usize]
 fn scopes(problem: &LevelProblem, objects: &[ObjectInfo], selected: &[usize]) -> Vec<Vec<usize>> {
     let component = |k: usize| {
         let o = &objects[k];
-        matches!(o.role, Role::Element | Role::Supply | Role::Ground | Role::Port) && o.symbol.is_some()
+        matches!(o.role, Role::Element | Role::Supply | Role::Ground | Role::Port | Role::Pinned) && o.symbol.is_some()
     };
     let owner = |k: usize| objects[k].stub.as_ref().map_or(k, |s| s.host.0);
     let mut out = Vec::new();
@@ -2138,7 +2149,9 @@ fn even_sets(problem: &LevelProblem, s: &Structure) -> Vec<Vec<usize>> {
         let ends = net
             .pins
             .iter()
-            .filter(|(k, _)| s.objects.get(*k).is_some_and(|o| matches!(o.role, Role::Element | Role::Port)))
+            .filter(|(k, _)| {
+                s.objects.get(*k).is_some_and(|o| matches!(o.role, Role::Element | Role::Port | Role::Pinned))
+            })
             .count();
         if ends >= 3 {
             NetRole::Node
