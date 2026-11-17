@@ -58,8 +58,9 @@ tag, **never publishes**. Core release also runs as a PR check for relevant chan
    (2026-10-30) core 0.5.4 alone, with npm `latest`; Viewer stays 0.5.2; and
    (2026-10-31) core 0.5.5 and Viewer 0.5.3, released together, with npm `latest`.
 2. Update the chosen core version and locks, rename/write `release-notes/core/X.Y.Z.md`, and
-   set repository variable `CORE_NPM_DIST_TAG` to the agreed `next` or `latest`. Publication
-   fails if this variable is absent or has another value. Do not infer a dist-tag from SemVer.
+   set repository variable `CORE_NPM_DIST_TAG` to the agreed `next`, `latest` or `legacy-0.3`.
+   Publication fails if this variable is absent or has another value. Do not infer a dist-tag
+   from SemVer.
 3. Review a successful rehearsal on that commit, then create and push `core-vX.Y.Z` only
    when release approval has been given. Tag and workspace version must match exactly.
 
@@ -72,6 +73,16 @@ publication anymore: historical `runtime-v0.1.0-preview.N` tags belonged to the 
 independently numbered npm previews (including preview.15). Their published packages remain
 available and unchanged. Use an exact npm version to avoid ambiguity while the first core
 dist-tag is undecided; bare `npm i @rich-netlist/runtime` follows npm's `latest` pointer.
+
+### The last core of the language 0.3: `legacy-0.3`
+
+The user chose (2026-11-16) that the last 0.5.x core, the last that reads and writes the
+language 0.3 and carries `rnl upgrade` to 0.4, is published with the npm dist-tag `legacy-0.3`,
+so that `npm i @rich-netlist/runtime@legacy-0.3` keeps finding it after 0.6.0. Trusted
+publishing can publish but cannot run `npm dist-tag add`, so the tag is given at publication:
+set `CORE_NPM_DIST_TAG` to `legacy-0.3` before pushing that core tag, and back to `latest` for
+the next core. With `legacy-0.3` npm `latest` does not move, and the GitHub Release is created
+with `--latest=false`, so the release that GitHub shows as latest does not move either.
 
 ### Failure and recovery
 

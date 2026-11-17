@@ -32,7 +32,7 @@ jobs:
         env:
           DIST_TAG: ${{ vars.CORE_NPM_DIST_TAG }}
         run: |
-          case "$DIST_TAG" in next|latest) ;; *) echo '::error::Set CORE_NPM_DIST_TAG to next or latest after the release decision.'; exit 1 ;; esac
+          case "$DIST_TAG" in next|latest|legacy-0.3) ;; *) echo '::error::Set CORE_NPM_DIST_TAG to next, latest or legacy-0.3 after the release decision.'; exit 1 ;; esac
           (cd assets && sha256sum --check SHA256SUMS.txt)
       - name: Install the pinned trusted-publishing npm
         run: npm install --global npm@11.21.0
@@ -79,11 +79,14 @@ jobs:
         with:
           name: rnl-core-${{ needs.build.outputs.version }}
           path: assets
-      - name: Publish RNL core as the latest GitHub Release
+      - name: Publish RNL core as a GitHub Release, the latest unless it is the last of 0.3
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.build.outputs.version }}
+          DIST_TAG: ${{ vars.CORE_NPM_DIST_TAG }}
         run: |
           (cd assets && sha256sum --check SHA256SUMS.txt)
+          latest=true
+          if [ "$DIST_TAG" = legacy-0.3 ]; then latest=false; fi
           gh release create "core-v$VERSION" assets/* --repo "$GITHUB_REPOSITORY" \
-            --title "RNL core $VERSION" --notes-file "release-notes/core/$VERSION.md" --latest --verify-tag
+            --title "RNL core $VERSION" --notes-file "release-notes/core/$VERSION.md" --latest="$latest" --verify-tag
