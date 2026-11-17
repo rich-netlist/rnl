@@ -153,3 +153,16 @@ fn labels_are_left_alone_without_no_labels() {
     assert!(r.files["t.sp"].contains("#R1 @TEXT(\"R_load\", key=\"name\")"), "{}", r.files["t.sp"]);
     assert!(!r.report.files[0].changes.iter().any(|c| c.rule == "no-labels-shown"));
 }
+
+#[test]
+fn stubs_stand_near_their_pins_as_the_package_draws_them() {
+    let r = convert("#R1:1 @AS $GROUND_STUB; #R2:1 @AS(gap=7) $SUPPLY_STUB", true);
+    assert!(!pending(&r, "standard-definition-body"), "{:?}", r.report);
+    assert!(r.report.files[0].notices.iter().any(|n| n.rule == "standard-stub-range"), "{:?}", r.report);
+    assert!(r.report.differences.is_empty(), "{:#?}", r.report.differences);
+    assert!(
+        r.report.default_look_changes.iter().any(|d| d.item.starts_with("distance")),
+        "{:#?}",
+        r.report.default_look_changes
+    );
+}

@@ -9,7 +9,7 @@
       "name": "05-definitions.sp",
       "file": 0,
       "line": 0,
-      "status": "constraints: 24 ok, 1 dropped",
+      "status": "constraints: 23 ok, 1 dropped",
       "host": {
         "ports": [],
         "instances": [

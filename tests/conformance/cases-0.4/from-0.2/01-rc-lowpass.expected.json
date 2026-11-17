@@ -1054,20 +1054,8 @@
           "priority": "normal"
         },
         {
-          "label": "ALIGN",
-          "kind": "ALIGN",
-          "status": "ok",
-          "priority": "low"
-        },
-        {
           "label": "DISTANCE",
           "kind": "DISTANCE",
-          "status": "ok",
-          "priority": "low"
-        },
-        {
-          "label": "ALIGN",
-          "kind": "ALIGN",
           "status": "ok",
           "priority": "low"
         },

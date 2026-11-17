@@ -3082,12 +3082,6 @@
           "priority": "normal"
         },
         {
-          "label": "ALIGN",
-          "kind": "ALIGN",
-          "status": "needs-solver",
-          "priority": "low"
-        },
-        {
           "label": "DISTANCE",
           "kind": "DISTANCE",
           "status": "ok",
@@ -3120,14 +3114,6 @@
       "name": "record-free-word-like-name",
       "file": "15-chinese.sp",
       "line": 95,
-      "col": 5
-    },
-    {
-      "severity": "hint",
-      "code": "RNL9500",
-      "name": "constraint-needs-solver",
-      "file": "rnl-std-basic.rnl",
-      "line": 640,
       "col": 5
     }
   ]

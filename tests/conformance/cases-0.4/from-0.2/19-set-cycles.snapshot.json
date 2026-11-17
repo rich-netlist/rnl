@@ -9,7 +9,7 @@
       "name": "19-set-cycles.sp",
       "file": 0,
       "line": 0,
-      "status": "2 without a position; constraints: 23 ok, 6 unsolved",
+      "status": "2 without a position; constraints: 21 ok, 6 unsolved",
       "host": {
         "ports": [],
         "instances": [

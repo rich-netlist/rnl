@@ -633,21 +633,21 @@
 
   /* ---------------------------------------------------------------- stubs (10.5) */
 
-  /* A ground below a pin, with its own wire of at least gap units. */
-  $GROUND_STUB = @DEFINE(roles=[["t", "pin"]], parameters=[["gap", 1]]) {
+  /* A ground near a pin, with its own wire: level with the pin or below it, at most gap units away vertically (priority low). */
+  $GROUND_STUB = @DEFINE(roles=[["t", "pin"]], parameters=[["gap", 3]]) {
     %g = $GROUND @ATTACH ?t::net;
     ?t::net @WIRE {?t %g::pin};
-    {?t %g::pin} @ALIGN("x", priority="low");
-    %g::pin ?t @DISTANCE("bottom-to-top", min=?gap, priority="low");
+    %g::pin ?t @DISTANCE("bottom-to-top", max=?gap, priority="low");
+    /* not aligned with the pin: how far to the side is left free */
     %g @ORIENT("R0", priority="low");
   };
 
-  /* A supply above a pin, with its own wire of at least gap units. */
-  $SUPPLY_STUB = @DEFINE(roles=[["t", "pin"]], parameters=[["gap", 1]]) {
+  /* A supply near a pin, with its own wire: level with the pin or above it, at most gap units away vertically (priority low). */
+  $SUPPLY_STUB = @DEFINE(roles=[["t", "pin"]], parameters=[["gap", 3]]) {
     %s = $SUPPLY @ATTACH ?t::net;
     ?t::net @WIRE {?t %s::pin};
-    {?t %s::pin} @ALIGN("x", priority="low");
-    ?t %s::pin @DISTANCE("bottom-to-top", min=?gap, priority="low");
+    ?t %s::pin @DISTANCE("bottom-to-top", max=?gap, priority="low");
+    /* not aligned with the pin: how far to the side is left free */
     %s @ORIENT("R0", priority="low");
   };
 

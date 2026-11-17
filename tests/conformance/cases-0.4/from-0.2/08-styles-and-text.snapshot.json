@@ -9,7 +9,7 @@
       "name": "08-styles-and-text.sp",
       "file": 0,
       "line": 0,
-      "status": "constraints: 7 ok, 1 needs-solver",
+      "status": "constraints: 5 ok, 1 needs-solver",
       "host": {
         "ports": [],
         "instances": [
@@ -2121,7 +2121,7 @@
       "name": "opamp",
       "file": 0,
       "line": 6,
-      "status": "3 without a position; constraints: 11 ok, 5 unsolved",
+      "status": "3 without a position; constraints: 10 ok, 5 unsolved",
       "host": {
         "ports": [
           "&inp",

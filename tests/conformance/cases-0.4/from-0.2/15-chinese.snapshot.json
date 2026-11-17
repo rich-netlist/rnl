@@ -9,7 +9,7 @@
       "name": "15-chinese.sp",
       "file": 0,
       "line": 0,
-      "status": "constraints: 31 ok, 1 needs-solver",
+      "status": null,
       "host": {
         "ports": [],
         "instances": [

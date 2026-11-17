@@ -1661,12 +1661,6 @@
           "priority": "normal"
         },
         {
-          "label": "ALIGN",
-          "kind": "ALIGN",
-          "status": "unsolved",
-          "priority": "low"
-        },
-        {
           "label": "DISTANCE",
           "kind": "DISTANCE",
           "status": "unsolved",
