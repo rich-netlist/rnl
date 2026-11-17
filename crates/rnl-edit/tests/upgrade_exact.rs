@@ -45,6 +45,18 @@ fn assertions_are_informational_but_violations_still_fail() {
     assert!(!r.report.successful());
 }
 #[test]
+fn one_pin_marks_turn_their_pins_as_the_package_draws_them() {
+    let r = convert("$GROUND @ATTACH &b; $SUPPLY @ATTACH &a", true);
+    assert!(!pending(&r, "standard-definition-body"), "{:?}", r.report);
+    assert!(r.report.files[0].notices.iter().any(|n| n.rule == "standard-orientation"), "{:?}", r.report);
+    assert!(!r.report.differences.iter().any(|d| d.item.starts_with("pin-orient")), "{:#?}", r.report.differences);
+    assert!(
+        r.report.default_look_changes.iter().any(|d| d.item.starts_with("pin-orient")),
+        "{:#?}",
+        r.report.default_look_changes
+    );
+}
+#[test]
 fn old_stub_defaults_are_explicit_and_authored_values_survive() {
     let r = convert("#R1:1 @AS $GROUND_STUB; #R2:1 @AS(gap=7) $SUPPLY_STUB", true);
     assert!(r.files["t.sp"].contains("@AS(gap=2) $GROUND_STUB"), "{}", r.files["t.sp"]);
