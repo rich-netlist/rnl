@@ -106,8 +106,9 @@ fn later_steps_follow_explicit_objects_even_when_the_rule_is_written_first() {
         })
         .unwrap();
     assert_eq!(members.len(), 2);
-    let PointRef::Origin(first) = members[0] else { panic!("usage point expected") };
-    assert_eq!(problem.objects[first].label, "%explicit");
+    // the usages have no symbol, so each stands for its member (14.1): #R2 of %explicit first
+    let PointRef::Origin(first) = members[0] else { panic!("an instance expected") };
+    assert_eq!(problem.objects[first].label, "#R2");
 }
 
 #[test]

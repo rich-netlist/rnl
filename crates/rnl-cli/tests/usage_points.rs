@@ -117,13 +117,13 @@ fn relative_and_absolute_coordinates_resolve_in_fact_priority_order() {
 
 #[test]
 fn idle_hints_follow_facts_not_roles_and_skip_disabled_or_discarded_links() {
-    let base = format!("{SYMBOL} $D = @DEFINE(roles=[\"a\"]) {{}}; %u = #R1 @AS $D; %v = #R2 @AS $D; %p = (_, _); {{%u %p}} @ALIGN(\"x\");");
+    let base = format!("{SYMBOL} $D = @DEFINE(roles=[\"a\"]) {{}}; %u = #R1 @AS $D; %v = #R2 @AS $D; %p = (_, _); {{%u::position %p}} @ALIGN(\"x\");");
     for (tail, count) in [
         ("", 1),
         ("{%p #R1} @ALIGN(\"x\")", 1),
         ("{%p #R1} @ALIGN(\"y\")", 1),
         ("{%p #R1} @ALIGN(\"x\",priority=\"disabled\")", 1),
-        ("{%p %v} @ALIGN(\"x\"); {%v #R2} @ALIGN(\"x\")", 3),
+        ("{%p %v::position} @ALIGN(\"x\"); {%v::position #R2} @ALIGN(\"x\")", 3),
         ("%p @PLACE(0,0,priority=\"high\"); #R1 @PLACE(2,2,priority=\"high\"); {%p #R1} @ALIGN(\"x\",priority=\"low\")", 1),
         ("&a @WIRE {%u::position (3,4)}", 0),
         ("%u::position @CIRCLE(radius=1)", 0),
@@ -249,7 +249,7 @@ fn position_aliases_share_one_point_and_discarded_body_offsets_do_not_hide_idle_
     assert_eq!(errors(&r), []);
     assert_eq!(at(&r, "%u"), Some((4.0, 5.0)));
     for (place, idle) in [("0,0", 1), ("0,11", 0)] {
-        let r = read("0.4", &format!("{SYMBOL} $D = @DEFINE(roles=[\"a\"]) {{ ?a @PLACE(1,1,priority=\"low\") }}; %u = #R1 @AS $D; %u @PLACE(10,10,priority=\"high\"); #R1 @PLACE({place},priority=\"high\"); {{%u (_,_)}} @ALIGN(\"x\")"));
+        let r = read("0.4", &format!("{SYMBOL} $D = @DEFINE(roles=[\"a\"]) {{ ?a @PLACE(1,1,priority=\"low\") }}; %u = #R1 @AS $D; %u @PLACE(10,10,priority=\"high\"); #R1 @PLACE({place},priority=\"high\"); {{%u::position (_,_)}} @ALIGN(\"x\")"));
         assert_eq!(errors(&r), []);
         assert_eq!(r.diagnostics().iter().filter(|d| d.code == codes::USAGE_POINT_IDLE_04).count(), idle);
     }
@@ -257,7 +257,7 @@ fn position_aliases_share_one_point_and_discarded_body_offsets_do_not_hide_idle_
 
 #[test]
 fn body_place_replaces_symbol_text_coordinates_and_later_text_offsets_replace_it() {
-    let base = "$S = @DEFINE-SYMBOL { (-1,-1) (1,1) @RECTANGLE; ? @TEXT(\"label\",key=\"label\") => @PLACE(0,1) }; #R1 @SET-SYMBOL $S; $D = @DEFINE(roles=[\"a\"]) { ?a::label @PLACE(2,3) }; %u = #R1 @AS $D; %u @PLACE(10,20); #R1 @PLACE(50,60); {%u (_, _)} @ALIGN(\"x\");";
+    let base = "$S = @DEFINE-SYMBOL { (-1,-1) (1,1) @RECTANGLE; ? @TEXT(\"label\",key=\"label\") => @PLACE(0,1) }; #R1 @SET-SYMBOL $S; $D = @DEFINE(roles=[\"a\"]) { ?a::label @PLACE(2,3) }; %u = #R1 @AS $D; %u @PLACE(10,20); #R1 @PLACE(50,60); {%u::position (_, _)} @ALIGN(\"x\");";
     for (tail, expected, idle) in
         [("", (12.0, 23.0), 0), ("#R1 @TEXT(\"label\",key=\"label\",dx=7,dy=8)", (57.0, 68.0), 1)]
     {
@@ -274,9 +274,10 @@ fn body_place_replaces_symbol_text_coordinates_and_later_text_offsets_replace_it
     }
 }
 
-/// A statement that places a usage whose point nothing of its own ties to its members moves only
-/// that point, not the members: each such statement has the hint, which says to constrain the
-/// members with `::members` (14.1). A usage whose body ties its point to its members has none.
+/// A statement that places the `::position` of a usage whose point nothing of its own ties to its
+/// members moves only that point, not the members: each such statement has the hint, which says
+/// to write the usage itself, which stands for its members (6.5, 14.1). A usage whose body ties
+/// its point to its members has none, nor has the usage written as an item.
 #[test]
 fn a_statement_that_places_only_the_point_of_a_usage_has_the_hint() {
     let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nR1 a 0 1k\nR2 b 0 1k\nR3 c 0 1k\nR4 d 0 1k\nR5 e 0 1k\n\
@@ -286,8 +287,9 @@ fn a_statement_that_places_only_the_point_of_a_usage_has_the_hint() {
                 *   $PAIR = @DEFINE(roles=[\"a\", \"b\"]) { {?a ?b ?} @ALIGN(\"y\"); {?a ? ?b} @DISTRIBUTE(\"left-to-right\") };\n\
                 *   %loop = #R2(a) #R3(b) @AS $LOOP;\n\
                 *   %pair = #R4(a) #R5(b) @AS $PAIR;\n\
-                *   {#R1 %loop %pair} @ORDER(\"left-to-right\");\n\
-                *   {#R1 %loop} @ALIGN(\"y\")\n\
+                *   {#R1 %loop::position %pair::position} @ORDER(\"left-to-right\");\n\
+                *   {#R1 %loop::position} @ALIGN(\"y\");\n\
+                *   {#R1 %loop} @ALIGN(\"x\")\n\
                 * }\n.end\n";
     let files = MemoryProvider::new().with("t.sp", text);
     let r = interpret_file(Path::new("t.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
@@ -299,7 +301,7 @@ fn a_statement_that_places_only_the_point_of_a_usage_has_the_hint() {
         .map(|d| (d.loc.as_ref().unwrap().line, d.message.clone()))
         .collect();
     let message =
-        "%loop has no symbol, and no fact ties its point to what is drawn: this statement moves only that point, \
-                   not its members; write %loop::members to constrain its members (14.1)";
+        "%loop has no symbol, and no fact ties its ::position to what is drawn: this statement moves only that \
+                   point, not its members; write %loop to constrain its members (14.1)";
     assert_eq!(hints, [(14, message.to_string()), (15, message.to_string())]);
 }

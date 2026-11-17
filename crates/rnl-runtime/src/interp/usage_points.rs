@@ -134,11 +134,12 @@ impl Interp<'_> {
     }
 
     /// Only actual positional facts connect a usage point to a drawing. Role membership and
-    /// the ancestry of an expanded body do not, and neither does a statement that places the usage
-    /// itself, one that has it as an item and is not of its own body: that statement moves the
-    /// point and nothing the point is tied to. Follow each axis separately and transitively. Each
-    /// statement that places a usage without a symbol whose point is then tied to nothing drawn
-    /// has the hint, which says to constrain its members instead (14.1).
+    /// the ancestry of an expanded body do not, and neither does a statement that places the
+    /// point itself, `%u::position` written as an item of a statement not of its own body: that
+    /// statement moves the point and nothing the point is tied to. Follow each axis separately
+    /// and transitively. Each statement that places the point of a usage without a symbol that is
+    /// then tied to nothing drawn has the hint, which says to write the usage itself, which stands
+    /// for its members (14.1).
     pub(super) fn hint_idle_usage_points(&mut self, s: SceneId) {
         if !self.scenes[s].usages.iter().any(|&u| self.usage_own_point(u)) {
             return;
@@ -151,7 +152,8 @@ impl Interp<'_> {
         };
         let mut candidates = Vec::new();
         let mut seen = HashSet::new();
-        // a usage without a symbol that a statement other than one of its own body places
+        // the point of a usage without a symbol that a statement other than one of its own body
+        // places; the usage itself, written as an item, stands for its members and is not here
         let placed = |this: &Self, o: ObjId, chain: &[ObjId]| {
             matches!(this.o(o), ObjData::Usage(_))
                 && this.usage_own_point(o)
@@ -269,12 +271,12 @@ impl Interp<'_> {
             if !drawn.contains(&(usage, 'x')) && !drawn.contains(&(usage, 'y')) {
                 let name = self.label(usage);
                 let advice = if name.starts_with('%') {
-                    format!("write {name}::members to constrain its members")
+                    format!("write {name} to constrain its members")
                 } else {
-                    "name it and write its ::members to constrain its members".to_string()
+                    "write the usage itself to constrain its members".to_string()
                 };
                 self.diag_site(Severity::Hint, codes::USAGE_POINT_IDLE_04, &site, off,
-                    format!("{name} has no symbol, and no fact ties its point to what is drawn: this statement moves only that point, not its members; {advice} (14.1)"));
+                    format!("{name} has no symbol, and no fact ties its ::position to what is drawn: this statement moves only that point, not its members; {advice} (14.1)"));
             }
         }
     }

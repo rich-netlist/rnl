@@ -133,6 +133,7 @@ impl Interp<'_> {
         self.run_tasks(s, 7);
         self.materialize_annotations(s);
         self.check_scene_pin_roles(s);
+        self.split_usage_constraints(s);
         self.resolve_currents(s, true);
         self.resolve_geometry(s);
         self.scenes[s].phase = 8;
@@ -806,6 +807,8 @@ impl Interp<'_> {
     ) -> Priority {
         let n = chain.len();
         let mut said: Vec<Said> = Vec::new();
+        // a constraint split off another is what its statement wrote, as that one is (14.1)
+        let own = own.map(|o| self.split_from.get(&o).copied().unwrap_or(o));
         for (t, target) in chain.iter().copied().chain(own).enumerate() {
             // the target's own statement written last
             let mut latest: Option<(Pos, Priority)> = None;

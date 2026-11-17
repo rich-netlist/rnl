@@ -278,6 +278,9 @@ pub struct Interp<'p> {
     /// Dependencies of member-place references on edits, including edits written later (5.2.3).
     places: places::Places,
     pending_constraints: HashMap<ObjId, constraints::Pending>,
+    /// A constraint split off another one when a usage among its items stands for its members,
+    /// with the one it was split from, whose statement and PRIORITY it shares (14.1).
+    pub(crate) split_from: HashMap<ObjId, ObjId>,
     pub(crate) std_enabled: bool,
     pub(crate) include_std: bool,
     standard_hints: standard::StandardHints,
@@ -421,6 +424,7 @@ impl<'p> Interp<'p> {
             restart: None,
             places: places::Places::default(),
             pending_constraints: HashMap::new(),
+            split_from: HashMap::new(),
             std_enabled: options.std,
             include_std: options.include_std,
             standard_hints: standard::StandardHints::default(),

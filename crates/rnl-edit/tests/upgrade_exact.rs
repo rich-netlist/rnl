@@ -66,8 +66,8 @@ fn old_stub_defaults_are_explicit_and_authored_values_survive() {
 #[test]
 fn local_drawn_usages_gain_alignments_without_copying_points() {
     let r=convert("$D= @DEFINE(roles=[[\"p\",\"point\"]]) {}; $S= @DEFINE-SYMBOL { (0,0) @CIRCLE(radius=1) }; %p=(2,3); %u=$D @ATTACH %p => @SET-SYMBOL $S",false);
-    assert!(r.files["t.sp"].contains("{%u %u::p} @ALIGN(\"x\")"), "{}", r.files["t.sp"]);
-    assert!(r.files["t.sp"].contains("{%u %u::p} @ALIGN(\"y\")"));
+    assert!(r.files["t.sp"].contains("{%u::position %u::p} @ALIGN(\"x\")"), "{}", r.files["t.sp"]);
+    assert!(r.files["t.sp"].contains("{%u::position %u::p} @ALIGN(\"y\")"));
     assert!(!pending(&r, "usage-main-point"));
 }
 #[test]
@@ -123,14 +123,14 @@ fn singleton_literal_groups_need_no_centre_decision() {
 fn anonymous_main_point_names_do_not_capture_existing_spelling() {
     let r=convert("$D = @DEFINE(roles=[[\"p\",\"point\"]]) {}; $S = @DEFINE-SYMBOL { (0,0) @CIRCLE(radius=1) }; %rnl_upgrade_usage_0=(7,8); $D @ATTACH (2,3) => @SET-SYMBOL $S",false);
     assert!(r.files["t.sp"].contains("=> %rnl_upgrade_usage_1"), "{}", r.files["t.sp"]);
-    assert!(r.files["t.sp"].contains("{%rnl_upgrade_usage_1 %rnl_upgrade_usage_1::p}"));
+    assert!(r.files["t.sp"].contains("{%rnl_upgrade_usage_1::position %rnl_upgrade_usage_1::p}"));
     assert!(!r.report.diagnostics.iter().any(|d| d.severity == "error"), "{:?}", r.report.diagnostics);
 }
 #[test]
 fn ground_on_a_terminal_preserves_the_electrical_net_and_point() {
     let r = convert("%g=$GROUND @ATTACH #R1:1", true);
     assert!(r.files["t.sp"].contains("@ATTACH #R1:1::net"), "{}", r.files["t.sp"]);
-    assert!(r.files["t.sp"].contains("{%g #R1:1} @ALIGN(\"x\")"));
+    assert!(r.files["t.sp"].contains("{%g::position #R1:1} @ALIGN(\"x\")"));
     assert!(!pending(&r, "usage-main-point"));
 }
 
