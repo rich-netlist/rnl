@@ -1526,6 +1526,9 @@ pub struct Resolved {
     pub notes: Vec<String>,
     pub(crate) model: Model,
     pub(crate) witness: Witness,
+    /// The facts of priority low discarded whose other groups [`SolverOptions::hints_for_low`]
+    /// asks for and [`seek_low_groups`] has not sought yet, in the order of the facts.
+    pub(crate) low_unsought: Vec<usize>,
     /// Whether the facts kept hold together with their constants as written, the tolerance not
     /// needed: the witness is then taken from them so, and the coordinates are sought so.
     pub(crate) as_written: bool,
@@ -1602,9 +1605,10 @@ pub(crate) fn point_value(problem: &LevelProblem, g: &Geometry, r: &PointRef, ax
 /// Resolves the facts of a level (8.5), with the time limit of the options on `clock` (the draft
 /// 0.3, 8.5): each fact on its own first, then the facts that have a solution on their own in
 /// order, then a first minimal conflict group of each fact discarded, then the other groups of
-/// each, but of a fact of priority low unless [`SolverOptions::hints_for_low`] asks for them,
-/// within the one limit; then, counted in work and not timed, the witness taken as written (see
-/// the module).
+/// each fact not of priority low, within the one limit; then, counted in work and not timed, the
+/// witness taken as written (see the module). The other groups of a fact of priority low, which
+/// [`SolverOptions::hints_for_low`] may ask for, are left to [`seek_low_groups`], outside the
+/// limit, so that asking for them changes nothing that is kept or placed.
 pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Resolved {
     let tol = from_f64(options.tolerance)
         .filter(|t| *t >= Q::zero())
@@ -1687,8 +1691,9 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
     // of each fact discarded, the deletion filter of its explanation, so that every fact has one
     // before the time goes to the others; then the others of each, in the order of the facts. A
     // fact of priority low keeps its first only, and is in no hint by statement, unless its hints
-    // are asked for: they may be left out (8.5, 7.6), and its groups can be many.
-    let hinted = |f: usize| options.hints_for_low || problem.facts[f].priority != Priority::Low;
+    // are asked for: they may be left out (8.5, 7.6), and its groups can be many. Those asked
+    // for are sought after the level is laid out (`seek_low_groups`), not within its limit.
+    let hinted = |f: usize| problem.facts[f].priority != Priority::Low;
     let mut discarded: Vec<Discarded> = undecided
         .iter()
         .map(|&fact| Discarded { fact, groups: Vec::new(), complete: false, undecided: true })
@@ -1722,9 +1727,10 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
     // within the caps of work, the witness of the resolution, which satisfies the facts kept
     // within the tolerance.
     let mut notes = Vec::new();
-    if !first_only.is_empty() {
+    if !first_only.is_empty() && !options.hints_for_low {
         notes.push(first_groups_only(&first_only));
     }
+    let low_unsought = if options.hints_for_low { first_only } else { Vec::new() };
     drop(phase);
     let _phase = crate::profile::span("resolve_phase", "witness_as_written");
     let placed = taken_as_written(problem, &model, &kept, &mut work);
@@ -1749,9 +1755,53 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
         notes,
         witness,
         model,
+        low_unsought,
         as_written,
         placing,
     }
+}
+
+/// The other minimal conflict groups of the facts of priority low discarded whose hints
+/// [`SolverOptions::hints_for_low`] asks for, sought after the resolution and whatever came of
+/// it, outside the budget of the level, so that a solve that reports them keeps and places what
+/// one that does not would, in the same work; then the hints by statement again, with those
+/// facts in them. They are sought within the time limit of the options, or else their safety
+/// limit, as the resolution was; and, with a budget of `allowance` work units (the work the level
+/// took), within that budget of their own too, so that a replay by the work of the level finds
+/// the same unless the time stopped them first. A fact whose groups were not all found so is not
+/// [`Discarded::complete`].
+pub(crate) fn seek_low_groups(
+    problem: &LevelProblem,
+    options: &SolverOptions,
+    clock: &dyn Clock,
+    resolved: &mut Resolved,
+    allowance: Option<u64>,
+) {
+    if resolved.low_unsought.is_empty() {
+        return;
+    }
+    let unsought = std::mem::take(&mut resolved.low_unsought);
+    let seconds = options.time_limit.or(options.safety_seconds);
+    let seek = |resolved: &mut Resolved, limit: Option<f64>| {
+        let deadline = Deadline::new(clock, limit);
+        let limits = Limits::Time(&deadline);
+        let n = problem.objects.len();
+        // not the level's work: the work of a solve that reports them is that of one that does not
+        let mut work = Work::default();
+        for &f in &unsought {
+            let Some(d) = resolved.discarded.iter_mut().find(|d| d.fact == f) else { continue };
+            let Some(first) = d.groups.first().cloned() else { continue };
+            let before: Vec<usize> = resolved.kept.iter().copied().take_while(|&k| k < f).collect();
+            (d.groups, d.complete) = all_groups(&resolved.model, n, limits, d.fact, &before, first, &mut work);
+        }
+    };
+    crate::budget::without(|| match allowance {
+        Some(units) => {
+            crate::budget::with(clock, crate::RunLimit::Work(units.max(1)), seconds, || seek(resolved, None));
+        }
+        None => seek(resolved, seconds),
+    });
+    resolved.statements = statement_hints(problem, &resolved.discarded);
 }
 
 /// The note on the facts of priority low discarded whose other groups were not sought
