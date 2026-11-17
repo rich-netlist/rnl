@@ -2241,6 +2241,7 @@ impl Level<'_> {
                     format!("group ({})", ls.join(" "))
                 }
             }
+            NodeKind::Attached(k) => format!("{} with what is attached to it", self.problem.objects[k].label),
             _ => format!("part {n} of the groups"),
         }
     }

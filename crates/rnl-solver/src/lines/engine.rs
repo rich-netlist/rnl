@@ -692,6 +692,7 @@ fn tables_of(
                 problem.groups.get(b).map_or("", |g| g.label.as_str())
             )),
             NodeKind::Part(..) => Some(format!("part {n}")),
+            NodeKind::Attached(k) => problem.objects.get(k).map(|o| format!("{} with what is attached to it", o.label)),
             NodeKind::Root => None,
         }
     };

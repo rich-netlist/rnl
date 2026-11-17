@@ -707,6 +707,7 @@ impl<'a> Tree<'a> {
                     format!("group({})", names.join(" "))
                 }
             },
+            NodeKind::Attached(k) => format!("{}+", self.problem.objects[k].label),
             _ => format!("node {n}"),
         }
     }

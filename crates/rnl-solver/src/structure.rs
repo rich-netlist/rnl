@@ -465,6 +465,9 @@ pub(crate) enum NodeKind {
     /// A part of a [`NodeKind::Union`]: 0 only in the first group, 1 shared, 2 only in the second.
     /// A part with the members of a node made before is that node, of its own kind.
     Part(usize, usize, u8),
+    /// Of a level of 0.4: an element of the netlist and the symbols of usages of one role attached
+    /// to it ([`attached_element`]), as one group.
+    Attached(usize),
 }
 
 /// A node of the tree of groups.
@@ -941,7 +944,13 @@ pub(crate) fn analyse(
     let pairs = pairs(problem, &objects);
     let open = open(problem, resolved);
     let (tree, tree_notes, selected_groups) = if language04 {
-        crate::group_tree::analyse(problem, &elements)
+        let mut attached: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+        for &k in &elements {
+            if let Some(e) = attached_element(problem, &objects, k) {
+                attached.entry(e).or_default().push(k);
+            }
+        }
+        crate::group_tree::analyse(problem, &elements, &attached)
     } else {
         let (tree, notes) = group_tree(problem, &objects, &elements);
         (tree, notes, (0..problem.groups.len()).collect())
@@ -1593,6 +1602,39 @@ fn stub_rise(problem: &LevelProblem, kept: &[usize], k: usize, host: PinKey) -> 
 /// of instances and bundles the one a fact kept (an ALIGN, a DISTANCE) ties a pin of the object
 /// to, else the first. Only that arrangement reads it; the search,
 /// the lines, the alignments, compaction and the order take the object as any other.
+/// Of a level of 0.4: the element of the netlist that the symbol `k` is attached to, as the user
+/// wrote it: the symbol of a usage of one role, attached (12.1) to a terminal or pin of an
+/// instance or bundle, or made in a usage of one role so attached, such as the ground of
+/// `$GROUND_STUB`, attached to the net of the terminal its usage is attached to. One attached to a
+/// net that no usage of one role around it ties to a terminal, such as a label on a net, has none.
+pub(crate) fn attached_element(problem: &LevelProblem, objects: &[ObjectInfo], k: usize) -> Option<usize> {
+    let o = objects.get(k)?;
+    let object = problem.objects.get(k)?;
+    if o.role != Role::Element || o.symbol.is_none() || object.kind != ObjectKind::Usage {
+        return None;
+    }
+    let mut usage = problem.usages.get(object.usage?)?;
+    if usage.object != Some(k) {
+        return None;
+    }
+    loop {
+        let [role] = usage.roles.as_slice() else { return None };
+        let [member] = role.members.as_slice() else { return None };
+        match member {
+            Filler::Terminal { object, .. } | Filler::Pin { object, .. } => {
+                let element = objects.get(*object).is_some_and(|x| x.role == Role::Element)
+                    && problem
+                        .objects
+                        .get(*object)
+                        .is_some_and(|x| matches!(x.kind, ObjectKind::Instance | ObjectKind::Bundle));
+                return element.then_some(*object);
+            }
+            Filler::Net(_) => usage = problem.usages.get(usage.parent?)?,
+            _ => return None,
+        }
+    }
+}
+
 fn attach_host(
     problem: &LevelProblem,
     kept: &[usize],
