@@ -3080,6 +3080,70 @@ impl Level<'_> {
         pairs.order = kept.iter().rev().copied().chain((0..facing.len()).rev().filter(|i| !kept.contains(i))).collect();
         let hang = gaps.get(2).is_none_or(|&g| g == 0);
         let mut hanging = Hanging::default();
+        // a pin of another part on the net of two pins that face each other on one line, of a part
+        // or of two, that leaves across that line towards it goes between them, so that its wire
+        // joins theirs straight
+        let mut runs: Vec<(usize, usize, usize, usize)> = Vec::new();
+        for (t, pins) in trees.iter().enumerate() {
+            for i in 0..pins.len() {
+                for j in 0..pins.len() {
+                    let ((pa, ea, ta), (pb, eb, tb)) = (&pins[i], &pins[j]);
+                    if pa == pb || (ea.0, ea.1) != (-eb.0, -eb.1) {
+                        continue;
+                    }
+                    let (along, way) = if ea.1 == 0 { (0, ea.0) } else { (1, ea.1) };
+                    let across = 1 - along;
+                    let ahead = value(&tb[along], along, &places) - value(&ta[along], along, &places);
+                    if way <= 0
+                        || !ahead.is_positive()
+                        || value(&tb[across], across, &places) != value(&ta[across], across, &places)
+                    {
+                        continue;
+                    }
+                    runs.push((t, i, j, across));
+                }
+            }
+        }
+        for &(t, i, j, across) in &runs {
+            let along = 1 - across;
+            let tree = &trees[t];
+            let (la, lb) = (&tree[i], &tree[j]);
+            let (pa, pb) = (&la.0, &lb.0);
+            let (lo, hi) = (la.2[along].clone(), lb.2[along].clone());
+            let line = value(&la.2[across], across, &places);
+            for (p, e, at) in tree {
+                let way = if across == 0 { e.0 } else { e.1 };
+                let sideways = if along == 0 { e.0 } else { e.1 } == 0;
+                let own = [&lo, &hi].iter().any(|t| t.unit == at[along].unit);
+                if p == pa || p == pb || way == 0 || !sideways || own {
+                    continue;
+                }
+                // towards the line of the pair, and short of it: the placement only raises a
+                // part, so one past the pair is left where it is
+                let to = &line - value(&at[across], across, &places);
+                if to.is_zero()
+                    || to.is_positive() != (way > 0)
+                    || value(&at[along], along, &places) > value(&lo, along, &places)
+                {
+                    continue;
+                }
+                hanging.count += 1;
+                if !hang {
+                    continue;
+                }
+                let mut trial = orders[along].clone();
+                trial.at_least(&lo, &at[along], int(1));
+                trial.at_least(&at[along], &hi, int(1));
+                match trial.least(places[along].clone()) {
+                    Some(v) => {
+                        orders[along] = trial;
+                        places[along] = v;
+                        hanging.hung += 1;
+                    }
+                    None => hanging.refused += 1,
+                }
+            }
+        }
         for (u, unit) in units.iter().enumerate() {
             let Unit::Leaf(k) = *unit else { continue };
             if s.objects[k].role != Role::Element || s.objects[k].symbol.is_none() {
