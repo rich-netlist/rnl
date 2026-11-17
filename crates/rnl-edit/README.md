@@ -1,6 +1,6 @@
 # rnl-edit
 
-Writing RNL into host netlists: the edit transactions of the editor interface (`notes/rnl-editor-interface/spec-draft.md` in rnl-dev, section 4). This is the first part, what a tool needs that prints a netlist and its drawing together, such as Analog Canvas's SPICE+RNL and Spectre+RNL export:
+Writing RNL into host netlists: the edit transactions of the editor interface (the draft of the editor interface, section 4). This is the first part, what a tool needs that prints a netlist and its drawing together, such as Analog Canvas's SPICE+RNL and Spectre+RNL export:
 
 ```rust
 pub fn write(request: &WriteRequest) -> Result<String, String>

@@ -1,4 +1,4 @@
-//! The snapshot of the editor interface (`notes/rnl-editor-interface/spec-draft.md` in rnl-dev,
+//! The snapshot of the editor interface (the draft of the editor interface,
 //! section 3): what a converter or an editor reads of a document besides its drawing, by ids it
 //! can write back into transactions. This first part gives what Analog Canvas's import needs:
 //!

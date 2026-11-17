@@ -2,7 +2,7 @@
 //! collection of its sub-packages (16.3). The header record of a package file may reference other
 //! packages with USE-PACKAGE: used, a package brings in what it references first, each package
 //! once, and on a chain of levels one package of each name is in effect. Ported from the tests of
-//! the language prototype (rnl-dev d668901).
+//! the language prototype.
 
 use std::path::Path;
 

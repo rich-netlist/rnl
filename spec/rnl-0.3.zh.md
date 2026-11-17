@@ -1,4 +1,4 @@
-<!-- translated from en/front.md sha256:74da0816b986 -->
+<!-- translated from en/front.md sha256:15a70698899d -->
 # RNL 语言标准 0.3 版（中文版）
 
 RNL（Rich Netlist）写在电路网表的注释里，描述电路怎样画成原理图、各部分是什么意思；电路本身只由网表定义。本文是这门语言 0.3 版的标准。
@@ -7,7 +7,7 @@ RNL（Rich Netlist）写在电路网表的注释里，描述电路怎样画成�
 - 标准词表 `rnl-words-0.3.json` 及其 JSON Schema `rnl-words.schema.json` 是本标准的一部分（5.3、附录 A）。
 - RNL 的原则见 `rich-netlist.zh.md`（中文版，以英文版 `rich-netlist.md` 为准）；本标准称之为"原则"。
 - 0.x 各版本之间不承诺兼容（16.1）。
-- 本文按研究仓库 rnl-dev 里 0.3 版的草案修订 0.2 版，提交 d26d049 (2026-10-15)；改动见附录 D。
+- 本文按 2026-10-15 的 0.3 版草案修订 0.2 版；改动见附录 D。
 
 ## 目录
 

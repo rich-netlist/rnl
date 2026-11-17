@@ -6,4 +6,4 @@ RNL (Rich Netlist) is written in the comments of a circuit netlist. It describes
 - The word list `rnl-words-0.2.json` and its schema `rnl-words.schema.json` are part of this standard (5.3, Annex A).
 - The principles of RNL are in `rich-netlist.md` (English, authoritative; Chinese version: `rich-netlist.zh.md`); this standard refers to them as "Principles".
 - Versions 0.x make no promise of compatibility with each other (16.1).
-- This text was consolidated from the discussion draft of the rnl-dev research repository, commit d668901 (2026-10-13).
+- This text was consolidated from the discussion draft of 2026-10-13.

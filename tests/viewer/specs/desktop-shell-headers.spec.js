@@ -54,11 +54,11 @@ test("Save Project gives write_bytes the archive's path as a header", async ({ p
 
 test("Open Project writes each file of the project with its path as a header", async ({ page, viewer }) => {
   const recorded = await calls(page, viewer, {}, async (desktop) => {
-    const bytes = { "C:/p/1-pilots/a.sp": new Uint8Array([1, 2]), "C:/p/2-old-cases/b c.sp": new Uint8Array([3]) };
-    await desktop.projectSource({ bytes, entry: "C:/p/1-pilots/a.sp", pool: Object.keys(bytes) }, { path: "C:/p.zip" });
+    const bytes = { "C:/p/1-first/a.sp": new Uint8Array([1, 2]), "C:/p/2-second/b c.sp": new Uint8Array([3]) };
+    await desktop.projectSource({ bytes, entry: "C:/p/1-first/a.sp", pool: Object.keys(bytes) }, { path: "C:/p.zip" });
   });
   expect(recorded).toEqual([
-    { command: "write_bytes", args: { bytes: 2 }, options: { headers: { path: "C%3A%2Fp%2F1-pilots%2Fa.sp" } } },
-    { command: "write_bytes", args: { bytes: 1 }, options: { headers: { path: "C%3A%2Fp%2F2-old-cases%2Fb%20c.sp" } } },
+    { command: "write_bytes", args: { bytes: 2 }, options: { headers: { path: "C%3A%2Fp%2F1-first%2Fa.sp" } } },
+    { command: "write_bytes", args: { bytes: 1 }, options: { headers: { path: "C%3A%2Fp%2F2-second%2Fb%20c.sp" } } },
   ]);
 });

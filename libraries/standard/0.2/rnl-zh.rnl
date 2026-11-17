@@ -1,5 +1,5 @@
-/* rnl-zh：标准词和标准包名字的中文代称（D16、D17）。由 notes/rnl-vocabulary-brainstorm/terms-zh.md 生成；
-   标准包的名字（$ 名字和 definition= 的代称）见 terms-zh.md 第九节（2026-10-12 定）。 */
+/* rnl-zh：标准词和标准包名字的中文代称（D16、D17）。按定下的中文术语表生成；
+   标准包的名字（$ 名字和 definition= 的代称）也照那张表（2026-10-12 定）。 */
 @RNL(type="header") {
   @VERSION("0.2");
   @PACKAGE(name="rnl-zh", version="0.2");
