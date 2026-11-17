@@ -492,7 +492,7 @@ pub struct BlockSymbol {
 }
 
 /// An instance, bundle or usage of a level, drawn or not: what the editor interface's snapshot
-/// gives of it (`notes/rnl-editor-interface` in rnl-dev, 3.5).
+/// gives of it (the draft of the editor interface, 3.5).
 #[derive(Clone, Debug)]
 pub struct ObjectInfo {
     /// A scene usage with its own point (0.4), independently of its symbol or position.

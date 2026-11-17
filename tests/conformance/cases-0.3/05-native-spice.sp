@@ -1,6 +1,6 @@
 * Every element the SPICE adapter reads natively, each with its default symbol of the series 0.3
 *! A SPICE file of version 0.3 implicitly uses the standard package 0.3 (16.3) and gets its symbols from the SPICE rule package rnl-std-spice: first by element letter, then by model type, P-type last; it does not use rnl-std-spectre.
-*! Apart from subcircuit calls, one line for each kind of element the SPICE adapter reads natively (from std-0.3/sheet/native.sp in rnl-dev), each with its default symbol, none drawn as a stand-in box. R2 is an instance of a resistor model card.
+*! Apart from subcircuit calls, one line for each kind of element the SPICE adapter reads natively, each with its default symbol, none drawn as a stand-in box. R2 is an instance of a resistor model card.
 * @RNL(type="header") { @VERSION("0.3")}
 R1 a1 b1 1k
 C1 a2 b2 1p

@@ -102,7 +102,7 @@ impl Interp<'_> {
         text.map_or_else(|| start.clone(), |(_, text)| crate::group_nodes::statement_at(text, start, end))
     }
 
-    // ---- ids for the editor interface (rnl-dev notes/rnl-editor-interface, 3.2)
+    // ---- ids for the editor interface (the draft of the editor interface, 3.2)
 
     /// Where the statement that made an object is, `@file:line:col`, for the objects that keep it.
     fn site_id(&self, o: ObjId) -> Option<String> {

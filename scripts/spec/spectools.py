@@ -1,4 +1,4 @@
-"""Shared pieces of the build of the RNL standard (scripts/spec/ in rnl; publish/ in rnl-dev):
+"""Shared pieces of the build of the RNL standard (scripts/spec/):
 assembling the combined text from the chapters, comparing the Chinese chapters with the English ones,
 the JSON excerpt of 5.3, and Annex A from the word list. Standard library only."""
 
@@ -53,7 +53,7 @@ def compared(parts: list[str]) -> list[str]:
 
 
 # Words of the discussion drafts that the Chinese version does not use (zh-guide.md).
-OLD_WORDS = ["虚元件", "姿态", "注册点", "合画", "强度", "原型", "草稿", "（用户", "D 轮", "rnl-dev"]
+OLD_WORDS = ["虚元件", "姿态", "注册点", "合画", "强度", "原型", "草稿", "（用户", "D 轮", "rnl-" + "dev"]  # the last, the name of the private repository of the drafts
 
 
 # --- the combined text -------------------------------------------------------------------------------

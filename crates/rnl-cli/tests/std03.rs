@@ -194,7 +194,7 @@ fn symbols(path: &Path) -> Vec<(String, String)> {
 
 #[test]
 fn every_native_element_gets_its_symbol() {
-    // the checks of rnl-dev's std-0.3/check-preview.mjs: every element each adapter reads natively,
+    // the checks of the preview of the series 0.3: every element each adapter reads natively,
     // a SPICE file by element letter and model type, a Spectre file by master and model type
     let spice = [
         ("#R1", "$RESISTOR"),

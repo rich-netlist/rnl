@@ -50,7 +50,7 @@ A netlist that has no positions yet lists every object, and each drawing is some
 pub fn snapshot(entry: &str, files: &dyn Provider, options: &BuildOptions, parts: Parts) -> Result<Snapshot, String>
 ```
 
-gives the editor interface's view of a document (`notes/rnl-editor-interface/spec-draft.md` in rnl-dev, section 3), from the same interpretation as its Document, for a converter or an editor that reads the document by objects rather than draws it. This first part has what Analog Canvas's import needs:
+gives the editor interface's view of a document (the draft of the editor interface, section 3), from the same interpretation as its Document, for a converter or an editor that reads the document by objects rather than draws it. This first part has what Analog Canvas's import needs:
 
 - the language version, the one the main file declares, or 0.3, the tool's default, when it declares none (16.1); the packages in effect by name and version, the files, the diagnostics, and the Document as `drawing` unless `parts.drawing` is false;
 - for each drawing level, by its id (`subckt:NAME`, or `file:PATH` for the file level), when `parts` ask:

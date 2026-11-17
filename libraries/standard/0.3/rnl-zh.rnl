@@ -1,5 +1,5 @@
 /* rnl-zh 0.3：标准词和标准系列 0.3 名字的中文代称（16.5）。标准词照 rnl-zh 0.2；$ 名字和 definition= 的代称
-   由 rnl-dev 的 notes/analog-canvas-rnl-import-export/std-0.3/terms-zh.md 生成（2026-10-17 定）。 */
+   按用户定下的中文术语表生成（2026-10-17 定）。 */
 @RNL(type="header") {
   @VERSION("0.3");
   @PACKAGE(name="rnl-zh", version="0.3");
