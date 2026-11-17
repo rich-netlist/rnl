@@ -490,17 +490,6 @@ pub(crate) fn attachments(s: &Structure, rows: &[Vec<usize>], ori: &[Orient]) ->
             continue;
         }
         match info.role {
-            Role::Port if info.hung_from.is_some() => {
-                let host = info.hung_from.expect("guarded");
-                let side = match s.exit(host.0, host.1, ori[host.0]) {
-                    Some((1, 0)) => Side::Right,
-                    Some((-1, 0)) => Side::Left,
-                    Some((0, -1)) => Side::Below,
-                    Some((0, 1)) => Side::Above,
-                    _ => Side::Left,
-                };
-                out.insert(k, Attach { host, side, facing: None, aside: 0 });
-            }
             Role::Port => {
                 let pins = s.attach_pins(k);
                 let sideways = pins.iter().find_map(|&p| match s.exit(p.0, p.1, ori[p.0]) {
@@ -535,29 +524,7 @@ pub(crate) fn attachments(s: &Structure, rows: &[Vec<usize>], ori: &[Orient]) ->
             _ => {}
         }
     }
-    let hung: Vec<(usize, Attach)> =
-        out.iter().filter(|(k, _)| s.objects[**k].hung_from.is_some()).map(|(k, a)| (*k, *a)).collect();
-    if !hung.is_empty() {
-        let free: Vec<usize> = out.keys().copied().filter(|&k| s.objects[k].hung_from.is_none()).collect();
-        for k in free {
-            let a = out[&k];
-            let same: Vec<(usize, Attach)> = hung.iter().filter(|(_, b)| b.host == a.host).copied().collect();
-            if !same.is_empty() {
-                let n = crate::beside::aside(s, k, &a, &same, ori);
-                out.insert(k, Attach { aside: n, ..a });
-            }
-        }
-    }
     out
-}
-
-pub(crate) fn leaves(s: &Structure, host: PinKey, ori: &[Orient]) -> Side {
-    match s.exit(host.0, host.1, ori[host.0]) {
-        Some((0, 1)) => Side::Above,
-        Some((0, -1)) => Side::Below,
-        Some((1, 0)) => Side::Right,
-        _ => Side::Left,
-    }
 }
 
 /// The pin on a port's net that faces its host's pin across the gap between two rows (see
@@ -639,13 +606,7 @@ fn parts(s: &Structure, k: usize, ori: &[Orient], attach: &BTreeMap<usize, Attac
         }
     }
     for &j in s.hanging.get(&k).map_or(&[][..], |v| v) {
-        let Some(stub) = &s.objects[j].stub else { continue };
-        let (Some(hp), Some(sp), Some(sb)) =
-            (s.pin_offset(k, stub.host.1, ori[k]), s.pin_offset(j, 0, ori[j]), dressed_box(s, j, ori[j]))
-        else {
-            continue;
-        };
-        let at = [&hp[0] - &sp[0], &hp[1] + &stub.rise - &sp[1]];
+        let (Some(at), Some(sb)) = (s.stub_at(j, ori[k], ori[j]), dressed_box(s, j, ori[j])) else { continue };
         out.push(shifted(&sb, &at));
     }
     for (&j, a) in attach.iter().filter(|(_, a)| a.host.0 == k) {
@@ -1431,10 +1392,10 @@ pub(crate) fn sketch(
     }
     for (j, info) in s.objects.iter().enumerate() {
         if let Some(stub) = &info.stub {
-            let (h, hp) = stub.host;
-            if let (Some(hpin), Some(sp)) = (s.pin_offset(h, hp, ori[h]), s.pin_offset(j, 0, ori[j])) {
+            let h = stub.host.0;
+            if let Some(at) = s.stub_at(j, ori[h], ori[j]) {
                 let base = g.origin[h].clone();
-                g.origin[j] = [&base[0] + &hpin[0] - &sp[0], &base[1] + &hpin[1] + &stub.rise - &sp[1]];
+                g.origin[j] = [&base[0] + &at[0], &base[1] + &at[1]];
             }
         }
     }
@@ -1524,14 +1485,8 @@ pub(crate) fn stub_on_body(s: &Structure, m: usize, o: Orient) -> bool {
     let Some(body) = s.box_offset(m, o) else { return false };
     s.hanging.get(&m).is_some_and(|stubs| {
         stubs.iter().any(|&j| {
-            let Some(stub) = &s.objects[j].stub else { return false };
             let so = s.witness.orient[j];
-            let (Some(hp), Some(sp), Some(sb)) =
-                (s.pin_offset(m, stub.host.1, o), s.pin_offset(j, 0, so), s.box_offset(j, so))
-            else {
-                return false;
-            };
-            let at = [&hp[0] - &sp[0], &hp[1] + &stub.rise - &sp[1]];
+            let (Some(at), Some(sb)) = (s.stub_at(j, o, so), s.box_offset(j, so)) else { return false };
             let b = shifted(&sb, &at);
             b[0].clone().max(body[0].clone()) < b[2].clone().min(body[2].clone())
                 && b[1].clone().max(body[1].clone()) < b[3].clone().min(body[3].clone())
@@ -1608,7 +1563,7 @@ fn facing(s: &Structure, at: &[[Q; 2]], ori: &[Orient], class: &FreeClass, value
                     continue;
                 }
                 let v = match &info.stub {
-                    Some(stub) if stub.host == (m, pin) => [Q::zero(), stub.rise.clone()],
+                    Some(stub) if stub.host == (m, pin) => [s.stub_run(t.0, o), stub.rise.clone()],
                     _ => match s.pin_at(at, ori, t.0, t.1) {
                         Some(q) => [&q[0] - &p[0], &q[1] - &p[1]],
                         None => continue,

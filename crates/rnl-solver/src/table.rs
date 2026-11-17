@@ -196,7 +196,7 @@ pub const LINES_ORDER_WHAT: &str = "The lines layout ranks the drawings it makes
 /// How the line layout ranks its drawings, first rank first: the outcomes of its search
 /// (`lines::settle`), then the line-layout order (`lines::quality::LabOrder`), by which it also
 /// weighs its drawing against the group-tree layout it starts from.
-pub static LINES_ORDER: [OrderRow; 19] = [
+pub static LINES_ORDER: [OrderRow; 17] = [
     OrderRow { name: "complete", fixed: true, what: "A drawing of the whole level made." },
     OrderRow { name: "facts", fixed: true, what: "Fewer kept facts broken." },
     OrderRow { name: "false_joins", fixed: true, what: "Fewer places where wires read as joined where they are not." },
@@ -217,12 +217,6 @@ pub static LINES_ORDER: [OrderRow; 19] = [
         what: "Fewer crossings and bends of the wires, weighed by lines_weights: the crossings plus four times the \
                bends by default.",
     },
-    OrderRow {
-        name: "hidden_ports",
-        fixed: false,
-        what: "Fewer ports whose way out a symbol or another net's wire shuts in.",
-    },
-    OrderRow { name: "rail_heights", fixed: false, what: "The grounds and the supplies at fewer heights." },
     OrderRow { name: "mirror_pairs", fixed: false, what: "Fewer mirror pairs off the axis they share." },
     OrderRow { name: "dots_near_pins", fixed: false, what: "Fewer junction dots less than two from a pin." },
     OrderRow { name: "length", fixed: false, what: "Shorter wires." },
@@ -354,7 +348,7 @@ pub fn settings_table() -> SettingsTable {
                 "What the line layout ranks its drawings by after the facts, the false joins, the annotations \
                  and the objectives it takes, the most important first: layers separated by commas, the items \
                  of a layer joined by +, a weight as name*2, no tolerance. The items are current, \
-                 crossings_and_bends, hidden_ports, rail_heights, mirror_pairs, dots_near_pins, length, \
+                 crossings_and_bends, mirror_pairs, dots_near_pins, length, \
                  wire_lines, symbol_lines and area; one left out does not rank, none ranks by none.",
             )
         },

@@ -81,8 +81,7 @@ and `wire_over_symbol`. For 0.4, only configured objectives rank candidates, aft
 one fixed key: false joins, the wires that run along another net's pin or through a
 symbol and so read as connected where they are not, count first, whether or not
 those objectives are configured. In the lines layout they rank right after the
-facts that must hold, above broken low-priority facts, and a stub put apart from
-another symbol is never put beyond it along the way it rises from its pin. There the
+facts that must hold, above broken low-priority facts. There the
 group tree ranks its arrangements by the line layout's own order (`lines_order` of the
 [settings table](solver-settings-table.md)): the configured objectives, then the pins
 against their CURRENT, then the crossings and bends weighed by `lines_weights` (one crossing
@@ -97,5 +96,19 @@ keep their existing gaps.
 
 The tree engine has no stage, debug, screening or planned-wire switches. It uses the
 full tree search with three straightening rounds and up to three binding releases.
-Port attachment follows pin bindings and connectivity, including netlist connections
-when nothing drawn reaches a port, without inspecting definition or device names.
+In a level of 0.4 the solver tells no supply, ground or port: the symbol a usage makes is
+an object as any other. Only the first arrangement of the tree reads one rule: the symbol
+a usage of one role makes, attached (12.1) to a terminal or a net, starts beside that
+terminal, or beside the pin of an instance or bundle on the net that a fact kept ties
+it to, else the first, on the side the pin leaves by: next to the pin's owner in the list of
+the group that owner is in, not beside the whole group. The search, the line layout, alignment,
+compaction and the order then take it as any other object, the search as an item of that list. An object whose kept facts fix one of its pins to
+another object's pin, on both axes or right above or below it at one distance (an ALIGN on x
+and DISTANCEs on y whose least and most are one), goes with that pin and is no element of
+the tree; again no name is read. The symbols of usages of one role attached to an element
+(to one of its terminals, or made in such a usage, as the ground of a stub is) make one group
+with it, and each group the element is in takes them in, so that this group nests in it. Within
+it, a symbol the facts keep above or below the pin it is attached at, with a bound on how far,
+hangs from that pin on that side, one grid unit away, and one unit beyond the pin the way the
+pin leaves when it leaves sideways, unless a fact aligns the two pins on x; one that another fact
+reaches on x does not hang. The others are items of the group's list.

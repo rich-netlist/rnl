@@ -79,11 +79,9 @@ pub const MAX_LINES_WEIGHT: u32 = 1000;
 
 /// The items by which the line layout ranks its drawings after the facts, the false joins, the
 /// annotations and the rules (`lines_order`), as [`crate::table::LINES_ORDER`] names them.
-pub const LINES_ITEMS: [&str; 10] = [
+pub const LINES_ITEMS: [&str; 8] = [
     "current",
     "crossings_and_bends",
-    "hidden_ports",
-    "rail_heights",
     "mirror_pairs",
     "dots_near_pins",
     "length",

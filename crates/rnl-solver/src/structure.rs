@@ -80,6 +80,9 @@ pub(crate) enum Role {
     Ground,
     /// One that hangs beside its pin, such as `$IO_PORT`'s ([`hang`]).
     Port,
+    /// Of a level of 0.4: a symbol of a usage that the facts kept put with a pin on another
+    /// object's pin on both axes ([`Structure::pinned`]): it goes with that pin, not as an element.
+    Pinned,
     Point,
     Text,
     /// A virtual part drawn at the point of its main object (12.1) that is none of the above.
@@ -153,16 +156,20 @@ pub(crate) struct SymbolInfo {
 
 /// A stub, such as `$GROUND_STUB` and `$SUPPLY_STUB` of the standard package: a supply or ground
 /// symbol made in a usage attached to a terminal, which hangs `rise` above the pin `host` (below for
-/// a negative `rise`), as its facts say ([`power`]).
+/// a negative `rise`), as its facts say ([`power`]), and `run` beyond it the way the pin leaves
+/// when it leaves sideways ([`Structure::stub_at`]).
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Stub {
     pub host: PinKey,
     pub rise: Q,
+    pub run: Q,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct ObjectInfo {
-    pub hung_from: Option<PinKey>,
+    /// Of a level of 0.4: the pin it starts beside in the first arrangement of the tree layout
+    /// and nowhere else ([`attach_host`]).
+    pub attach_host: Option<PinKey>,
     pub role: Role,
     pub device: Device,
     pub symbol: Option<usize>,
@@ -460,6 +467,9 @@ pub(crate) enum NodeKind {
     /// A part of a [`NodeKind::Union`]: 0 only in the first group, 1 shared, 2 only in the second.
     /// A part with the members of a node made before is that node, of its own kind.
     Part(usize, usize, u8),
+    /// Of a level of 0.4: an element of the netlist and the symbols of usages of one role attached
+    /// to it ([`attached_element`]), as one group.
+    Attached(usize),
 }
 
 /// A node of the tree of groups.
@@ -691,7 +701,7 @@ impl Structure {
     /// symbol and a place, but those that the solution leaves free.
     pub(crate) fn components(&self) -> impl Iterator<Item = usize> + '_ {
         self.objects.iter().enumerate().filter_map(|(k, o)| {
-            let component = matches!(o.role, Role::Element | Role::Supply | Role::Ground | Role::Port);
+            let component = matches!(o.role, Role::Element | Role::Supply | Role::Ground | Role::Port | Role::Pinned);
             (component && o.symbol.is_some() && !o.left_free).then_some(k)
         })
     }
@@ -701,15 +711,6 @@ impl Structure {
     /// the ROUTEs and the wires written, [`Connections`]).
     pub(crate) fn attach_pins(&self, k: usize) -> Vec<PinKey> {
         attach_pins(&self.objects, &self.connections, k)
-    }
-
-    /// A symbol reached by its netlist connections but by no drawn connection.
-    pub(crate) fn beside_by_netlist(&self, k: usize) -> bool {
-        let element = |p: &PinKey| self.objects[p.0].role == Role::Element;
-        !self.objects[k].fact_touched
-            && self.connections.targets.get(&(k, 0)).is_none_or(|t| t.is_empty())
-            && self.connections.circuit.get(&(k, 0)).is_some_and(|pins| pins.iter().any(element))
-            && !self.attach_pins(k).is_empty()
     }
 
     /// Text boxes anchored on this pin, relative to the symbol's origin.
@@ -823,6 +824,25 @@ impl Structure {
         Some([turned(o, local, 0), turned(o, local, 1)])
     }
 
+    /// Where the stub `j` goes from the origin of its host turned by `host`, itself turned by
+    /// `own`: its pin `rise` above the host's pin, and `run` beyond it the way that pin leaves
+    /// when it leaves sideways ([`Stub`]).
+    pub(crate) fn stub_at(&self, j: usize, host: Orient, own: Orient) -> Option<[Q; 2]> {
+        let stub = self.objects.get(j)?.stub.as_ref()?;
+        let (h, hp) = stub.host;
+        let (hpin, sp) = (self.pin_offset(h, hp, host)?, self.pin_offset(j, 0, own)?);
+        Some([&hpin[0] + &self.stub_run(j, host) - &sp[0], &hpin[1] + &stub.rise - &sp[1]])
+    }
+
+    /// How far the stub `j` goes beyond its host's pin on x, the host turned by `host`.
+    pub(crate) fn stub_run(&self, j: usize, host: Orient) -> Q {
+        let Some(stub) = self.objects.get(j).and_then(|o| o.stub.as_ref()) else { return Q::zero() };
+        match self.exit(stub.host.0, stub.host.1, host) {
+            Some((x, 0)) if x != 0 && !stub.run.is_zero() => int(x) * &stub.run,
+            _ => Q::zero(),
+        }
+    }
+
     /// The direction a wire leaves a pin, turned by `o`.
     pub(crate) fn exit(&self, k: usize, pin: usize, o: Orient) -> Option<(i64, i64)> {
         let (x, y) = self.pins(k).get(pin)?.dir?;
@@ -902,40 +922,46 @@ pub(crate) fn analyse(
     let witness = resolved.witness.geometry.clone();
     let kept = resolved.kept.clone();
     let mut objects = object_infos(problem, &model, &kept);
-    let mut power = power(problem, &kept, &mut objects);
+    // of a level of 0.4: the symbols of usages that the facts kept put with a pin on another
+    // object's pin on both axes go with that pin ([`Role::Pinned`]), not as elements of their own
+    let mut pinned = BTreeMap::new();
     if problem.version == "0.4" {
-        for (k, object) in objects.iter_mut().enumerate() {
-            if object.role == Role::Port && object.own {
-                object.hung_from = crate::tree_hang::host(problem, k);
+        for (k, o) in objects.iter_mut().enumerate() {
+            let usage = problem.objects.get(k).is_some_and(|x| x.kind == ObjectKind::Usage);
+            if o.role != Role::Element || o.symbol.is_none() || !usage {
+                continue;
+            }
+            if let Some(host) = crate::beside::on_pin(problem, &kept, k) {
+                o.role = Role::Pinned;
+                pinned.insert(k, host);
+            } else if let Some(stub) = exact_stub(problem, &kept, k).filter(|_| o.own) {
+                // a pin the facts put exactly above or below another's: it hangs from that pin
+                o.role = Role::Pinned;
+                o.stub = Some(stub);
             }
         }
     }
+    let power = power(problem, &kept, &mut objects);
     let mut connections = connections(problem, &model);
     if problem.version == "0.4" {
-        let untied: Vec<_> = (0..objects.len())
-            .filter(|&k| {
-                let o = &objects[k];
-                matches!(o.role, Role::Supply | Role::Ground)
-                    && o.own
-                    && !o.fact_touched
-                    && o.stub.is_none()
-                    && o.symbol.is_some()
-            })
-            .map(|k| (k, attach_pins(&objects, &connections, k)))
-            .collect();
-        for (k, pins) in untied {
-            match objects[k].role {
-                _ if pins.is_empty() => {
-                    objects[k].role = Role::Element;
-                    power.supply.retain(|&j| j != k);
-                    power.ground.retain(|&j| j != k);
-                }
-                Role::Supply => {
-                    power.supply_pins.extend(pins.iter().copied());
-                    power.supply_up.extend(pins);
-                }
-                Role::Ground => power.ground_pins.extend(pins),
-                _ => {}
+        for k in 0..objects.len() {
+            objects[k].attach_host = attach_host(problem, &kept, &objects, &connections, k);
+        }
+        // the symbols attached to an element that the facts keep above or below a pin of it hang
+        // from that pin, within the group they make with the element
+        for k in 0..objects.len() {
+            let (Some(host), Some(e)) = (objects[k].attach_host, attached_element(problem, &objects, k)) else {
+                continue;
+            };
+            if host.0 != e {
+                continue;
+            }
+            if !objects[k].own {
+                continue;
+            }
+            if let Some(stub) = bounded_stub(problem, &kept, k, host) {
+                objects[k].role = Role::Pinned;
+                objects[k].stub = Some(stub);
             }
         }
     }
@@ -956,7 +982,13 @@ pub(crate) fn analyse(
     let pairs = pairs(problem, &objects);
     let open = open(problem, resolved);
     let (tree, tree_notes, selected_groups) = if language04 {
-        crate::group_tree::analyse(problem, &elements)
+        let mut attached: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+        for &k in &elements {
+            if let Some(e) = attached_element(problem, &objects, k) {
+                attached.entry(e).or_default().push(k);
+            }
+        }
+        crate::group_tree::analyse(problem, &elements, &attached)
     } else {
         let (tree, notes) = group_tree(problem, &objects, &elements);
         (tree, notes, (0..problem.groups.len()).collect())
@@ -1048,7 +1080,6 @@ pub(crate) fn analyse(
         }
     }
     let mut pin_pairs = Vec::new();
-    let mut pinned = BTreeMap::new();
     let mut pin_texts: BTreeMap<PinKey, Vec<[Q; 4]>> = BTreeMap::new();
     if language04 {
         for &f in &kept {
@@ -1066,12 +1097,6 @@ pub(crate) fn analyse(
                     }
                 }
                 pin_pairs.push((from.object, to.object, pairs));
-            }
-        }
-        for (k, o) in objects.iter().enumerate().filter(|(_, o)| o.role != Role::Element && o.symbol.is_some()) {
-            let _ = o;
-            if let Some(host) = crate::beside::on_pin(problem, &kept, k) {
-                pinned.insert(k, host);
             }
         }
         // Main's text anchors already describe the renderer's position. Use those offsets,
@@ -1443,7 +1468,9 @@ fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<Ob
         .enumerate()
         .map(|(k, o)| {
             let own = matches!(o.position, Position::Own { .. });
-            let role = match (o.kind, hang(problem, k)) {
+            // a level of 0.4 tells no supply, ground or port: such a symbol is an object as any other
+            let hung = if problem.version == "0.4" { None } else { hang(problem, k) };
+            let role = match (o.kind, hung) {
                 (ObjectKind::Point, _) => Role::Point,
                 (ObjectKind::Annotation, _) => Role::Other,
                 (ObjectKind::Text, _) => Role::Text,
@@ -1468,7 +1495,7 @@ fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<Ob
                 oriented: o.orient.is_some(),
                 own,
                 stub: None,
-                hung_from: None,
+                attach_host: None,
                 fact_touched: touched[k][0] || touched[k][1],
                 fact_axes: touched[k],
                 left_free: false,
@@ -1538,6 +1565,112 @@ pub(crate) fn hang(problem: &LevelProblem, k: usize) -> Option<Hang> {
     }
 }
 
+/// Of a level of 0.4: where the facts kept put the pin of `k` from another object's pin, when
+/// they put it exactly: an ALIGN on x of the two pins, and DISTANCEs on y between them whose
+/// least and most are one ([`Stub`]; such as a supply or ground stub of the standard package
+/// with its gap as both, though no name is read).
+fn exact_stub(problem: &LevelProblem, kept: &[usize], k: usize) -> Option<Stub> {
+    let facts = || kept.iter().filter_map(|&f| problem.facts.get(f)).map(|f| &f.kind);
+    let pins = |refs: &[PointRef]| refs.iter().map(|r| r.pin_key()).collect::<Option<Vec<_>>>();
+    facts().find_map(|kind| {
+        let FactKind::Align { axis: Axis::X, members } = kind else { return None };
+        let [a, b] = pins(members)?.try_into().ok()?;
+        let (own, host) = if a.0 == k && b.0 != k {
+            (a, b)
+        } else if b.0 == k && a.0 != k {
+            (b, a)
+        } else {
+            return None;
+        };
+        let (Some(lo), Some(hi)) = rise_bounds(problem, kept, own, host) else { return None };
+        (lo == hi && own.1 == 0).then_some(Stub { host, rise: lo, run: Q::zero() })
+    })
+}
+
+/// How far the pin `own` rises over the pin `host` by the DISTANCEs on y between them that the
+/// facts kept hold, with a direction: at least the first, at most the second; none for a side no
+/// such fact bounds.
+fn rise_bounds(problem: &LevelProblem, kept: &[usize], own: PinKey, host: PinKey) -> (Option<Q>, Option<Q>) {
+    let pins = |refs: &[PointRef]| refs.iter().map(|r| r.pin_key()).collect::<Option<Vec<_>>>();
+    let (mut lo, mut hi): (Option<Q>, Option<Q>) = (None, None);
+    for kind in kept.iter().filter_map(|&f| problem.facts.get(f)).map(|f| &f.kind) {
+        let FactKind::Distance { axis: Axis::Y, sense, min, max, from, to } = kind else { continue };
+        let (Some(&[f]), Some(&[t])) = (pins(from).as_deref(), pins(to).as_deref()) else {
+            continue;
+        };
+        let sign = match (sense, (f, t) == (host, own), (f, t) == (own, host)) {
+            (Sense::Increasing, true, _) | (Sense::Decreasing, _, true) => 1,
+            (Sense::Decreasing, true, _) | (Sense::Increasing, _, true) => -1,
+            _ => continue,
+        };
+        let (least, most) = (min.and_then(from_f64), max.and_then(from_f64));
+        let (low, high) = if sign > 0 { (least, most) } else { (most.map(|m| -m), least.map(|m| -m)) };
+        if let Some(v) = low {
+            lo = Some(lo.map_or(v.clone(), |l| if v > l { v.clone() } else { l }));
+        }
+        if let Some(v) = high {
+            hi = Some(hi.map_or(v.clone(), |h| if v < h { v.clone() } else { h }));
+        }
+    }
+    (lo, hi)
+}
+
+/// Of a level of 0.4: a symbol attached to an element ([`attached_element`]) at the pin `host` of
+/// that element, which the facts kept keep on one side of the pin's height, above or below, with
+/// a bound on how far: it hangs from that pin `ATTACH_GAP` that way, or as near as the bounds
+/// allow, and `ATTACH_GAP` beyond the pin when the pin leaves sideways; as the symbols attached to
+/// an element are laid out within the group they make with it, on the side their facts put them.
+fn bounded_stub(problem: &LevelProblem, kept: &[usize], k: usize, host: PinKey) -> Option<Stub> {
+    let (lo, hi) = rise_bounds(problem, kept, (k, 0), host);
+    let gap = int(crate::search::ATTACH_GAP);
+    let rise = match (lo, hi) {
+        (Some(lo), hi) if !lo.is_negative() => {
+            let up = hi.map_or(gap.clone(), |h| if gap > h { h } else { gap.clone() });
+            if up < lo {
+                lo
+            } else {
+                up
+            }
+        }
+        (lo, Some(hi)) if !hi.is_positive() => {
+            let down = lo.map_or(-gap.clone(), |l| if -gap.clone() < l { l } else { -gap.clone() });
+            if down > hi {
+                hi
+            } else {
+                down
+            }
+        }
+        _ => return None,
+    };
+    // the facts kept on x: an ALIGN of the two pins keeps the symbol right above or below the
+    // pin; any other fact that reaches the symbol on x is left to hold, as it would not here
+    let on_x = |r: &PointRef| match r {
+        PointRef::Origin(o) => *o == k,
+        PointRef::Centre(rs) => {
+            rs.iter().any(|r| r.pin_key().is_some_and(|p| p.0 == k) || matches!(r, PointRef::Origin(o) if *o == k))
+        }
+        _ => r.pin_key().is_some_and(|p| p.0 == k),
+    };
+    let mut aligned = false;
+    for kind in kept.iter().filter_map(|&f| problem.facts.get(f)).map(|f| &f.kind) {
+        match kind {
+            FactKind::Align { axis: Axis::X, members } if members.iter().any(on_x) => {
+                let pins: Vec<Option<PinKey>> = members.iter().map(|r| r.pin_key()).collect();
+                if pins.len() == 2 && pins.contains(&Some((k, 0))) && pins.contains(&Some(host)) {
+                    aligned = true;
+                } else {
+                    return None;
+                }
+            }
+            FactKind::Distance { axis: Axis::X, from, to, .. } if from.iter().chain(to).any(on_x) => return None,
+            FactKind::Place { at, axis: Axis::X, .. } if on_x(at) => return None,
+            _ => {}
+        }
+    }
+    let run = if aligned { Q::zero() } else { gap };
+    (!rise.is_zero()).then_some(Stub { host, rise, run })
+}
+
 /// How far above the pin `host` the pin of stub `k` is, as a fact kept says: a DISTANCE on y
 /// between the two pins with a direction and a least gap (14.5), such as the one the stubs of the
 /// standard package hold themselves by; none without such a fact.
@@ -1563,6 +1696,95 @@ fn stub_rise(problem: &LevelProblem, kept: &[usize], k: usize, host: PinKey) -> 
             None
         }
     })
+}
+
+/// The pin that an object a usage of one role makes, attached (12.1) to a terminal or a net,
+/// starts beside in the first arrangement of the tree layout: the terminal, or of the net's pins
+/// of instances and bundles the one a fact kept (an ALIGN, a DISTANCE) ties a pin of the object
+/// to, else the first. Only that arrangement reads it; the search,
+/// the lines, the alignments, compaction and the order take the object as any other.
+/// Of a level of 0.4: the element of the netlist that the symbol `k` is attached to, as the user
+/// wrote it: the symbol of a usage of one role, attached (12.1) to a terminal or pin of an
+/// instance or bundle, or made in a usage of one role so attached, such as the ground of
+/// `$GROUND_STUB`, attached to the net of the terminal its usage is attached to. One attached to a
+/// net that no usage of one role around it ties to a terminal, such as a label on a net, has none.
+pub(crate) fn attached_element(problem: &LevelProblem, objects: &[ObjectInfo], k: usize) -> Option<usize> {
+    let o = objects.get(k)?;
+    let object = problem.objects.get(k)?;
+    if o.role != Role::Element || o.symbol.is_none() || object.kind != ObjectKind::Usage {
+        return None;
+    }
+    let mut usage = problem.usages.get(object.usage?)?;
+    if usage.object != Some(k) {
+        return None;
+    }
+    loop {
+        let [role] = usage.roles.as_slice() else { return None };
+        let [member] = role.members.as_slice() else { return None };
+        match member {
+            Filler::Terminal { object, .. } | Filler::Pin { object, .. } => {
+                let element = objects.get(*object).is_some_and(|x| x.role == Role::Element)
+                    && problem
+                        .objects
+                        .get(*object)
+                        .is_some_and(|x| matches!(x.kind, ObjectKind::Instance | ObjectKind::Bundle));
+                return element.then_some(*object);
+            }
+            Filler::Net(_) => usage = problem.usages.get(usage.parent?)?,
+            _ => return None,
+        }
+    }
+}
+
+fn attach_host(
+    problem: &LevelProblem,
+    kept: &[usize],
+    objects: &[ObjectInfo],
+    connections: &Connections,
+    k: usize,
+) -> Option<PinKey> {
+    let o = &objects[k];
+    let object = problem.objects.get(k)?;
+    if o.role != Role::Element || !o.own || o.symbol.is_none() || object.kind != ObjectKind::Usage {
+        return None;
+    }
+    let usage = problem.usages.get(object.usage?)?;
+    let ([role], Some(true)) = (usage.roles.as_slice(), usage.object.map(|j| j == k)) else { return None };
+    let [member] = role.members.as_slice() else { return None };
+    let of_netlist = |p: &PinKey| {
+        objects.get(p.0).is_some_and(|o| o.role == Role::Element)
+            && problem.objects.get(p.0).is_some_and(|o| matches!(o.kind, ObjectKind::Instance | ObjectKind::Bundle))
+    };
+    match member {
+        Filler::Terminal { object, pin: Some(pin), .. } | Filler::Pin { object, pin } => {
+            Some((*object, *pin)).filter(of_netlist)
+        }
+        Filler::Net(n) => {
+            let mut pins: Vec<PinKey> =
+                connections.nets.iter().find(|x| x.name == *n)?.pins.iter().copied().filter(of_netlist).collect();
+            pins.sort_unstable();
+            // the pin of the net that a fact kept ties a pin of the object to, else the first
+            let pin_of = |r: &PointRef| match r {
+                PointRef::Pin { object, pin, .. }
+                | PointRef::SymbolPin { object, pin, .. }
+                | PointRef::PinPosition { object, pin, .. } => Some((*object, *pin)),
+                _ => None,
+            };
+            let tied = |p: &PinKey| {
+                kept.iter().any(|&f| {
+                    let refs: Vec<&PointRef> = match problem.facts.get(f).map(|x| &x.kind) {
+                        Some(FactKind::Align { members, .. }) => members.iter().collect(),
+                        Some(FactKind::Distance { from, to, .. }) => from.iter().chain(to).collect(),
+                        _ => return false,
+                    };
+                    refs.iter().any(|r| pin_of(r) == Some(*p))
+                        && refs.iter().any(|r| pin_of(r).is_some_and(|q| q.0 == k))
+                })
+            };
+            pins.iter().copied().find(|p| tied(p)).or_else(|| pins.first().copied())
+        }
+        _ => None,
+    }
 }
 
 /// The supply and ground symbols ([`Role::Supply`], [`Role::Ground`]: those that hang above and
@@ -1619,7 +1841,7 @@ fn power(problem: &LevelProblem, kept: &[usize], objects: &mut [ObjectInfo]) -> 
         let rise = stub_rise(problem, kept, k, host).unwrap_or_else(|| if supply { gap } else { -gap });
         let rises = rise.is_positive();
         if let Some(o) = objects.get_mut(k) {
-            o.stub = Some(Stub { host, rise });
+            o.stub = Some(Stub { host, rise, run: Q::zero() });
         }
         if rises {
             p.supply_pins.insert(host);
@@ -2035,7 +2257,7 @@ fn group_tree(problem: &LevelProblem, objects: &[ObjectInfo], elements: &[usize]
 fn scopes(problem: &LevelProblem, objects: &[ObjectInfo], selected: &[usize]) -> Vec<Vec<usize>> {
     let component = |k: usize| {
         let o = &objects[k];
-        matches!(o.role, Role::Element | Role::Supply | Role::Ground | Role::Port) && o.symbol.is_some()
+        matches!(o.role, Role::Element | Role::Supply | Role::Ground | Role::Port | Role::Pinned) && o.symbol.is_some()
     };
     let owner = |k: usize| objects[k].stub.as_ref().map_or(k, |s| s.host.0);
     let mut out = Vec::new();
@@ -2117,7 +2339,9 @@ fn even_sets(problem: &LevelProblem, s: &Structure) -> Vec<Vec<usize>> {
         let ends = net
             .pins
             .iter()
-            .filter(|(k, _)| s.objects.get(*k).is_some_and(|o| matches!(o.role, Role::Element | Role::Port)))
+            .filter(|(k, _)| {
+                s.objects.get(*k).is_some_and(|o| matches!(o.role, Role::Element | Role::Port | Role::Pinned))
+            })
             .count();
         if ends >= 3 {
             NetRole::Node

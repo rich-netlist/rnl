@@ -25,11 +25,20 @@ fn root(elements: &[usize]) -> GroupTree {
 
 #[cfg(test)]
 fn from_problem(problem: &LevelProblem, elements: &[usize]) -> (GroupTree, Vec<String>) {
-    let (tree, notes, _) = analyse(problem, elements);
+    let (tree, notes, _) = analyse(problem, elements, &BTreeMap::new());
     (tree, notes)
 }
 
-pub(crate) fn analyse(problem: &LevelProblem, elements: &[usize]) -> (GroupTree, Vec<String>, Vec<usize>) {
+/// `attached`: of a level of 0.4, each element of the netlist with the symbols of usages of one role
+/// attached to it ([`crate::structure::attached_element`]). Each such element and its symbols are
+/// one group of its own ([`NodeKind::Attached`]), and each group the element is in takes its
+/// symbols in too, so that the group of the element nests in it; a group that would then cross
+/// another keeps the members it was given.
+pub(crate) fn analyse(
+    problem: &LevelProblem,
+    elements: &[usize],
+    attached: &BTreeMap<usize, Vec<usize>>,
+) -> (GroupTree, Vec<String>, Vec<usize>) {
     let fallback = || {
         (root(elements), vec!["group search stopped at the shared budget; using one layout block".into()], Vec::new())
     };
@@ -68,25 +77,64 @@ pub(crate) fn analyse(problem: &LevelProblem, elements: &[usize]) -> (GroupTree,
     // otherwise disjoint element groups cross. Projection can then make nested sets equal.
     let mut selected = taken.clone();
     selected.sort_unstable();
-    let mut sets = BTreeMap::new();
-    let mut projected = Vec::new();
+    let mut sets: Vec<(NodeKind, BTreeSet<usize>)> = Vec::new();
     for g in taken {
         let set: BTreeSet<_> = declarations[g].members.intersection(&all).copied().collect();
-        if set.len() >= 2 && !projected.iter().any(|t| sets[t] == set) {
-            sets.insert(g, set);
-            projected.push(g);
+        if set.len() >= 2 && !sets.iter().any(|(_, t)| *t == set) {
+            sets.push((NodeKind::Group(g), set));
         }
     }
-    projected.sort_by_key(|g| (std::cmp::Reverse(sets[g].len()), *g));
-    let placed: Vec<&BTreeSet<usize>> = projected.iter().map(|g| &sets[g]).collect();
+    // the symbols attached to an element go into each group the element is in, where that
+    // crosses no other group: the larger groups first, and again until none changes, so that an
+    // inner group is widened after the group round it; a group made equal to another goes
+    let crosses = |a: &BTreeSet<usize>, b: &BTreeSet<usize>| !a.is_disjoint(b) && !a.is_subset(b) && !b.is_subset(a);
+    let mut changed = true;
+    while changed {
+        changed = false;
+        let mut order: Vec<usize> = (0..sets.len()).collect();
+        order.sort_by_key(|&i| std::cmp::Reverse(sets[i].1.len()));
+        for i in order {
+            let mut wider = sets[i].1.clone();
+            for (e, symbols) in attached {
+                if wider.contains(e) {
+                    wider.extend(symbols.iter().copied().filter(|k| all.contains(k)));
+                }
+            }
+            if wider != sets[i].1 && !sets.iter().enumerate().any(|(j, (_, t))| j != i && crosses(&wider, t)) {
+                sets[i].1 = wider;
+                changed = true;
+            }
+        }
+    }
+    let mut unique: Vec<(NodeKind, BTreeSet<usize>)> = Vec::new();
+    for (kind, set) in sets {
+        if !unique.iter().any(|(_, t)| *t == set) {
+            unique.push((kind, set));
+        }
+    }
+    let mut sets = unique;
+    for (e, symbols) in attached {
+        let set: BTreeSet<usize> =
+            std::iter::once(*e).chain(symbols.iter().copied()).filter(|k| all.contains(k)).collect();
+        if set.len() >= 2 && !sets.iter().any(|(_, t)| *t == set || crosses(&set, t)) {
+            sets.push((NodeKind::Attached(*e), set));
+        }
+    }
+    let rank = |kind: &NodeKind| match kind {
+        NodeKind::Group(g) => (0, *g),
+        NodeKind::Attached(e) => (1, *e),
+        _ => (2, 0),
+    };
+    sets.sort_by(|a, b| b.1.len().cmp(&a.1.len()).then_with(|| rank(&a.0).cmp(&rank(&b.0))));
+    let placed: Vec<&BTreeSet<usize>> = sets.iter().map(|(_, s)| s).collect();
     let Some(parents) = nest(&placed, &mut permit) else {
         return fallback();
     };
     let mut tree = root(elements);
-    for (i, &g) in projected.iter().enumerate() {
+    for (i, (kind, set)) in sets.iter().enumerate() {
         tree.nodes.push(GroupNode {
-            kind: NodeKind::Group(g),
-            members: sets[&g].iter().copied().collect(),
+            kind: kind.clone(),
+            members: set.iter().copied().collect(),
             children: Vec::new(),
             own: Vec::new(),
             fixed_order: false,
@@ -167,6 +215,42 @@ mod tests {
         let (tree, notes) = from_problem(&p, &[0, 1, 2, 3]);
         assert_eq!(notes.len(), 1);
         assert_eq!(tree, root(&[0, 1, 2, 3]));
+    }
+
+    /// The symbols attached to an element make one group with it, and each group the element is
+    /// in takes them in: B and C attached to A, with {A D} declared, give {A B C} within {A B C D}.
+    #[test]
+    fn symbols_attached_to_an_element_group_with_it_within_its_groups() {
+        let mut p = problem_of((0..5).map(|_| instance()).collect(), vec![]);
+        p.groups = vec![group(0, true, "g", &[0, 3])];
+        let attached = BTreeMap::from([(0, vec![1, 2])]);
+        let (tree, _, _) = analyse(&p, &[0, 1, 2, 3, 4], &attached);
+        let node = |kind: NodeKind| tree.nodes.iter().position(|n| n.kind == kind).unwrap();
+        let (outer, inner) = (node(NodeKind::Group(0)), node(NodeKind::Attached(0)));
+        assert_eq!(tree.nodes[outer].members, vec![0, 1, 2, 3]);
+        assert_eq!(tree.nodes[inner].members, vec![0, 1, 2]);
+        assert_eq!(tree.nodes[outer].children, vec![inner]);
+        assert_eq!(tree.nodes[outer].own, vec![3]);
+        assert_eq!(tree.nodes[0].own, vec![4]);
+    }
+
+    /// An inner group takes the attached symbols after the group round it has, whatever the order
+    /// of the declarations; and two groups made equal by them are one node.
+    #[test]
+    fn attached_symbols_widen_nested_groups_from_the_outside_and_equal_groups_merge() {
+        let mut p = problem_of((0..5).map(|_| instance()).collect(), vec![]);
+        let attached = BTreeMap::from([(0, vec![1])]);
+        p.groups = vec![group(0, true, "outer", &[0, 3, 4]), group(1, true, "inner", &[0, 3])];
+        let (tree, _, _) = analyse(&p, &[0, 1, 2, 3, 4], &attached);
+        let members = |kind: NodeKind| tree.nodes.iter().find(|n| n.kind == kind).map(|n| n.members.clone());
+        assert_eq!(members(NodeKind::Group(0)), Some(vec![0, 1, 3, 4]));
+        assert_eq!(members(NodeKind::Group(1)), Some(vec![0, 1, 3]));
+        assert_eq!(members(NodeKind::Attached(0)), Some(vec![0, 1]));
+        p.groups = vec![group(0, true, "a", &[0, 2]), group(1, true, "b", &[0, 1, 2])];
+        let (tree, _, _) = analyse(&p, &[0, 1, 2, 3, 4], &attached);
+        let sets: Vec<&Vec<usize>> = tree.nodes[1..].iter().map(|n| &n.members).collect();
+        assert_eq!(sets.iter().filter(|m| ***m == vec![0, 1, 2]).count(), 1, "{sets:?}");
+        assert_eq!(tree.nodes[0].own, vec![3, 4]);
     }
 
     #[test]

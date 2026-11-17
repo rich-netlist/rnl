@@ -6,7 +6,7 @@ use rnl_runtime::problem::{Axis, FactKind, LevelProblem, PointRef};
 
 use crate::coords::Placed;
 use crate::rational::{int, to_f64};
-use crate::structure::{Role, Structure};
+use crate::structure::Structure;
 
 use super::settle::GroupSettled;
 
@@ -48,7 +48,6 @@ pub(crate) fn open_orders(
     s: &Structure,
     groups: &[GroupSettled],
     placed: &Placed,
-    aligned: &[(usize, (usize, usize))],
 ) -> Vec<String> {
     if !crate::budget::permit(crate::budget::Step::Structure, problem.facts.len()) {
         return Vec::new();
@@ -172,25 +171,13 @@ pub(crate) fn open_orders(
         }
         orders.push(AxisOrder { class, after, fixed });
     }
-    let name = |k: usize| -> String {
-        if s.objects[k].role == Role::Port {
-            if let Some(net) = s.ports.iter().find(|p| p.object == k).and_then(|p| p.net.clone()) {
-                return net;
-            }
-        }
-        problem.objects[k].label.trim_start_matches('#').to_string()
-    };
-    let pin_name = |(k, p): (usize, usize)| -> String {
-        let terminal = s.pins(k).get(p).and_then(|x| x.terminals.first().cloned()).unwrap_or_else(|| p.to_string());
-        format!("{}:{terminal}", name(k))
-    };
+    let name = |k: usize| -> String { problem.objects[k].label.trim_start_matches('#').to_string() };
     let mid = |k: usize| -> Option<(f64, f64)> {
         let b = s.box_at(&placed.origins, &placed.geometry.orient, k)?;
         let m = |i: usize, j: usize| to_f64(&((&b[i] + &b[j]) / int(2)));
         Some((m(0, 2), m(1, 3)))
     };
     let axes_of = |k: usize| -> Vec<usize> { (0..2).filter(|&a| touched[a].contains(&k)).collect() };
-    let aligned_to = |k: usize| aligned.iter().find(|(p, _)| *p == k).map(|(_, pin)| pin_name(*pin));
     let top_down = |ks: &[usize]| -> String {
         let mut v = ks.to_vec();
         v.sort_by(|&a, &b| {
@@ -232,18 +219,15 @@ pub(crate) fn open_orders(
         let head = format!("lines: an order the facts leave open, {}:", g.name);
         let none: Vec<usize> = in_pairs.iter().copied().filter(|&k| axes_of(k).is_empty()).collect();
         if !none.is_empty() {
-            let set: Vec<String> =
-                none.iter().filter_map(|&k| aligned_to(k).map(|p| format!("{} on the line of {p}", name(k)))).collect();
             out.push(format!(
-                "{head} {} {} no fact on where {}: the solver put {} left to right {}, top to bottom {}{}; to fix them, \
+                "{head} {} {} no fact on where {}: the solver put {} left to right {}, top to bottom {}; to fix them, \
                  say which side of what each is and what it is level with",
                 none.iter().map(|&k| name(k)).collect::<Vec<_>>().join(", "),
                 if none.len() == 1 { "has" } else { "have" },
                 if none.len() == 1 { "it is" } else { "they are" },
                 if none.len() == 1 { "it" } else { "them" },
                 left_right(&none),
-                top_down(&none),
-                if set.is_empty() { String::new() } else { format!(" ({})", set.join(", ")) }
+                top_down(&none)
             ));
         }
         for a in 0..2 {
@@ -254,25 +238,16 @@ pub(crate) fn open_orders(
             let (given, open) =
                 if a == 0 { ("left and right", "up and down") } else { ("up and down", "left and right") };
             let other = if a == 0 { "y" } else { "x" };
-            let set: Vec<(usize, String)> = ks.iter().filter_map(|&k| aligned_to(k).map(|p| (k, p))).collect();
-            let loose: Vec<usize> = ks.iter().copied().filter(|k| !set.iter().any(|(j, _)| j == k)).collect();
-            let mut chose: Vec<String> = set.iter().map(|(k, p)| format!("{} on the line of {p}", name(*k))).collect();
-            if loose.len() > 1 {
-                chose.push(if a == 0 {
-                    format!("top to bottom {}", top_down(&loose))
-                } else {
-                    format!("left to right {}", left_right(&loose))
-                });
-            } else if let Some(&k) = loose.first() {
-                chose.push(format!("{} where the table put it", name(k)));
-            }
-            let example =
-                set.first().map_or_else(String::new, |(k, p)| format!("ALIGN({other}) {} {p}, or ", name(*k)));
+            let chose = match ks.as_slice() {
+                [k] => format!("{} where the table put it", name(*k)),
+                _ if a == 0 => format!("top to bottom {}", top_down(&ks)),
+                _ => format!("left to right {}", left_right(&ks)),
+            };
             out.push(format!(
-                "{head} {} {} facts {given} only, none {open}: the solver chose {}; to fix them, add {example}an ORDER on {other}",
+                "{head} {} {} facts {given} only, none {open}: the solver chose {}; to fix them, add an ORDER on {other}",
                 ks.iter().map(|&k| name(k)).collect::<Vec<_>>().join(", "),
                 if ks.len() == 1 { "has" } else { "have" },
-                chose.join(", ")
+                chose
             ));
         }
         let placed = |k: usize| orders[0].fixed.contains(&k) && orders[1].fixed.contains(&k);

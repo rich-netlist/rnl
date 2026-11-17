@@ -1,7 +1,7 @@
 //! Exact quality ordering for completed line-layout candidates.
 //! An interrupted measurement cannot rank ahead of a completed drawing.
 
-use super::{axis, current, dots, port, supply};
+use super::{axis, current, dots, reads, virtuals};
 use crate::budget::{permit, Step};
 use crate::coords::Placed;
 use crate::rational::{int, Q};
@@ -18,8 +18,6 @@ pub(super) struct LabOrder {
     pub(super) annotation_cost: (usize, usize),
     pub(super) current: usize,
     pub(super) cb: u64,
-    pub(super) hidden: usize,
-    pub(super) levels: usize,
     pub(super) off_axis: usize,
     pub(super) near_dots: usize,
     pub(super) length: Q,
@@ -33,7 +31,7 @@ pub(super) struct LabOrder {
     /// as the tree's rank has them; measured for a whole level only.
     pub(super) rules: Vec<Q>,
     /// The rows and columns of the symbols, one only virtual symbols take counting
-    /// `virtual_weight` ([`supply::weighed_lines`]).
+    /// `virtual_weight` ([`virtuals::weighed_lines`]).
     pub(super) crosses_weighed: Q,
     /// The layers of `lines_order`, each the weighted sum of its items ([`Ranking`]).
     pub(super) quality: Vec<Q>,
@@ -45,8 +43,6 @@ pub(super) struct LabOrder {
 pub(crate) enum Item {
     Current,
     CrossingsAndBends,
-    HiddenPorts,
-    RailHeights,
     MirrorPairs,
     DotsNearPins,
     Length,
@@ -61,8 +57,6 @@ impl Item {
         Some(match name {
             "current" => Item::Current,
             "crossings_and_bends" => Item::CrossingsAndBends,
-            "hidden_ports" => Item::HiddenPorts,
-            "rail_heights" => Item::RailHeights,
             "mirror_pairs" => Item::MirrorPairs,
             "dots_near_pins" => Item::DotsNearPins,
             "length" => Item::Length,
@@ -125,8 +119,6 @@ impl LabOrder {
         match item {
             Item::Current => count(self.current),
             Item::CrossingsAndBends => int(self.cb as i64),
-            Item::HiddenPorts => count(self.hidden),
-            Item::RailHeights => count(self.levels),
             Item::MirrorPairs => count(self.off_axis),
             Item::DotsNearPins => count(self.near_dots),
             Item::Length => self.length.clone(),
@@ -170,8 +162,6 @@ impl LabOrder {
             annotation_cost: (0, 0),
             current: 0,
             cb: 0,
-            hidden: 0,
-            levels: 0,
             off_axis: 0,
             near_dots: 0,
             length: int(0),
@@ -188,7 +178,7 @@ impl LabOrder {
     }
     pub(super) fn said(&self) -> String {
         format!(
-            "{}{} × {} + {} × {} = {}, {}{}{}{}length {}, {} lines of the wires, {} crosses of the symbols, area {}",
+            "{}{} × {} + {} × {} = {}, {}{}length {}, {} lines of the wires, {} crosses of the symbols, area {}",
             if self.current > 0 {
                 format!("{} the current marks left across it, ", crate::driver::count(self.current, "pin"))
             } else {
@@ -199,16 +189,6 @@ impl LabOrder {
             self.weights.1,
             self.bends,
             self.cb,
-            if self.hidden > 0 {
-                format!("{} hidden, ", crate::driver::count(self.hidden, "port"))
-            } else {
-                String::new()
-            },
-            if self.levels > 0 {
-                format!("{} of the grounds and the supplies beyond one, ", crate::driver::count(self.levels, "height"))
-            } else {
-                String::new()
-            },
             if self.off_axis > 0 {
                 format!("{} off the axis they share, ", crate::driver::count(self.off_axis, "mirror pair"))
             } else {
@@ -346,7 +326,7 @@ pub(super) fn lab_measure(
     let reads = |k: usize| within.is_none_or(|w| w.contains(&k));
     let mut written: Vec<PathEnds<Vec<[Q; 2]>>> = Vec::new();
     for (w, wire) in problem.wires.iter().enumerate() {
-        if !wire.anchors.iter().all(|r| port::reads_reference(r, &reads)) {
+        if !wire.anchors.iter().all(|r| reads::reads_reference(r, &reads)) {
             continue;
         }
         let path = match crate::route::written_path(problem, g, w) {
@@ -483,7 +463,7 @@ pub(super) fn lab_measure(
     let mut crosses = (BTreeSet::new(), BTreeSet::new());
     // below a weight of 1, each row and column by whether a symbol other than a virtual one takes it
     let virtuals = (ranking.virtual_weight != int(1) && ranking.takes(Item::SymbolLines))
-        .then(|| supply::virtual_symbols(problem, s));
+        .then(|| virtuals::virtual_symbols(problem, s));
     let mut firm: (std::collections::BTreeMap<Q, bool>, std::collections::BTreeMap<Q, bool>) = Default::default();
     for k in s.components().filter(|&k| reads(k)) {
         let o = &placed.origins[k];
@@ -506,17 +486,15 @@ pub(super) fn lab_measure(
     let crosses_weighed = match &virtuals {
         None => int((crosses.0.len() + crosses.1.len()) as i64),
         Some(_) => {
-            supply::weighed_lines(&firm.0, &ranking.virtual_weight)
-                + supply::weighed_lines(&firm.1, &ranking.virtual_weight)
+            virtuals::weighed_lines(&firm.0, &ranking.virtual_weight)
+                + virtuals::weighed_lines(&firm.1, &ranking.virtual_weight)
         }
     };
     let mut result = LabOrder {
         interrupted: false,
         annotation_cost,
         current: current::against(s, placed, within),
-        hidden: port::hidden(problem, s, placed, routing, within).len(),
         cb: weights.0 * crossings + weights.1 * bends,
-        levels: supply::levels(s, placed, within),
         off_axis: axis::off_axis(s, placed, within),
         near_dots: dots::near_pins(problem, s, placed, routing, within),
         lines: xs.len() + ys.len(),
@@ -570,8 +548,6 @@ mod tests {
         match item {
             Item::Current => l.current = n,
             Item::CrossingsAndBends => l.cb = v as u64,
-            Item::HiddenPorts => l.hidden = n,
-            Item::RailHeights => l.levels = n,
             Item::MirrorPairs => l.off_axis = n,
             Item::DotsNearPins => l.near_dots = n,
             Item::Length => l.length = int(v),
@@ -584,8 +560,7 @@ mod tests {
     }
 
     /// Each item ranks while `lines_order` takes it and not once it is left out; `none` ranks by
-    /// none of them. By default the hidden ports, the heights of the grounds and supplies, the mirror
-    /// pairs and the dots near pins do not rank.
+    /// none of them. By default the mirror pairs and the dots near pins do not rank.
     #[test]
     fn each_item_ranks_only_while_lines_order_takes_it() {
         let d = Ranking::default();
@@ -594,7 +569,7 @@ mod tests {
         for name in crate::LINES_ITEMS {
             let item = Item::from_name(name).unwrap();
             assert!(drawing(item, 1, &all) > drawing(item, 0, &all), "{name}");
-            let off = [Item::HiddenPorts, Item::RailHeights, Item::MirrorPairs, Item::DotsNearPins];
+            let off = [Item::MirrorPairs, Item::DotsNearPins];
             assert_eq!(d.takes(item), !off.contains(&item), "{name}");
             let alone = ranking(&format!("lines_order=\"{name}\""));
             assert_eq!(drawing(item, 1, &alone).quality(), [int(1)], "{name}");
@@ -610,22 +585,22 @@ mod tests {
         assert!(drawing(Item::CrossingsAndBends, 9, &none).quality().is_empty());
     }
 
-    /// The layers rank in the order `lines_order` gives: a hidden port before dots near pins in one
-    /// order, after them when the order is turned.
+    /// The layers rank in the order `lines_order` gives: a mirror pair off its axis before dots near
+    /// pins in one order, after them when the order is turned.
     #[test]
     fn the_layers_rank_in_the_order_given() {
         let both = |r: &Ranking| {
-            let mut a = drawing(Item::HiddenPorts, 1, r);
+            let mut a = drawing(Item::MirrorPairs, 1, r);
             a.near_dots = 0;
             let mut b = drawing(Item::DotsNearPins, 3, r);
-            b.hidden = 0;
+            b.off_axis = 0;
             a.rank_by(r);
             b.rank_by(r);
             (a, b)
         };
-        let (a, b) = both(&ranking("lines_order=\"hidden_ports,dots_near_pins\""));
+        let (a, b) = both(&ranking("lines_order=\"mirror_pairs,dots_near_pins\""));
         assert!(a > b);
-        let (a, b) = both(&ranking("lines_order=\"dots_near_pins,hidden_ports\""));
+        let (a, b) = both(&ranking("lines_order=\"dots_near_pins,mirror_pairs\""));
         assert!(a < b);
     }
 
@@ -651,13 +626,11 @@ mod tests {
     }
 
     /// A row or column of the symbols that only a virtual symbol takes counts `virtual_weight`:
-    /// the fixture's port, the object of a usage, takes a column of its own.
+    /// the fixture's first object, made the object of a usage, takes a column of its own.
     #[test]
     fn a_line_only_virtual_symbols_take_counts_the_virtual_weight() {
-        let (mut p, s, placed, routing) = port::tests::fixture();
-        for k in s.components().filter(|&k| s.objects[k].role == crate::structure::Role::Port) {
-            p.objects[k].kind = rnl_runtime::problem::ObjectKind::Usage;
-        }
+        let (mut p, s, placed, routing) = reads::tests::fixture();
+        p.objects[0].kind = rnl_runtime::problem::ObjectKind::Usage;
         let at = |w: &str| lab_order(&p, &s, &placed, &routing, &ranking(&format!("virtual_weight={w}")), None);
         let (half, one, none) = (at("0.5"), at("1"), at("0"));
         assert_eq!(half.crosses, one.crosses);
@@ -676,7 +649,7 @@ mod tests {
     #[test]
     fn an_x_counts_one_crossing_and_two_bends() {
         use rnl_runtime::solution::{RoutedWire, WirePoint};
-        let (p, s, placed, routing) = port::tests::fixture();
+        let (p, s, placed, routing) = reads::tests::fixture();
         let with = |paths: [[[i64; 2]; 4]; 2]| {
             let mut r = routing.clone();
             for (route, path) in paths.into_iter().enumerate() {
@@ -697,12 +670,11 @@ mod tests {
 
     #[test]
     fn interrupted_measurements_never_beat_completed_drawings_and_replay_exactly() {
-        let (p, s, placed, routing) = port::tests::fixture();
+        let (p, s, placed, routing) = reads::tests::fixture();
         let run = || lab_order(&p, &s, &placed, &routing, &Ranking::default(), None);
         let full = run();
         assert!(!full.interrupted);
         assert_eq!(full.cb, full.crossings + 4 * full.bends);
-        assert_eq!(full.hidden, 1);
         let mut interrupted = false;
         let mut complete = false;
         for seconds in 0..80 {

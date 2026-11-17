@@ -1759,6 +1759,50 @@ fn a_wire_between_two_rows_crosses_no_lead_of_a_stub() {
     }
 }
 
+/// A stub that the facts kept put exactly on a pin's line, at one rise (an ALIGN on x of the two
+/// pins and DISTANCEs on y whose least and most are one), hangs from that pin as a usage pinned
+/// to it, whatever its name, right above it; with a least rise alone, it hangs from it too, as a
+/// symbol attached to the element, right above it too while a fact aligns the two pins on x.
+#[test]
+fn a_stub_held_at_one_rise_hangs_from_its_pin() {
+    let text = "* ex
+* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }
+                .model pch pmos level=1
+M1 out in vdd vdd pch
+* @RNL { &vdd @ADD-TO $SUPPLY_NET_SET }
+.end
+";
+    let structure = |p: &LevelProblem| {
+        let options = SolverOptions::without_time_limit();
+        let resolved = crate::resolve(p, &options);
+        crate::structure::analyse(p, &resolved, &options, CAPS, &mut crate::Work::default())
+    };
+    let mut p = problems_of(text).into_iter().next().unwrap();
+    let s = structure(&p);
+    assert!(s.language04);
+    let bounded: Vec<&crate::structure::Stub> = s.objects.iter().filter_map(|o| o.stub.as_ref()).collect();
+    assert!(!bounded.is_empty() && bounded.iter().all(|stub| stub.run.is_zero()));
+    // the least rise of each stub made its most too
+    let mut bounded = 0;
+    for f in &mut p.facts {
+        if let FactKind::Distance { axis: Axis::Y, min: Some(min), max, .. } = &mut f.kind {
+            *max = Some(*min);
+            bounded += 1;
+        }
+    }
+    assert!(bounded > 0);
+    let s = structure(&p);
+    let m1 = p.objects.iter().position(|o| o.label == "#M1").unwrap();
+    let stubs: Vec<usize> = (0..p.objects.len()).filter(|&k| s.objects[k].stub.is_some()).collect();
+    assert!(!stubs.is_empty());
+    for k in stubs {
+        let stub = s.objects[k].stub.as_ref().unwrap();
+        assert_eq!((s.objects[k].role, stub.host.0), (Role::Pinned, m1), "{}", p.objects[k].label);
+        assert!(stub.rise > Q::zero(), "{}: {}", p.objects[k].label, stub.rise);
+        assert!(stub.run.is_zero(), "{}", p.objects[k].label);
+    }
+}
+
 /// The structure of the level with a title of a case of the solver, not solved.
 fn case_structure(file: &str, title: &str) -> (LevelProblem, Structure) {
     let ps = problems(&repo().join("tests/integration/solver").join(file));
@@ -2466,15 +2510,24 @@ fn a_stub_text_over_its_host_text_counts_among_the_texts_over_texts() {
     let (s, g) = (&e.structure, &e.placed.geometry);
     assert!(s.language04, "{what}");
     let texts = |k: usize| s.text_offsets_each(&p, g, k);
+    // a stub: the object of a usage made in one that attaches to a pin, the host's
+    let stub_host = |k: usize| {
+        let parent = &p.usages[p.usages.get(p.objects[k].usage?)?.parent?];
+        parent.roles.iter().flat_map(|r| &r.members).find_map(|m| match m {
+            rnl_runtime::problem::Filler::Terminal { object, .. }
+            | rnl_runtime::problem::Filler::Pin { object, .. } => Some(*object),
+            _ => None,
+        })
+    };
     let (k, host) = (0..s.objects.len())
         .find_map(|k| {
-            let host = s.objects[k].stub.as_ref()?.host.0;
+            let host = stub_host(k)?;
             (!texts(k).is_empty() && !texts(host).is_empty()).then_some((k, host))
         })
         .unwrap_or_else(|| {
             let stubs: Vec<String> = (0..s.objects.len())
                 .filter_map(|k| {
-                    let host = s.objects[k].stub.as_ref()?.host.0;
+                    let host = stub_host(k)?;
                     Some(format!(
                         "{} {} on {} {}",
                         p.objects[k].label,

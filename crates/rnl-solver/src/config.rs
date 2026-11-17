@@ -866,7 +866,7 @@ mod tests {
         p.version = "0.4".into();
         let d = SolverOptions::default();
         assert_eq!(d.settings.lines_order.canonical(), crate::DEFAULT_LINES_ORDER.replace(' ', ""));
-        let off = ["hidden_ports", "rail_heights", "mirror_pairs", "dots_near_pins"];
+        let off = ["mirror_pairs", "dots_near_pins"];
         assert!(crate::LINES_ITEMS.iter().all(|name| d.settings.lines_order.takes(name) != off.contains(name)));
         p.solver_config = settings("lines_order=\"length,crossings_and_bends+current*3\"");
         let (o, warnings, errors) = d.for_problem(&p);

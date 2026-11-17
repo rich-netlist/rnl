@@ -1,7 +1,7 @@
 //! Combine tree initialization, group settling and strict coordinate compaction.
 
 use super::quality::{lab_order, LabOrder};
-use super::{open, port, settle, track};
+use super::{open, settle, track};
 use crate::coords::Placed;
 use crate::rational::{to_f64, Q};
 use crate::route::Routing;
@@ -196,7 +196,7 @@ pub(crate) fn lay_out(
         Ok(made) => made,
         Err(why) => return fallback(laid, notes, why, work),
     };
-    let Made { made, routed, groups, aligned, mine, lists, kept } = made;
+    let Made { made, routed, groups, mine, lists, kept } = made;
     if mine.annotation_cost > theirs.annotation_cost {
         notes.push(format!(
             "lines: annotation overlaps and wire intersections {:?}, previously {:?}",
@@ -208,18 +208,6 @@ pub(crate) fn lay_out(
         mine.said(),
         theirs.said()
     ));
-    if mine.hidden > 0 || theirs.hidden > 0 {
-        let names = |placed: &Placed, routing: &Routing| {
-            let hid = port::hidden(problem, s, placed, routing, None);
-            hid.iter().map(|&k| problem.objects[k].label.clone()).collect::<Vec<_>>().join(", ")
-        };
-        notes.push(format!(
-            "lines: ports hidden, their way out shut in by a symbol or another net's wire: in the drawing made [{}], \
-             in the group-tree layout's [{}]",
-            names(&made.placed, &made.routing),
-            names(&laid.placed, &laid.routing)
-        ));
-    }
     // a round kept with wires that could not keep their gaps may read as joined where it is not
     // (`score::false_joins`): it is not taken with more such joins than the group-tree layout's
     if kept {
@@ -301,7 +289,7 @@ pub(crate) fn lay_out(
     let (mut arrangement, groups_tree) = arrangement;
     arrangement.lists = lists;
     let arrangement = Some((arrangement, groups_tree));
-    notes.extend(open::open_orders(problem, s, &groups, &made.placed, &aligned));
+    notes.extend(open::open_orders(problem, s, &groups, &made.placed));
     let skeleton = LayoutSkeleton {
         tables: tables_of(problem, s, &made.placed, arrangement.as_ref()),
         lines: lines_of(problem, s, &made.placed, &routed.lines, &made.moved),
@@ -320,7 +308,6 @@ struct Made {
     made: crate::skeleton::Strict,
     routed: track::Routed,
     groups: Vec<settle::GroupSettled>,
-    aligned: Vec<(usize, (usize, usize))>,
     mine: LabOrder,
     lists: Vec<Option<Item>>,
     /// a round's drawing whose wires could not all keep their gaps, taken when a limit stopped the
@@ -382,7 +369,7 @@ fn attempt(
             notes.extend(settled.notes.iter().cloned());
         }
         taken = Some(settled.taken.clone());
-        let settle::Settled { placed, routing, routed, groups, aligned, made, lists, quality, .. } = settled;
+        let settle::Settled { placed, routing, routed, groups, made, lists, quality, .. } = settled;
         let crossings = routed.crossings;
         let bends: u32 = routed.costs.iter().map(|c| c.1).sum();
         let made_lines: [usize; 2] = [0, 1].map(|a| {
@@ -416,7 +403,7 @@ fn attempt(
             return previous(last, notes, format!("budget exhausted in routing round {attempt}"));
         }
         if made.conflicts.is_empty() {
-            return Ok(Made { made, routed, groups, aligned, mine: quality, lists, kept: false });
+            return Ok(Made { made, routed, groups, mine: quality, lists, kept: false });
         }
         if attempt + 1 == ROUNDS {
             return Err(format!("{} wires cannot keep their gaps where they run", made.conflicts.len()));
@@ -440,7 +427,7 @@ fn attempt(
                 made.conflicts.len()
             ));
         }
-        last = Some((Made { made, routed, groups, aligned, mine: quality, lists, kept: true }, attempt));
+        last = Some((Made { made, routed, groups, mine: quality, lists, kept: true }, attempt));
     }
     Err("no round kept every gap".to_string())
 }
@@ -705,6 +692,7 @@ fn tables_of(
                 problem.groups.get(b).map_or("", |g| g.label.as_str())
             )),
             NodeKind::Part(..) => Some(format!("part {n}")),
+            NodeKind::Attached(k) => problem.objects.get(k).map(|o| format!("{} with what is attached to it", o.label)),
             NodeKind::Root => None,
         }
     };
