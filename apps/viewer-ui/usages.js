@@ -23,7 +23,7 @@ let preferences = new Map();
 const activeSettings = new WeakMap();
 let shown = false;
 let groupsShown = false; // the frames of the groups: the Solve panel's Group frames, apart from the usages' View > Show Usages
-let nestedHidden = false; // the Usage panel's Hide nested usages: a usage made inside another with the same members is not drawn
+let duplicatesHidden = false; // the Usage panel's Hide duplicate usages: of the usages of the same devices one frame is drawn
 let currentsShown = false;
 let currentLayer = null;
 let revision = 0;
@@ -71,11 +71,27 @@ function newScope() {
 const chosen =() => selectedAsUsage ? usages().find(u => u.object === selected) : null;
 /** Whether a usage's frame is shown by its own switches: Show Usages, or Group frames for a group, and its own check. */
 const ownVisible = u => (isGroup(u) ? groupsShown : shown) && setting(u).visible;
-const memberKeys = new WeakMap();
-/** The objects a usage has as members, in all its roles, as a key: the same members, the same key; "" for none. */
-function memberKey(u) {
-  if (!memberKeys.has(u)) memberKeys.set(u, [...new Set(u.roles.flatMap(r => r.objects ?? []))].sort((a, b) => a - b).join(","));
-  return memberKeys.get(u);
+const deviceKeys = new WeakMap();
+/**
+ * The devices a usage stands for, as a key: the instances that fill its roles, a usage among them for its own devices in
+ * turn, nets, pins and points left out; the same devices, the same key; "" for none.
+ */
+function deviceKey(u) {
+  if (deviceKeys.has(u)) return deviceKeys.get(u);
+  const by = usageByObject();
+  const devices = new Set();
+  const seen = new Set([u.object]);
+  const take = (x) => {
+    for (const r of x.roles) for (const o of r.objects ?? []) {
+      const inner = by.get(o);
+      if (inner) { if (!seen.has(o)) { seen.add(o); take(inner); } }
+      else if (doc.objects[o]?.kind === "instance") devices.add(o);
+    }
+  };
+  take(u);
+  const key = [...devices].sort((a, b) => a - b).join(",");
+  deviceKeys.set(u, key);
+  return key;
 }
 const byObjects = new WeakMap();
 /** The usages of the level shown by their object, for following `parent`. */
@@ -84,26 +100,50 @@ function usageByObject() {
   if (!byObjects.has(all)) byObjects.set(all, new Map(all.map(u => [u.object, u])));
   return byObjects.get(all);
 }
+let duplicateCache = { all: null, revision: -1, on: false, drawn: new Map() };
 /**
- * With Hide nested usages on, the outermost usage that `u` is made inside (`parent`, through any number of definitions)
- * that has the same members and whose frame is shown: `u`'s frame would only go round the same objects again, a step
- * out, so it is not drawn. Null when there is none, when the mode is off, and for a group, which is not made inside a
- * usage. A usage made inside another with other members is drawn as before.
+ * With Hide duplicate usages on, the usage drawn in the place of each other one of the same devices (`deviceKey`): of the
+ * usages of a level that draw nothing of their own (no symbol, wire or annotation, as $MATCHED or $SERIES; not a group)
+ * and are shown by their own switches, those of the same devices are one set, of which one frame is drawn. It is the last
+ * one written (the order of the Document's usages, in which a usage made inside a definition follows the one it is made
+ * in), and then the outermost usage of the set that it is made inside (`parent`, through any number of definitions): of a
+ * definition that makes another usage of its own devices, as $DIFFERENTIAL_PAIR makes $MATCHED, the outer one; of two
+ * usages written over the same devices, the later. Usages of other devices are drawn as before. By the usage's object,
+ * for each usage not drawn; empty while the mode is off.
  */
-function nestedIn(u) {
-  if (!nestedHidden || isGroup(u) || u.parent == null) return null;
-  const key = memberKey(u);
-  if (!key) return null;
-  const all = usageByObject();
-  let outer = null;
-  const seen = new Set();
-  for (let p = all.get(u.parent); p && !seen.has(p.object); p = p.parent == null ? null : all.get(p.parent)) {
-    seen.add(p.object);
-    if (memberKey(p) === key && ownVisible(p)) outer = p;
+function duplicates() {
+  const all = usages();
+  const c = duplicateCache;
+  if (c.all === all && c.revision === revision && c.on === duplicatesHidden) return c.drawn;
+  const drawn = new Map();
+  if (duplicatesHidden) {
+    const sets = new Map();
+    for (const u of all) {
+      if (isGroup(u) || (u.has_drawing ?? u.has_symbol) || !ownVisible(u)) continue;
+      const key = deviceKey(u);
+      if (!key) continue;
+      if (!sets.has(key)) sets.set(key, []);
+      sets.get(key).push(u);
+    }
+    const by = usageByObject();
+    for (const set of sets.values()) {
+      if (set.length < 2) continue;
+      const members = new Set(set.map(u => u.object));
+      let shown = set[set.length - 1];
+      const seen = new Set();
+      for (let p = shown.parent; p != null && !seen.has(p); p = by.get(p)?.parent) {
+        seen.add(p);
+        if (members.has(p)) shown = by.get(p);
+      }
+      for (const u of set) if (u !== shown) drawn.set(u.object, shown);
+    }
   }
-  return outer;
+  duplicateCache = { all, revision, on: duplicatesHidden, drawn };
+  return drawn;
 }
-const visible = u => ownVisible(u) && !nestedIn(u);
+/** The usage drawn in the place of `u` while Hide duplicate usages is on; null when `u` is drawn itself. */
+const duplicateOf = u => duplicates().get(u.object) ?? null;
+const visible = u => ownVisible(u) && !duplicateOf(u);
 /** Hidden virtual symbols still select as ordinary parts when picked on the drawing. */
 export function usageSelection(object, from) {
   const u = usages().find(u => u.object === object);
@@ -159,7 +199,8 @@ export function startUsages() {
     v && /^#[0-9a-f]{6}$/i.test(v.color) && typeof v.visible === "boolean").slice(-MAX_PREFERENCES));
   shown = load("usages-shown", false) === true;
   groupsShown = load("groups-shown", false) === true;
-  nestedHidden = load("usages-nested-hidden", false) === true;
+  // (kept as usages-nested-hidden by the Hide nested usages it replaces, which is read when there is no other)
+  duplicatesHidden = load("usages-duplicates-hidden", load("usages-nested-hidden", false)) === true;
   const groupsBox = $("solve-group-frames");
   if (groupsBox) {
     groupsBox.checked = groupsShown;
@@ -206,10 +247,10 @@ export function toggleGroups(value) {
   revision++;
   repaint();
 }
-/** The Usage panel's Hide nested usages, on or off: `value` true or false, or inverted when omitted. */
-export function toggleNestedHidden(value) {
-  nestedHidden = typeof value === "boolean" ? value : !nestedHidden;
-  save("usages-nested-hidden", nestedHidden);
+/** The Usage panel's Hide duplicate usages, on or off: `value` true or false, or inverted when omitted. */
+export function toggleDuplicatesHidden(value) {
+  duplicatesHidden = typeof value === "boolean" ? value : !duplicatesHidden;
+  save("usages-duplicates-hidden", duplicatesHidden);
   revision++;
   renderUsages();
   repaint();
@@ -252,16 +293,16 @@ export function renderUsages() {
     const every = sorted.every(([type]) => expanded.has(type));
     const bar = document.createElement("div");
     bar.className = "usage-toolbar";
-    const nested = document.createElement("label");
-    nested.className = "usage-nested-toggle";
-    const nestedBox = document.createElement("input");
-    nestedBox.type = "checkbox";
-    nestedBox.id = "usage-hide-nested";
-    nestedBox.checked = nestedHidden;
-    nestedBox.dataset.focusKey = "hide-nested";
-    nestedBox.addEventListener("change", () => toggleNestedHidden(nestedBox.checked));
-    append(nested, nestedBox, m("Hide nested usages"));
-    append(bar, nested);
+    const duplicate = document.createElement("label");
+    duplicate.className = "usage-duplicates-toggle";
+    const duplicateBox = document.createElement("input");
+    duplicateBox.type = "checkbox";
+    duplicateBox.id = "usage-hide-duplicates";
+    duplicateBox.checked = duplicatesHidden;
+    duplicateBox.dataset.focusKey = "hide-duplicates";
+    duplicateBox.addEventListener("change", () => toggleDuplicatesHidden(duplicateBox.checked));
+    append(duplicate, duplicateBox, m("Hide duplicate usages"));
+    append(bar, duplicate);
     const all = document.createElement("button");
     all.type = "button";
     all.id = "usage-expand-all";
@@ -311,8 +352,8 @@ export function renderUsages() {
         row.dataset.object = String(u.object);
         row.classList.toggle("selected", u.object === inspected);
         // (a usage that is not in effect has its state in the table of its members' usages)
-        const outer = setting(u).visible ? nestedIn(u) : null;
-        row.classList.toggle("nested", !!outer);
+        const drawnInstead = setting(u).visible ? duplicateOf(u) : null;
+        row.classList.toggle("duplicate", !!drawnInstead);
         const button = document.createElement("button");
         button.type = "button";
         button.className = "usage-name";
@@ -325,8 +366,8 @@ export function renderUsages() {
         const check = checkbox(m`Show ${u.id}`, setting(u).visible, visible => change(u, { visible }));
         check.dataset.focusKey = `check:${u.id}`;
         append(row, button);
-        // one that Hide nested usages does not draw says inside which usage it is
-        if (outer) append(row, span("usage-state usage-nested-note", m`inside ${labelOf(outer)}`));
+        // one that Hide duplicate usages does not draw says which usage is drawn instead
+        if (drawnInstead) append(row, span("usage-state usage-duplicate-note", m`duplicate of ${labelOf(drawnInstead)}`));
         append(row, check);
         append(group, row);
       }
