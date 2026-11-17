@@ -128,8 +128,10 @@ pub(crate) struct Settled {
 
 /// An outcome's rank, least first: whether the level's drawing failed, then its false joins (at the
 /// root, `score::false_joins`) and the groups dissolved or stretched, the parts not routed, whether it
-/// failed, the conflicts of the merge, the lab's order, the steps of routing.
-type Score = (bool, (usize, usize, usize, usize), usize, bool, usize, LabOrder, usize);
+/// failed, the lab's order, the steps of routing. The wires its merge could not keep their whole gap
+/// from a symbol do not rank it: the drawing the search takes is routed again until they do
+/// (`super::engine`'s rounds), and an outcome they would rank last may be the best drawing.
+type Score = (bool, (usize, usize, usize, usize), usize, bool, LabOrder, usize);
 
 type Choice = (usize, Vec<usize>, Vec<usize>);
 
@@ -1380,15 +1382,7 @@ impl Search<'_, '_> {
             }
             _ => (0, 0),
         };
-        let score: Score = (
-            root && failed,
-            (facts, joins, low, t.score.0),
-            t.score.1,
-            failed,
-            made.as_ref().map_or(0, |m| m.conflicts.len()),
-            lab,
-            t.score.4,
-        );
+        let score: Score = (root && failed, (facts, joins, low, t.score.0), t.score.1, failed, lab, t.score.4);
 
         let state = &self.nodes[id].state;
         let block = (!root).then(|| Rc::new(lv.block(&units, &t, &state.blocks)));
@@ -1409,10 +1403,10 @@ impl Search<'_, '_> {
             }
         }
         let o = self.outcomes.len();
-        let inner = kids.iter().filter_map(|k| state.blocks.get(k)).map(|b| &self.outcomes[b.1].score.5);
+        let inner = kids.iter().filter_map(|k| state.blocks.get(k)).map(|b| &self.outcomes[b.1].score.4);
         let (cb, lines) = inner.fold((0, 0), |(c, l), x| (c + x.cb, l + x.lines));
-        let own = (score.5.cb.saturating_sub(cb), score.5.lines.saturating_sub(lines));
-        if crate::budget::stopped() || score.5.interrupted {
+        let own = (score.4.cb.saturating_sub(cb), score.4.lines.saturating_sub(lines));
+        if crate::budget::stopped() || score.4.interrupted {
             return Ok(Came::Same);
         }
         self.outcomes.push(Outcome {
@@ -1570,7 +1564,7 @@ impl Search<'_, '_> {
     fn finish(mut self, end: SearchEnd, work: &Work) -> Result<Settled, String> {
         let drawing = |o: usize| {
             let s = &self.outcomes[o].score;
-            (s.0, (s.1 .0, s.1 .1, s.1 .2), s.3, s.2, s.4, &s.5, s.6)
+            (s.0, (s.1 .0, s.1 .1, s.1 .2), s.3, s.2, &s.4, s.5)
         };
         let other = self.lost.iter().map(|s| s.0).min_by(|&a, &b| drawing(a).cmp(&drawing(b)).then(a.cmp(&b)));
         let better = |o: usize| self.best.is_none_or(|b| drawing(o) < drawing(b));
@@ -1644,7 +1638,7 @@ impl Search<'_, '_> {
             let port_gaps = &out.choice.1[..core.ports.min(out.choice.1.len())];
             let (tried, batches, settings) = by_group.get(&n).copied().unwrap_or_default();
             let t = &out.tried;
-            let lab = &out.score.5;
+            let lab = &out.score.4;
             notes.push(format!(
                 "lines: {}: {} placed, routed and merged in {} batch{}{}; the one taken leaves {} joins, {} crossings \
                  and {} bends routed, {} crossings and {} bends merged ({} weighed), {} lines of the wires{}",
@@ -1818,7 +1812,7 @@ impl Search<'_, '_> {
             }
         }
         Ok(Settled {
-            quality: out.score.5,
+            quality: out.score.4,
             placed,
             routing,
             routed: t.routed,
