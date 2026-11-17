@@ -456,6 +456,9 @@ fn strict_swaps_make_45_degree_crosses_or_keep_the_routed_shape_when_facts_preve
         let run = || compact_strict(&p, &s, &placed, &routing, &options, &mut Work::default(), None, &[]);
         let made = run();
         assert!(!made.failed, "fixed={fixed}: {:?}", made.notes);
+        // drawn as routed, the two jogs count four bends read and three compacted; as an X, two
+        let bends = if fixed { "bends of the wires read 4, made 3" } else { "bends of the wires read 2, made 2" };
+        assert!(made.notes.iter().any(|n| n.ends_with(bends)), "fixed={fixed}: {:?}", made.notes);
         let mut spaced_options = options.clone();
         spaced_options.settings.spacing = [3, 2];
         let mut spacing_notes = Vec::new();
