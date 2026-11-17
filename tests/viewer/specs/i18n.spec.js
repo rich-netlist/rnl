@@ -79,10 +79,10 @@ test('parser and solver messages stay verbatim while UI headings and counters ch
   await page.keyboard.press('F9');
   await page.waitForFunction(()=>document.body.classList.contains('preview')&&!document.body.classList.contains('solving'));
   const report = await page.locator('.solve-line .msg, .solve-line .more, .solve-summary').allTextContents();
-  const heading=page.locator('.solve-group summary').first();
-  await expect(heading).toContainText(zh('Files'));
+  const heading=page.locator('.solve-group summary').first(); // (the first group of the report: the facts discarded)
+  await expect(heading).toContainText(zh('Discarded in the order of 8.5'));
   await language(page,'en');
-  await expect(heading).toContainText('Files');
+  await expect(heading).toContainText('Discarded in the order of 8.5');
   expect(await page.locator('.solve-line .msg, .solve-line .more, .solve-summary').allTextContents()).toEqual(report);
 });
 

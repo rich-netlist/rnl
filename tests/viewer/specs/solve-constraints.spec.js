@@ -344,15 +344,16 @@ test.describe("with a solve, on the desktop", () => {
     await rows(page).filter({ hasText: /ALIGN y \{#M1 #M2\}/ }).first().click();
     await expect(frameBox(page)).toHaveCount(1);
     expect(await boxTexts(page)).toEqual(["ALIGN y", "1", "2"]);
-    // a distance has two lists, numbered each from its own start
-    await rows(page).filter({ hasText: /DISTANCE x increasing min=3 \{#M1 #M2 #M3 #M4 #M5\} \{#M6 #M7 #CC\}/ }).first().click();
-    expect(await boxTexts(page)).toEqual(["DISTANCE x increasing ≥ 3", "from1", "from2", "from3", "from4", "from5", "to1", "to2", "to3"]);
-    // a set in a list is one number for each of its objects
-    await rows(page).filter({ hasText: /^.*ORDER x increasing \{\{#VIP #VIN\}/ }).first().click();
-    expect(await boxTexts(page)).toEqual(["ORDER x increasing", "1", "1", "2", "2", "2", "2", "2", "3", "3", "3", "4"]);
+    // a distance has two lists, numbered each from its own start (in 0.4 the groups of a DISTANCE stand for their
+    // members, a constraint for each pair: one object in each list)
+    await rows(page).filter({ hasText: /DISTANCE x increasing min=3 \{#M1\} \{#CC\}/ }).first().click();
+    expect(await boxTexts(page)).toEqual(["DISTANCE x increasing ≥ 3", "from1", "to1"]);
+    // the objects of an ORDER are numbered in its order
+    await rows(page).filter({ hasText: /ORDER x increasing \{#VIP #M1 #M6 #CL\}/ }).first().click();
+    expect(await boxTexts(page)).toEqual(["ORDER x increasing", "1", "2", "3", "4"]);
     // the pin of an object is marked at the pin
-    await rows(page).filter({ hasText: /DISTANCE y increasing min=2 max=2 \{#VDD:p\} \{%s:p\}/ }).first().click();
-    expect((await boxTexts(page))[0]).toBe("DISTANCE y increasing = 2");
+    await rows(page).filter({ hasText: /DISTANCE y increasing min=0 max=3 \{#VDD::p\}/ }).first().click();
+    expect((await boxTexts(page))[0]).toBe("DISTANCE y increasing ≥ 0 ≤ 3");
     // and the box goes with the preview
     await page.evaluate(() => window.viewer.command("solve-close"));
     await expect(page.locator("#preview-badge")).toBeHidden();
