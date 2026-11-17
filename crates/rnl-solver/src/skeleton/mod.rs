@@ -304,9 +304,10 @@ fn written(
 /// them,
 /// the shorter one's run ends at a bend. That bend becomes the branch: the longer wire starts there,
 /// and the third wire runs on to it, with a bend where the branch was unless it goes straight on.
-pub(crate) fn folded(mut r: Routing) -> Routing {
+/// Only wires the solver routed, never a wire a file writes, are folded.
+pub(crate) fn folded(mut r: Routing, routed: &BTreeSet<usize>) -> Routing {
     for _ in 0..64 {
-        if !fold_one(&mut r) {
+        if !fold_one(&mut r, routed) {
             break;
         }
     }
@@ -327,7 +328,7 @@ fn way(a: &[Q; 2], b: &[Q; 2]) -> Option<(usize, bool)> {
 
 type Oriented = (Vec<WirePoint>, Vec<[Q; 2]>);
 
-fn fold_one(r: &mut Routing) -> bool {
+fn fold_one(r: &mut Routing, routed: &BTreeSet<usize>) -> bool {
     let mut ends: BTreeMap<usize, Vec<(usize, bool)>> = BTreeMap::new();
     for (i, w) in r.wires.iter().enumerate() {
         let n = w.points.len();
@@ -342,7 +343,12 @@ fn fold_one(r: &mut Routing) -> bool {
         }
     }
     for (&b, at) in &ends {
-        if at.len() != 3 || at[0].0 == at[1].0 || at[0].0 == at[2].0 || at[1].0 == at[2].0 {
+        if at.len() != 3
+            || at[0].0 == at[1].0
+            || at[0].0 == at[2].0
+            || at[1].0 == at[2].0
+            || at.iter().any(|(i, _)| !routed.contains(i))
+        {
             continue;
         }
         let o: Vec<Oriented> = at
@@ -720,7 +726,8 @@ pub(crate) fn compact_strict(
         return out;
     }
     let (p, r) = written(problem, s, placed, routing, &sk);
-    let r = folded(r);
+    let routed: BTreeSet<usize> = sk.paths.iter().filter_map(|p| p.routed).collect();
+    let r = folded(r, &routed);
     out.failed_facts.clear();
     let g = &p.geometry;
     for &f in &s.kept {

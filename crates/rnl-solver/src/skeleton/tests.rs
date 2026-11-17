@@ -590,7 +590,11 @@ fn prototype_d_routing(lower: i64) -> Routing {
 /// the shorter one's run, and the third wire runs on to it with a bend where the branch was.
 #[test]
 fn prototype_d_folds_two_wires_on_one_line_into_a_t() {
-    let r = folded(prototype_d_routing(0));
+    let all: BTreeSet<usize> = (0..3).collect();
+    // a wire the file writes is not folded
+    let written = folded(prototype_d_routing(0), &[0, 1].into_iter().collect());
+    assert_eq!(written.paths, prototype_d_routing(0).paths);
+    let r = folded(prototype_d_routing(0), &all);
     let q = |x: i64, y: i64| [int(x), int(y)];
     assert_eq!(r.branches[0].at, (4., 0.));
     assert_eq!(r.paths[0], vec![q(0, 5), q(0, 0), q(4, 0)]);
@@ -609,7 +613,7 @@ fn prototype_d_leaves_a_branch_whose_wires_leave_it_different_ways() {
     let mut before = prototype_d_routing(-1);
     before.wires[1].points.insert(1, WirePoint::Bend((0., -1.)));
     before.paths[1].insert(1, [int(0), int(-1)]);
-    let r = folded(before.clone());
+    let r = folded(before.clone(), &(0..3).collect());
     assert_eq!(r.paths, before.paths);
     assert_eq!(r.wires, before.wires);
     assert_eq!(r.branches[0].at, (0., 0.));

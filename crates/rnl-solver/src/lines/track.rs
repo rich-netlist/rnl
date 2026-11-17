@@ -622,6 +622,7 @@ fn route_part(
     };
     add(&mut tree, &parts[&roots[first]]);
     let mut left: Vec<usize> = parts.keys().copied().filter(|&r| r != roots[first]).collect();
+    let failed_before = counts.failed;
     let rect = |r: [(usize, usize); 2]| [0, 1].map(|a| region_slots(&lines.axes[a], r[a].0, r[a].1));
     let given = |r: [(usize, usize); 2], inner: i32| {
         [0, 1].map(|a| (lines.axes[a].slot(r[a].0) + inner, lines.axes[a].slot(r[a].1) - inner))
@@ -704,14 +705,33 @@ fn route_part(
         routed.push((path, crossings));
     }
     // `reroute_nets`: each path once, the rest kept, the parts it left apart joined again as
-    // above; taken where the net's own drawing is cheaper.
-    if input.reroute && routed.len() >= 2 {
+    // above; taken where the net's own drawing is cheaper and every wire of it ends on the net.
+    // Not for a net with a part left unjoined, whose parts could not all be joined again; the
+    // counts of the parts are the first routing's.
+    if input.reroute && routed.len() >= 2 && counts.failed == failed_before {
         let _span = crate::profile::span("lines", "reroute");
         let before = *spent;
         let all: Vec<(Pt, Option<(i64, i64)>)> =
             parts.values().flat_map(|(a, _)| a.iter().map(|&a| (at[a], net.anchors[a].exit))).collect();
         let keys: Vec<usize> = parts.keys().copied().collect();
+        let fixed: BTreeSet<Pt> =
+            parts.values().flat_map(|(a, p)| a.iter().map(|&a| at[a]).chain(p.iter().copied())).collect();
+        // a wire one of whose ends is on no other wire and no part of the net
+        let loose = |paths: &[(Vec<Pt>, u32)]| {
+            let pts: Vec<Vec<Pt>> = paths.iter().map(|(p, _)| points_of(p)).collect();
+            pts.iter().enumerate().any(|(k, own)| {
+                [own.first(), own.last()]
+                    .into_iter()
+                    .flatten()
+                    .any(|e| !fixed.contains(e) && !pts.iter().enumerate().any(|(j, q)| j != k && q.contains(e)))
+            })
+        };
+        let mut scratch = Parts::default();
         for _ in 0..routed.len() {
+            // the steps are those of every net routed after this one too
+            if *spent >= input.budget / 2 {
+                break;
+            }
             let round = *spent;
             let out = routed.remove(0);
             // the parts and the paths kept, joined where they share a point
@@ -771,7 +791,12 @@ fn route_part(
                 let touching = sources.iter().find(|(p, _)| t2.contains_key(p)).map(|(p, _)| *p);
                 let found = match touching {
                     Some(p) => Some((vec![p], 0, 0)),
-                    None => connect(&sources, &t2, spent, counts)?,
+                    None => match connect(&sources, &t2, spent, &mut scratch) {
+                        Ok(found) => found,
+                        Err(why) if crate::budget::stopped() => return Err(why),
+                        // the first routing stands
+                        Err(_) => None,
+                    },
                 };
                 let Some((path, crossings, _)) = found else {
                     ok = false;
@@ -789,6 +814,7 @@ fn route_part(
             let mut candidate = routed.clone();
             candidate.extend(new);
             if ok
+                && !loose(&candidate)
                 && merged(&base_dirs, &candidate, &all, input.weights)
                     < merged(&base_dirs, &with_out, &all, input.weights)
             {

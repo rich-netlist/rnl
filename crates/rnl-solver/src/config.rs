@@ -698,6 +698,7 @@ impl SolverOptions {
             out.settings.layout = Layout::default();
             // its trees are its nets' already, and it does not read the setting
             out.settings.join_trees = false;
+            out.settings.reroute_nets = false;
             return (out, warnings, Vec::new());
         }
         if self.settings.legacy_alias {
@@ -790,6 +791,10 @@ mod tests {
         let err = SolverOptions::default().with_config("reroute_nets=1").unwrap_err();
         assert!(err.contains("reroute_nets must be a boolean"), "{err}");
         assert!(SolverOptions::defaults_config().contains("reroute_nets=false"));
+        // a level before 0.4 is laid out in rows and does not read it
+        p.version = "0.3".into();
+        let on = SolverOptions::default().with_config("reroute_nets=true").unwrap();
+        assert!(!on.for_problem(&p).0.settings.reroute_nets);
     }
 
     /// The weights of a crossing and of a bend: two integers from 0 to 1000, not both 0, which a
