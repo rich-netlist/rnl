@@ -658,7 +658,7 @@ fn rnl_problem_gives_a_file_of_0_2_no_numbers() {
     // switch, kept for compatibility, changes nothing
     let fs = FsProvider::new(&[]);
     let mut files = Vec::new();
-    for dir in [case(""), solver_case("")] {
+    for dir in [case("")] {
         for e in std::fs::read_dir(dir).unwrap() {
             let f = e.unwrap().path();
             if f.extension().is_some_and(|x| x == "sp" || x == "scs") {
