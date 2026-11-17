@@ -694,8 +694,8 @@
     {{?refcascode ?outcascode} {?ref ?out}} @ORDER("top-to-bottom", priority="low");
     {?refcascode{1} ?ref{1}} @ALIGN("x", priority="low");
     {?outcascode{1} ?out{1}} @ALIGN("x", priority="low");
-    ?ref{1} ?refcascode{1} @ORIENT-RELATION("R0", priority="low");
-    ?out{1} ?outcascode{1} @ORIENT-RELATION("R0", priority="low");
+    /* no orientation relation between the rows: each cascode turns on its own, and only
+       its sources or emitters face down */
     ?refcascode{1} ?refcascode{2:end} @ORIENT-RELATION("R0", priority="low");
     ?outcascode{1} ?outcascode{2:end} @ORIENT-RELATION("R0", priority="low");
     {?refcascode ?outcascode} @SELECT-INSTANCE(type="nmos")
@@ -753,8 +753,8 @@
     {{?refcascode ?outcascode} {?ref ?out}} @ORDER("bottom-to-top", priority="low");
     {?refcascode{1} ?ref{1}} @ALIGN("x", priority="low");
     {?outcascode{1} ?out{1}} @ALIGN("x", priority="low");
-    ?ref{1} ?refcascode{1} @ORIENT-RELATION("R0", priority="low");
-    ?out{1} ?outcascode{1} @ORIENT-RELATION("R0", priority="low");
+    /* no orientation relation between the rows: each cascode turns on its own, and only
+       its sources or emitters face up */
     ?refcascode{1} ?refcascode{2:end} @ORIENT-RELATION("R0", priority="low");
     ?outcascode{1} ?outcascode{2:end} @ORIENT-RELATION("R0", priority="low");
     {?refcascode ?outcascode} @SELECT-INSTANCE(type="nmos")
