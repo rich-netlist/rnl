@@ -33,7 +33,13 @@ fn finisher<'a>(ctx: &Context<'a>) -> rnl_view::RecordFinisher<'a> {
     rnl_view::RecordFinisher::new(&ctx.original.doc, ctx.files, ctx.formats, ctx.runtime, ctx.problem)
 }
 
-fn read(ctx: &Context<'_>, finisher: &rnl_view::RecordFinisher<'_>, record: &str) -> Result<Interpretation, String> {
+/// The document read with `record`, and the record as it is read: finished with the check of its
+/// numbers, as a record written is.
+fn read(
+    ctx: &Context<'_>,
+    finisher: &rnl_view::RecordFinisher<'_>,
+    record: &str,
+) -> Result<(Interpretation, String), String> {
     // Numeric references are inactive until their record has a valid check. Prepare each
     // complete candidate, including its appended PLACE statements, in the same package
     // environment as the normal reading. Keep the caller's raw record and byte spans intact.
@@ -61,7 +67,7 @@ fn read(ctx: &Context<'_>, finisher: &rnl_view::RecordFinisher<'_>, record: &str
     {
         return Err("trial generated record has missing or stale numbering".into());
     }
-    Ok(read)
+    Ok((read, numbered))
 }
 
 /// Why a record does not read back when objects of the level are lost in it: an object the solve
@@ -318,6 +324,8 @@ fn original_point_in_trial(
 /// Unmappable/ambiguous usages and non-positioned role targets fail closed.
 pub struct Completion {
     pub record: String,
+    /// `record` finished with the check of its numbers, as the trial read it and as it is written
+    pub numbered: String,
     pub trials: usize,
     pub elapsed: std::time::Duration,
 }
@@ -370,7 +378,7 @@ fn complete_within(
     }
     let record = &written.record;
     let finisher = finisher(ctx);
-    let before = read(ctx, &finisher, record)?;
+    let (before, _) = read(ctx, &finisher, record)?;
     // what only helps the solve, once for every trial below
     let auxiliary = crate::junction_completion_problem::auxiliary(ctx.problem);
     if let Some(why) = lost(ctx.problem, &before, &auxiliary.points) {
@@ -492,7 +500,7 @@ fn complete_within(
             };
             trial.insert_str(plan.end, &place);
         }
-        let after = read(ctx, &finisher, &trial)?;
+        let (after, numbered) = read(ctx, &finisher, &trial)?;
         let after_problem =
             after.problems.iter().find(|p| p.level == ctx.problem.level).ok_or("trial problem missing")?;
         let added = added_fact_indices(
@@ -518,7 +526,7 @@ fn complete_within(
             tolerance: ctx.tolerance,
             auxiliary: &auxiliary,
         }) {
-            Ok(()) => return Ok(Completion { record: trial, trials: attempt + 1, elapsed: start.elapsed() }),
+            Ok(()) => return Ok(Completion { record: trial, numbered, trials: attempt + 1, elapsed: start.elapsed() }),
             Err(e) => {
                 last_error = e;
                 if let Some(d) = after.diagnostics().iter().find(|d| {
@@ -548,6 +556,8 @@ fn complete_within(
 /// out, by their index in [`Written::junctions`], with why.
 pub struct Partial {
     pub record: String,
+    /// `record` finished with the check of its numbers, as [`Completion::numbered`]
+    pub numbered: String,
     pub trials: usize,
     pub elapsed: std::time::Duration,
     pub dropped: Vec<(usize, String)>,
@@ -574,17 +584,18 @@ pub fn complete_what_can_be_by(
     // takes stays bounded however many dots it has; the record without any dot is checked beyond it
     let mut trials = 0;
     let why = match complete_within(ctx, written, MAX_TRIALS, &mut trials, deadline) {
-        Ok(done) => return Ok(Partial { record: done.record, trials, elapsed: start.elapsed(), dropped: Vec::new() }),
+        Ok(done) => {
+            let (record, numbered) = (done.record, done.numbered);
+            return Ok(Partial { record, numbered, trials, elapsed: start.elapsed(), dropped: Vec::new() });
+        }
         Err(why) => why,
     };
-    let bare = only(written, &[]);
-    if let Err(without) = complete_within(ctx, &bare, 1, &mut 0, None) {
+    let bare = match complete_within(ctx, &only(written, &[]), 1, &mut 0, None) {
+        Ok(bare) => bare,
         // objects lost on reading the record back are lost with the dots or without them
-        if without.ends_with(LOST) {
-            return Err(without);
-        }
-        return Err(format!("{why}; without any dot: {without}"));
-    }
+        Err(without) if without.ends_with(LOST) => return Err(without),
+        Err(without) => return Err(format!("{why}; without any dot: {without}")),
+    };
     // the dots one by one, in order, each beside those kept before it: a dot kept may leave no
     // place for a later one that could have been placed alone
     let mut kept: Vec<usize> = Vec::new();
@@ -604,13 +615,13 @@ pub fn complete_what_can_be_by(
         match complete_within(ctx, &only(written, &with), MAX_TRIALS - trials, &mut trials, deadline) {
             Ok(done) => {
                 kept = with;
-                record = Some(done.record);
+                record = Some((done.record, done.numbered));
             }
             Err(why) => dropped.push((index, why)),
         }
     }
-    let record = record.unwrap_or(bare.record);
-    Ok(Partial { record, trials, elapsed: start.elapsed(), dropped })
+    let (record, numbered) = record.unwrap_or((bare.record, bare.numbered));
+    Ok(Partial { record, numbered, trials, elapsed: start.elapsed(), dropped })
 }
 
 /// The written record with only the junctions `keep`, by their index in [`Written::junctions`]:
