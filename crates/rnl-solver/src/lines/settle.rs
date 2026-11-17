@@ -2050,7 +2050,7 @@ fn fact_edges(
             out.extend(chain(a, ms, up));
             out
         }
-        FactKind::Distance { axis, sense, min, from, to, .. } => {
+        FactKind::Distance { axis, sense, min, max, from, to } => {
             let (a, Some(fs), Some(ts)) = (ax(axis), all(from), all(to)) else { return Vec::new() };
             let up = match sense {
                 Sense::Increasing => true,
@@ -2064,12 +2064,17 @@ fn fact_edges(
                 }
             };
             let least = min.and_then(from_f64).unwrap_or_else(|| int(1));
+            let most = max.and_then(from_f64);
             let mut out = within(a, &fs);
             out.extend(within(a, &ts));
             for p in &fs {
                 for q in &ts {
                     let (x, y) = if up { (p.clone(), q.clone()) } else { (q.clone(), p.clone()) };
-                    out.push(Edge { axis: a, from: x, to: y, gap: Some(least.clone()), sides: (0, 0) });
+                    out.push(Edge { axis: a, from: x.clone(), to: y.clone(), gap: Some(least.clone()), sides: (0, 0) });
+                    // at most `max` apart: the far one no further than that past the near one
+                    if let Some(most) = &most {
+                        out.push(Edge { axis: a, from: y, to: x, gap: Some(-most.clone()), sides: (0, 0) });
+                    }
                 }
             }
             out
