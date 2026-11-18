@@ -208,6 +208,7 @@ mod virtual_part_pins04;
 mod vocabulary_parity;
 mod write_host_diagnostics04;
 mod write_refusal04;
+mod writeback_safety;
 
 /// Every file of this directory is a module of this program: one that is not would not be compiled
 /// nor run, with no warning.
