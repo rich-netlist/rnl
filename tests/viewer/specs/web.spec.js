@@ -25,6 +25,11 @@ const locked = (name) => {
 };
 test.beforeEach(async ({ page }) => {
   await page.route("https://rich-netlist.github.io/rnl-packages/**", route => route.abort());
+  // Solve > Ask to Solve on Open off on every origin, the solver servers' too, whose ports the storage
+  // that every page starts with (playwright.config.js) cannot know
+  await page.addInitScript(() => {
+    try { if (localStorage.getItem("solve-on-open") === null) localStorage.setItem("solve-on-open", "false"); } catch { /* no storage */ }
+  });
 });
 
 test("the preload hints name the scripts the page loads and the files it reads when it starts", async ({ page }) => {
@@ -799,6 +804,19 @@ test("a netlist served at the root of its server is named after the server", asy
   for (const d of doc.diagnostics) expect(doc.files[d.file_index]?.name).toBe(d.file);
   sameAsRnl(doc, path.join(folder(files), "127.0.0.1"));
   await showsDocument(page, doc);
+});
+
+test("the web viewer, which solves in the browser, asks to solve a netlist opened with components not drawn", async ({ page }) => {
+  // on, as it is to begin with; the other tests of this file have it off (beforeEach)
+  await page.addInitScript(() => localStorage.setItem("solve-on-open", "true"));
+  await start(page);
+  await page.locator("#file-input").setInputFiles({ name: "bare.sp", mimeType: "text/plain", buffer: Buffer.from("* none placed\nR1 a b 1k\nC1 b 0 1p\n.end\n") });
+  const dialog = page.locator("dialog.dialog");
+  await expect(dialog).toContainText("Solve the Netlist?");
+  await expect(dialog).toContainText("2 components have no position yet, so they are not drawn.");
+  await dialog.getByRole("button", { name: "Not now" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(await page.evaluate(() => window.viewer.doc.name)).toBe("bare.sp");
 });
 
 test("files set on the file input open as with Open, and the page asks which is the netlist", async ({ page }) => {

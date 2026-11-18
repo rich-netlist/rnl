@@ -30,6 +30,7 @@ import { current, doc, path, selected } from "./state.js";
 import { renderUnplaced } from "./unplaced.js";
 import { setSemanticsOnly, setRnlOnly } from "./text.js";
 import { $, load, save, startSettings } from "./util.js";
+import { startSolveOnOpen } from "./solve-on-open.js";
 
 /** Load the shell and the command table, then open what the shell has for the start. */
 async function start() {
@@ -78,6 +79,7 @@ async function start() {
   renderUnplaced();
 
   await startCommands();
+  startSolveOnOpen();
   // the Library's files, without waiting for the core to index them (each build waits for that)
   await startPool();
   startPreload();
