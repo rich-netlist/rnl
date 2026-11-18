@@ -195,10 +195,13 @@ test("an instance whose subcircuit the Library defines twice asks which definiti
   await expect(dialog.locator(".dialog-option")).toHaveText(["/cell_a.inc:2", "/cell_b.inc:2"]);
   // Escape opens nothing
   await page.keyboard.press("Escape");
+  // (a dialog is closed only when its close event comes, after the key: until then the page's keys wait)
+  await expect(dialog).toHaveCount(0);
   expect(await page.evaluate(() => window.viewer.doc.path)).toMatch(/top\.netlist$/);
   // the second definition, as a view of its own file, at its subcircuit
   await page.evaluate(() => { window.seen = new WeakSet([window.viewer.doc]); });
   await page.keyboard.press("e");
+  await expect(dialog.locator(".dialog-title")).toHaveText("Choose a definition of cell");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
   const entered = await shown(page);
