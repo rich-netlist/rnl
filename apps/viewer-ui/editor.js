@@ -8,6 +8,7 @@ import { append, m, setAttr, setText, tr } from "./i18n.js";
 // asking. A solve (solve.js) is of the text applied.
 
 import { setCheck, setEnabled } from "./commands.js";
+import { editKey } from "./editor-keys.js";
 import { decide, inform, modal } from "./dialog.js";
 import { applyEdits, currentSource, openSource } from "./open.js";
 import * as edits from "./edits.js";
@@ -137,7 +138,40 @@ function makeEditor(path, name) {
     e.scroll = area.scrollTop;
   });
   area.addEventListener("blur", () => (e.caret = area.selectionStart));
+  // Enter in a comment continues it, Tab and Shift+Tab indent and outdent (editor-keys.js); after Esc,
+  // Tab moves the focus out of the text box as usual. A modifier pressed alone, as Shift is before Tab,
+  // keeps what Esc did.
+  let escaped = false;
+  area.addEventListener("keydown", (ev) => {
+    if (ev.isComposing || ev.keyCode === 229 || ["Shift", "Control", "Alt", "Meta"].includes(ev.key)) return;
+    const after = escaped;
+    escaped = ev.key === "Escape";
+    const format = doc?.files.find((f) => f.path === path)?.format;
+    const edit = editKey({
+      text: area.value, start: area.selectionStart, end: area.selectionEnd, key: ev.key,
+      shift: ev.shiftKey, other: ev.ctrlKey || ev.altKey || ev.metaKey, escaped: after, format,
+    });
+    if (!edit) return;
+    ev.preventDefault();
+    typeInto(area, edit);
+  });
   return e;
+}
+
+/**
+ * Make an edit of editor-keys.js in a text box as typing would: through the browser's own insertion,
+ * which the text box's Undo takes back, and which tells the box's input listener; by hand where the
+ * browser has none.
+ */
+function typeInto(area, { from, to, insert, start, end }) {
+  area.setSelectionRange(from, to);
+  let typed = false;
+  try { typed = document.execCommand("insertText", false, insert); } catch { typed = false; }
+  if (!typed) {
+    area.setRangeText(insert, from, to, "end");
+    area.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  area.setSelectionRange(start, end);
 }
 
 /** The numbers beside a text box, as many as it has lines. */
