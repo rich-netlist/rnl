@@ -1697,7 +1697,7 @@ impl<'a> Tree<'a> {
             if bindings {
                 if let Some((a, said)) = self.bind(&current, &eval, &released) {
                     if crate::annotation::estimated_work(self.problem) > 0
-                        && !crate::budget::permit(
+                        && !crate::budget::permit_size(
                             crate::budget::Step::Placement,
                             crate::annotation::estimated_work(self.problem),
                         )
@@ -1767,7 +1767,7 @@ impl<'a> Tree<'a> {
                     continue;
                 }
                 if crate::annotation::estimated_work(self.problem) > 0
-                    && !crate::budget::permit(
+                    && !crate::budget::permit_size(
                         crate::budget::Step::Placement,
                         crate::annotation::estimated_work(self.problem),
                     )
@@ -1805,7 +1805,7 @@ impl<'a> Tree<'a> {
                 let mut unbound = current.clone();
                 if let Some(b) = unbound.bound.pop() {
                     if crate::annotation::estimated_work(self.problem) > 0
-                        && !crate::budget::permit(
+                        && !crate::budget::permit_size(
                             crate::budget::Step::Placement,
                             crate::annotation::estimated_work(self.problem),
                         )
@@ -2259,9 +2259,9 @@ impl<'a> Tree<'a> {
         let mut best = self.place_route_score(arr, &orient, &rels, &pull, &code, work);
         let mut taken = 0;
         for _ in 0..rounds {
-            if !crate::budget::permit(
+            if !crate::budget::permit_size(
                 crate::budget::Step::Placement,
-                s.objects.len().saturating_add(crate::annotation::estimated_work(problem)),
+                crate::annotation::with_estimated_work(s.objects.len(), problem),
             ) {
                 break;
             }

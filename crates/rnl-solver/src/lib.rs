@@ -187,8 +187,12 @@ impl SolveReport {
     /// The settings that replay this solve alike, as `--solver-config` takes them and the note of
     /// the budget gives them: `limit="work",work=W`, with `tree_work` when the lines layout's
     /// group-tree start was stopped, or might be, by its allowance. None when the replay is not by
-    /// work.
+    /// work, and when the safety limit stopped the solve, which its work does not replay
+    /// ([`BudgetReport::reproducible`]).
     pub fn replay_config(&self) -> Option<String> {
+        if self.budget.is_some_and(|b| !b.reproducible()) {
+            return None;
+        }
         let options = SolverOptions::parse(self.canonical_options.as_deref()?).ok()?;
         let Some(RunLimit::Work(work)) = options.run_limit else { return None };
         let tree = options.tree_work.map_or_else(String::new, |t| format!(",{}", t.setting()));
@@ -470,7 +474,13 @@ fn solve_isolated(
                 SolverOptions { run_limit: Some(replay_limit), time_limit: None, tree_work, ..options.clone() };
             solved.report.canonical_options = Some(replay.canonical());
             solved.report.budget = Some(report);
-            solved.report.notes.push(if matches!(replay_limit, RunLimit::Work(_)) {
+            solved.report.notes.push(if !report.reproducible() {
+                format!(
+                    "budget: {} work units; limit: {:?}; stopped: {:?}; not replayed by its work: the safety \
+                     limit stopped it by the clock",
+                    report.work, report.limit, report.reason
+                )
+            } else if matches!(replay_limit, RunLimit::Work(_)) {
                 let tree = tree_work.map_or_else(String::new, |t| format!(", {}", t.setting()));
                 format!(
                     "budget: {} work units; limit: {:?}; stopped: {:?}; replay with limit=\"work\", work={}{tree}",

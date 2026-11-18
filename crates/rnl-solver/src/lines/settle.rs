@@ -588,8 +588,10 @@ pub(crate) fn settle(
     stop: &Stop,
 ) -> Result<Settled, String> {
     let _counters = Counters::enter();
-    if !permit(BudgetStep::Candidate, problem.objects.len().saturating_add(crate::annotation::estimated_work(problem)))
-    {
+    if !crate::budget::permit_size(
+        BudgetStep::Candidate,
+        crate::annotation::with_estimated_work(problem.objects.len(), problem),
+    ) {
         return Err("budget exhausted".into());
     }
     let (arr, nodes) = (&arrangement.0, &arrangement.1);
@@ -1213,9 +1215,9 @@ impl Search<'_, '_> {
     }
 
     fn evaluate(&mut self, id: usize, choice: Choice, work: &mut Work) -> Result<Came, String> {
-        if !permit(
+        if !crate::budget::permit_size(
             BudgetStep::Candidate,
-            self.lv.problem.objects.len().saturating_add(crate::annotation::estimated_work(self.lv.problem)),
+            crate::annotation::with_estimated_work(self.lv.problem.objects.len(), self.lv.problem),
         ) {
             return Ok(Came::Same);
         }

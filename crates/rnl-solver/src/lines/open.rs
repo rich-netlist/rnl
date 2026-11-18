@@ -146,7 +146,10 @@ pub(crate) fn open_orders(
             }
         }
         loop {
-            if !crate::budget::permit(crate::budget::Step::Structure, after.len().saturating_mul(after.len())) {
+            if !crate::budget::permit_size(
+                crate::budget::Step::Structure,
+                crate::budget::product(after.len(), after.len()),
+            ) {
                 return Vec::new();
             }
             let mut grew = false;
@@ -196,7 +199,8 @@ pub(crate) fn open_orders(
     };
     let mut out = Vec::new();
     for g in groups {
-        if !crate::budget::permit(crate::budget::Step::Structure, g.own.len().saturating_mul(g.all.len())) {
+        if !crate::budget::permit_size(crate::budget::Step::Structure, crate::budget::product(g.own.len(), g.all.len()))
+        {
             return Vec::new();
         }
         let mut pairs: Vec<(usize, usize)> = Vec::new();

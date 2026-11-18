@@ -79,9 +79,9 @@ pub(crate) fn lay_out(
         }
     };
     for round in 0..=rounds {
-        if !crate::budget::permit(
+        if !crate::budget::permit_size(
             crate::budget::Step::Structure,
-            problem.objects.len().saturating_add(crate::annotation::estimated_work(problem)),
+            crate::annotation::with_estimated_work(problem.objects.len(), problem),
         ) {
             laid.notes.push(format!("skeleton, round {round}: shared budget exhausted; drawing retained"));
             break;

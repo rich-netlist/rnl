@@ -138,6 +138,9 @@ struct Control<'a> {
     past: Cell<Option<u64>>,
     past_due: Cell<u64>,
     past_stopped: Cell<bool>,
+    /// Whether the safety limit stopped steps past the limit at any time in the run: what those
+    /// steps did then hangs on the clock, so that the run is not replayed by its work.
+    past_safety: Cell<bool>,
 }
 
 /// The steps admitted on one reading of the clock at most ([`Control::late`]).
@@ -208,6 +211,7 @@ impl Control<'_> {
                 self.past_due.set(next.saturating_add(self.every));
                 if self.clock.elapsed() - self.start >= safety {
                     self.past_stopped.set(true);
+                    self.past_safety.set(true);
                     return false;
                 }
             } else {
@@ -269,14 +273,19 @@ pub(crate) fn with<T>(
         past: Cell::new(None),
         past_due: Cell::new(0),
         past_stopped: Cell::new(false),
+        past_safety: Cell::new(false),
     };
     let result = ACTIVE.set(Some(&control), f);
     control.step.set("complete");
     control.observe(ProgressKind::Complete, Vec::new());
-    (
-        result,
-        BudgetReport { limit, work: control.used.get(), reason: control.stopped.get().unwrap_or(StopReason::Complete) },
-    )
+    // steps past the limit that the safety limit stopped did what the clock let them: the run
+    // stopped by its safety limit, which its work does not replay
+    let reason = if control.past_safety.get() {
+        StopReason::Safety
+    } else {
+        control.stopped.get().unwrap_or(StopReason::Complete)
+    };
+    (result, BudgetReport { limit, work: control.used.get(), reason })
 }
 
 /// Tell the observer that the solver entered `stage`, when it is not the stage it is in.
@@ -327,9 +336,11 @@ pub(crate) fn stopped() -> bool {
 /// Runs `f` past the limit the budget has reached: its steps are admitted until the safety limit
 /// passes, the only limit that stops it, and their work is counted apart from the work reported,
 /// so that a solve limited by work, run again to the work it reported, stops where it stopped and
-/// does the same past it. A time limit has no safety limit, so that it replays by work: there `f`
-/// is bounded by its own caps alone. Gives what `f` gives, the work it did, and whether the safety
-/// limit stopped it. Without a budget, or one not stopped, `f` runs as it would.
+/// does the same past it. Where the safety limit stops `f`, the run's reason is
+/// [`StopReason::Safety`], whatever stopped it before, as the clock decided what `f` did. A time
+/// limit has no safety limit, so that it replays by work: there `f` is bounded by its own caps
+/// alone. Gives what `f` gives, the work it did, and whether the safety limit stopped it. Without a
+/// budget, or one not stopped, `f` runs as it would.
 pub(crate) fn past_limit<T>(f: impl FnOnce() -> T) -> (T, u64, bool) {
     if !stopped() {
         return (f(), 0, false);
@@ -357,9 +368,21 @@ pub(crate) fn past_limit<T>(f: impl FnOnce() -> T) -> (T, u64, bool) {
     (out, work, safety)
 }
 
+/// The product of two counts, as a size: made in `u64`, so that it saturates where it would on
+/// any target, not at `usize::MAX` of a 32-bit one.
+pub(crate) fn product(a: usize, b: usize) -> u64 {
+    (a as u64).saturating_mul(b as u64)
+}
+
 /// Never charge zero: otherwise a work count would not uniquely identify the cutoff.
 pub(crate) fn permit(step: Step, size: usize) -> bool {
-    let cost = step.weight().saturating_mul((size as u64).max(1));
+    permit_size(step, size as u64)
+}
+
+/// [`permit`] for a size made in `u64`, such as a [`product`] of counts, so that a charge is the
+/// same on a 32-bit and a 64-bit target.
+pub(crate) fn permit_size(step: Step, size: u64) -> bool {
+    let cost = step.weight().saturating_mul(size.max(1));
     permit_weighted(step, cost)
 }
 
@@ -482,7 +505,8 @@ mod tests {
         assert_eq!(consumed(), 0);
     }
 
-    /// The safety limit stops steps past the limit, and the reason reported stays the limit's.
+    /// The safety limit stops steps past the limit, and the run is then reported stopped by it, not
+    /// replayed by its work: how far those steps went hangs on the clock.
     #[test]
     fn the_safety_limit_stops_steps_past_the_limit() {
         let ((steps, safety), report) = with(&Ticks(Cell::new(0)), RunLimit::Time(2.0), Some(40.0), || {
@@ -497,7 +521,66 @@ mod tests {
             (steps, safety)
         });
         assert!(safety && steps > 0);
-        assert_eq!(report.reason, StopReason::Time);
+        assert_eq!(report.reason, StopReason::Safety);
+        assert!(!report.reproducible());
+        // a limit of work, with the steps past it done before the safety limit passes: the reason
+        // stays the limit's
+        let ((), report) = with(&Ticks(Cell::new(0)), RunLimit::Work(3), Some(1000.0), || {
+            while permit(Step::Pivot, 1) {}
+            let (_, _, safety) = past_limit(|| (0..3).all(|_| permit(Step::Pivot, 1)));
+            assert!(!safety);
+        });
+        assert_eq!(report.reason, StopReason::Work);
+        assert!(report.reproducible());
+    }
+
+    /// A solve limited by work whose steps past the limit the safety limit stops, as on a slow
+    /// machine, is reported stopped by its safety limit, with no replay offered: those steps went as
+    /// far as the clock let them. On a fast machine the same solve stops by its work and replays.
+    #[test]
+    fn a_solve_whose_steps_past_the_limit_the_safety_limit_stops_is_not_replayed_by_its_work() {
+        use crate::resolve::tests::{instance, problem_of};
+        use crate::{solve_with_clock, SolverOptions};
+        use rnl_runtime::problem::PointRef;
+        struct Steps(Cell<f64>, f64);
+        impl Clock for Steps {
+            fn elapsed(&self) -> f64 {
+                let now = self.0.get();
+                self.0.set(now + self.1);
+                now
+            }
+        }
+        let mut p = problem_of(vec![instance(), instance()], Vec::new());
+        p.version = "0.4".into();
+        p.routes.push(rnl_runtime::problem::RouteIntent {
+            tree: true,
+            net: "n".into(),
+            mode: "auto".into(),
+            style: Vec::new(),
+            wires: Vec::new(),
+            pins: vec![
+                PointRef::Pin { object: 0, pin: 0, terminal: "g".into() },
+                PointRef::Pin { object: 1, pin: 0, terminal: "g".into() },
+            ],
+        });
+        let options = SolverOptions::default().with_config("limit=\"work\",work=0,safety_seconds=30").unwrap();
+        // each reading of the clock a microsecond on: the safety limit is never reached
+        let fast = solve_with_clock(&p, &options, &Steps(Cell::new(0.), 1e-6));
+        let budget = fast.report.budget.unwrap();
+        assert_eq!(budget.reason, StopReason::Work);
+        assert!(budget.reproducible());
+        assert!(fast.report.replay_config().is_some());
+        // each reading 31 seconds on: the safety limit passes at the first step past the limit
+        let slow = solve_with_clock(&p, &options, &Steps(Cell::new(0.), 31.));
+        let budget = slow.report.budget.unwrap();
+        assert_eq!(budget.reason, StopReason::Safety);
+        assert!(!budget.reproducible());
+        assert_eq!(slow.report.replay_config(), None);
+        assert!(
+            slow.report.notes.iter().any(|n| n.starts_with("budget:") && n.contains("not replayed")),
+            "{:?}",
+            slow.report.notes
+        );
     }
 
     struct Ticks(Cell<u64>);
@@ -605,6 +688,22 @@ mod tests {
         });
         assert_eq!(report.work, 5);
         assert!(!active());
+    }
+
+    /// A product of two counts is charged as it is made in `u64`, past what a 32-bit `usize`
+    /// holds: 65,536 pins squared is 2^32, not `u32::MAX`.
+    #[test]
+    fn a_product_of_counts_is_charged_in_u64() {
+        assert_eq!(product(65_536, 65_536), 1u64 << 32);
+        assert_eq!(product(usize::MAX, usize::MAX), u64::MAX);
+        let weight = Step::Structure.weight();
+        let big = product(65_536, 65_536);
+        let ((), report) =
+            with(&StoppedClock, RunLimit::Unlimited, None, || assert!(permit_size(Step::Structure, big)));
+        assert_eq!(report.work, weight * (1u64 << 32));
+        // a count charges as before
+        let ((), report) = with(&StoppedClock, RunLimit::Unlimited, None, || assert!(permit(Step::Structure, 7)));
+        assert_eq!(report.work, weight * 7);
     }
 
     #[test]
