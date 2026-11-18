@@ -821,8 +821,10 @@ fn pass(
             junction_seconds = Some(completion.elapsed.as_secs_f64());
             numbered = Some((completion.record.clone(), completion.numbered));
             written.record = completion.record;
-        } else if p.version == "0.4" && report_available && !written.record.is_empty() {
-            // no dots to place: the record still has to read back as it was solved
+        } else if p.version == "0.4" && !written.record.is_empty() {
+            // no dots to place: the record still has to read back as it was solved. The check
+            // compares the objects of two readings and needs no report of facts, so a backend
+            // that leaves the report out is checked too
             let both = Layered { layers: vec![&memory, &files] };
             let original_text = text_of(&r, &both, &host.file, &path)?;
             let context = crate::junction_completion_driver::Context {
