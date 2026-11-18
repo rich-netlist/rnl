@@ -1624,6 +1624,16 @@ test("the bar names a manifest's authors in their order, each with an https addr
   }
 });
 
+test("a manifest's source links only an https address, as an author's: another links the commit's tree", async ({ page }) => {
+  const source = { repo: "someone/design", commit: "0123456789abcdef0123456789abcdef01234567", url: "javascript:alert(1)" };
+  await manifestRoutes(page, demoManifest({ level: "(top)", source }));
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
+  await shown(page);
+  const link = page.locator("#manifest-bar .manifest-source");
+  await expect(link).toHaveText("Source: someone/design@0123456");
+  await expect(link).toHaveAttribute("href", `https://github.com/someone/design/tree/${source.commit}`);
+});
+
 test("a manifest's level defined in an included file is shown in the entry's document, with all it includes", async ({ page }) => {
   await manifestRoutes(page, demoManifest({ level: "amp" }));
   await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);

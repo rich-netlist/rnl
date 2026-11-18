@@ -70,6 +70,12 @@ pub struct UsageRole {
     /// References as written by the runtime, including unavailable members.
     pub members: Vec<String>,
     pub objects: Vec<usize>,
+    /// The points among its members, which are not objects: a named point by its name, one written as a position by it,
+    /// as `members` writes them; absent when it has none. Two usages that frame the same objects at other points are not
+    /// the same.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(test, ts(as = "Option<Vec<String>>", optional))]
+    pub points: Vec<String>,
     /// SVG groups to keep at full opacity while focusing this role.
     pub groups: Vec<String>,
     /// Visible extent in SVG pixels, y down; absent when no member can be displayed.
@@ -233,6 +239,7 @@ fn inspect(
         direct.entry(w.object_id.clone()).or_default().add(&g);
     }
     let by_id: HashMap<_, _> = lv.objects.iter().map(|o| (o.id.as_str(), o)).collect();
+    let point_ids: HashSet<&str> = lv.points.iter().map(|p| p.id.as_str()).collect();
     let mut memo = HashMap::new();
     let modern = rnl_runtime::interp::unit::keeps_0_4(&lv.language);
     let mut usages: Vec<Usage> = listed
@@ -300,11 +307,14 @@ fn inspect(
                 .map(|(name, a)| {
                     let mut members = Vec::new();
                     names(a, &mut members);
+                    let mut points = Vec::new();
+                    point_names(a, &point_ids, &mut points);
                     let g = geometry(a, level.scale, &by_id, &direct, &mut HashSet::new(), &mut memo);
                     UsageRole {
                         name: name.clone(),
                         members,
                         objects: g.objects.into_iter().collect(),
+                        points,
                         groups: g.groups.into_iter().collect(),
                         bounds: g.bounds,
                     }
@@ -468,6 +478,19 @@ fn names(a: &Attach, out: &mut Vec<String>) {
         }
     }
 }
+/// The points among the members, as `names` writes them: a named point of the level, or a position.
+fn point_names(a: &Attach, points: &HashSet<&str>, out: &mut Vec<String>) {
+    match a {
+        Attach::Object(id) if points.contains(id.as_str()) => out.push(id.clone()),
+        Attach::Object(_) => (),
+        Attach::At((x, y)) => out.push(format!("({x}, {y})")),
+        Attach::Set(members) => {
+            for a in members {
+                point_names(a, points, out);
+            }
+        }
+    }
+}
 fn point((x, y): (f64, f64), scale: f64) -> Geometry {
     Geometry { bounds: Some([x * scale, -y * scale, x * scale, -y * scale]), ..Default::default() }
 }
@@ -609,6 +632,31 @@ mod tests {
         let d = crate::build("g.sp", &p, &BuildOptions::default()).unwrap();
         let object = |name: &str| d.objects.iter().find(|o| o.name == name).unwrap();
         assert!(object("R3").usages.iter().all(|e| e.state == "in-effect"), "0.3 has no tree of groups");
+    }
+
+    #[test]
+    fn a_role_keeps_its_points_which_are_not_objects() {
+        let text = "* points
+* @RNL(type=\"header\") { @VERSION(\"0.4\") }
+R1 out 0 1k
+* @RNL {
+*   %axis = @DEFINE(roles=[[\"part\", \"instance\"], [\"axis\", \"point\"]]) {};
+*   #R1 @PLACE(0, 0); %p = (12, 0); %q = (0, 12);
+*   %a = #R1(part) %p(axis) @AS %axis;
+*   %b = #R1(part) %q(axis) @AS %axis
+* }
+.end
+";
+        let p = MemoryProvider::new().with("points.sp", text);
+        let d = crate::build("points.sp", &p, &BuildOptions::default()).unwrap();
+        assert!(!d.diagnostics.iter().any(|d| d.severity == "error"), "{:?}", d.diagnostics);
+        let roles = |id: &str| &d.levels[0].usages.iter().find(|u| u.id == id).unwrap().roles;
+        // the same instance, and each its own point, which is no object
+        assert_eq!(roles("%a")[0].objects, roles("%b")[0].objects);
+        assert!(roles("%a")[0].points.is_empty());
+        assert_eq!(roles("%a")[1].points, ["%p"]);
+        assert_eq!(roles("%b")[1].points, ["%q"]);
+        assert!(roles("%a")[1].objects.is_empty());
     }
 
     #[test]
