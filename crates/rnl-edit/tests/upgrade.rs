@@ -346,3 +346,75 @@ R1 a b 1k
     let result = upgraded(source);
     assert!(result.report.differences.is_empty(), "{:?}", result.report.differences);
 }
+
+#[test]
+fn only_the_hash_of_the_record_is_refreshed_not_the_same_text_elsewhere() {
+    use rnl_runtime::problem::input_digest;
+    let bare = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n.end\n";
+    let fresh = format!("sig2:{}.00000000000000aa", input_digest(&read_with(bare, false).problems[0]));
+    let source = format!(
+        "* title\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\nR1 a 0 1k\n* the run before: {fresh}\n* @RNL(type=\"generated\", priority=\"high\", author=\"rnl-solver 0.1\", hash=\"{fresh}\") {{ #R1 @PLACE(1, 2) }}\n.end\n"
+    );
+    let options = UpgradeOptions { std: false, keep_generated: true, ..UpgradeOptions::default() };
+    let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", &source), &options).unwrap();
+    let output = &result.files["t.sp"];
+    assert!(output.contains(&format!("* the run before: {fresh}\n")), "{output}");
+    let hash = hash_of(output, 1);
+    assert_ne!(hash, fresh, "{output}");
+    assert!(hash.ends_with(".00000000000000aa"), "{output}");
+}
+
+#[test]
+fn a_title_stays_the_first_line_when_the_entry_is_given_with_a_directory() {
+    // The first line of a SPICE file is its title, whatever it says: here it reads like a resistor.
+    let source = "Rtitle data 0 1k\nR1 out 0 2k\n.end\n";
+    for entry in ["/w/plain.sp", "w/plain.sp", "plain.sp"] {
+        let result = upgrade(entry, &MemoryProvider::new().with(entry, source), &options()).unwrap();
+        let output = &result.files[entry];
+        assert_eq!(output.lines().next(), Some("Rtitle data 0 1k"), "{entry}: {output}");
+        assert_eq!(output.lines().nth(1), Some("* @RNL(type=\"header\") { @VERSION(\"0.4\") }"), "{entry}: {output}");
+        assert!(result.report.successful(), "{entry}: {:?}", result.report);
+    }
+}
+
+#[test]
+fn the_verilog_a_files_that_the_upgraded_file_reads_are_in_its_group() {
+    // A file of 0.4 reads the Verilog-A files that it brings in; one of 0.3 reads none.
+    let files = MemoryProvider::new()
+        .with(
+            "/w/top.sp",
+            "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n.hdl model.va\nX1 a 0 model\n.end\n",
+        )
+        .with("/w/model.va", "module model(p,n);\ninout p,n;\nelectrical p,n;\nendmodule\n");
+    let result = upgrade("/w/top.sp", &files, &options()).unwrap();
+    assert!(result.read.iter().any(|p| p == "/w/model.va"), "{:?}", result.read);
+    assert!(result.report.successful(), "{:?}", result.report);
+}
+
+#[test]
+fn an_instance_whose_terminals_a_device_renames_keeps_its_pins() {
+    // The pins of 0.3 bind terminal numbers; those of the standard symbols of 0.4 bind the adapter's
+    // default names, d g s for a MESFET, which a DEVICE that renames the terminals takes away.
+    let source = "* title\n* @RNL(type=\"header\") {\n*   @VERSION(\"0.3\");\n*   @DEVICE(name=\"Z2\", terminals=[\"drain\", \"gate\", \"source\"])\n* }\nZ1 d g1 0 mesf\nZ2 d g2 0 mesf\n.model mesf nmf\n* @RNL {\n*   #Z1 @PLACE(0, 0); #Z2 @PLACE(10, 0);\n*   &d @WIRE {#Z1:d #Z2:drain};\n*   &0 @WIRE {#Z1:s #Z2:source}\n* }\n.end\n";
+    let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
+    let output = &result.files["t.sp"];
+    assert!(output.contains("#Z2 @SET-SYMBOL(terminals=[[1, \"d\"], [2, \"g\"], [3, \"s\"]]) $NJFET"), "{output}");
+    assert!(!output.contains("#Z1 @SET-SYMBOL"), "{output}");
+    assert!(result.report.differences.is_empty(), "{:#?}", result.report.differences);
+    assert!(result.report.successful(), "{:?}", result.report.diagnostics);
+}
+
+#[test]
+fn levels_of_the_same_title_are_compared_each_as_its_own() {
+    // A file level is titled by the file's name, which a subcircuit may share: the comparison tells
+    // the two apart by file as well, so the upgrade reads the same as with another title.
+    let report = |cell: &str| {
+        let files = MemoryProvider::new()
+            .with("/w/top.sp", &format!("* title\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\nR1 a 0 1k\nX1 a {cell}\n* @RNL {{ #R1 @PLACE(0, 0); #X1 @PLACE(4, 0) }}\n.include lib/cell.inc\n.end\n"))
+            .with("/w/lib/cell.inc", &format!("* lib\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n.subckt {cell} p\nR1 p 0 3k\n* @RNL {{ #R1 @PLACE(2, 2) }}\n.ends\n"));
+        upgrade("/w/top.sp", &files, &options()).unwrap().report
+    };
+    let (same, other) = (report("top.sp"), report("cell"));
+    assert!(same.successful(), "{:#?}", same.differences);
+    assert_eq!(same.differences.len(), other.differences.len());
+}

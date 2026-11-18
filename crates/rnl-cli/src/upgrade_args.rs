@@ -56,6 +56,17 @@ pub(crate) fn run(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> 
             keep_generated: args.upgrade_keep_generated,
         },
     )?;
+    // An input is replaced only by an upgrade that keeps its circuit and leaves nothing to review;
+    // any other is written to a directory, to be reviewed there.
+    let target = match target {
+        Some(Target::InPlace) if !result.report.successful() => {
+            eprintln!(
+                "rnl upgrade: --in-place left the input unchanged: the upgrade has target errors, differences or unconverted statements; write it with -o DIR to review it"
+            );
+            None
+        }
+        target => target,
+    };
     let mut files: Vec<_> =
         result.files.iter().map(|(path, text)| SolvedFile { path: path.clone(), text: text.clone() }).collect();
     // The shared writer also copies dependencies for an already upgraded entry.

@@ -100,23 +100,11 @@ impl DefaultBoxes {
         source: &str,
         notices: &mut Vec<Unconverted>,
     ) -> Vec<Edit> {
-        let eol = if source.contains("\r\n") { "\r\n" } else { "\n" };
         let mut out = Vec::new();
         for b in self.boxes.iter().filter(|b| doc.levels.get(b.level).is_some_and(|l| l.path == path)) {
-            let Ok(line) = record_line(doc, b.level, source) else { continue };
-            let Some(at) = line_start(source, line) else { continue };
-            let marker = carrier_at(doc, path, source, line);
-            let mut text: String = carried(&b.record, marker).into_iter().map(|l| format!("{l}{eol}")).collect();
-            // at the end of a text whose last line has no end of line
-            if at == source.len() && !source.is_empty() && !source.ends_with('\n') {
-                text.insert_str(0, eol);
-            }
-            out.push(Edit {
-                start: at,
-                end: at,
-                replacement: text.clone(),
-                change: Change { rule: RULE.into(), line, before: String::new(), after: text },
-            });
+            let Some(edit) = at_end(doc, b.level, path, source, &b.record, RULE) else { continue };
+            let line = edit.change.line;
+            out.push(edit);
             notices.push(Unconverted {
                 rule: RULE.into(),
                 line,
@@ -129,6 +117,33 @@ impl DefaultBoxes {
         }
         out
     }
+}
+
+/// The record `record`, carried as the file `path` carries RNL there, written before the end of the
+/// level `level` of `source`, under the rule `rule`; None where the level has no such line.
+pub(super) fn at_end(
+    doc: &HostDocument,
+    level: LevelId,
+    path: &str,
+    source: &str,
+    record: &str,
+    rule: &str,
+) -> Option<Edit> {
+    let eol = if source.contains("\r\n") { "\r\n" } else { "\n" };
+    let line = record_line(doc, level, source).ok()?;
+    let at = line_start(source, line)?;
+    let marker = carrier_at(doc, super::rewrite::document_name(doc, path), source, line);
+    let mut text: String = carried(record, marker).into_iter().map(|l| format!("{l}{eol}")).collect();
+    // at the end of a text whose last line has no end of line
+    if at == source.len() && !source.is_empty() && !source.ends_with('\n') {
+        text.insert_str(0, eol);
+    }
+    Some(Edit {
+        start: at,
+        end: at,
+        replacement: text.clone(),
+        change: Change { rule: rule.into(), line, before: String::new(), after: text },
+    })
 }
 
 /// The symbol an object of a level is drawn with, placed or not.

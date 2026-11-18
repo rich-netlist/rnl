@@ -60,9 +60,12 @@ fn terminal_04(name: String) -> String {
     }
 }
 
+/// The pins of the level of `problem` in `read`. A title does not tell a level: a file level is
+/// titled by the file's name, which an included file of another directory may share, and the same
+/// name may title a subcircuit.
 fn pins(read: &Interpretation, problem: &LevelProblem) -> Pins {
     let mut out = Pins::default();
-    for level in read.model.levels.iter().filter(|l| l.title == problem.title) {
+    for level in read.model.levels.iter().filter(|l| l.level == problem.level) {
         for object in level.objects.iter().filter(|o| !o.id.starts_with('@')) {
             for (index, pin) in object.pins.iter().enumerate() {
                 let terminal = pin.terminals.iter().find_map(|t| match t.rsplit_once(':') {
@@ -491,21 +494,22 @@ impl Items {
 
 /// The identities of the objects that only the upgraded text has: what a rule made there (junction
 /// dots, default texts), and what 0.4 counts as an object where 0.3 had only a usage of that name
-/// (a `$GROUND_STUB` or `$FLOW`, which now has a point of its own). Per level title.
-fn defaults(before: &Interpretation, after: &Interpretation) -> BTreeMap<String, BTreeSet<String>> {
+/// (a `$GROUND_STUB` or `$FLOW`, which now has a point of its own). Per level, by its file and title
+/// ([`LevelKey`]).
+fn defaults(before: &Interpretation, after: &Interpretation) -> BTreeMap<LevelKey, BTreeSet<String>> {
     let old: BTreeMap<_, (BTreeSet<_>, BTreeSet<_>)> = before
         .problems
         .iter()
         .map(|p| {
             (
-                p.title.clone(),
+                level_key(before, p),
                 (names(p, &pins(before, p)).into_iter().collect(), p.ids.usages.iter().cloned().collect()),
             )
         })
         .collect();
     let mut out = BTreeMap::new();
     for problem in &after.problems {
-        let (known, usages) = old.get(&problem.title).cloned().unwrap_or_default();
+        let (known, usages) = old.get(&level_key(after, problem)).cloned().unwrap_or_default();
         let set: BTreeSet<String> = names(problem, &pins(after, problem))
             .into_iter()
             .zip(&problem.objects)
@@ -517,13 +521,13 @@ fn defaults(before: &Interpretation, after: &Interpretation) -> BTreeMap<String,
             })
             .map(|(name, _)| name)
             .collect();
-        out.insert(problem.title.clone(), set);
+        out.insert(level_key(after, problem), set);
     }
     // What a rule made in either reading is the default fill of that version, which differs
     // between versions (0.3 draws a ground at each ground pin, 0.4 a stub).
     for read in [before, after] {
         for problem in &read.problems {
-            out.entry(problem.title.clone()).or_default().extend(
+            out.entry(level_key(read, problem)).or_default().extend(
                 names(problem, &pins(read, problem))
                     .into_iter()
                     .zip(&problem.objects)
@@ -553,39 +557,41 @@ fn explained_symbol(old: &str, new: &str) -> bool {
         || super::canvas::TABLE.iter().any(|r| r.old == old && r.new == new && r.old != r.new)
 }
 
-/// Per level title, the objects whose text of the key `name` became one of the key `netname`, which
-/// the upgrade writes for a net-displaying usage: in the reading before, `X::name` is `X::netname`.
-fn netname_keys(before: &Interpretation, after: &Interpretation) -> BTreeMap<String, BTreeSet<String>> {
-    let texts = |read: &Interpretation, title: &str| -> BTreeSet<String> {
+/// Per level ([`LevelKey`]), the objects whose text of the key `name` became one of the key
+/// `netname`, which the upgrade writes for a net-displaying usage: in the reading before, `X::name`
+/// is `X::netname`.
+fn netname_keys(before: &Interpretation, after: &Interpretation) -> BTreeMap<LevelKey, BTreeSet<String>> {
+    let texts = |read: &Interpretation, key: &LevelKey| -> BTreeSet<String> {
         read.model
             .levels
             .iter()
-            .filter(|l| l.title == title)
+            .filter(|l| model_key(read, l) == *key)
             .flat_map(|l| &l.texts)
             .map(|t| t.object_id.clone())
             .collect()
     };
     let mut out = BTreeMap::new();
     for level in &after.model.levels {
-        let (old, new) = (texts(before, &level.title), texts(after, &level.title));
+        let key = model_key(after, level);
+        let (old, new) = (texts(before, &key), texts(after, &key));
         let owners: BTreeSet<String> = old
             .iter()
             .filter_map(|id| id.strip_suffix("::name"))
             .filter(|o| new.contains(&format!("{o}::netname")) && !new.contains(&format!("{o}::name")))
             .map(str::to_string)
             .collect();
-        out.insert(level.title.clone(), owners);
+        out.insert(key, owners);
     }
     out
 }
 
 /// The items of the reading before with each text of the key `name` that the upgrade renamed called
 /// by its new name, in the item and in what it says.
-fn renamed_keys(items: BTreeMap<Key, Value>, keys: &BTreeMap<String, BTreeSet<String>>) -> BTreeMap<Key, Value> {
+fn renamed_keys(items: BTreeMap<Key, Value>, keys: &BTreeMap<LevelKey, BTreeSet<String>>) -> BTreeMap<Key, Value> {
     items
         .into_iter()
         .map(|((file, level, category, item), value)| {
-            let Some(owners) = keys.get(&level).filter(|o| !o.is_empty()) else {
+            let Some(owners) = keys.get(&(file.clone(), level.clone())).filter(|o| !o.is_empty()) else {
                 return ((file, level, category, item), value);
             };
             let (mut item, mut text) = (item, value.to_string());
@@ -607,10 +613,10 @@ fn renamed_keys(items: BTreeMap<Key, Value>, keys: &BTreeMap<String, BTreeSet<St
         .collect()
 }
 
-/// Per level title, the usages without a symbol that have a position of their own, free: 0.4 gives
-/// each usage a point, which draws nothing where no symbol is drawn.
-fn bare_usages(read: &Interpretation) -> BTreeMap<String, BTreeSet<String>> {
-    let mut out: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+/// Per level ([`LevelKey`]), the usages without a symbol that have a position of their own, free:
+/// 0.4 gives each usage a point, which draws nothing where no symbol is drawn.
+fn bare_usages(read: &Interpretation) -> BTreeMap<LevelKey, BTreeSet<String>> {
+    let mut out: BTreeMap<LevelKey, BTreeSet<String>> = BTreeMap::new();
     for problem in &read.problems {
         let names = identities(read, problem);
         let free = |s: &Slot| matches!(s, Slot::Free);
@@ -619,7 +625,7 @@ fn bare_usages(read: &Interpretation) -> BTreeMap<String, BTreeSet<String>> {
                 && object.symbol.is_none()
                 && matches!(&object.position, Position::Own { x, y } if free(x) && free(y));
             if bare {
-                out.entry(problem.title.clone()).or_default().insert(names[index].clone());
+                out.entry(level_key(read, problem)).or_default().insert(names[index].clone());
             }
         }
     }
@@ -632,19 +638,20 @@ fn bare_usages(read: &Interpretation) -> BTreeMap<String, BTreeSet<String>> {
 /// that went to their pin) is the rule's doing, which the report names in the changes of the file;
 /// it goes to `rule_changes`, still listed. A change of definition the tables do not explain is a
 /// difference.
-fn converted(before: &Interpretation, after: &Interpretation) -> BTreeMap<String, BTreeSet<String>> {
-    let definitions = |read: &Interpretation, title: &str| -> BTreeMap<String, String> {
+fn converted(before: &Interpretation, after: &Interpretation) -> BTreeMap<LevelKey, BTreeSet<String>> {
+    let definitions = |read: &Interpretation, key: &LevelKey| -> BTreeMap<String, String> {
         read.model
             .levels
             .iter()
-            .filter(|l| l.title == title)
+            .filter(|l| model_key(read, l) == *key)
             .flat_map(|l| &l.objects)
             .filter_map(|o| Some((o.id.clone(), o.definition.clone()?)))
             .collect()
     };
     let mut out = BTreeMap::new();
     for level in &after.model.levels {
-        let (old, new) = (definitions(before, &level.title), definitions(after, &level.title));
+        let key = model_key(after, level);
+        let (old, new) = (definitions(before, &key), definitions(after, &key));
         let set = new
             .into_iter()
             .filter(|(id, definition)| {
@@ -652,18 +659,18 @@ fn converted(before: &Interpretation, after: &Interpretation) -> BTreeMap<String
             })
             .map(|(id, _)| id)
             .collect();
-        out.insert(level.title.clone(), set);
+        out.insert(key, set);
     }
     out
 }
 
 /// The ids of the texts that only a symbol gives, in either reading, per level title. Such a text
 /// appearing, going or changing is the package's default look, whatever the text says.
-fn package_texts(before: &Interpretation, after: &Interpretation) -> BTreeMap<String, BTreeSet<String>> {
-    let mut out: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+fn package_texts(before: &Interpretation, after: &Interpretation) -> BTreeMap<LevelKey, BTreeSet<String>> {
+    let mut out: BTreeMap<LevelKey, BTreeSet<String>> = BTreeMap::new();
     for read in [before, after] {
         for level in &read.model.levels {
-            out.entry(level.title.clone())
+            out.entry(model_key(read, level))
                 .or_default()
                 .extend(level.texts.iter().filter(|t| !t.written).map(|t| t.object_id.clone()));
         }
@@ -691,24 +698,37 @@ fn mentions(defaults: &BTreeSet<String>, text: &str) -> bool {
     defaults.iter().any(|name| text.contains(&mark(name)))
 }
 
+/// A level as the two readings both know it: the path of its file and its title. A title alone
+/// does not tell a level: a file level is titled by the file's name, which an included file of
+/// another directory may share.
+type LevelKey = (String, String);
+
+fn level_key(read: &Interpretation, problem: &LevelProblem) -> LevelKey {
+    (read.doc.levels[problem.level].path.clone(), problem.title.clone())
+}
+
+fn model_key(read: &Interpretation, level: &rnl_runtime::model::LevelView) -> LevelKey {
+    (read.doc.levels[level.level].path.clone(), level.title.clone())
+}
+
 /// The identities of the instances that the reading `before` draws with the default symbol, per
-/// level title: the boxes whose pins a wire goes to are compared (`wired_pins`).
-fn default_boxed(before: &Interpretation) -> BTreeMap<String, BTreeSet<String>> {
-    let mut out: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    for problem in &before.problems {
-        let names = identities(before, problem);
+/// level ([`LevelKey`]): the boxes whose pins a wire goes to are compared (`wired_pins`).
+fn default_boxed(read: &Interpretation) -> BTreeMap<LevelKey, BTreeSet<String>> {
+    let mut out: BTreeMap<LevelKey, BTreeSet<String>> = BTreeMap::new();
+    for problem in &read.problems {
+        let names = identities(read, problem);
         for (index, object) in problem.objects.iter().enumerate() {
             if object.symbol.is_some_and(|k| problem.symbols[k].default) {
-                out.entry(problem.title.clone()).or_default().insert(names[index].clone());
+                out.entry(level_key(read, problem)).or_default().insert(names[index].clone());
             }
         }
     }
     out
 }
 
-/// The instances that 0.4 draws with a turned or moved symbol (see `turned`), by level title and
-/// id, with the frame that draws the new symbol as the old.
-pub(super) type Turned = BTreeMap<(String, String), Frame>;
+/// The instances that 0.4 draws with a turned or moved symbol (see `turned`), by the file and title
+/// of their level and their id, with the frame that draws the new symbol as the old.
+pub(super) type Turned = BTreeMap<(String, String, String), Frame>;
 
 /// The code of 0.3 that `code` of 0.4 draws with a symbol turned by `turn`: the one it composes.
 fn turned_back(turn: Orient, code: Orient) -> Orient {
@@ -791,8 +811,8 @@ fn turned_fact(
 /// symbol is turned back, of the reading after.
 fn snapshot(
     read: &Interpretation,
-    added: &BTreeMap<String, BTreeSet<String>>,
-    boxed: &BTreeMap<String, BTreeSet<String>>,
+    added: &BTreeMap<LevelKey, BTreeSet<String>>,
+    boxed: &BTreeMap<LevelKey, BTreeSet<String>>,
     boxes: &BTreeSet<String>,
     turned: &Turned,
 ) -> Items {
@@ -806,7 +826,7 @@ fn snapshot(
         .filter(|(path, text)| path.starts_with(rnl_view::BUNDLED_DIR) || bundled.files.values().any(|b| b == text))
         .flat_map(|(path, _)| [path.as_str(), path.rsplit(['/', '\\']).next().unwrap_or(path)])
         .collect();
-    let pinmaps: BTreeMap<String, Pins> = read.problems.iter().map(|p| (p.title.clone(), pins(read, p))).collect();
+    let pinmaps: BTreeMap<usize, Pins> = read.problems.iter().map(|p| (p.level, pins(read, p))).collect();
     for level in &read.doc.levels {
         if !level.circuit {
             continue;
@@ -826,7 +846,7 @@ fn snapshot(
     for level in &read.model.levels {
         let file = &read.doc.levels[level.level].path;
         let title = &level.title;
-        let pins = pinmaps.get(title).cloned().unwrap_or_default();
+        let pins = pinmaps.get(&level.level).cloned().unwrap_or_default();
         let mut put = |category: &str, key: &str, value: Value| out.put(file, title, category, key, value);
         // An id that is where a statement is written moves with the upgrade; such an object is
         // known by what it is.
@@ -850,7 +870,9 @@ fn snapshot(
                     .map(|item| symbol(&level.unplaced_symbols, item.symbol, 0))
             };
             let mut geometry = drawn.or_else(undrawn);
-            if let (Some(frame), Some(g)) = (turned.get(&(title.clone(), object.id.clone())), geometry.as_mut()) {
+            if let (Some(frame), Some(g)) =
+                (turned.get(&(file.clone(), title.clone(), object.id.clone())), geometry.as_mut())
+            {
                 turn_geometry(*frame, g);
             }
             let standard = matches!(object.symbol.as_ref().map(|s| &s.origin), Some(SymbolOrigin::Package(_)));
@@ -905,7 +927,7 @@ fn snapshot(
         let title = &problem.title;
         let names = identities(read, problem);
         let frame_of = |index: usize| match &problem.objects.get(index)?.reference {
-            Reference::Name(id) => turned.get(&(title.clone(), id.clone())).copied(),
+            Reference::Name(id) => turned.get(&(file.clone(), title.clone(), id.clone())).copied(),
             _ => None,
         };
         let turn_of = |index: usize| frame_of(index).map(|f| f.turn);
@@ -920,7 +942,7 @@ fn snapshot(
             Some(frame.offset(code)).filter(|&o| o != (0.0, 0.0))
         };
         let none = BTreeSet::new();
-        let default = added.get(title).unwrap_or(&none);
+        let default = added.get(&(file.clone(), title.clone())).unwrap_or(&none);
         // The pins of an instance drawn with the default symbol, the viewer's stand-in of 0.3 or
         // the default block symbol of 0.4 (9.2.6), are the default look too.
         let mut default_or_boxed = default.clone();
@@ -932,7 +954,7 @@ fn snapshot(
         let mut put = |category: &str, key: &str, value: Value| out.put(file, title, category, key, value);
         // A pin of the default symbol of 0.3 that a wire goes to stays where it was: where it is,
         // in the symbol, and the way it faces. The rest of that symbol is the default look.
-        let boxed_here = boxed.get(title);
+        let boxed_here = boxed.get(&(file.clone(), title.clone()));
         let mut wired = BTreeSet::new();
         for wire in &problem.wires {
             for anchor in &wire.anchors {
@@ -1072,7 +1094,7 @@ pub(super) fn compare(
     let no_ids = BTreeSet::new();
     for ((file, level, category, item), value) in after {
         let old = before.remove(&(file.clone(), level.clone(), category.clone(), item.clone()));
-        let default = added.get(&level);
+        let default = added.get(&(file.clone(), level.clone()));
         let only_look = match &old {
             Some(old) => {
                 old != &value
@@ -1109,7 +1131,7 @@ pub(super) fn compare(
             continue;
         }
         let package_text = matches!(category.as_str(), "texts" | "positions")
-            && package.get(&level).is_some_and(|ids| {
+            && package.get(&(file.clone(), level.clone())).is_some_and(|ids| {
                 item.starts_with("label|")
                     || ids.contains(&item)
                     || item.split('|').next().is_some_and(|first| ids.contains(first))
@@ -1117,14 +1139,15 @@ pub(super) fn compare(
         let fill = default.is_some_and(|d| is_fill(d, &category, &item, &value))
             || old.as_ref().is_some_and(|old| is_fill(default.unwrap_or(&no_ids), &category, &item, old));
         // the free point of its own that 0.4 gives a usage without a symbol, which draws nothing
-        let bare_point =
-            old.is_none() && category == "positions" && bare.get(&level).is_some_and(|ids| ids.contains(&item));
+        let bare_point = old.is_none()
+            && category == "positions"
+            && bare.get(&(file.clone(), level.clone())).is_some_and(|ids| ids.contains(&item));
         // a pin that a definition of the standard package turns at priority low, which 0.3 left to
         // the solver: the package's default look (11.2)
         let packaged =
             old.is_none() && package_look.contains(&(file.clone(), level.clone(), category.clone(), item.clone()));
         let only_look = only_look || package_text || fill || bare_point || packaged;
-        let ids = rules.get(&level).unwrap_or(&no_ids);
+        let ids = rules.get(&(file.clone(), level.clone())).unwrap_or(&no_ids);
         // The upgrade writes a default that 0.3 had by itself (`@ATTACH(gap=2)`) as a parameter,
         // so that the drawing stays: the object is the same but for parameters it did not list.
         let explicit_default = category == "objects"
@@ -1148,15 +1171,15 @@ pub(super) fn compare(
         }
     }
     for ((file, level, category, item), value) in before {
-        let ids = rules.get(&level).unwrap_or(&no_ids);
+        let ids = rules.get(&(file.clone(), level.clone())).unwrap_or(&no_ids);
         let by_rule_here = about(ids, &item, &value.to_string());
         let package_text = matches!(category.as_str(), "texts" | "positions")
-            && package.get(&level).is_some_and(|ids| {
+            && package.get(&(file.clone(), level.clone())).is_some_and(|ids| {
                 item.starts_with("label|")
                     || ids.contains(&item)
                     || item.split('|').next().is_some_and(|first| ids.contains(first))
             });
-        let fill = added.get(&level).is_some_and(|d| is_fill(d, &category, &item, &value));
+        let fill = added.get(&(file.clone(), level.clone())).is_some_and(|d| is_fill(d, &category, &item, &value));
         // a fact of the old standard package's default look that the new package draws otherwise
         let packaged = before_look.contains(&(file.clone(), level.clone(), category.clone(), item.clone()));
         let difference = Difference { file, level, category, item, before: Some(value), after: None };

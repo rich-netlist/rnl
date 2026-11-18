@@ -179,18 +179,87 @@ fn mapping(before: &[Pin], after: &[Pin], allow_direction_fallback: bool) -> Opt
     Some(format!("@SET-SYMBOL(terminals=[{}])", pairs.join(", ")))
 }
 
+/// The rule of the terminal maps given to instances whose terminals a DEVICE renames.
+const RENAMED_RULE: &str = "device-terminal-map";
+
+/// An instance that the reading of 0.3 draws with a symbol of a package while a DEVICE
+/// gives its terminals names other than the adapter's (6.12). The pins of 0.3 bind terminal
+/// numbers, so the names did not matter; those of 0.4 bind the adapter's names, which the instance
+/// no longer has, so they would bind nothing (11.3). With the verified terminal map of its symbol,
+/// the instance gets that symbol with the map, written after the records of its level; where a
+/// statement of the file gives it the symbol, that statement gets the same map (`standard-terminal-map`).
+/// Without a verified map, a notice says what is missing.
+struct Renamed {
+    level: usize,
+    line: u32,
+    /// `#Z1`, as a record writes it.
+    instance: String,
+    /// The symbol of 0.4.
+    symbol: String,
+    /// `#Z1 @SET-SYMBOL(terminals=[...]) $NJFET`, where the map is verified.
+    statement: Option<String>,
+}
+
+fn renamed(input: &Interpretation, maps: &BTreeMap<(usize, String), String>, symbols: &Symbols) -> Vec<Renamed> {
+    let doc = &input.doc;
+    let mut out = Vec::new();
+    for level in &input.model.levels {
+        if level.language.as_str() >= "0.4" {
+            continue;
+        }
+        let Some(lv) = doc.levels.get(level.level) else { continue };
+        for object in &level.objects {
+            let Some(symbol) = object.symbol.as_ref().filter(|s| {
+                object.kind == "instance" && matches!(s.origin, rnl_runtime::model::SymbolOrigin::Package(_))
+            }) else {
+                continue;
+            };
+            let name = object.id.trim_start_matches('#');
+            let Some(index) = lv.instances.iter().position(|i| doc.key(&i.name) == doc.key(name)) else { continue };
+            let instance = &lv.instances[index];
+            let Some(names) = level.terminal_names.get(index) else { continue };
+            let target = super::legacy::renamed_03_symbol(symbol.name.trim_start_matches('$'))
+                .map_or_else(|| symbol.name.clone(), |s| format!("${s}"));
+            // the pins of the symbol of 0.4, each by the terminal name it binds
+            let same = |a: &str, b: &str| if instance.case_sensitive { a == b } else { a.eq_ignore_ascii_case(b) };
+            let binds = |pins: &Vec<Pin>| {
+                pins.iter().all(|pin| match &pin.terminal {
+                    Value::Str(name) => names.iter().flatten().any(|n| same(n, name)),
+                    _ => true,
+                })
+            };
+            let pins: Vec<_> = symbols.iter().filter(|((_, n), _)| *n == target).map(|(_, pins)| pins).collect();
+            if pins.is_empty() || pins.iter().any(|p| binds(p)) {
+                continue;
+            }
+            let reference = format!("#{}", rnl_runtime::model::quoted(&instance.name));
+            let statement =
+                maps.get(&(level.level, symbol.name.clone())).map(|map| format!("{reference} {map} {target}"));
+            out.push(Renamed {
+                level: level.level,
+                line: instance.line,
+                instance: reference,
+                symbol: target,
+                statement,
+            });
+        }
+    }
+    out
+}
+
 #[derive(Default)]
 pub(super) struct Terminals {
     maps: BTreeMap<(usize, String), String>,
+    renamed: Vec<Renamed>,
 }
 impl Terminals {
     pub(super) fn new(input: &Interpretation) -> Self {
         let mut maps = BTreeMap::new();
+        let target = symbols("0.4");
         let (shadowed, aliases) = super::standard::shadows(input);
         if aliases {
-            return Self { maps };
+            return Self { renamed: renamed(input, &maps, &target), maps };
         }
-        let target = symbols("0.4");
         let bundled = rnl_view::bundled();
         for version in ["0.2", "0.3"] {
             for ((package, name), before) in symbols(version) {
@@ -232,7 +301,41 @@ impl Terminals {
                 }
             }
         }
-        Self { maps }
+        Self { renamed: renamed(input, &maps, &target), maps }
+    }
+
+    /// For the levels written in the file `path`: a record, before the end of each, that gives the
+    /// instances whose terminals a DEVICE renames their symbol with its terminal map; a notice for
+    /// each such instance with no verified map.
+    pub(super) fn renamed_edits(
+        &self,
+        doc: &rnl_runtime::host::HostDocument,
+        path: &str,
+        source: &str,
+        notices: &mut Vec<super::Unconverted>,
+    ) -> Vec<Edit> {
+        let mut statements: BTreeMap<usize, Vec<&str>> = BTreeMap::new();
+        for renamed in self.renamed.iter().filter(|r| doc.levels.get(r.level).is_some_and(|l| l.path == path)) {
+            match &renamed.statement {
+                Some(statement) => statements.entry(renamed.level).or_default().push(statement),
+                None => notices.push(super::Unconverted {
+                    rule: RENAMED_RULE.into(),
+                    line: renamed.line,
+                    before: String::new(),
+                    reason: format!(
+                        "a DEVICE renames the terminals of {}, and the pins of {} in 0.4 bind the adapter's default terminal names: give {} @SET-SYMBOL(terminals=[...]) {} that maps its pins to its terminals (6.12, 11.3)",
+                        renamed.instance, renamed.symbol, renamed.instance, renamed.symbol
+                    ),
+                }),
+            }
+        }
+        statements
+            .into_iter()
+            .filter_map(|(level, statements)| {
+                let record = format!("@RNL {{\n  {}\n}}", statements.join(";\n  "));
+                super::default_boxes::at_end(doc, level, path, source, &record, RENAMED_RULE)
+            })
+            .collect()
     }
 
     pub(super) fn edit(
