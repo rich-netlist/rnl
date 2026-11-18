@@ -2,18 +2,16 @@
 // dialog says how many, as the Not drawn tab counts them, and offers Solve, which solves as Solve does,
 // or Not now, after which the same file asks no more while the page is open. Only when a file is
 // opened, not read again or rebuilt; only where a solver is; Solve › Ask to Solve on Open turns it
-// off. The other tests start with it off (playwright.config.js); these start from an empty storage.
+// off. The fake shell starts the other tests with it off; `ask-solve=1` leaves it on, as the page has it.
 
 import { expect, test } from "../viewer.js";
-
-test.use({ storageState: { cookies: [], origins: [] } });
 
 const DESKTOP = { platform: "desktop" };
 const dialog = (page) => page.locator("dialog.dialog");
 
 /** Open `fixture` and wait until the page has seen it, without waiting for idle (a dialog is up). */
 async function open(page, fixture, query = DESKTOP) {
-  const params = new URLSearchParams({ shell: "fake", open: fixture, ...query });
+  const params = new URLSearchParams({ shell: "fake", open: fixture, "ask-solve": "1", ...query });
   await page.goto(`${process.env.RNL_VIEWER_URL}/index.html?${params}`);
   await page.waitForFunction(() => window.viewer?.doc && !document.body.classList.contains("busy"));
 }

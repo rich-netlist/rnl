@@ -8,9 +8,12 @@ import path from "node:path";
 import { buildRnl, writeFixtures } from "./fixtures.js";
 import { serve } from "./server.js";
 
-/** The storage every page starts with (playwright.config.js): Ask to Solve on Open off, at the origins of both servers. */
+/**
+ * The storage every page starts with (playwright.config.js): Ask to Solve on Open off, at the origin of
+ * the web viewer's server; the pages of the fake shell have it off from the shell (fake-shell.js).
+ */
 function writeStorageState() {
-  const origins = [process.env.RNL_VIEWER_URL, process.env.RNL_WEB_URL].filter(Boolean)
+  const origins = [process.env.RNL_WEB_URL].filter(Boolean)
     .map((origin) => ({ origin, localStorage: [{ name: "solve-on-open", value: "false" }] }));
   fs.writeFileSync(process.env.RNL_STORAGE_STATE, JSON.stringify({ cookies: [], origins }));
 }
@@ -26,7 +29,6 @@ export default async function globalSetup() {
   writeFixtures(rnl, dir);
   const server = await serve(dir);
   process.env.RNL_VIEWER_URL = server.url;
-  writeStorageState();
   return async () => {
     await server.close();
     fs.rmSync(process.env.RNL_STORAGE_STATE, { force: true });

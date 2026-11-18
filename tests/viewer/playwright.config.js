@@ -60,9 +60,9 @@ function pageSpecsOnly() {
 // the workers load this file too, and inherit whether the runner builds the site, and its port
 process.env.RNL_WEB ??= pageSpecsOnly() ? "0" : "1";
 // What every page starts with in the browser's storage, which global-setup.js writes: Solve › Ask to
-// Solve on Open turned off, so that a netlist opened with components not drawn asks nothing of a test
-// that does not test the question (solve-on-open.spec.js does, from an empty storage). The workers
-// inherit the main process's path.
+// Solve on Open turned off at the web viewer's origin, so that a netlist opened with components not
+// drawn asks nothing of a test that does not test the question (the fake shell turns it off for its
+// pages itself). The workers inherit the main process's path.
 process.env.RNL_STORAGE_STATE ||= path.join(os.tmpdir(), `rnl-viewer-storage-${process.pid}.json`);
 const web = process.env.RNL_WEB !== "0";
 if (web) {
