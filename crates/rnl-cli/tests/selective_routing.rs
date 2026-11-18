@@ -434,6 +434,50 @@ fn independent_trees_solve_and_write_back_without_cross_tree_wires() {
 }
 
 #[test]
+fn a_route_net_with_fewer_than_two_points_before_generation_is_warned() {
+    // `in` and `y` reach one pin each; `in` is a port, whose tag generation would add too late
+    let read = |statements: &str| {
+        let source = format!(
+            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n.subckt amp in out\nR1 in out 1k\nR2 out x 1k\nR3 x y 1k\n\
+             * @RNL {{ $S = @DEFINE-SYMBOL {{ (0,0) @PIN(terminal=1); (2,0) @PIN(terminal=2) }}; {{#R1 #R2 #R3}} @SET-SYMBOL $S; {statements} }}\n.ends\n.end\n"
+        );
+        let r = interpret_file(
+            Path::new("t.sp"),
+            None,
+            &MemoryProvider::new().with("t.sp", &source),
+            &Options { std: false, ..Options::solver() },
+        )
+        .unwrap();
+        assert!(errors(&r).is_empty(), "{statements}: {:?}", errors(&r));
+        let mut warned: Vec<String> = r
+            .diagnostics()
+            .into_iter()
+            .filter(|d| d.code == rnl_runtime::diag::codes::ROUTE_NET_SINGLE_POINT)
+            .inspect(|d| assert_eq!(d.severity, Severity::Warning))
+            .map(|d| d.message.clone())
+            .collect();
+        warned.sort();
+        warned
+    };
+    let warned = read("&in @ROUTE-NET; &out @ROUTE-NET; &x @ROUTE-NET; &y @ROUTE-NET");
+    assert_eq!(warned.len(), 2, "{warned:?}");
+    assert!(
+        warned[0].starts_with("ROUTE-NET on in does nothing") && warned[0].contains("`$IO_PORT @ATTACH &in`"),
+        "{warned:?}"
+    );
+    assert!(warned[1].starts_with("ROUTE-NET on y does nothing") && !warned[1].contains("IO_PORT"), "{warned:?}");
+    // a request over a set or by a rule leaves its one-pin nets by design, port nets too
+    assert!(read("# @SELECT-NET => @ROUTE-NET").is_empty());
+    assert!(read("%nets = # @SELECT-NET; %nets @ROUTE-NET").is_empty());
+    assert!(read("{&in &y} @ROUTE-NET").is_empty());
+    // a request in a definition's body, or disabled, is not warned
+    assert!(read("$D = @DEFINE(roles=[[\"p\", \"pin\"]]) { ?p::net @ROUTE-NET }; #R3:2 @AS $D").is_empty());
+    assert!(read("&y @ROUTE-NET(priority=\"disabled\")").is_empty());
+    // a net whose pins an UNROUTE takes out is told of by RNL9403, not this
+    assert!(read("&out @ROUTE-NET; &out @UNROUTE-NET(priority=\"high\")").is_empty());
+}
+
+#[test]
 fn partial_and_complete_unroute_overrides_are_both_hints() {
     for (tail, count) in [("#R1 @UNROUTE-OBJECT", 1), ("&a @UNROUTE-NET", 4)] {
         let r = valid(&format!("&a @ROUTE-NET; {tail}"));

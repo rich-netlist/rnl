@@ -3717,12 +3717,13 @@ impl Interp<'_> {
                             pos_plus(&site.pos, "g", index as i64),
                             &member_site,
                             off,
+                            false,
                         ) {
                             made.push(object);
                         }
                     }
                 } else {
-                    let _ = it.record_routing(scene, source, spec.clone(), site.pos.clone(), &site, off);
+                    let _ = it.record_routing(scene, source, spec.clone(), site.pos.clone(), &site, off, false);
                 }
                 if spec.net && spec.join {
                     if let ObjData::Set(set) = it.om(output) {
@@ -3750,6 +3751,7 @@ impl Interp<'_> {
                     pos_plus(&ctx.pos, "e", index as i64),
                     &site,
                     off,
+                    false,
                 ) {
                     made.push((object, true));
                 }
@@ -3758,7 +3760,7 @@ impl Interp<'_> {
                 if join { self.new_obj(ObjData::Set(Box::new(SetData::plain(made, false)))) } else { input.obj };
             return Ok((output, input.sel));
         }
-        let output = self.record_routing(scene, input.obj, spec, ctx.pos.clone(), ctx, off)?;
+        let output = self.record_routing(scene, input.obj, spec, ctx.pos.clone(), ctx, off, true)?;
         Ok((output, input.sel))
     }
 

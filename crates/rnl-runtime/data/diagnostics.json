@@ -4863,6 +4863,16 @@
    "sections": []
   },
   {
+   "number": "RNL9407",
+   "name": "route-net-single-point",
+   "severity": "warning",
+   "message": "ROUTE-NET on {net} does nothing: before generation the net has fewer than two points to join (8.2, 13.7){advice}",
+   "sections": [
+    "8.2",
+    "13.7"
+   ]
+  },
+  {
    "number": "RNL9404",
    "name": "unplaced-objects",
    "severity": "hint",

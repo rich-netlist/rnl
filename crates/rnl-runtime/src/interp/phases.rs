@@ -98,6 +98,7 @@ impl Interp<'_> {
             self.scenes[s].condition_trees = self.resolve_routing_trees(s, true, false);
             self.run_tasks_in_phase(s, 9, 4);
             self.scenes[s].condition_trees = self.resolve_routing_trees(s, true, false);
+            self.note_routes_without_a_tree(s);
         }
         self.scenes[s].phase = 5;
         self.run_tasks(s, 5);
