@@ -24,8 +24,8 @@
       "case_id": "reviewed-0.4/bandgap-reference.sp",
       "source": "tests/integration/solver-0.4/bandgap-reference.sp",
       "input": "inputs/representative/reviewed-0.4/bandgap-reference.sp",
-      "sha256": "418ee0f9882146a0e1b3d74a5c2aa36cfce73bfd02b36cf52fe15f5520e74e9f",
-      "bytes": 3587
+      "sha256": "9dfea107fbd788c75c8951b47286ea2975ac48208f7b78a89efb24daed8ebaca",
+      "bytes": 3707
     },
     {
       "case_id": "reviewed-0.4/cs-amplifier.sp",
@@ -101,7 +101,7 @@
       "case_id": "reviewed-0.4/tow-thomas-biquad.sp",
       "source": "tests/integration/solver-0.4/tow-thomas-biquad.sp",
       "input": "inputs/representative/reviewed-0.4/tow-thomas-biquad.sp",
-      "sha256": "4abb144d25c09fc670abda75c3ad68c858d95fdcf81ff7f643e886f5811d0334",
+      "sha256": "e3eca14761eb7d9c870a66416bce7f1d1896dd66b5c302eff5dc388f6ef1475d",
       "bytes": 3515
     }
   ],

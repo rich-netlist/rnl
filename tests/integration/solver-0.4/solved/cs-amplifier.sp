@@ -51,7 +51,7 @@ RL out 0 10k
 *   %supply_distance = #VDD #VSIG @DISTANCE("left-to-right", min=4);
 *   %supply_row = {#VDD #VSIG} @ALIGN("y")
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:5e1a0c4ce0756568.6812a3e5d5469100", numbering="e4081387d5b0c56a") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:9cb590bda7db1851.9da9d1c56a7c0c2c", numbering="39b187f3dc28d4ea") {
 *   %ground_stub_VDD_n = $GROUND_STUB @ATTACH(gap=3) #VDD::n;
 *   %ground_stub_VSIG_n = $GROUND_STUB @ATTACH(gap=3) #VSIG::n;
 *   %ground_stub_RG2_n = $GROUND_STUB @ATTACH(gap=3) #RG2::n;
@@ -61,21 +61,21 @@ RL out 0 10k
 *   %supply_stub_VDD_p = $SUPPLY_STUB @ATTACH(gap=3) #VDD::p;
 *   %supply_stub_RG1_p = $SUPPLY_STUB @ATTACH(gap=3) #RG1::p;
 *   %supply_stub_RD_p = $SUPPLY_STUB @ATTACH(gap=3) #RD::p;
-*   %rt1 = (0, 6);
-*   %rt2 = (9, 9);
-*   %rt3 = (9, 3);
-*   #VDD @PLACE(-21, 0) => @ORIENT("R0");
-*   #VSIG @PLACE(-11, 0) => @ORIENT("R0");
-*   #CIN @PLACE(-8, 6) => @ORIENT("R90");
-*   #RG1 @PLACE(0, 9) => @ORIENT("R0");
-*   #RG2 @PLACE(0, 3) => @ORIENT("R0");
-*   #M1 @PLACE(9, 6) => @ORIENT("R0");
-*   #RD @PLACE(9, 13) => @ORIENT("R0");
+*   %rt1 = (0, 5);
+*   %rt2 = (9, 8);
+*   %rt3 = (9, 2);
+*   #VDD @PLACE(-21, -1) => @ORIENT("R0");
+*   #VSIG @PLACE(-11, -1) => @ORIENT("R0");
+*   #CIN @PLACE(-8, 5) => @ORIENT("R90");
+*   #RG1 @PLACE(0, 8) => @ORIENT("R0");
+*   #RG2 @PLACE(0, 2) => @ORIENT("R0");
+*   #M1 @PLACE(9, 5) => @ORIENT("R0");
+*   #RD @PLACE(9, 12) => @ORIENT("R0");
 *   #RS @PLACE(9, 0) => @ORIENT("R0");
-*   #CS @PLACE(17, 0) => @ORIENT("R90");
-*   #COUT @PLACE(27, 9) => @ORIENT("R90");
-*   #RL @PLACE(30, 0) => @ORIENT("R0");
-*   %degen @PLACE(0, 0);
+*   #CS @PLACE(16, 0) => @ORIENT("R90");
+*   #COUT @PLACE(26, 8) => @ORIENT("R90");
+*   #RL @PLACE(29, 0) => @ORIENT("R0");
+*   %degen @PLACE(12.5, 0);
 *   %#1 @PLACE(0, 0);
 *   %amp @PLACE(0, 0);
 *   %#2 @PLACE(0, 0);
@@ -90,24 +90,24 @@ RL out 0 10k
 *   %branch2 @PLACE(0, 0);
 *   %#7 @PLACE(0, 0);
 *   %ground_stub_VDD_n @PLACE(0, 0);
-*   %ground_stub_VDD_n::g @PLACE(-21, -4) => @ORIENT("R0");
+*   %ground_stub_VDD_n::g @PLACE(-21, -5) => @ORIENT("R0");
 *   %ground_stub_VSIG_n @PLACE(0, 0);
-*   %ground_stub_VSIG_n::g @PLACE(-11, -4) => @ORIENT("R0");
+*   %ground_stub_VSIG_n::g @PLACE(-11, -5) => @ORIENT("R0");
 *   %ground_stub_RG2_n @PLACE(0, 0);
-*   %ground_stub_RG2_n::g @PLACE(0, -1) => @ORIENT("R0");
+*   %ground_stub_RG2_n::g @PLACE(0, -2) => @ORIENT("R0");
 *   %ground_stub_RS_n @PLACE(0, 0);
 *   %ground_stub_RS_n::g @PLACE(9, -4) => @ORIENT("R0");
 *   %ground_stub_CS_n @PLACE(0, 0);
-*   %ground_stub_CS_n::g @PLACE(21, -2) => @ORIENT("R0");
+*   %ground_stub_CS_n::g @PLACE(20, -2) => @ORIENT("R0");
 *   %ground_stub_RL_n @PLACE(0, 0);
-*   %ground_stub_RL_n::g @PLACE(30, -4) => @ORIENT("R0");
+*   %ground_stub_RL_n::g @PLACE(29, -4) => @ORIENT("R0");
 *   %supply_stub_VDD_p @PLACE(0, 0);
-*   %supply_stub_VDD_p::s @PLACE(-21, 4) => @ORIENT("R0");
+*   %supply_stub_VDD_p::s @PLACE(-21, 3) => @ORIENT("R0");
 *   %supply_stub_RG1_p @PLACE(0, 0);
-*   %supply_stub_RG1_p::s @PLACE(0, 13) => @ORIENT("R0");
+*   %supply_stub_RG1_p::s @PLACE(0, 12) => @ORIENT("R0");
 *   %supply_stub_RD_p @PLACE(0, 0);
-*   %supply_stub_RD_p::s @PLACE(9, 17) => @ORIENT("R0");
-*   &sig @WIRE(mode="straight") {#VSIG::p (-11, 6) #CIN::p};
+*   %supply_stub_RD_p::s @PLACE(9, 16) => @ORIENT("R0");
+*   &sig @WIRE(mode="straight") {#VSIG::p (-11, 5) #CIN::p};
 *   &g @WIRE(mode="straight") {#RG2::p %rt1};
 *   &g @WIRE(mode="straight") {%rt1 #RG1::n};
 *   &g @WIRE(mode="straight") {#CIN::n %rt1};
@@ -115,13 +115,13 @@ RL out 0 10k
 *   &d @WIRE(mode="straight") {#M1::d %rt2};
 *   &d @WIRE(mode="straight") {%rt2 #RD::n};
 *   &d @WIRE(mode="straight") {#COUT::p %rt2};
-*   &s @WIRE(mode="straight") {#RS::p %rt3};
 *   &s @WIRE(mode="straight") {%rt3 #M1::s};
-*   &s @WIRE(mode="straight") {#CS::p (12, 0) (12, 3) %rt3};
-*   &out @WIRE(mode="straight") {#COUT::n (30, 9) #RL::p};
-*   %#12 @WIRE(mode="straight") {#CS::n (21, 0) %ground_stub_CS_n::g::pin};
-*   $JUNCTION @ATTACH %rt1 => @PLACE(0, 6);
-*   $JUNCTION @ATTACH %rt2 => @PLACE(9, 9);
-*   $JUNCTION @ATTACH %rt3 => @PLACE(9, 3)
+*   &s @WIRE(mode="straight") {#CS::p (12, 0) (12, 2) %rt3};
+*   &s @WIRE(mode="straight") {%rt3 #RS::p};
+*   &out @WIRE(mode="straight") {#COUT::n (29, 8) #RL::p};
+*   %#12 @WIRE(mode="straight") {#CS::n (20, 0) %ground_stub_CS_n::g::pin};
+*   $JUNCTION @ATTACH %rt1 => @PLACE(0, 5);
+*   $JUNCTION @ATTACH %rt2 => @PLACE(9, 8);
+*   $JUNCTION @ATTACH %rt3 => @PLACE(9, 2)
 * }
 .end

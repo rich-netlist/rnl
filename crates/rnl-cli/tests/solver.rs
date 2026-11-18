@@ -232,8 +232,8 @@ fn facts_are_in_the_order_of_8_5() {
     assert_eq!(p.usages[p.facts[first_expanded].chain[0]].definition, "$CURRENT_MIRROR_P");
     let last = p.facts.last().unwrap();
     assert!(last.chain.iter().any(|&u| p.usages[u].definition == "$GROUND_STUB"), "{last:?}");
-    // ORIENT-RELATION of the mirrored layouts and of the mirror, and the groups
-    assert_eq!(p.facts.iter().filter(|f| f.kind.name() == "ORIENT-RELATION").count(), 4);
+    // ORIENT-RELATION of the mirrored layouts (a current mirror relates no orientations), and the groups
+    assert_eq!(p.facts.iter().filter(|f| f.kind.name() == "ORIENT-RELATION").count(), 2);
     assert_eq!(
         p.groups.iter().map(|g| (g.label.as_str(), g.members.len())).collect::<Vec<_>>(),
         [("%stage1", 5), ("%stage2", 3), ("%src", 2)]

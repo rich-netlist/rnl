@@ -497,7 +497,7 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
             "  discarded [23] ALIGN y {#M1 #M2} (normal, T4-miller-conflicts.sp:40): it conflicts with [0] and [4]",
             "  discarded [59] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:45): of priority low, which is \
              expected; --report lists what it conflicts with (8.5)",
-            "  discarded [72] ALIGN y {#M1 #M2 %dp} (low, rnl-std-semantics.rnl:120, from \
+            "  discarded [70] ALIGN y {#M1 #M2 %dp} (low, rnl-std-semantics.rnl:120, from \
              $MIRRORED_LAYOUT): of priority low, which is expected; --report lists what it conflicts with (8.5)",
         ]
     );
@@ -518,21 +518,21 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
     assert_eq!(lines[head + 1..head + 4], statements, "{lines:#?}");
     assert!(!lines[head + 4].starts_with("    "), "{lines:#?}");
     assert!(lines[0].starts_with(
-        "level T4-miller-conflicts.sp (file in T4-miller-conflicts.sp): 102 kept, 4 discarded of 106 facts"
+        "level T4-miller-conflicts.sp (file in T4-miller-conflicts.sp): 100 kept, 4 discarded of 104 facts"
     ));
     assert!(!lines.iter().any(|l| l == "  unsolved:"), "{lines:#?}");
     assert!(lines.iter().any(|l| l.starts_with("  work: ")) && lines.iter().any(|l| l.starts_with("  time: ")));
     // the solver gave the low facts their first group only, which a note says (8.5, 7.6), so that
     // even the report of every fact leaves out their hints, and says that the solver did not seek
     // them
-    for fact in [59, 72] {
+    for fact in [59, 70] {
         let low = level.solved.report.discarded.iter().find(|d| d.fact == fact).unwrap();
         assert!(!low.complete, "{low:?}");
     }
     let low = level.solved.report.discarded.iter().find(|d| d.fact == 59).unwrap();
     assert_eq!(low.groups, vec![vec![2]]);
     let note = "    the minimal conflict groups of a fact of priority low discarded are listed only with --report \
-                (hints_for_low), as its hints may be left out (8.5, 7.6): [59] and [72] have their first group \
+                (hints_for_low), as its hints may be left out (8.5, 7.6): [59] and [70] have their first group \
                 only, and are in no hint by statement";
     assert!(lines.iter().any(|l| l == note), "{lines:#?}");
     let every = rnl_cli::solve::report(level, true);
@@ -556,7 +556,7 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
     assert!(level.solved.report.discarded.iter().all(|d| d.complete), "{:?}", level.solved.report.discarded);
     let all = rnl_cli::solve::report(level, true);
     assert!(!all.iter().any(|l| l == note), "{all:#?}");
-    assert_eq!(all.iter().filter(|l| l.starts_with("    kept [")).count(), 102);
+    assert_eq!(all.iter().filter(|l| l.starts_with("    kept [")).count(), 100);
     assert_eq!(all.iter().filter(|l| l.starts_with("    discarded [")).count(), 4);
     assert!(all.iter().any(|l| l == "    kept [0] the y of #M1 = 0 (high, T4-miller-conflicts.sp:48)"), "{all:#?}");
     // and the hints of the low facts, and of the statement that only a low fact loses
@@ -573,8 +573,8 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
     assert_eq!(
         all[head + 1..head + 5],
         [
-            "    T4-miller-conflicts.sp:48 [0] the y of #M1 = 0 took part in discarding [23], [72]",
-            "    T4-miller-conflicts.sp:49 [4] the y of #M2 = 3 took part in discarding [23], [72]",
+            "    T4-miller-conflicts.sp:48 [0] the y of #M1 = 0 took part in discarding [23], [70]",
+            "    T4-miller-conflicts.sp:49 [4] the y of #M2 = 3 took part in discarding [23], [70]",
             statements[2],
             "    T4-miller-conflicts.sp:51 [2] DISTANCE y increasing min=6 max=6 {#VIP} {#VIN} took part in \
              discarding [59]",
@@ -2044,15 +2044,15 @@ fn every_minimal_group_is_named_and_a_limit_that_cuts_them_says_the_list_is_not_
 
 #[test]
 fn a_case_whose_resolution_runs_out_of_time_keeps_what_it_decided() {
-    // T4 within a work of 62 000, of which the resolution of 8.5 takes about 64 000: the facts
+    // T4 within a work of 61 000, of which the resolution of 8.5 takes about 62 000: the facts
     // decided by then are those of 8.5 as far as they go, its four discarded, each later fact that
     // needs a check is undecided, and every fact kept holds; a level of 0.4 is resolved within the
     // work of its solve, which the clock of the solve does not cut (7.6). The window is narrow:
-    // within 60 000 no fact is discarded yet
+    // within 59 000 no fact is discarded yet
     let fs = FsProvider::new(&[]);
     let t4 = case("T4-miller-conflicts");
     let mut cut = for_case(&t4);
-    cut.solver.run_limit = Some(rnl_solver::RunLimit::Work(62_000));
+    cut.solver.run_limit = Some(rnl_solver::RunLimit::Work(61_000));
     let run = solve(&t4, &fs, &cut).unwrap();
     let level = &run.levels[0];
     let r = &level.solved.report;
