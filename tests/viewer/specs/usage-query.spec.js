@@ -49,7 +49,7 @@ test("an instance's usages are in the lower half of the Usage panel, the usages 
   await expect(sentences.nth(4)).toHaveText("{members} of usage %all (definition $SET)");
   // each row says where its statement is: the file's line
   await expect(page.locator("#usage-detail .membership-where")).toHaveText(Array(6).fill(/usage-query\.sp:\d+/));
-  expect(await page.locator("#usage-detail .membership-where").first().textContent()).toBe("usage-query.sp:16");
+  expect(await page.locator("#usage-detail .membership-where").first().textContent()).toBe("usage-query.sp:17");
 });
 
 test("a usage that is not in effect is greyed, with its state and its reason, and is no usage to select", async ({ page }) => {
@@ -79,11 +79,15 @@ test("a usage that is not in effect is greyed, with its state and its reason, an
 
 test("a terminal's role, a net's, the origin of a usage a rule made, and an object that is in none", async ({ page }) => {
   await selectObject(page, "instance", "M1");
-  // its own terminal d, and the ground stubs of the standard package that name its other terminals
+  // its own terminal d, as the netlist writes it
   await expect(ids(page).first()).toHaveText("%drain");
-  await expect(page.locator("#usage-detail .membership-role").first()).toHaveText("pin (terminal d)");
-  await expect(page.locator("#usage-detail .membership-role")).toHaveText(["pin (terminal d)", "t (terminal s)", "t (terminal b)"]);
-  await expect(page.locator("#usage-detail .membership-origin")).toHaveText(["rule of rnl-std-fill", "rule of rnl-std-fill"]);
+  await expect(page.locator("#usage-detail .membership-role")).toHaveText(["pin (terminal d)"]);
+  // the ground stubs of the standard package name the pins of its other terminals, objects of their own
+  for (const pin of ["pin(#M1,2)", "pin(#M1,3)"]) {
+    await selectObject(page, "pin", pin);
+    await expect(page.locator("#usage-detail .membership-role")).toContainText(["t"]);
+    await expect(page.locator("#usage-detail .membership-origin")).toContainText(["rule of rnl-std-fill"]);
+  }
   await selectObject(page, "net", "b");
   await expect(page.locator("#usage-detail .membership-role")).toContainText(["signal"]);
   // a usage a rule made says so
@@ -128,13 +132,13 @@ test("the link of a row shows its statement in the text", async ({ page, viewer 
   await page.locator("#tab-usages").click();
   await page.locator("#usage-detail .membership-where").first().click();
   await expect(page.locator("#tab-netlist")).toHaveAttribute("aria-selected", "true");
-  await expect(viewer.line(16)).toBeVisible();
-  await expect(viewer.line(16)).toContainText("%pair1");
+  await expect(viewer.line(17)).toBeVisible();
+  await expect(viewer.line(17)).toContainText("%pair1");
 });
 
 test("a context menu of a reference in the text shows its usages", async ({ page, viewer }) => {
   await page.locator("#tab-netlist").click();
-  const reference = page.locator("#source .ln[data-line='16'] [data-obj]").first();
+  const reference = page.locator("#source .ln[data-line='17'] [data-obj]").first();
   await reference.click({ button: "right" });
   const item = page.locator(".context-menu .context-item");
   await expect(item).toHaveText("Show its usages");
@@ -170,7 +174,7 @@ test("View > Show Roles on Hover is off to begin with; on, the pointer's box add
   // a terminal's role says whose terminal it is
   const q = await viewer.where("M1");
   await page.mouse.move(q.x, q.y);
-  await expect(tip).toHaveText("M1 · pin (terminal d) of $PIN %drain · +2");
+  await expect(tip).toHaveText("M1 · pin (terminal d) of $PIN %drain");
   // the choice is kept
   await page.reload();
   await viewer.started();

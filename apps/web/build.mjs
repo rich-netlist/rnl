@@ -7,7 +7,8 @@
 //
 // --no-core takes the binding as bindings/runtime-wasm/build.mjs last built it instead of building it
 // again (the page solves only if that was built with --solver); --no-solver leaves the solver's module out, as the
-// local program, whose page solves with the program, does not need it; --samples copies the conformance corpus's cases and equivalence files and the site's
+// local program, whose page solves with the program, does not need it; --samples copies the conformance corpus's cases and equivalence files of 0.4
+// (cases-0.4/from-0.2 as samples/cases, equivalence-0.4 as samples/equivalence) and the site's
 // examples into samples/, to try the viewer with ?url=samples/cases/04-hierarchy.sp and for tests.
 
 import { publishLibrary } from "./library.mjs";
@@ -97,8 +98,9 @@ writeFileSync(join(out, "about.json"), `${JSON.stringify({ version, coreVersion,
 writeFileSync(join(out, "viewer-api.json"), JSON.stringify({ rnl: 1, features: API_FEATURES, maxOpenBytes: MAX_OPEN_BYTES }) + "\n");
 
 if (samples) {
-  for (const name of ["cases", "equivalence"]) {
-    cpSync(join(root, "tests", "conformance", name), join(out, "samples", name), { recursive: true });
+  // the cases of 0.4, where the samples' addresses have always had them: samples/cases/04-hierarchy.sp
+  for (const [name, from] of [["cases", ["cases-0.4", "from-0.2"]], ["equivalence", ["equivalence-0.4"]]]) {
+    cpSync(join(root, "tests", "conformance", ...from), join(out, "samples", name), { recursive: true });
   }
   cpSync(join(root, "site", "examples"), join(out, "samples", "site"), { recursive: true });
   mkdirSync(join(out, "samples", "brand"), { recursive: true });

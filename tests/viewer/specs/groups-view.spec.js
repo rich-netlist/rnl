@@ -67,13 +67,15 @@ for (const platform of ["web", "desktop"]) {
       expect(await shown()).toBe(false);
     });
 
-    test("a level of an earlier version has its groups all at the top, and a level without groups has no view", async ({ page, viewer }) => {
+    test("nested groups stand one under the other, and a level without groups has no view", async ({ page, viewer }) => {
       await viewer.open("ota-groups", { platform });
       await page.keyboard.press("7");
       await page.locator("#solve-view-groups").click();
-      const top = page.locator("#groups-list > .group-row:not(.greyed)");
-      expect(await top.count()).toBeGreaterThan(1);
-      for (let i = 0; i < await top.count(); i++) expect(await depthOf(top.nth(i))).toBe(0);
+      // %core holds %amp, which holds %inp
+      const tree = page.locator("#groups-list > .group-row:not(.greyed)");
+      await expect(tree).toHaveCount(3);
+      expect(await tree.locator(".usage-name").evaluateAll((els) => els.map((e) => e.childNodes[1].textContent))).toEqual(["%core", "%amp", "%inp"]);
+      for (const i of [0, 1, 2]) expect(await depthOf(tree.nth(i))).toBe(i);
       // %bias is turned off by its PRIORITY
       await expect(page.locator("#groups-list > .group-row.greyed .usage-state")).toHaveText("disabled");
 

@@ -35,7 +35,7 @@ import { uiCatalog, uiLanguages } from "../../../scripts/i18n/viewer-locales.mjs
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const manifest = path.join(root, "apps", "desktop", "Cargo.toml");
-const cases = path.join(root, "tests", "conformance", "cases");
+const cases = path.join(root, "tests", "conformance", "cases-0.4", "from-0.2");
 /** Copies of the netlist and its include, in a directory of the test's own so that it may save over them; made in main. */
 let netlist = null;
 let netlistInclude = null;
@@ -696,7 +696,7 @@ async function drive(app, port, profile, t0, session) {
   same(fs.readFileSync(netlistInclude).equals(includeOnDisk), true, "the include after the netlist was saved");
   // Saving before applying is different from downloading on the web: the disk source really
   // changes. Verify the same newly typed USE-PACKAGE sequence against the native reader/cache.
-  const withPackage = saved.replace('@VERSION("0.2")', '@VERSION("0.2"); @USE-PACKAGE(name="rnl-std", version="0.2")');
+  const withPackage = saved.replace('@VERSION("0.4")', '@VERSION("0.4"); @USE-PACKAGE(name="rnl-std-logic", version="0.4")');
   const setEditor = text => page.evaluate(`(() => {
     const area = document.querySelector('#source .editor:not([hidden]) textarea');
     area.value = ${JSON.stringify(text.replace(/\r\n/g,'\n'))};
@@ -770,10 +770,14 @@ async function drive(app, port, profile, t0, session) {
   const pasted = await page.evaluate(`({ files: window.viewer.doc.files.length, missing: window.viewer.doc.missing })`);
   same(pasted, { files: 1, missing: ["/04-hierarchy-lib.inc"] }, "the clipboard's netlist, alone");
   console.log("File > Load from Clipboard drew the netlist that the clipboard held, alone");
-  await page.evaluate(`import('./pool.js').then(p => p.toggleAutoInclude(true))`);
-  check(await page.evaluate(`window.viewer.doc.files.length === 2 && window.viewer.doc.files.some(f => f.name.endsWith('04-hierarchy-lib.inc')) &&
-    window.viewer.doc.diagnostics.some(d => d.severity === 'warning' && d.message.includes('added by Auto Include'))`),
-  "clipboard Auto Include did not resolve the library subcircuit");
+  // (turning Auto Include on does nothing while the page is still loading, as it may be after the clipboard's
+  // netlist is drawn: it is asked again until the library subcircuit is resolved). A netlist of 0.4 is told so
+  // with a hint, "subcircuit rdiv was added from … by Auto Include"; 0.3's was a warning in other words.
+  await until("clipboard Auto Include resolving the library subcircuit", () => page.evaluate(`(async () => {
+    await (await import('./pool.js')).toggleAutoInclude(true);
+    return window.viewer.doc.files.length === 2 && window.viewer.doc.files.some(f => f.name.endsWith('04-hierarchy-lib.inc')) &&
+      window.viewer.doc.diagnostics.some(d => d.severity === 'hint' && d.message.startsWith('subcircuit rdiv was added from') && d.message.endsWith('by Auto Include'));
+  })()`), 20_000);
 
   // a netlist with nothing placed: its Document carries no drawing of the objects that have no
   // position, the app keeps them from the build, and the Not drawn list asks for those of its rows
@@ -938,8 +942,9 @@ async function filePoolSmoke(page) {
   const top = path.join(work, "pool-top.sp");
   const pkg = path.join(parts, "renamed.rnl");
   const inc = path.join(parts, "part.inc");
-  fs.writeFileSync(top, '* top\n* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="acme", version="1.0") }\n.include "part.inc"\n.end\n');
-  fs.writeFileSync(pkg, '@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="acme", version="1.0") }\n');
+  fs.writeFileSync(top, '* top\n* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="acme", version="1.0") }\n.include "part.inc"\n.end\n');
+  // (a package of 0.4 with nothing but its header is an alias package, which USE-PACKAGE does not load: 16.5)
+  fs.writeFileSync(pkg, '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme", version="1.0") }\n@RNL { $acme = @DEFINE-STYLE(linewidth=1) {} }\n');
   fs.writeFileSync(inc, "Rpool a 0 1k\n");
   const slashed = (p) => p.replaceAll("\\", "/");
   await page.evaluate(`(async () => {
@@ -1004,7 +1009,7 @@ async function filePoolSmoke(page) {
   })()`);
   await until("the native missing-package hint", () => page.evaluate(`
     document.querySelector('.package-hint .msg')?.textContent === 'Look for it in Help › Public Packages.'
-      && window.viewer.doc.diagnostics.some(d => d.message.includes('package analog-canvas-extensions 0.1 cannot be found'))`));
+      && window.viewer.doc.diagnostics.some(d => d.message.includes('package analog-canvas-extensions 0.7 cannot be found'))`));
   same(await page.evaluate(`document.querySelectorAll('[data-group="builtin"] .pool-open').length`), 25,
     "the native built-in library contains both standard series");
   check(await page.evaluate(`Array.from(document.querySelectorAll('[data-group="builtin"] .pool-open')).every(b => /^0\\.[23]\\/rnl-(std|zh)/.test(b.textContent))`),
@@ -1164,7 +1169,7 @@ async function autoIncludeSmoke(page, work, parts, pkg) {
   const top = path.join(work, "auto-top.sp");
   const cell = path.join(parts, "cell.NETLIST");
   const duplicate = path.join(parts, "duplicate.inc");
-  const body = '* auto top\n* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="acme", version="1.0") }\nX1 a 0 cell\n.end\n';
+  const body = '* auto top\n* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="acme", version="1.0") }\nX1 a 0 cell\n.end\n';
   fs.writeFileSync(top, body);
   fs.writeFileSync(cell, ".subckt cell p n\nR1 p n 1k\n.ends\n");
   await page.evaluate(`(async () => {
@@ -1173,7 +1178,8 @@ async function autoIncludeSmoke(page, work, parts, pkg) {
   })()`);
   check(await page.evaluate(`Array.from(document.querySelectorAll('[data-group^="path:"] .pool-row')).some(r => r.dataset.path.endsWith('cell.NETLIST'))`), "PATH did not list netlists alongside packages");
   same(await page.evaluate("window.viewer.doc.files.length"), 2, "Auto Include defaults on");
-  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.severity === 'warning' && d.message.includes('cell.NETLIST') && d.message.includes('added by Auto Include'))`), "the automatic include warning is missing");
+  // (the netlist is of 0.4: Auto Include says what it added with a hint)
+  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.severity === 'hint' && d.message.includes('cell.NETLIST') && d.message.endsWith('by Auto Include'))`), "the automatic include hint is missing");
   same(await page.evaluate("window.viewer.doc.files[0].text"), body, "Auto Include altered the source");
   check(await page.evaluate("document.getElementById('auto-include').checked && window.viewer.checked('toggle-auto-include')"), "Auto Include controls disagree");
   const solved = await page.evaluate(`(async () => {
@@ -1190,7 +1196,7 @@ async function autoIncludeSmoke(page, work, parts, pkg) {
   fs.writeFileSync(cell, ".subckt replacement p n\nR2 p n 2k\n.ends\n");
   fs.writeFileSync(top, body.replace("X1 a 0 cell", "X1 a 0 replacement"));
   await page.evaluate("window.viewer.command('reload-library')");
-  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.message.includes('replacement') && d.message.includes('added by Auto Include'))`), "Reload Library retained stale definitions");
+  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.message.includes('replacement') && d.message.endsWith('by Auto Include'))`), "Reload Library retained stale definitions");
   fs.writeFileSync(pkg, fs.readFileSync(pkg, "utf8").replace('version="1.0"', 'version="2.0"'));
   await page.evaluate("window.viewer.command('reload-library')");
   check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.message.includes('acme 1.0 cannot be found'))`), "Reload Library did not reread packages");

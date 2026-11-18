@@ -13,7 +13,7 @@ assert.ok(app.endsWith('.app') && fs.existsSync(app),'Pass --app PATH.app');
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
 const output=process.env.SMOKE_OUTPUT_DIR || fs.mkdtempSync(path.join(os.tmpdir(),'rnl-macos-smoke-'));
 fs.mkdirSync(output,{recursive:true});
-const sample=path.join(root,'tests/conformance/cases/04-hierarchy.sp');
+const sample=path.join(root,'tests/conformance/cases-0.4/from-0.2/04-hierarchy.sp');
 const original=fs.readFileSync(sample);
 const observer=path.join(output,'observe');
 execFileSync('swiftc',[path.join(root,'apps/desktop/tests/macos-observe.swift'),'-o',observer]);
@@ -162,7 +162,7 @@ try {
   key('q','using control down');
   await observe('reading',drawn);
   // A second LaunchServices open reaches an already-running app, as Finder's Open With does.
-  const next=path.join(root,'tests/conformance/equivalence/inverter-chain.scs');
+  const next=path.join(root,'tests/conformance/equivalence-0.4/inverter-chain.scs');
   execFileSync('open',['-a',app,next]);
   await observe('finder-warm',r=>text(r).includes('inverter-chain.scs') && r.circuitInk>200 && r.circuitDensity<0.35);
   execFileSync('open',['-a',app,sample]);

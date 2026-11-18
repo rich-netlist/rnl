@@ -19,7 +19,7 @@ on:
       - "scripts/bundle_packages.py"
       - "scripts/test_bundle_packages.py"
       - "scripts/packages.py"
-      - "tests/conformance/cases/04-hierarchy*"
+      - "tests/conformance/cases-0.4/from-0.2/04-hierarchy*"
       - "rustfmt.toml"
       - ".github/workflows/desktop.yml"
       - ".github/workflows/viewer-release.yml"
@@ -34,7 +34,7 @@ on:
       - "scripts/bundle_packages.py"
       - "scripts/test_bundle_packages.py"
       - "scripts/packages.py"
-      - "tests/conformance/cases/04-hierarchy*"
+      - "tests/conformance/cases-0.4/from-0.2/04-hierarchy*"
       - "rustfmt.toml"
       - ".github/workflows/desktop.yml"
       - ".github/workflows/viewer-release.yml"
@@ -314,7 +314,7 @@ jobs:
         if: runner.os == 'Windows'
         timeout-minutes: 10
         run: node apps/desktop/tests/webview2.mjs --install
-      # it builds the app, starts it on tests/conformance/cases/04-hierarchy.sp and stops it
+      # it builds the app, starts it on tests/conformance/cases-0.4/from-0.2/04-hierarchy.sp and stops it
       - name: Smoke test
         if: runner.os == 'Windows'
         timeout-minutes: 20

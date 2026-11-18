@@ -1,5 +1,6 @@
 * Shared inspection overlay geometry, including declaration ports
-* @RNL(type="header") { @VERSION("0.3") }
+* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4") }
+* @RNL { /* rnl upgrade wrote this record: it keeps the labels and ports the file had before 0.4 */ # @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; $SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_SET; $GROUND_NET_SET @REMOVE-FROM $PORT_FILL_SET }
 .subckt cell input output
 Rinside input output 1k
 * @RNL {
@@ -8,6 +9,17 @@ Rinside input output 1k
 *   %input = $IO_PORT @ATTACH &input => @PLACE(-7, 4);
 *   %output = $IO_PORT @ATTACH &output => @PLACE(7, -4) => @ORIENT("R180");
 *   #Rinside:1 @CURRENT("in"); #Rinside:2 @CURRENT("out")
+* }
+* @RNL {
+*   $BOX_cell = @DEFINE-SYMBOL {
+*     @RECTANGLE(linestyle="dashed") {(-2, -1) (2, 1)};
+*     @LINE {(-3, 0) (-2, 0)};
+*     @LINE {(3, 0) (2, 0)};
+*     (-3, 0) @PIN(terminal=1, direction="left", label="input");
+*     (3, 0) @PIN(terminal=2, direction="right", label="output");
+*     ? @TEXT("${name}", key="name", halign="middle", valign="bottom") => @PLACE(0, 1.3)
+*   };
+*   # @SET-SYMBOL $BOX_cell
 * }
 .ends cell
 R1 a b 1k
@@ -25,7 +37,7 @@ X1 a e cell
 *   %pair = #R1(left) #R2(right) @AS $PAIR;
 *   %nested = %pair @AS $NEST;
 *   %spread = {#R1 #R3} @AS $SET;
-*   %ground = $GROUND @ATTACH #R1:2;
+*   %ground = $GROUND @ATTACH #R1:2::net => @PLACE(0, -2);
 *   #R1:1 @CURRENT("in"); #R1:2 @CURRENT("out");
 *   #R2:1 @CURRENT("out"); #R3:1 @CURRENT("in"); #R4:1 @CURRENT("out");
 *   #R2:2 @CURRENT("in") => @CURRENT("unspecified");

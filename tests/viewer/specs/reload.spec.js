@@ -62,7 +62,7 @@ test("reading again keeps the views left on other levels, and the tree's folded 
 test("a file that changed keeps the selection on its statement, which moved", async ({ page, viewer }) => {
   await viewer.click("X2");
   await viewer.selected(`instance X2 in ${TOP}`);
-  expect(await viewer.markedLines()).toEqual([50]);
+  expect(await viewer.markedLines()).toEqual([54]);
   await page.keyboard.press("Control+=");
   const view = await viewer.viewBox();
   const scroll = await page.locator("#source").evaluate((s) => s.scrollTop);
@@ -70,9 +70,9 @@ test("a file that changed keeps the selection on its statement, which moved", as
 
   await page.evaluate(() => { window.fakeShell.next = "04-hierarchy-changed"; });
   await viewer.build(() => page.keyboard.press("F5"));
-  await expect(viewer.line(54)).toHaveText(/Vin a 0 1\.2/);
+  await expect(viewer.line(58)).toHaveText(/Vin a 0 1\.2/);
   await viewer.selected(`instance X2 in ${TOP}`);
-  expect(await viewer.markedLines()).toEqual([51]);
+  expect(await viewer.markedLines()).toEqual([55]);
   expect(await viewer.viewBox()).toBe(view);
   expect(await page.locator("#source").evaluate((s) => s.scrollTop)).toBe(scroll);
 
@@ -80,7 +80,7 @@ test("a file that changed keeps the selection on its statement, which moved", as
   await showSource(page, "04-hierarchy-lib.inc");
   await viewer.build(() => page.keyboard.press("F5"));
   await expect(page.locator("#source-file")).toHaveText("04-hierarchy-lib.inc");
-  await expect(viewer.line(2)).toHaveText(/\.subckt rdiv top mid bot/);
+  await expect(viewer.line(3)).toHaveText(/\.subckt rdiv top mid bot/);
 });
 
 test("a reading that fails is shown, and the next one shows the document from its top", async ({ page, viewer }) => {

@@ -58,11 +58,11 @@ test("a complete Viewer imports exact packages and asks before replacing unsaved
   const viewer = await launch(page);
   const text = fs.readFileSync(new URL("../inputs/missing-canvas-package.sp", import.meta.url), "utf8");
   await send(page, { type: "open", requestId: "first", name: "canvas.sp", text,
-    packages: [{ name: "analog-canvas-extensions", version: "0.1" }] });
+    packages: [{ name: "analog-canvas-extensions", version: "0.7" }] });
   expect(await result(page, "first", "loaded")).toMatchObject({ errors: 0 });
   await expect(viewer.locator("#canvas > svg")).toBeVisible();
   await viewer.locator("#tab-files").click();
-  await expect(viewer.getByRole("button", { name: "Open analog-canvas-extensions 0.1", exact: true })).toBeVisible();
+  await expect(viewer.getByRole("button", { name: "Open analog-canvas-extensions 0.7", exact: true })).toBeVisible();
   await viewer.locator("#tab-netlist").click();
   await viewer.evaluate(() => window.viewer.command("toggle-edit"));
   const editor = viewer.locator("#source textarea").first();
@@ -116,7 +116,7 @@ test('an approved package finishing its Library index cannot cancel a newer API 
     let held=false;
     shell.setPool=async(...args)=>{
       const result=await original(...args);
-      if (!held && args[0].some(item=>item.name==='analog-canvas-extensions 0.1')) {
+      if (!held && args[0].some(item=>item.name==='analog-canvas-extensions 0.7')) {
         held=true;window.packageIndexBlocked=true;
         await new Promise(resolve=>{window.finishPackageIndex=resolve;});
       }
@@ -149,9 +149,9 @@ test("token, origin and window identity reject unrelated opens; package failures
   expect(await result(page, "missing", "error")).toMatchObject({ message: expect.stringContaining("does-not-exist 0.1") });
   await expect(viewer.locator("#source")).toContainText("* valid");
   expect(await page.evaluate(() => messages.some(m => ["expired", "unrelated"].includes(m.requestId)))).toBe(false);
-  await viewer.route("**/public-packages/packages/analog-canvas-extensions/0.1/*.rnl", route => route.fulfill({ body: "altered bytes" }));
-  await send(page, { type: "open", requestId: "corrupt", name: "corrupt.sp", text: circuit("corrupt"), packages: [{ name: "analog-canvas-extensions", version: "0.1" }] });
-  expect(await result(page, "corrupt", "error")).toMatchObject({ message: expect.stringContaining("SHA-256 mismatch for analog-canvas-extensions 0.1") });
+  await viewer.route("**/public-packages/packages/analog-canvas-extensions/0.7/*.rnl", route => route.fulfill({ body: "altered bytes" }));
+  await send(page, { type: "open", requestId: "corrupt", name: "corrupt.sp", text: circuit("corrupt"), packages: [{ name: "analog-canvas-extensions", version: "0.7" }] });
+  expect(await result(page, "corrupt", "error")).toMatchObject({ message: expect.stringContaining("SHA-256 mismatch for analog-canvas-extensions 0.7") });
   await expect(viewer.locator("#source")).toContainText("* valid");
 });
 

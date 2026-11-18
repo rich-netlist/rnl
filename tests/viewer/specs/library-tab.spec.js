@@ -10,7 +10,7 @@ const dialog = (page) => page.locator("dialog.dialog");
 
 test("desktop: a missing public package keeps its error and points to Help › Public Packages, with no download", async ({ page, viewer }, info) => {
   await viewer.open("missing-canvas-package", { platform: "desktop", pool: "1" });
-  await expect(page.locator(".diag.error .msg")).toContainText(["package analog-canvas-extensions 0.1 cannot be found"]);
+  await expect(page.locator(".diag.error .msg")).toContainText(["package analog-canvas-extensions 0.7 cannot be found"]);
   const hint = page.locator(".package-hint");
   await expect(hint).toContainText("Look for it in Help › Public Packages.");
   await expect(hint.getByRole("link")).toHaveCount(0);

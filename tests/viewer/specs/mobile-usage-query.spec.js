@@ -17,7 +17,8 @@ test.describe("on a phone", () => {
   test("the table of the selected instance's usages fits the width of the screen", async ({ page }) => {
     const rows = page.locator("#usage-detail .usage-membership-row");
     await expect(page.locator("#usage-detail h2")).toHaveText("Usages of R3");
-    await expect(rows).toHaveCount(7);
+    // (in 0.4 %gnd is attached to the net at R3's terminal 2, #R3:2::net, so it is no usage of R3)
+    await expect(rows).toHaveCount(6);
     const wide = await page.evaluate(() => {
       const detail = document.querySelector("#usage-detail");
       return { page: document.documentElement.scrollWidth - document.documentElement.clientWidth, detail: detail.scrollWidth - detail.clientWidth };
@@ -96,8 +97,8 @@ test.describe("on a phone", () => {
   });
 
   test("a tap on the id of a row selects the usage", async ({ page }) => {
-    await page.locator('#usage-detail button.membership-id:text-is("%gnd")').tap();
-    await expect(page.locator("#usage-detail h2")).toHaveText(/%gnd/);
+    await page.locator('#usage-detail button.membership-id:text-is("%all")').tap();
+    await expect(page.locator("#usage-detail h2")).toHaveText(/%all/);
     await expect(page.locator("#usage-detail .usage-membership-row")).toHaveCount(0);
   });
 });

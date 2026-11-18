@@ -1,4 +1,6 @@
 * Symbol inspection and semantic RNL
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4") }
+* @RNL { /* rnl upgrade wrote this record: it keeps the labels and ports the file had before 0.4 */ # @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; $SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_SET; $GROUND_NET_SET @REMOVE-FROM $PORT_FILL_SET }
 .subckt leaf p n
 R1 p n 1k
 * @RNL {
@@ -26,7 +28,7 @@ Xunplaced a 0 leaf
 *   };
 *   #Xown @PLACE(0, 0);
 *   #Xparent @SET-SYMBOL %own => @PLACE(12, 0);
-*   #Xpackage @SET-SYMBOL $RESISTOR => @PLACE(24, 0);
+*   #Xpackage @SET-SYMBOL(terminals=[[1, "p"], [2, "n"]]) $RESISTOR => @PLACE(24, 0);
 *   #Xunplaced @SET-SYMBOL %own;
 *   (0, 8) descriptive 中文 text @TEXT("hello");
 *   (0, 11) @TEXT("literal only", bold=true); /* comment only */

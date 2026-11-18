@@ -9,19 +9,19 @@ const copy = page => page.locator('#source').evaluate(source => {
 
 test('semantic RNL filtering keeps source lines and excludes literals, comments and disabled records', async ({ page, viewer }) => {
   await viewer.open('symbol-inspector');
-  await expect(viewer.line(12)).toHaveClass(/semantic-rnl/);
-  await expect(viewer.line(13)).toHaveClass(/rnl-line/);
-  await expect(viewer.line(13)).not.toHaveClass(/semantic-rnl/);
-  await expect(viewer.line(34)).not.toHaveClass(/rnl-line/);
+  await expect(viewer.line(14)).toHaveClass(/semantic-rnl/);
+  await expect(viewer.line(15)).toHaveClass(/rnl-line/);
+  await expect(viewer.line(15)).not.toHaveClass(/semantic-rnl/);
   await expect(viewer.line(36)).not.toHaveClass(/rnl-line/);
-  const colours = await page.evaluate(() => [12, 13].map(n => getComputedStyle(document.querySelector(`#source .ln[data-line="${n}"]`)).backgroundColor));
+  await expect(viewer.line(38)).not.toHaveClass(/rnl-line/);
+  const colours = await page.evaluate(() => [14, 15].map(n => getComputedStyle(document.querySelector(`#source .ln[data-line="${n}"]`)).backgroundColor));
   expect(colours[0]).not.toBe(colours[1]);
   await expect(page.locator('#semantics-only')).toBeDisabled();
   await page.locator('#rnl-only').check();
-  await expect(viewer.line(3)).toHaveCount(0);
-  await expect(viewer.line(13)).toBeVisible();
+  await expect(viewer.line(5)).toHaveCount(0);
+  await expect(viewer.line(15)).toBeVisible();
   await page.locator('#semantics-only').check();
-  expect(await rows(page).evaluateAll(es => es.map(e => Number(e.dataset.line)))).toEqual([12, 31]);
+  expect(await rows(page).evaluateAll(es => es.map(e => Number(e.dataset.line)))).toEqual([14, 33]);
   await page.locator('#source').focus();
   await page.keyboard.press('Control+a');
   const selected = await copy(page);
@@ -135,7 +135,7 @@ test('symbol follows parent assignment, package source and direct subcircuit ent
   await page.keyboard.press('Enter');
   await page.locator('#tab-symbol').click();
   await expect(page.locator('.symbol-name')).toHaveText('$RESISTOR');
-  await expect(page.locator('.symbol-origin-info')).toHaveText('Package rnl-std-basic 0.3');
+  await expect(page.locator('.symbol-origin-info')).toHaveText('Package rnl-std-basic 0.4');
   await expect(page.locator('.symbol-definition')).toContainText('$RESISTOR = @DEFINE-SYMBOL');
   await expect(page.locator('.symbol-label-list')).toContainText('${value}');
   await page.evaluate(() => {

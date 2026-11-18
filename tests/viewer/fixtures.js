@@ -19,7 +19,7 @@ export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 
 /** The fixtures by name, and the files of the corpus they are built from. */
 export const FILES = {
-  "15-chinese": "tests/conformance/cases/15-chinese.sp",
+  "15-chinese": "tests/conformance/cases-0.4/from-0.2/15-chinese.sp",
   "usage-current": "tests/viewer/inputs/usage-current.sp",
   "verilog-a": "tests/viewer/inputs/resistor.va",
   "verilog": "tests/viewer/inputs/inverter.v",
@@ -45,13 +45,13 @@ export const FILES = {
   "virtual-selection": "tests/viewer/inputs/virtual-selection.sp",
   "selection-boxes": "tests/viewer/inputs/selection-boxes.sp",
   "view-improvements": "tests/viewer/inputs/view-improvements.sp",
-  "01-rc-lowpass": "tests/conformance/cases/01-rc-lowpass.sp",
-  "03-five-transistor-ota": "tests/conformance/cases/03-five-transistor-ota.sp",
-  "04-hierarchy": "tests/conformance/cases/04-hierarchy.sp",
-  "10-constraints-and-priority": "tests/conformance/cases/10-constraints-and-priority.sp",
-  "12-diagnostics": "tests/conformance/cases/12-diagnostics.sp",
-  "17-line-styles": "tests/conformance/cases/17-line-styles.sp",
-  "inverter-chain": "tests/conformance/equivalence/inverter-chain.scs",
+  "01-rc-lowpass": "tests/conformance/cases-0.4/from-0.2/01-rc-lowpass.sp",
+  "03-five-transistor-ota": "tests/conformance/cases-0.4/from-0.2/03-five-transistor-ota.sp",
+  "04-hierarchy": "tests/viewer/inputs/04-hierarchy.sp",
+  "10-constraints-and-priority": "tests/conformance/cases-0.4/from-0.2/10-constraints-and-priority.sp",
+  "12-diagnostics": "tests/conformance/cases-0.4/from-0.2/12-diagnostics.sp",
+  "17-line-styles": "tests/conformance/cases-0.4/from-0.2/17-line-styles.sp",
+  "inverter-chain": "tests/conformance/equivalence-0.4/inverter-chain.scs",
   "T4-miller-conflicts": "tests/integration/solver/T4-miller-conflicts.sp",
 };
 
@@ -164,9 +164,12 @@ export const UNDRAWN = [
 export const PICK = [
   "* hover names, labels and overlapping objects",
   "R1 a b 1k", "R2 b c 2k", "C1 c 0 1p",
-  '* @RNL(type="header") { @VERSION("0.2")}',
+  '* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4")}',
   "* @RNL {",
-  "*   #R1 @PLACE(0, 0); #R2 @PLACE(0.8, 1.5); #C1 @PLACE(10, 0);",
+  // as rnl upgrade writes it: no labels or ports filled in, the drawing the netlist had before 0.4
+  "*   # @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; $SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_SET; $GROUND_NET_SET @REMOVE-FROM $PORT_FILL_SET;",
+  // R2's box overlaps R1's and holds R1's name, but not R1's middle
+  "*   #R1 @PLACE(0, 0); #R2 @PLACE(1.6, 1.5); #C1 @PLACE(10, 0);",
   '*   #R1:1 @TEXT("t1", dx=-1);',
   "*   &c @WIRE {(8.5, 1) (11.5, 1)}",
   "* }",
@@ -387,7 +390,7 @@ export function writeFixtures(rnl, dir) {
 
   const changed = path.join(dir, "changed");
   fs.mkdirSync(changed, { recursive: true });
-  const cases = path.join(root, "tests/conformance/cases");
+  const cases = path.join(root, "tests/viewer/inputs");
   fs.copyFileSync(path.join(cases, "04-hierarchy-lib.inc"), path.join(changed, "04-hierarchy-lib.inc"));
   const text = fs.readFileSync(path.join(cases, "04-hierarchy.sp"), "utf8");
   const edited = text.replace(/^(.*\r?\n)/, "$1* changed after it was opened\n").replace("Vin a 0 0.9", "Vin a 0 1.2");

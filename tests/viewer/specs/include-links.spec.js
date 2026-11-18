@@ -66,9 +66,9 @@ test('filtered virtual source retains its logical position on reload and repeate
 
 test('Failed statements filters undrawn rows and copy while RNL and semantic filters compose', async ({page,viewer}) => {
   await viewer.open('symbol-inspector');
-  await expect(viewer.line(19)).toHaveClass(/not-drawn/);
+  await expect(viewer.line(21)).toHaveClass(/not-drawn/);
   await page.locator('#show-failed').uncheck();
-  await expect(viewer.line(19)).toHaveCount(0);
+  await expect(viewer.line(21)).toHaveCount(0);
   await page.locator('#source').focus();
   await page.keyboard.press('Control+a');
   const copied = await page.locator('#source').evaluate(el => {
@@ -79,7 +79,7 @@ test('Failed statements filters undrawn rows and copy while RNL and semantic fil
   expect(copied).toContain('Xparent a');
   await page.keyboard.press('Escape');
   await page.locator('#rnl-only').check();
-  await expect(viewer.line(17)).toHaveCount(0);
+  await expect(viewer.line(19)).toHaveCount(0);
   await page.locator('#semantics-only').check();
-  expect(await page.locator('#source .ln').evaluateAll(es => es.map(e => Number(e.dataset.line)))).toEqual([12,31]);
+  expect(await page.locator('#source .ln').evaluateAll(es => es.map(e => Number(e.dataset.line)))).toEqual([14,33]);
 });

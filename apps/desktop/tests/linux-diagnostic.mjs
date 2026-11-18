@@ -18,7 +18,7 @@ fs.mkdirSync(output, { recursive: true });
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "rnl-linux-diagnostic-"));
 const sample = "04-hierarchy.sp";
 for (const name of [sample, "04-hierarchy-lib.inc"]) {
-  fs.copyFileSync(path.join(root, "tests/conformance/cases", name), path.join(temp, name));
+  fs.copyFileSync(path.join(root, "tests/conformance/cases-0.4/from-0.2", name), path.join(temp, name));
 }
 // A control without WebDriver, injected JavaScript, rAF observers, or WebKit snapshots.
 // This is what an ordinary user launch paints into the X server.

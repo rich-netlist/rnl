@@ -86,7 +86,7 @@ test("the shared API advertises optional fields and correlates explicit package 
   expect((await messages(page, "ready"))[0].features).toEqual(expect.arrayContaining(["requestId", "packages"]));
   await send(page, { type: "open", requestId: "canvas", name: "canvas.sp",
     text: fs.readFileSync(new URL("../inputs/missing-canvas-package.sp", import.meta.url), "utf8"),
-    packages: [{ name: "analog-canvas-extensions", version: "0.1" }] });
+    packages: [{ name: "analog-canvas-extensions", version: "0.7" }] });
   expect(await waitMessage(page, "loaded")).toMatchObject({ requestId: "canvas", errors: 0 });
 });
 
@@ -702,7 +702,7 @@ test("usages and currents messages switch the usage frames and the current direc
 
 const displayGuideNetlist = [
   "* Embedded display aids",
-  "* @RNL(type=\"header\") { @VERSION(\"0.3\") }",
+  "* @RNL(type=\"header\") { @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\"); @VERSION(\"0.4\") }",
   "R1 in mid 1k",
   "R2 mid out 1k",
   "C1 in out 1p",
