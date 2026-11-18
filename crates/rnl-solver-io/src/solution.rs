@@ -7,7 +7,7 @@ use rnl_runtime::{
     solution::{Branch, Placement, RoutedWire, Solution, WirePoint, WireRoute},
 };
 use serde_json::{json, Value};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 fn wire_point_value(p: &WirePoint) -> Value {
     match p {
@@ -177,5 +177,118 @@ pub fn decode_solution(value: &Value, problem: &LevelProblem) -> Result<Solution
         }
         validate_wire(&w.points, problem, &bindings, s.branches.len(), &format!("$.wire_routes[{i}].points"))?;
     }
+    validate_nets(&s, problem)?;
     Ok(s)
+}
+
+/// The nets a point of a wire is known to be on: a pin, on the nets [`LevelProblem::nets`] lists
+/// it on; a point object, on the nets of the wires written through it. None for a point the
+/// problem does not tie to a net, which any wire may take.
+struct NetsOf<'a> {
+    pins: BTreeMap<(usize, usize), BTreeSet<&'a str>>,
+    points: BTreeMap<usize, BTreeSet<&'a str>>,
+}
+
+impl<'a> NetsOf<'a> {
+    fn new(p: &'a LevelProblem) -> Self {
+        let mut pins: BTreeMap<(usize, usize), BTreeSet<&str>> = BTreeMap::new();
+        for net in &p.nets {
+            for r in &net.pins {
+                if let Some(key) = r.pin_key() {
+                    pins.entry(key).or_default().insert(net.name.as_str());
+                }
+            }
+        }
+        let mut points: BTreeMap<usize, BTreeSet<&str>> = BTreeMap::new();
+        for wire in &p.wires {
+            if wire.nets.is_empty() {
+                continue;
+            }
+            for r in &wire.anchors {
+                if let PointRef::Origin(k) = r {
+                    points.entry(*k).or_default().extend(wire.nets.iter().map(String::as_str));
+                }
+            }
+        }
+        NetsOf { pins, points }
+    }
+
+    fn of(&self, r: &PointRef) -> Option<&BTreeSet<&'a str>> {
+        match r {
+            PointRef::Origin(k) => self.points.get(k),
+            PointRef::Centre(_) => None,
+            _ => r.pin_key().and_then(|key| self.pins.get(&key)),
+        }
+    }
+}
+
+/// Each wire stays on its net: a wire routed for a ROUTE, on the ROUTE's net; a wire written in
+/// RNL that the result routes, on its own nets. Every pin or point a wire passes that the problem
+/// ties to nets is on one of them, but for a point that a wire written of the ROUTE's tree, or the
+/// wire written itself, passes as its author wrote it (a wire written may pass a pin of another
+/// net, which the reading warns of); and the wires that meet at one branch point share a net. A
+/// result that joined two nets would be written as one, under the name of one of them. A wire may
+/// pass pins of another tree of its own net: the solver joins the trees of a net
+/// (`join_trees`), and gives their wires the first tree's ROUTE.
+fn validate_nets(s: &Solution, p: &LevelProblem) -> Result<()> {
+    let nets_of = NetsOf::new(p);
+    // the nets each branch point can be on, narrowed by each wire that meets there
+    let mut branches: BTreeMap<usize, BTreeSet<String>> = BTreeMap::new();
+    let mut check =
+        |points: &[WirePoint], nets: BTreeSet<&str>, written: &[&PointRef], path: &str, what: &str| -> Result<()> {
+            for (i, point) in points.iter().enumerate() {
+                match point {
+                    WirePoint::Anchor(r) => {
+                        if let Some(on) = nets_of.of(r).filter(|_| !written.contains(&r)) {
+                            if on.is_disjoint(&nets) {
+                                return Err(Error {
+                                    path: format!("{path}[{i}].point"),
+                                    message: format!(
+                                        "this point is on {}, not on {what}",
+                                        on.iter().map(|n| format!("&{n}")).collect::<Vec<_>>().join(", ")
+                                    ),
+                                });
+                            }
+                        }
+                    }
+                    WirePoint::Branch(b) => {
+                        let shared: BTreeSet<String> = match branches.get(b) {
+                            Some(before) => before.iter().filter(|n| nets.contains(n.as_str())).cloned().collect(),
+                            None => nets.iter().map(|n| n.to_string()).collect(),
+                        };
+                        if shared.is_empty() {
+                            return Err(Error {
+                                path: format!("{path}[{i}].branch"),
+                                message: format!("branch {b} joins {what} to a wire of another net"),
+                            });
+                        }
+                        branches.insert(*b, shared);
+                    }
+                    WirePoint::Bend(_) => {}
+                }
+            }
+            Ok(())
+        };
+    // the points of the wires written that a wire may pass as their author wrote them
+    let anchors = |wires: &mut dyn Iterator<Item = usize>| -> Vec<&PointRef> {
+        wires.filter_map(|w| p.wires.get(w)).flat_map(|w| &w.anchors).collect()
+    };
+    for (i, w) in s.wires.iter().enumerate() {
+        let route = &p.routes[w.route];
+        let net = route.net.as_str();
+        let written = anchors(&mut route.wires.iter().copied());
+        let what = format!("&{net} of its route");
+        check(&w.points, BTreeSet::from([net]), &written, &format!("$.wires[{i}].points"), &what)?;
+    }
+    for (i, w) in s.wire_routes.iter().enumerate() {
+        let wire = &p.wires[w.wire];
+        let nets: BTreeSet<&str> = wire.nets.iter().map(String::as_str).collect();
+        if nets.is_empty() {
+            continue;
+        }
+        let what = format!("the nets of {}", wire.label);
+        let written = anchors(&mut std::iter::once(w.wire));
+        check(&w.points, nets, &written, &format!("$.wire_routes[{i}].points"), &what)?;
+    }
+    Ok(())
 }
