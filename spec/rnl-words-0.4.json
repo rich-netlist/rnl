@@ -155,7 +155,7 @@
   },
   {
    "name": "empty node",
-   "meaning": "`&` alone: no net; taken by roles of kind net and by the net slot of WIRE, and elsewhere as an empty set of nets (6.3)"
+   "meaning": "`&` alone: no net; taken by roles of kind `net` and by the net slot of WIRE, and elsewhere as an empty set of nets (6.3)"
   }
  ],
  "takes": [

@@ -285,7 +285,7 @@ def check_word_list(spec: Path, v: str) -> list[str]:
         ch05 = read(spec / v / lang / "ch05.md")
         m = re.search(r"^([ \t]*)```json$", ch05, re.M)
         want = "\n".join(m.group(1) + x if x else x for x in spectools.excerpt(words).split("\n")) if m else None
-        if not m or want not in ch05:
+        if m and want not in ch05:  # from 0.4 on, 5.3 has no excerpt
             msgs.append(f"{v}/{lang}/ch05.md: the JSON excerpt of 5.3 is not the PLACE entry of the word list")
     return msgs
 
