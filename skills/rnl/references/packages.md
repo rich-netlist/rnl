@@ -69,23 +69,23 @@ A definition is used as `#A(role) #B(role) @AS $DEFINITION` or `$DEFINITION @ATT
 
 | Definition | Roles | Parameters (defaults) | Symbol | Group | Comment before it in the file |
 | --- | --- | --- | --- | --- | --- |
-| `$ARROW_45` | `at` (point) | – | – | – | A 45-degree arrow head drawn on a point in a symbol or on a 45-degree wire in the scene. |
-| `$CURRENT_ARROW_45` | `p` (terminal/point) | – | – | – | A 45-degree current arrow on a terminal or a point along a 45-degree branch. |
+| `$ARROW_45` | `at` (point) | – | `$ARROW_45_SYMBOL` | – | A 45-degree arrow head drawn on a point in a symbol or on a 45-degree wire in the scene. |
+| `$CURRENT_ARROW_45` | `p` (terminal/point) | – | `$ARROW_45_SYMBOL` | – | A 45-degree current arrow on a terminal or a point along a 45-degree branch. |
 
 ### rnl-std-basic
 
 | Definition | Roles | Parameters (defaults) | Symbol | Group | Comment before it in the file |
 | --- | --- | --- | --- | --- | --- |
-| `$GROUND` | `p` (net) | – | – | – | A ground on a net, drawn at a point of its own with its pin facing up at priority low, the bars below the pin: on the net 0 it is the three bars alone, and on any other net it shows the name of its net, by the rule at the end of this … |
-| `$SUPPLY` | `p` (net) | – | – | – | A supply on a net, drawn at a point of its own with its pin facing down at priority low, the bar above the pin. |
-| `$BIAS` | `p` (net) | – | – | – | A bias voltage mark on a net, drawn at a point of its own. |
-| `$IO_PORT` | `p` (net) | – | – | – | A port tag on a net, drawn at a point of its own; its net must be a port of its level. |
-| `$NET_LABEL` | `p` (net/pin) | – | – | – | A net label: the name of a net on a short lead, drawn at a point of its own; given a bus pin, such as a pin of a bundle (11.8), it keeps the pin and is one label on all its nets, showing their names (13.6). |
-| `$NO_CONNECT` | `t` (terminal/pin) | – | – | – | A no-connect mark on a terminal or pin left unconnected on purpose; a terminal is kept as itself so a mark on a bus bit records which bit is open (12.6). |
-| `$JUNCTION` | `p` (point/terminal) | – | – | – | A junction dot on a point or a terminal. |
+| `$GROUND` | `p` (net) | – | `$GROUND_SYMBOL` | – | A ground on a net, drawn at a point of its own with its pin facing up at priority low, the bars below the pin: on the net 0 it is the three bars alone, and on any other net it shows the name of its net, by the rule at the end of this … |
+| `$SUPPLY` | `p` (net) | – | `$SUPPLY_SYMBOL` | – | A supply on a net, drawn at a point of its own with its pin facing down at priority low, the bar above the pin. |
+| `$BIAS` | `p` (net) | – | `$BIAS_SYMBOL` | – | A bias voltage mark on a net, drawn at a point of its own. |
+| `$IO_PORT` | `p` (net) | – | `$IO_PORT_SYMBOL` | – | A port tag on a net, drawn at a point of its own; its net must be a port of its level. |
+| `$NET_LABEL` | `p` (net/pin) | – | `$NET_LABEL_SYMBOL` | – | A net label: the name of a net on a short lead, drawn at a point of its own; given a bus pin, such as a pin of a bundle (11.8), it keeps the pin and is one label on all its nets, showing their names (13.6). |
+| `$NO_CONNECT` | `t` (terminal/pin) | – | `$NO_CONNECT_SYMBOL` | – | A no-connect mark on a terminal or pin left unconnected on purpose; a terminal is kept as itself so a mark on a bus bit records which bit is open (12.6). |
+| `$JUNCTION` | `p` (point/terminal) | – | `$JUNCTION_SYMBOL` | – | A junction dot on a point or a terminal. |
 | `$CURRENT_ARROW` | `p` (terminal/point) | – | – | – | A current arrow on a terminal or a point. |
-| `$ARROW` | `at` (point) | – | – | – | An arrow head drawn on a point in a symbol or in the scene (9.2.7). |
-| `$SPDT_SWITCH` | `at` (point) | – | – | – | A single-pole double-throw switch drawn as a figure on a point, with no netlist line. |
+| `$ARROW` | `at` (point) | – | `$ARROW_SYMBOL` | – | An arrow head drawn on a point in a symbol or in the scene (9.2.7). |
+| `$SPDT_SWITCH` | `at` (point) | – | `$SPDT_SWITCH_SYMBOL` | – | A single-pole double-throw switch drawn as a figure on a point, with no netlist line. |
 | `$FIGURE` | `at` (point) | – | – | – | A figure drawn at a point with no netlist line, given a symbol of its own with SET-SYMBOL. |
 | `$PORT_LIST` | – | – | – | – | A port tag on every port net of a level that does not already have an $IO_PORT, in one column, ordered from the top down and grouped, at least 6 units left of the instances of the level, each at R0 with its pin to the right, all at … |
 | `$COMMENT` | `{target}` | `text` = `""` | – | – | A non-drawn comment attached to any objects, or to the level itself when target is omitted. |
@@ -185,13 +185,13 @@ A definition is used as `#A(role) #B(role) @AS $DEFINITION` or `$DEFINITION @ATT
 
 | Definition | Roles | Parameters (defaults) | Symbol | Group | Comment before it in the file |
 | --- | --- | --- | --- | --- | --- |
-| `$ADDER` | `in1` (net), `in2` (net), `out` (net) | – | – | – | An ideal signal-flow adder (out = in1 + in2), drawn with $ADDER_SYMBOL. |
-| `$SUBTRACTOR` | `in1` (net), `in2` (net), `out` (net) | – | – | – | An ideal signal-flow subtractor (out = in1 - in2), drawn with $SUBTRACTOR_SYMBOL. |
-| `$MULTIPLIER` | `in1` (net), `in2` (net), `out` (net) | – | – | – | An ideal signal-flow multiplier (out = in1 * in2), drawn with $MULTIPLIER_SYMBOL. |
-| `$INTEGRATOR` | `in` (net), `out` (net) | – | – | – | An ideal continuous-time integrator, drawn with $INTEGRATOR_SYMBOL. |
-| `$DISCRETE_TIME_INTEGRATOR` | `in` (net), `out` (net) | – | – | – | An ideal discrete-time integrator, drawn with $DISCRETE_TIME_INTEGRATOR_SYMBOL. |
-| `$QUANTIZER` | `in` (net), `out` (net) | – | – | – | An ideal quantizer, drawn with $QUANTIZER_SYMBOL. |
-| `$UNIT_DELAY` | `in` (net), `out` (net) | – | – | – | An ideal unit delay, drawn with $UNIT_DELAY_SYMBOL. |
+| `$ADDER` | `in1` (net), `in2` (net), `out` (net) | – | `$ADDER_SYMBOL` | – | An ideal signal-flow adder (out = in1 + in2), drawn with $ADDER_SYMBOL. |
+| `$SUBTRACTOR` | `in1` (net), `in2` (net), `out` (net) | – | `$SUBTRACTOR_SYMBOL` | – | An ideal signal-flow subtractor (out = in1 - in2), drawn with $SUBTRACTOR_SYMBOL. |
+| `$MULTIPLIER` | `in1` (net), `in2` (net), `out` (net) | – | `$MULTIPLIER_SYMBOL` | – | An ideal signal-flow multiplier (out = in1 * in2), drawn with $MULTIPLIER_SYMBOL. |
+| `$INTEGRATOR` | `in` (net), `out` (net) | – | `$INTEGRATOR_SYMBOL` | – | An ideal continuous-time integrator, drawn with $INTEGRATOR_SYMBOL. |
+| `$DISCRETE_TIME_INTEGRATOR` | `in` (net), `out` (net) | – | `$DISCRETE_TIME_INTEGRATOR_SYMBOL` | – | An ideal discrete-time integrator, drawn with $DISCRETE_TIME_INTEGRATOR_SYMBOL. |
+| `$QUANTIZER` | `in` (net), `out` (net) | – | `$QUANTIZER_SYMBOL` | – | An ideal quantizer, drawn with $QUANTIZER_SYMBOL. |
+| `$UNIT_DELAY` | `in` (net), `out` (net) | – | `$UNIT_DELAY_SYMBOL` | – | An ideal unit delay, drawn with $UNIT_DELAY_SYMBOL. |
 
 ## Symbols
 
@@ -389,7 +389,7 @@ A symbol is chosen by the rules of the next section, or by `@SET-SYMBOL $NAME` o
 
 | Symbol | Pins | Labels | Definition |
 | --- | --- | --- | --- |
-| `$ARROW_45_SYMBOL` | – | – | – |
+| `$ARROW_45_SYMBOL` | – | – | `$ARROW_45` |
 | `$CAPACITOR_45` | n:down p:up | name, value | – |
 | `$CURRENT_SOURCE_45` | n:down p:up | name, value | – |
 | `$DIODE_45` | a:up k:down | name, model | – |
@@ -412,10 +412,10 @@ A symbol is chosen by the rules of the next section, or by `@SET-SYMBOL $NAME` o
 | Symbol | Pins | Labels | Definition |
 | --- | --- | --- | --- |
 | `$AMMETER` | n:down p:up | name | – |
-| `$ARROW_SYMBOL` | – | – | – |
+| `$ARROW_SYMBOL` | – | – | `$ARROW` |
 | `$BATTERY` | n:down p:up | name, value | – |
 | `$BEHAVIORAL_SOURCE` | n:down p:up | name, value | – |
-| `$BIAS_SYMBOL` | p:down | netname | – |
+| `$BIAS_SYMBOL` | p:down | netname | `$BIAS` |
 | `$CAPACITOR` | n:down p:up | name, value | – |
 | `$CLOSED_SWITCH` | n:right p:left | name | – |
 | `$CONTROLLED_CURRENT_SOURCE` | n:down p:up | name, value | – |
@@ -423,14 +423,14 @@ A symbol is chosen by the rules of the next section, or by `@SET-SYMBOL $NAME` o
 | `$CRYSTAL` | n1:up n2:down | name | – |
 | `$CURRENT_SOURCE` | n:down p:up | name, value | – |
 | `$EXTERNALLY_CONTROLLED_SWITCH` | cp:left n:down p:up | name | – |
-| `$GROUND_SYMBOL` | p:up | – | – |
+| `$GROUND_SYMBOL` | p:up | – | `$GROUND` |
 | `$INDUCTOR` | n:down p:up | name, value | – |
-| `$IO_PORT_SYMBOL` | p:right | netname | – |
-| `$JUNCTION_SYMBOL` | – | – | – |
+| `$IO_PORT_SYMBOL` | p:right | netname | `$IO_PORT` |
+| `$JUNCTION_SYMBOL` | – | – | `$JUNCTION` |
 | `$MICROPHONE` | n:down p:up | name, value | – |
 | `$NAMED_GROUND_SYMBOL` | p:up | netname | – |
-| `$NET_LABEL_SYMBOL` | p:right | netname | – |
-| `$NO_CONNECT_SYMBOL` | – | – | – |
+| `$NET_LABEL_SYMBOL` | p:right | netname | `$NET_LABEL` |
+| `$NO_CONNECT_SYMBOL` | – | – | `$NO_CONNECT` |
 | `$PHOTORESISTOR` | n:down p:up | name, value | – |
 | `$POLARIZED_CAPACITOR` | n:down p:up | name, value | – |
 | `$POTENTIOMETER` | n1:up n2:down nw:right | name, value | – |
@@ -439,9 +439,9 @@ A symbol is chosen by the rules of the next section, or by `@SET-SYMBOL $NAME` o
 | `$RESISTOR` | n:down p:up | name, value | – |
 | `$RF_PORT` | n:down p:up | name, value | – |
 | `$SINE_VOLTAGE_SOURCE` | n:down p:up | name, value | – |
-| `$SPDT_SWITCH_SYMBOL` | – | – | – |
+| `$SPDT_SWITCH_SYMBOL` | – | – | `$SPDT_SWITCH` |
 | `$SPEAKER` | n:down p:up | name, value | – |
-| `$SUPPLY_SYMBOL` | p:down | netname | – |
+| `$SUPPLY_SYMBOL` | p:down | netname | `$SUPPLY` |
 | `$SWITCH` | n:right p:left | name | – |
 | `$TRANSFORMER` | n1:down n2:down p1:up p2:up | name | – |
 | `$TRANSMISSION_LINE` | n1:down n2:down p1:left p2:right | name | – |
@@ -576,13 +576,13 @@ A symbol is chosen by the rules of the next section, or by `@SET-SYMBOL $NAME` o
 
 | Symbol | Pins | Labels | Definition |
 | --- | --- | --- | --- |
-| `$ADDER_SYMBOL` | in1:left in2:down out:right | name | – |
-| `$DISCRETE_TIME_INTEGRATOR_SYMBOL` | in:left out:right | formula, name | – |
-| `$INTEGRATOR_SYMBOL` | in:left out:right | formula, name | – |
-| `$MULTIPLIER_SYMBOL` | in1:left in2:down out:right | name | – |
-| `$QUANTIZER_SYMBOL` | in:left out:right | name | – |
-| `$SUBTRACTOR_SYMBOL` | in1:left in2:down out:right | name | – |
-| `$UNIT_DELAY_SYMBOL` | in:left out:right | formula, name | – |
+| `$ADDER_SYMBOL` | in1:left in2:down out:right | name | `$ADDER` |
+| `$DISCRETE_TIME_INTEGRATOR_SYMBOL` | in:left out:right | formula, name | `$DISCRETE_TIME_INTEGRATOR` |
+| `$INTEGRATOR_SYMBOL` | in:left out:right | formula, name | `$INTEGRATOR` |
+| `$MULTIPLIER_SYMBOL` | in1:left in2:down out:right | name | `$MULTIPLIER` |
+| `$QUANTIZER_SYMBOL` | in:left out:right | name | `$QUANTIZER` |
+| `$SUBTRACTOR_SYMBOL` | in1:left in2:down out:right | name | `$SUBTRACTOR` |
+| `$UNIT_DELAY_SYMBOL` | in:left out:right | formula, name | `$UNIT_DELAY` |
 
 ## Which symbol an instance gets
 

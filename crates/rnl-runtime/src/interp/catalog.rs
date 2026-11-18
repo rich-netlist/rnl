@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use crate::geom::Pt;
 use crate::model::SymbolView;
 use crate::source::Provider;
-use crate::syntax::{Arg, Member, ObjExpr, Params};
+use crate::syntax::{Arg, Member, ObjExpr, Params, Value};
 
 use super::obj::{Lit, ObjData, ObjId, TermKey, UnitId};
 use super::unit::Binding;
@@ -214,8 +214,9 @@ impl Interp<'_> {
     }
 
     /// The rules of a package, in the order of its file, that are written
-    /// `# @SELECT-USAGE $DEF => @SET-SYMBOL $SYM`, read as rules (10.3), with a definition and a
-    /// symbol found where they are written (16.2).
+    /// `# @SELECT-USAGE $DEF => @SET-SYMBOL $SYM`, or with `(recursive=true)` on the selection as the
+    /// standard series 0.4 writes them, read as rules (10.3), with a definition and a symbol found
+    /// where they are written (16.2).
     fn usage_symbols(&mut self, pu: UnitId) -> Vec<UsageSymbol> {
         let mut out = Vec::new();
         for m in self.units[pu].members.clone() {
@@ -239,10 +240,18 @@ impl Interp<'_> {
         let [select, set] = &m.segments[..] else { return None };
         let (sc, ss) = (select.call.as_ref()?, set.call.as_ref()?);
         let plain = |p: &Option<Params>| p.as_ref().is_none_or(|p| p.positional.is_empty() && p.named.is_empty());
+        // every usage of the definition, in the level or in the levels below it too (10.3)
+        let every = |p: &Option<Params>| {
+            plain(p)
+                || p.as_ref().is_some_and(|p| {
+                    p.positional.is_empty()
+                        && matches!(p.named.as_slice(), [n] if self.word(&n.name, u) == "recursive" && matches!(n.value, Value::Bool(true)))
+                })
+        };
         if !m.binds.is_empty()
             || self.kw(&sc.kw, u) != "SELECT-USAGE"
             || self.kw(&ss.kw, u) != "SET-SYMBOL"
-            || !plain(&sc.params)
+            || !every(&sc.params)
             || !plain(&ss.params)
         {
             return None;
