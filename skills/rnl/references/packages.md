@@ -20,7 +20,7 @@ The header record of a file that uses the whole series, the optional `rnl-std-no
 | Package | References | What it is for |
 | --- | --- | --- |
 | `alias-zh` 0.4 | – | Provides Chinese spellings for RNL 0.4 keywords and standard words, all $ names of the standard 0.4 packages, and role, parameter and public local names of standard definitions. |
-| `analog-canvas-extensions` 0.7 | – | Not standard: Analog Canvas's appearance variants of standard symbols, named $CANVAS_ and its component id, its four-input gates, its four-terminal MOSFETs with the body pin at (1, 0), and facts of its drawings that the netlist does not … |
+| `analog-canvas-extensions` 0.7 | – | Analog Canvas’s own package for the language 0.4: its look variants of standard symbols, its four-input gates and four-terminal MOSFETs, and the definitions of meaning only that bring a file it writes back to it unchanged. |
 | `rnl-std-45deg` 0.4 | `rnl-std-basic` | 45-degree symbols for bridges, cross-coupled pairs, diagonal windings and 45-degree wires. |
 | `rnl-std-all` 0.4 | `rnl-std-style`, `rnl-std-basic`, `rnl-std-semiconductors`, `rnl-std-fill`, `rnl-std-semantics`, `rnl-std-functional`, `rnl-std-rf`, `rnl-std-logic`, `rnl-std-signal-flow`, `rnl-std-spice`, `rnl-std-spectre` | The one package collection of the series 0.4, with no content of its own: it brings in styles, basic and semiconductor symbols and definitions, automatic fill, circuit semantics, the four domain packages, and the rule package of each host … |
 | `rnl-std-basic` 0.4 | – | The symbols of passive parts, sources, switches, transmission lines, virtual parts and marks; the definitions of virtual parts, marks, figures and stubs, each with the rule that draws its usages; and the sets of ground, supply and bias … |
