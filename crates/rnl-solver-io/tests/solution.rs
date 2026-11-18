@@ -131,6 +131,112 @@ fn a_valid_pin_index_does_not_authorize_another_endpoint_or_arbitrary_reference_
     assert!(decode_solution(&encode_solution(&s).unwrap(), &p).is_err());
 }
 
+/// A result whose wire, routed for the ROUTE of one net, passes the pins of another, or meets a
+/// wire of another net at a branch point, is refused: written, it would join the two nets under
+/// one name.
+#[test]
+fn a_wire_routed_for_one_net_through_the_pins_of_another_is_refused() {
+    use rnl_runtime::solution::{Branch, RoutedWire, WirePoint};
+    let text = r#"* two nets
+* @RNL(type="header") { @VERSION("0.4") }
+R1 a 0 1k
+R2 a 0 2k
+* @RNL {
+* $S = @DEFINE-SYMBOL { (-1,0) @PIN(terminal=1); (1,0) @PIN(terminal=2); (-0.5,-0.5) (0.5,0.5) @RECTANGLE };
+* {#R1 #R2} @SET-SYMBOL $S => @ORIENT("R0");
+* &a @ROUTE-NET; &0 @ROUTE-NET
+* }
+.end
+"#;
+    let files = MemoryProvider::new().with("test.sp", text);
+    let read = rnl_view::interpret("test.sp", None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    let p = read.problems[0].clone();
+    let route = |net: &str| p.routes.iter().position(|r| r.net == net).unwrap();
+    let (a, ground) = (route("a"), route("0"));
+    let pins_a: Vec<WirePoint> = p.routes[a].pins.iter().cloned().map(WirePoint::Anchor).collect();
+    let pins_0: Vec<WirePoint> = p.routes[ground].pins.iter().cloned().map(WirePoint::Anchor).collect();
+    let decode = |wires: Vec<RoutedWire>, branches: usize| {
+        let s = Solution {
+            wires,
+            branches: vec![Branch { at: (0., 1.), junction: true }; branches],
+            ..Solution::default()
+        };
+        decode_solution(&encode_solution(&s).unwrap(), &p)
+    };
+    // each net's pins on a wire of its own ROUTE: taken
+    decode(
+        vec![RoutedWire { route: a, points: pins_a.clone() }, RoutedWire { route: ground, points: pins_0.clone() }],
+        0,
+    )
+    .unwrap();
+    // the pins of &a on a wire of the ROUTE of &0, as an external solver gave them
+    let err = decode(vec![RoutedWire { route: ground, points: pins_a.clone() }], 0).unwrap_err();
+    assert_eq!(err.path, "$.wires[0].points[0].point", "{err:?}");
+    assert!(err.message.contains("&a") && err.message.contains("&0"), "{err:?}");
+    // a wire of each net, meeting at one branch point
+    let err = decode(
+        vec![
+            RoutedWire { route: a, points: vec![pins_a[0].clone(), WirePoint::Branch(0)] },
+            RoutedWire { route: ground, points: vec![pins_0[0].clone(), WirePoint::Branch(0)] },
+        ],
+        1,
+    )
+    .unwrap_err();
+    assert_eq!(err.path, "$.wires[1].points[1].branch", "{err:?}");
+    // two wires of one net meeting at a branch point: taken
+    decode(
+        vec![
+            RoutedWire { route: a, points: vec![pins_a[0].clone(), WirePoint::Branch(0)] },
+            RoutedWire { route: a, points: vec![pins_a[1].clone(), WirePoint::Branch(0)] },
+        ],
+        1,
+    )
+    .unwrap();
+}
+
+/// A wire written on one net through a pin of another, which the reading only warns of, is routed
+/// again through the points its author wrote: a result that does so is taken, and one that takes
+/// another net's pin the author did not write is refused.
+#[test]
+fn a_wire_written_through_a_pin_of_another_net_is_routed_as_written() {
+    use rnl_runtime::solution::{WirePoint, WireRoute};
+    let text = r#"* a wire on the wrong net
+* @RNL(type="header") { @VERSION("0.4") }
+R1 a 0 1k
+R2 a 0 2k
+* @RNL {
+* $S = @DEFINE-SYMBOL { (-1,0) @PIN(terminal=1); (1,0) @PIN(terminal=2); (-0.5,-0.5) (0.5,0.5) @RECTANGLE };
+* {#R1 #R2} @SET-SYMBOL $S => @ORIENT("R0");
+* &a @WIRE(mode="straight") {#R1:1 #R2:2}
+* }
+.end
+"#;
+    let files = MemoryProvider::new().with("test.sp", text);
+    let read = rnl_view::interpret("test.sp", None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    let p = read.problems[0].clone();
+    assert_eq!(p.wires.len(), 1);
+    let written: Vec<WirePoint> = p.wires[0].anchors.iter().cloned().map(WirePoint::Anchor).collect();
+    let rewrite = |points: Vec<WirePoint>| {
+        let s = Solution { wire_routes: vec![WireRoute { wire: 0, points }], ..Solution::default() };
+        decode_solution(&encode_solution(&s).unwrap(), &p)
+    };
+    rewrite(vec![written[0].clone(), WirePoint::Bend((0., 2.)), written[1].clone()]).unwrap();
+    // the other pin of R2, on &a, is the wire's net; that of R1 on &0 is not, and its author did not
+    // write it
+    let r1_ground = p
+        .nets
+        .iter()
+        .find(|n| n.name == "0")
+        .unwrap()
+        .pins
+        .iter()
+        .find(|r| r.pin_key().is_some_and(|(o, _)| o == 0))
+        .cloned()
+        .unwrap();
+    let err = rewrite(vec![written[0].clone(), WirePoint::Anchor(r1_ground)]).unwrap_err();
+    assert_eq!(err.path, "$.wire_routes[0].points[1].point", "{err:?}");
+}
+
 #[test]
 fn malformed_result_indices_and_duplicate_placements_are_rejected_with_paths() {
     let p = problem("0.4");
