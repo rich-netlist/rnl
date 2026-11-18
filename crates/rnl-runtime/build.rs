@@ -21,7 +21,7 @@ fn main() {
         let constant = name.to_uppercase().replace('-', "_");
         let about = if sections.is_empty() { String::new() } else { format!(" ({})", sections.join(", ")) };
         let number = kind["number"].as_str().unwrap_or_else(|| panic!("the kind {name} has a number"));
-        let n: u16 = number.strip_prefix("RNL").and_then(|n| n.parse().ok()).expect("a number is RNL and four digits");
+        let n = number_of(number);
         writeln!(out, "/// {number}, {severity}{about}.").unwrap();
         writeln!(out, "pub const {constant}: Code = Code::new({n}, {name:?});").unwrap();
         all.push(constant);
@@ -29,9 +29,11 @@ fn main() {
     // a retired kind keeps its number and its name: no kind of the list takes either
     for gone in json["retired"].as_array().map_or(&[][..], |r| r.as_slice()) {
         let (number, name) = (gone["number"].as_str(), gone["name"].as_str());
+        let retired = number.map(number_of);
         for kind in json["kinds"].as_array().unwrap() {
+            // compared as numbers, which only one spelling writes
             assert!(
-                number.is_none() || kind["number"].as_str() != number,
+                retired.is_none() || kind["number"].as_str().map(number_of) != retired,
                 "{number:?} is retired and is not given again"
             );
             assert!(kind["name"].as_str() != name, "{name:?} is retired and is not given again");
@@ -40,4 +42,10 @@ fn main() {
     writeln!(out, "/// Every kind, in the order of the list.").unwrap();
     writeln!(out, "pub const ALL: &[Code] = &[{}];", all.join(", ")).unwrap();
     std::fs::write(PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("codes.rs"), out).unwrap();
+}
+
+/// The number of `RNLnnnn`: RNL and exactly four ASCII digits, no other spelling.
+fn number_of(number: &str) -> u16 {
+    let digits = number.strip_prefix("RNL").filter(|d| d.len() == 4 && d.bytes().all(|b| b.is_ascii_digit()));
+    digits.and_then(|d| d.parse().ok()).unwrap_or_else(|| panic!("{number:?} is not RNL and four digits"))
 }
