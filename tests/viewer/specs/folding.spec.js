@@ -126,11 +126,11 @@ test('unvisited includes have no tokenized model or rows; diagnostics still reve
   await page.locator('#tab-hierarchy').click();
   await page.locator('#index .index-row', { hasText: 'rdiv' }).click();
   await page.locator('#tab-netlist').click();
-  await expect(viewer.line(2).locator('.fold-toggle')).toBeVisible();
-  await viewer.line(2).locator('.fold-toggle').click();
-  await page.evaluate(async () => (await import('./text.js')).revealLine(1, 3, true));
-  await expect(viewer.line(3)).toHaveClass(/flash/);
-  await expect(viewer.line(2).locator('.fold-toggle')).toHaveAttribute('aria-expanded', 'true');
+  await expect(viewer.line(3).locator('.fold-toggle')).toBeVisible();
+  await viewer.line(3).locator('.fold-toggle').click();
+  await page.evaluate(async () => (await import('./text.js')).revealLine(1, 4, true));
+  await expect(viewer.line(4)).toHaveClass(/flash/);
+  await expect(viewer.line(3).locator('.fold-toggle')).toHaveAttribute('aria-expanded', 'true');
   await viewer.build(() => page.evaluate(() => window.fakeShell.open({ name: '04-hierarchy', fixture: '04-hierarchy' })));
   expect(await page.evaluate(async () => !!(await import('./text.js')).fileViews[1]._model)).toBe(false);
 });

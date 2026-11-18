@@ -22,7 +22,7 @@ test("clicking a symbol selects its instance and marks its statement and the pla
   const x2 = await viewer.object("instance", "X2", TOP);
   await viewer.click("X2");
   await viewer.selected(`instance X2 in ${TOP}`);
-  expect(await viewer.markedLines()).toEqual([50]);
+  expect(await viewer.markedLines()).toEqual([54]);
   // its name in the statement and the references to it in the records
   const lines = await viewer.spanLines(x2);
   expect(lines.length).toBeGreaterThan(2);
@@ -48,14 +48,14 @@ test("clicking a symbol selects its instance and marks its statement and the pla
   await expect(page.locator("#canvas")).toHaveClass(/\bsel-sub\b/);
   await expect(page.locator("#selection")).toHaveText(`X2 instance of amp in ${TOP} · E or Enter opens it; Shift opens a new window`);
   // the statement is scrolled into view
-  const [line, source] = [await viewer.line(50).boundingBox(), await page.locator("#source").boundingBox()];
+  const [line, source] = [await viewer.line(54).boundingBox(), await page.locator("#source").boundingBox()];
   expect(line.y).toBeGreaterThanOrEqual(source.y);
   expect(line.y + line.height).toBeLessThanOrEqual(source.y + source.height);
 
   // an instance that opens nothing
   await viewer.click("Vin");
   await viewer.selected(`instance Vin in ${TOP}`);
-  expect(await viewer.markedLines()).toEqual([53]);
+  expect(await viewer.markedLines()).toEqual([57]);
   await expect(page.locator("#enter-badge")).toBeHidden();
   await expect(page.locator("#canvas")).not.toHaveClass(/\bsel-sub\b/);
   await expect(page.locator("#selection")).toHaveText(`Vin instance in ${TOP}`);
@@ -94,22 +94,22 @@ test("clicking a statement or a node in the text selects it on the drawing, on i
 
   // the node b of X1's statement, on the top level
   const b = await viewer.object("net", "b", TOP);
-  await viewer.line(49).locator(`[data-obj~="${b}"]`).click();
+  await viewer.line(53).locator(`[data-obj~="${b}"]`).click();
   await viewer.selected(`net b in ${TOP}`);
   await expect(page.locator("#level-name")).toHaveText(TOP);
   expect(await viewer.selectedGroups()).toEqual(await groupsOf(page, b));
 
   // a reference in a record, such as #X3 in #X3:top, which names its instance first
   const x3 = await viewer.object("instance", "X3", TOP);
-  const ref = (await viewer.spanLines(x3)).find((l) => l !== 51);
+  const ref = (await viewer.spanLines(x3)).find((l) => l !== 55);
   await viewer.line(ref).locator(`[data-obj~="${x3}"]`).first().click();
   await viewer.selected(`instance X3 in ${TOP}`);
-  expect(await viewer.markedLines()).toEqual([51]);
+  expect(await viewer.markedLines()).toEqual([55]);
 
   // a node in the included file, in the subcircuit rdiv
   await showSource(page, "04-hierarchy-lib.inc");
   const mid = await viewer.object("net", "mid", "rdiv");
-  await viewer.line(3).locator(`[data-obj~="${mid}"]`).click();
+  await viewer.line(4).locator(`[data-obj~="${mid}"]`).click();
   await viewer.selected("net mid in rdiv");
   await expect(page.locator("#level-name")).toHaveText("rdiv");
   expect(await viewer.selectedGroups()).toEqual(await groupsOf(page, mid));
@@ -118,7 +118,7 @@ test("clicking a statement or a node in the text selects it on the drawing, on i
 test("a terminal's reference names its instance and, all of it, the net at the terminal", async ({ page, viewer }) => {
   // line 60, &c @WIRE(...) {#X2:out #X3:top}: #X3 is X3, and #X3:top, like #X2:out, is the net c
   const [x3, c] = [await viewer.object("instance", "X3", TOP), await viewer.object("net", "c", TOP)];
-  const marked = () => viewer.line(60).locator(".hl").evaluateAll((els) => els.map((e) => e.textContent).join(""));
+  const marked = () => viewer.line(64).locator(".hl").evaluateAll((els) => els.map((e) => e.textContent).join(""));
   await viewer.click("X3");
   await viewer.selected(`instance X3 in ${TOP}`);
   expect(await marked()).toBe("#X3");
@@ -127,9 +127,9 @@ test("a terminal's reference names its instance and, all of it, the net at the t
   expect(await marked()).toBe("&c#X2:out#X3:top");
   // a click on the terminal's name selects the net, and on the instance's the instance
   await viewer.click("X1");
-  await viewer.line(60).locator(`[data-obj="${c}"]`, { hasText: "top" }).click();
+  await viewer.line(64).locator(`[data-obj="${c}"]`, { hasText: "top" }).click();
   await viewer.selected(`net c in ${TOP}`);
-  await viewer.line(60).locator(`[data-obj="${x3} ${c}"]`).click();
+  await viewer.line(64).locator(`[data-obj="${x3} ${c}"]`).click();
   await viewer.selected(`instance X3 in ${TOP}`);
 });
 
@@ -186,7 +186,7 @@ test("Escape and a click on an empty place clear the selection", async ({ page, 
   await cleared();
 
   // in the text: a line that is no statement and names nothing
-  await viewer.line(50).locator(".no").click();
+  await viewer.line(54).locator(".no").click();
   await viewer.selected(`instance X2 in ${TOP}`);
   await viewer.line(1).click();
   await cleared();

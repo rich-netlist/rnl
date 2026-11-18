@@ -95,21 +95,21 @@ test("the badge on a selected subcircuit instance sits on its box and opens it",
 
 test("a double click on an instance's statement or name in the text opens its subcircuit", async ({ page, viewer }) => {
   // X3's statement, by its line number
-  await viewer.line(51).locator(".no").dblclick();
+  await viewer.line(55).locator(".no").dblclick();
   await expect(page.locator("#level-name")).toHaveText("rdiv");
   await page.keyboard.press("Backspace");
   await viewer.selected(`instance X3 in ${TOP}`);
 
   // X1's name in a reference of a record
   const x1 = await viewer.object("instance", "X1", TOP);
-  await viewer.line(58).locator(`[data-obj~="${x1}"]`).first().dblclick();
+  await viewer.line(62).locator(`[data-obj~="${x1}"]`).first().dblclick();
   await expect(page.locator("#level-name")).toHaveText("amp");
   // the word that the double click selected is let go
   expect(await page.evaluate(() => String(window.getSelection()))).toBe("");
 
   // a statement that opens nothing opens nothing
   await page.keyboard.press("Backspace");
-  await viewer.line(53).locator(".no").dblclick();
+  await viewer.line(57).locator(".no").dblclick();
   await viewer.selected(`instance Vin in ${TOP}`);
   await expect(page.locator("#level-name")).toHaveText(TOP);
 });

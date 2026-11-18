@@ -3,6 +3,6 @@
 R1 a b 1k
 R2 b 0 1k
 R3 b c 1k
-* @RNL(type="header") { @VERSION("0.3") }
+* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4") }
 * @RNL { #R1 @PLACE(0, 0); #R2 @PLACE(9, 0); {#R1 #R2} @ALIGN("y") }
 .end

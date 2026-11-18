@@ -30,7 +30,7 @@ const output = process.env.SMOKE_OUTPUT_DIR || temp;
 fs.mkdirSync(output, { recursive: true });
 const sample = "04-hierarchy.sp";
 for (const name of [sample, "04-hierarchy-lib.inc"]) {
-  fs.copyFileSync(path.join(root, "tests/conformance/cases", name), path.join(temp, name));
+  fs.copyFileSync(path.join(root, "tests/conformance/cases-0.4/from-0.2", name), path.join(temp, name));
 }
 const original = fs.readFileSync(path.join(temp, sample));
 const server = net.createServer();

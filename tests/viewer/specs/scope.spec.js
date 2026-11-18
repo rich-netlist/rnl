@@ -63,12 +63,12 @@ test("while a subcircuit is drawn, the text outside its definition is dimmed", a
   await down(page, viewer, "X1");
   expect((await viewer.state()).title).toBe("amp");
   await expect(page.locator("#source")).toHaveClass(/\bscoped\b/);
-  expect(await dimmed(page)).toEqual([[[1, 7], [49, 78]], []]);
+  expect(await dimmed(page)).toEqual([[[1, 7], [53, 87]], []]);
   // the definition's lines are as at the top level
   expect(await viewer.line(11).evaluate((e) => getComputedStyle(e.querySelector(".code")).opacity)).toBe("1");
   // reading the file again keeps it so
   await viewer.build(() => page.keyboard.press("F5"));
-  expect(await dimmed(page)).toEqual([[[1, 7], [49, 78]], []]);
+  expect(await dimmed(page)).toEqual([[[1, 7], [53, 87]], []]);
   // back up, nothing is
   await page.keyboard.press("Backspace");
   await expect.poll(async () => (await viewer.state()).title).toBe("04-hierarchy.sp");
@@ -83,10 +83,10 @@ test("going down into an instance brings the start of its subcircuit's definitio
 
 test("going back up shows the statement of the instance the subcircuit was left through", async ({ page, viewer }) => {
   await down(page, viewer, "X1");
-  expect(await viewer.within(viewer.line(49))).toBe(false);
+  expect(await viewer.within(viewer.line(53))).toBe(false);
   await page.keyboard.press("Backspace");
   await expect.poll(async () => (await viewer.state()).selected).toBe("instance X1 in 04-hierarchy.sp");
-  expect(await viewer.within(viewer.line(49))).toBe(true);
+  expect(await viewer.within(viewer.line(53))).toBe(true);
 });
 
 test("a subcircuit opened from the index or the tree shows its definition, in its file", async ({ page, viewer }) => {
@@ -98,8 +98,8 @@ test("a subcircuit opened from the index or the tree shows its definition, in it
   // the text, hidden behind the hierarchy, shows the definition once it is shown again
   await page.locator("#tab-netlist").click();
   await expect(page.locator("#source-file")).toHaveText("04-hierarchy-lib.inc");
-  expect(await dimmed(page)).toEqual([[[1, 78]], [[1, 1]]]);
-  expect(await viewer.within(viewer.line(2))).toBe(true);
+  expect(await dimmed(page)).toEqual([[[1, 87]], [[1, 2]]]);
+  expect(await viewer.within(viewer.line(3))).toBe(true);
   // the tree: X2 of the top level, which opens amp
   await page.locator("#tab-hierarchy").click();
   await page.locator('#tree .tree-row[data-path="0/1"]').click();
@@ -110,11 +110,11 @@ test("a subcircuit opened from the index or the tree shows its definition, in it
 
 test("a name picked in the text shows its level, and leaves the text where it is", async ({ page, viewer }) => {
   // the text scrolled down at the top level, to the statements of amp's placements
-  await viewer.line(43).evaluate((e) => {
+  await viewer.line(45).evaluate((e) => {
     document.getElementById("source").scrollTop = e.offsetTop - 40;
   });
   const scroll = await page.locator("#source").evaluate((e) => e.scrollTop);
-  await viewer.line(43).locator("[data-obj]").first().click();
+  await viewer.line(45).locator("[data-obj]").first().click();
   await expect(page.locator("#level-name")).toHaveText("amp");
   expect((await viewer.state()).selected).toBe("instance M1 in amp");
   await expect(page.locator("#source")).toHaveClass(/\bscoped\b/);

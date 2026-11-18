@@ -1,5 +1,6 @@
 * Usage inspection and independent drawing scopes
-* @RNL(type="header") { @VERSION("0.3") }
+* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4") }
+* @RNL { /* rnl upgrade wrote this record: it keeps the labels and ports the file had before 0.4 */ # @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; $SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_SET; $GROUND_NET_SET @REMOVE-FROM $PORT_FILL_SET }
 .subckt other p n
 Rother p n 1k
 * @RNL {
@@ -28,7 +29,7 @@ R4 d e 4k
 *   %signal = &a @AS $NET;
 *   %pin1 = #R1:1 @AS $PIN;
 *   %axis = (4, 5) @AS $POINT;
-*   %ground = $GROUND @ATTACH #R1:2;
+*   %ground = $GROUND @ATTACH #R1:2::net => @PLACE(0, -2);
 *   %wire = &a @WIRE {(-6, 2) #R1:1}
 * }
 .end

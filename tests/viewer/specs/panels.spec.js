@@ -210,12 +210,12 @@ test("the plain filename follows the circuit and the controls stay below its pat
   expect(await page.locator('#netlist-file').evaluate(el => el.tagName)).toBe('SPAN');
   expect(await page.locator('.netlist-options').evaluate(el => el.getBoundingClientRect().top >= document.getElementById('netlist-file').getBoundingClientRect().bottom)).toBe(true);
   await expect(page.locator("#source-file")).toBeHidden();
-  await expect(viewer.line(2)).toHaveText(/subckt rdiv/);
+  await expect(viewer.line(3)).toHaveText(/subckt rdiv/);
   await page.locator("#tab-hierarchy").click();
   await page.locator('#tree .tree-row[data-path="0"]').click();
   await page.locator("#tab-netlist").click();
   await expect(page.locator("#netlist-file")).toHaveText(/04-hierarchy\.sp$/);
-  await expect(viewer.line(49)).toHaveText(/X1 a b vdd 0 amp/);
+  await expect(viewer.line(53)).toHaveText(/X1 a b vdd 0 amp/);
 });
 
 test("the problems' severity column is as wide as the widest name, so that a language's longer names do not run into the messages", async ({ page, viewer }) => {

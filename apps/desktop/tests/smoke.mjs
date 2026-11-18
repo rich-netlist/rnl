@@ -35,7 +35,7 @@ import { uiCatalog, uiLanguages } from "../../../scripts/i18n/viewer-locales.mjs
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const manifest = path.join(root, "apps", "desktop", "Cargo.toml");
-const cases = path.join(root, "tests", "conformance", "cases");
+const cases = path.join(root, "tests", "conformance", "cases-0.4", "from-0.2");
 /** Copies of the netlist and its include, in a directory of the test's own so that it may save over them; made in main. */
 let netlist = null;
 let netlistInclude = null;
@@ -696,7 +696,7 @@ async function drive(app, port, profile, t0, session) {
   same(fs.readFileSync(netlistInclude).equals(includeOnDisk), true, "the include after the netlist was saved");
   // Saving before applying is different from downloading on the web: the disk source really
   // changes. Verify the same newly typed USE-PACKAGE sequence against the native reader/cache.
-  const withPackage = saved.replace('@VERSION("0.2")', '@VERSION("0.2"); @USE-PACKAGE(name="rnl-std", version="0.2")');
+  const withPackage = saved.replace('@VERSION("0.4")', '@VERSION("0.4"); @USE-PACKAGE(name="rnl-std-logic", version="0.4")');
   const setEditor = text => page.evaluate(`(() => {
     const area = document.querySelector('#source .editor:not([hidden]) textarea');
     area.value = ${JSON.stringify(text.replace(/\r\n/g,'\n'))};
@@ -938,8 +938,8 @@ async function filePoolSmoke(page) {
   const top = path.join(work, "pool-top.sp");
   const pkg = path.join(parts, "renamed.rnl");
   const inc = path.join(parts, "part.inc");
-  fs.writeFileSync(top, '* top\n* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="acme", version="1.0") }\n.include "part.inc"\n.end\n');
-  fs.writeFileSync(pkg, '@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="acme", version="1.0") }\n');
+  fs.writeFileSync(top, '* top\n* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="acme", version="1.0") }\n.include "part.inc"\n.end\n');
+  fs.writeFileSync(pkg, '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme", version="1.0") }\n');
   fs.writeFileSync(inc, "Rpool a 0 1k\n");
   const slashed = (p) => p.replaceAll("\\", "/");
   await page.evaluate(`(async () => {
@@ -1164,7 +1164,7 @@ async function autoIncludeSmoke(page, work, parts, pkg) {
   const top = path.join(work, "auto-top.sp");
   const cell = path.join(parts, "cell.NETLIST");
   const duplicate = path.join(parts, "duplicate.inc");
-  const body = '* auto top\n* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="acme", version="1.0") }\nX1 a 0 cell\n.end\n';
+  const body = '* auto top\n* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="acme", version="1.0") }\nX1 a 0 cell\n.end\n';
   fs.writeFileSync(top, body);
   fs.writeFileSync(cell, ".subckt cell p n\nR1 p n 1k\n.ends\n");
   await page.evaluate(`(async () => {

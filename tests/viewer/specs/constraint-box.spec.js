@@ -8,7 +8,7 @@ test.skip(!process.env.RNL_WEB_URL, 'the web site is not built');
 
 // a subcircuit and a top level of three resistors in a row, placed, which three constraints name in different orders
 const NETLIST = `* A row of resistors with constraints
-* @RNL(type="header") { @VERSION("0.3") }
+* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4") }
 .subckt cell input output
 Rinside input output 1k
 * @RNL { #Rinside @PLACE(0, 0) }
@@ -21,7 +21,7 @@ X1 d e cell
 *   #R1 @PLACE(0, 0); #R2 @PLACE(9, 0); #R3 @PLACE(18, 0); #X1 @PLACE(27, 0);
 *   {#R1 #R2 #R3} @ALIGN("y");
 *   {#R3 #R1 #R2} @ORDER("left-to-right");
-*   #R1 #R2 @DISTANCE("x", min=2, max=4);
+*   #R1 #R2 @DISTANCE("left-to-right", min=2, max=4);
 *   {#R2 #R3 #R2} @ALIGN("y");
 *   {#R3:n #R1:n} @ALIGN("x")
 * }
@@ -57,7 +57,7 @@ test('a box with a title and the numbers of the objects, in the order the constr
   expect(order).toEqual(['2', '3', '1']);
   // a distance numbers its two lists apart, and writes its limits
   await row(page, /DISTANCE x/).click();
-  expect(await texts(page)).toEqual(['DISTANCE x ≥ 2 ≤ 4', 'from1', 'to1']);
+  expect(await texts(page)).toEqual(['DISTANCE x increasing ≥ 2 ≤ 4', 'from1', 'to1']);
   // every frame of the usages but the box is dimmed
   await expect(page.locator('.usage-overlays [data-muted]')).toHaveCount(await page.locator('.usage-overlays .usage-frame').count());
   // a second click on the row takes the box away

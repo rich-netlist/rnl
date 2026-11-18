@@ -136,7 +136,7 @@ test('an open clipboard dialog updates its labels without changing text or selec
 test('symbol labels switch live and obsolete source tooltips stay removed after changing level', async ({page,viewer}) => {
   await viewer.open('symbol-inspector');
   await page.locator('#show-failed').check();
-  const line=viewer.line(19);
+  const line=viewer.line(21);
   await expect(line).toHaveAttribute('title', /Not drawn/);
   await page.evaluate(async () => {
     const doc=window.viewer.doc;

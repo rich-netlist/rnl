@@ -794,14 +794,14 @@ test("a netlist served at the root of its server is named after the server", asy
 
 test("files set on the file input open as with Open, and the page asks which is the netlist", async ({ page }) => {
   await start(page);
-  const cases = (...names) => names.map((name) => path.join(root, "tests", "conformance", "cases", name));
+  const cases = (...names) => names.map((name) => path.join(root, "tests", "conformance", "cases-0.4", "from-0.2", name));
   // a netlist and its include: the include is mostly included, so the netlist opens
   let doc = await opened(page, () =>
     page.locator("#file-input").setInputFiles(cases("04-hierarchy.sp", "04-hierarchy-lib.inc")),
   );
   expect(doc.path).toBe("/04-hierarchy.sp");
   expect(doc.files.map((f) => f.path)).toEqual(["04-hierarchy.sp", "04-hierarchy-lib.inc"]);
-  sameAsRnl(doc, "tests/conformance/cases/04-hierarchy.sp");
+  sameAsRnl(doc, "tests/conformance/cases-0.4/from-0.2/04-hierarchy.sp");
   await showsDocument(page, doc);
 
   // two netlists: the page asks, the netlists first, and opens the one chosen
@@ -815,7 +815,7 @@ test("files set on the file input open as with Open, and the page asks which is 
   });
   await expect(dialog).toHaveCount(0);
   expect(doc.path).toBe("/12-diagnostics.sp");
-  sameAsRnl(doc, "tests/conformance/cases/12-diagnostics.sp");
+  sameAsRnl(doc, "tests/conformance/cases-0.4/from-0.2/12-diagnostics.sp");
 
   // cancelled, the dialog opens nothing
   await page.locator("#file-input").setInputFiles(cases("12-diagnostics.sp", "01-rc-lowpass.sp"));
@@ -1001,7 +1001,7 @@ test("Help > Desktop Viewer opens the site's page of the tools in a new tab", as
 });
 
 test("File > Load from Clipboard opens the text alone, as rnl view reads it in a file of its own", async ({ page }) => {
-  const text = fs.readFileSync(path.join(root, "tests", "conformance", "cases", "04-hierarchy.sp"), "utf8");
+  const text = fs.readFileSync(path.join(root, "tests", "conformance", "cases-0.4", "from-0.2", "04-hierarchy.sp"), "utf8");
   await start(page);
   // the test gives the page the clipboard's text, as a browser would once it lets the page read it
   await page.evaluate((t) => {
@@ -1130,8 +1130,8 @@ test("the text edited and applied is built by the core as rnl view builds the sa
 
 test("Save before Apply retains a newly typed USE-PACKAGE through repeated edit and library rebuilds", async ({ page }) => {
   await start(page);
-  const original = '* save before apply\n* @RNL(type="header") { @VERSION("0.3") }\nR1 a 0 1k\n.end\n';
-  const edited = original.replace('@VERSION("0.3")', '@VERSION("0.3"); @USE-PACKAGE(name="save-regression", version="0.1")');
+  const original = '* save before apply\n* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4") }\nR1 a 0 1k\n.end\n';
+  const edited = original.replace('@VERSION("0.4")', '@VERSION("0.4"); @USE-PACKAGE(name="save-regression", version="0.1")');
   await opened(page, () => page.locator('#file-input').setInputFiles({name:'save-first.sp',mimeType:'text/plain',buffer:Buffer.from(original)}));
   await page.keyboard.press('Control+q');
   const area = page.locator('#source .editor:not([hidden]) textarea');
@@ -1154,7 +1154,7 @@ test("Save before Apply retains a newly typed USE-PACKAGE through repeated edit 
 
 async function mockPackageCatalog(page, versions = ['0.1'], names = ['offer-test']) {
   const packages = names.flatMap(name => versions.map(version => {
-    const text = `@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="${name}", version="${version}") }\n`;
+    const text = `@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="${name}", version="${version}") }\n`;
     const relative = `mock/${name}-${version}.rnl`;
     return {name,version,path:relative,url:relative,kind:'extension',summary:{en:'Test package',zh:'测试包'},
       sha256:createHash('sha256').update(text).digest('hex'),text};
@@ -1164,7 +1164,7 @@ async function mockPackageCatalog(page, versions = ['0.1'], names = ['offer-test
   await page.route('**/public-packages/catalog.json',route=>route.fulfill({json:catalog}));
   return catalog;
 }
-const packageTop = reference => `* package offers\n* @RNL(type="header") { @VERSION("0.3"); ${reference} }\nR1 a 0 1k\n.end\n`;
+const packageTop = reference => `* package offers\n* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4"); ${reference} }\nR1 a 0 1k\n.end\n`;
 const packageFile = (text, name='offer.sp') => ({name,mimeType:'text/plain',buffer:Buffer.from(text)});
 
 test('clipboard Save then Apply can subsequently return to the original text',async({page})=>{
@@ -1275,12 +1275,12 @@ test('a stalled public catalog times out after ten seconds while viewing and edi
 test("Include File resolves a package with a different filename and Exclude removes it from search", async ({ page }) => {
   await start(page);
   await page.locator("#file-input").setInputFiles({ name: "top.sp", mimeType: "text/plain", buffer: Buffer.from(
-    '* top\n* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="acme", version="1.0") }\nR1 a 0 1k\n.end\n') });
+    '* top\n* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4"); @USE-PACKAGE(name="acme", version="1.0") }\nR1 a 0 1k\n.end\n') });
   await shown(page);
   await page.locator("#tab-files").click();
   expect(await page.locator("#pool-list .pool-row").count()).toBe(1);
   const d = await opened(page, () => page.locator("#include-input").setInputFiles({ name: "custom.rnl", mimeType: "text/plain", buffer: Buffer.from(
-    '@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="acme", version="1.0") }\n') }));
+    '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme", version="1.0") }\n') }));
   expect(d.diagnostics.some((d) => d.message.includes("acme 1.0 cannot be found"))).toBe(false);
   const excluded = await opened(page, () => page.getByRole("button", { name: "Exclude custom.rnl", exact: true }).click());
   expect(excluded.diagnostics.some((d) => d.message.includes("acme 1.0 cannot be found"))).toBe(true);
@@ -1415,9 +1415,9 @@ async function pasteText(page, text) {
 test("opened web files join Files once; Exclude keeps the root open and removes package lookup", async ({ page }) => {
   await start(page);
   const pkg = { name: "custom.rnl", mimeType: "text/plain", buffer: Buffer.from(
-    '@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="acme-open", version="1.0") }\n') };
+    '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme-open", version="1.0") }\n') };
   const top = { name: "top.sp", mimeType: "text/plain", buffer: Buffer.from(
-    '* top\n* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="acme-open", version="1.0") }\nR1 a 0 1k\n.end\n') };
+    '* top\n* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4"); @USE-PACKAGE(name="acme-open", version="1.0") }\nR1 a 0 1k\n.end\n') };
   await opened(page, () => page.locator("#file-input").setInputFiles(pkg));
   await opened(page, () => page.locator("#file-input").setInputFiles(pkg));
   await expect(page.locator("#pool-list .pool-row")).toHaveCount(1);
@@ -1435,11 +1435,11 @@ test("opened web files join Files once; Exclude keeps the root open and removes 
 
 test("temporary package is absent from include and USE-PACKAGE lookup; applied text survives switching", async ({ page }) => {
   await start(page);
-  const pkg = '@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="acme-temp", version="1.0") }\n';
+  const pkg = '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme-temp", version="1.0") }\n';
   await pasteText(page, pkg);
   await expect(page.locator(".pool-temporary.current")).toHaveAttribute("aria-current", "true");
   await expect(page.locator("#pool-list .pool-row")).toHaveCount(0);
-  const text = '* top\n* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="acme-temp", version="1.0") }\n.include "clipboard.rnl"\n.end\n';
+  const text = '* top\n* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4"); @USE-PACKAGE(name="acme-temp", version="1.0") }\n.include "clipboard.rnl"\n.end\n';
   const top = { name: "other.sp", mimeType: "text/plain", buffer: Buffer.from(text) };
   const missing = await opened(page, () => page.locator("#file-input").setInputFiles(top));
   expect(missing.missing).toContain("/clipboard.rnl");

@@ -79,17 +79,21 @@ for (const platform of ["web", "desktop"]) {
 
     test("another level has hints of its own; a switch whose rows are gone is off", async ({ page, viewer }) => {
       await viewer.open("04-hierarchy", { platform });
-      // no diagnostics here, only the hints of the level: counted, and listed, with no "nothing" row
+      // the top level has neither diagnostics nor hints: the "nothing" row
+      await expect(page.locator("#diags > li.nothing")).toHaveText("No errors, warnings or hints.");
+      // a level below has hints of its own: counted, and listed, with no "nothing" row
+      await page.evaluate(async () => (await import("./subcircuits.js")).goTo(1));
+      expect((await documentOf(page)).hints.length).toBeGreaterThan(0);
       await expect(page.locator("#diags > li.nothing")).toHaveCount(0);
       expect(await page.locator("#counts > .n-error, #counts > .n-warning").count()).toBe(0);
-      for (const level of [0, 1, 0]) {
+      for (const level of [1, 0, 2, 1]) {
         await page.evaluate(async (level) => (await import("./subcircuits.js")).goTo(level), level);
         const { hints } = await documentOf(page);
         if (hints.length) await expect(chip(page, "hint")).toHaveText(`${hints.length} hint${hints.length === 1 ? "" : "s"}`);
         else await expect(chip(page, "hint")).toHaveCount(0);
         await expect(geoRows(page)).toHaveCount(hints.length);
       }
-      await page.evaluate(async () => (await import("./subcircuits.js")).goTo(0));
+      await page.evaluate(async () => (await import("./subcircuits.js")).goTo(1));
       await chip(page, "hint").click();
       await expect(chip(page, "hint")).toHaveAttribute("aria-pressed", "true");
       await page.evaluate(() => {

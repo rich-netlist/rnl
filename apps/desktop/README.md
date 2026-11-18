@@ -77,7 +77,7 @@ Both Linux formats accept a netlist path after the executable, or **File › Ope
 From the repository root:
 
 ```bash
-cargo run --manifest-path apps/desktop/Cargo.toml -- tests/conformance/cases/03-five-transistor-ota.sp
+cargo run --manifest-path apps/desktop/Cargo.toml -- tests/conformance/cases-0.4/from-0.2/03-five-transistor-ota.sp
 ```
 
 Local development builds optimize the RNL runtime, host readers, viewer model and renderer at

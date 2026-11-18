@@ -131,14 +131,15 @@ for (const [platform, query] of Object.entries(PLATFORMS)) {
       expect(ids.every(Boolean)).toBe(true);
       expect(new Set(ids).size).toBe(labels);
       const text = (id) => page.locator(`#canvas svg g[data-id=${JSON.stringify(id)}] text`).first();
+      // (a label's text may stand in a group of its own inside the label's: the nearest group with an id is the label's)
       const original = await page.evaluate((ids) => [...document.querySelectorAll('#canvas svg g[data-id] text')]
-        .filter((el) => !ids.includes(el.parentElement.getAttribute('data-id')))
+        .filter((el) => !ids.includes(el.parentElement.closest('g[data-id]').getAttribute('data-id')))
         .map((el) => getComputedStyle(el).fill), ids);
       for (const id of ids) await expect(text(id)).toHaveCSS('fill', 'rgb(232, 89, 12)');
       await page.keyboard.press('Escape');
       for (const id of ids) await expect(text(id)).not.toHaveCSS('fill', 'rgb(232, 89, 12)');
       const same = await page.evaluate((ids) => [...document.querySelectorAll('#canvas svg g[data-id] text')]
-        .filter((el) => !ids.includes(el.parentElement.getAttribute('data-id')))
+        .filter((el) => !ids.includes(el.parentElement.closest('g[data-id]').getAttribute('data-id')))
         .map((el) => getComputedStyle(el).fill), ids);
       expect(same).toEqual(original);
       await page.evaluate(() => window.viewer.command('background-dark'));

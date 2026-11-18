@@ -41,7 +41,7 @@ test("seven levels are listed, indented to three, each row naming whose member i
 
 test("the other instance has the same chain, and the usages are listed once each", async ({ page }) => {
   await selectObject(page, "instance", "R2");
-  expect(await rows(page).count()).toBe(9); // the same chain, and a usage of the standard package that names its terminal
+  expect(await rows(page).count()).toBe(8); // the same chain
   const ids = await page.locator("#usage-detail .membership-id").allTextContents();
   expect(new Set(ids).size).toBe(ids.length);
 });

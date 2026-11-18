@@ -21,7 +21,7 @@ test("opening shows the drawing, the text and the problems", async ({ page, view
   await expect(page.locator("#source-file")).toBeHidden();
   const lines = await page.evaluate(() => window.viewer.doc.files[0].text.split(/\r?\n/).filter((l, i, a) => i < a.length - 1 || l).length);
   await expect(page.locator("#source .file:not([hidden]) .ln")).toHaveCount(lines);
-  await expect(viewer.line(49)).toHaveText(/X1 a b vdd 0 amp/);
+  await expect(viewer.line(53)).toHaveText(/X1 a b vdd 0 amp/);
   // the fixture has no problems: its comments are ASCII
   // (the geometry hints of the level are rows of the list and are counted, but no diagnostic is)
   await expect(page.locator("#counts > .n-error, #counts > .n-warning")).toHaveCount(0);
@@ -29,7 +29,7 @@ test("opening shows the drawing, the text and the problems", async ({ page, view
 
   // the other file
   await showSource(page, "04-hierarchy-lib.inc");
-  await expect(viewer.line(2)).toHaveText(/\.subckt rdiv top mid bot/);
+  await expect(viewer.line(3)).toHaveText(/\.subckt rdiv top mid bot/);
 });
 
 test("the problems are listed, the most serious first, and their lines are coloured", async ({ page, viewer }) => {
@@ -51,23 +51,23 @@ test("the problems are listed, the most serious first, and their lines are colou
   await expect(items.filter({ hasText: first.message }).first()).toContainText(`${first.line}:${first.col}`);
   await expect(viewer.line(first.line)).toHaveClass(/\bd-error\b/);
   // the line numbers of warnings and hints too; a line takes the colour of its most serious problem,
-  // such as line 53, with a warning before an error
+  // such as line 56, with a warning before an error
   const colours = (n) => viewer.line(n).evaluate((e) => [...e.classList].filter((c) => c.startsWith("d-")));
-  expect(diags.filter((d) => d.line === 53).map((d) => d.severity)).toEqual(["warning", "error"]);
-  expect(await colours(53)).toEqual(["d-error"]);
-  expect(diags.filter((d) => d.line === 63).map((d) => d.severity)).toEqual(["warning"]);
-  expect(await colours(63)).toEqual(["d-warning"]);
-  expect(diags.filter((d) => d.line === 60).map((d) => d.severity)).toEqual(["hint", "hint"]);
-  expect(await colours(60)).toEqual(["d-hint"]);
-  expect(await colours(61)).toEqual([]);
+  expect(diags.filter((d) => d.line === 56).map((d) => d.severity)).toEqual(["warning", "error"]);
+  expect(await colours(56)).toEqual(["d-error"]);
+  expect(diags.filter((d) => d.line === 66).map((d) => d.severity)).toEqual(["warning"]);
+  expect(await colours(66)).toEqual(["d-warning"]);
+  expect(diags.filter((d) => d.line === 63).map((d) => d.severity)).toEqual(["hint", "hint"]);
+  expect(await colours(63)).toEqual(["d-hint"]);
+  expect(await colours(64)).toEqual([]);
   const number = (n) => viewer.line(n).locator(".no").evaluate((e) => getComputedStyle(e).color);
-  expect(new Set([await number(53), await number(63), await number(61)]).size).toBe(3);
+  expect(new Set([await number(56), await number(66), await number(64)]).size).toBe(3);
   // a level without positions is not drawn
   await page.locator("#tab-hierarchy").click();
   await page.locator("#index .index-row", { hasText: "sub" }).click();
   await expect(page.locator("#empty")).toBeVisible();
   await expect(page.locator("#empty")).toHaveText("Nothing on this level has a position yet, so nothing is drawn.");
-  await expect(page.locator("#status")).toHaveText("Not drawn without a solver: 3 without a position");
+  await expect(page.locator("#status")).toHaveText("Not drawn without a solver: 5 without a position; constraints: 10 unsolved");
 });
 
 test("the status bar shows the constraints that need a solver or could not be checked", async ({ page, viewer }) => {
@@ -77,7 +77,7 @@ test("the status bar shows the constraints that need a solver or could not be ch
   await expect(page.locator("#status")).toHaveText(`Not drawn without a solver: ${status}`);
   await expect(page.locator("#status")).toHaveAttribute("title", `Not drawn without a solver: ${status}`);
   // a level that lacks nothing shows nothing there
-  await page.evaluate(() => window.fakeShell.picks.push("04-hierarchy"));
+  await page.evaluate(() => window.fakeShell.picks.push("01-rc-lowpass"));
   await viewer.build(() => page.keyboard.press("Control+O"));
   await expect(page.locator("#status")).toHaveText("");
 });

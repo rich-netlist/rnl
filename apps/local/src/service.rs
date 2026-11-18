@@ -303,7 +303,7 @@ mod tests {
         text.lines().map(|line| serde_json::from_str(line).unwrap()).collect()
     }
 
-    const HIERARCHY: &str = include_str!("../../../tests/conformance/cases/04-hierarchy.sp");
+    const HIERARCHY: &str = include_str!("../../../tests/conformance/cases-0.4/from-0.2/04-hierarchy.sp");
 
     #[test]
     fn a_streamed_solve_tells_its_events_and_then_the_result() {
@@ -342,11 +342,11 @@ mod tests {
         r.respace = true;
         let json: serde_json::Value = serde_json::from_str(&solve(&r, &server).unwrap()).unwrap();
         assert_eq!(json["report"]["mode"], "respace");
-        // (this netlist is not of 0.4, so no level can be respaced: each is left as it is, with the reason)
+        // (no level of this netlist has a record of the solver to respace from: each is left as it is, with the reason)
         assert!(
             json["report"]["notes"].as_array().is_some_and(|n| n
                 .iter()
-                .any(|t| t.as_str().is_some_and(|t| t.contains("not solved") && t.contains("unsupported")))),
+                .any(|t| t.as_str().is_some_and(|t| t.contains("not solved") && t.contains("no hash")))),
             "{}",
             json["report"]["notes"]
         );
@@ -365,7 +365,7 @@ mod tests {
         assert_eq!(lines[0]["levels"], 1);
         let titles: Vec<_> =
             lines.iter().filter(|l| l["event"] == "level").map(|l| l["title"].as_str().unwrap().to_string()).collect();
-        // (a file read as 0.2 is solved again as 0.3: the same level, told twice)
+        // (the same level may be told more than once)
         assert!(!titles.is_empty() && titles.iter().all(|t| t == "amp"), "{titles:?}");
         assert!(lines.last().unwrap().get("result").is_some());
         // an empty title is none

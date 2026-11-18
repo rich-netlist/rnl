@@ -60,9 +60,10 @@ for (const [platform, query] of Object.entries(PLATFORMS)) {
       await expect(tip(page)).toHaveText("vdd");
     });
 
-    test("a ground that the netlist does not name shows nothing, a label shows nothing, the drawing's empty parts show nothing", async ({ page, viewer }) => {
+    test("a ground shows the name the netlist gives it, a label shows nothing, the drawing's empty parts show nothing", async ({ page, viewer }) => {
+      // the grounds of the top level are the ones rnl upgrade wrote, each named %gs_…
       await page.mouse.move(...Object.values(await viewer.where("0", "box")));
-      await expect(tip(page)).toBeHidden();
+      await expect(tip(page)).toHaveText(/^gs_/);
       await page.mouse.move(...Object.values(await viewer.labelWhere("#X1::name")));
       await expect(tip(page)).toBeHidden();
       const empty = await viewer.empty();
@@ -99,7 +100,10 @@ for (const [platform, query] of Object.entries(PLATFORMS)) {
           return [h.name, objects[0].kind, objects.find((o) => o.kind === "net").name];
         });
       });
-      expect(named.sort()).toEqual([["pi", "usage", "inp"], ["pn", "usage", "inn"], ["po", "usage", "out"]]);
+      // and the ground and supply stubs rnl upgrade wrote, %gs_… and %ss_…
+      const stubs = named.filter(([name]) => /^[gs]s_/.test(name));
+      expect(stubs.length).toBeGreaterThan(0);
+      expect(named.filter((n) => !stubs.includes(n)).sort()).toEqual([["pi", "usage", "inp"], ["pn", "usage", "inn"], ["po", "usage", "out"]]);
       const [u, v] = await page.evaluate(() => {
         const hit = window.viewer.doc.levels[0].hits.find((h) => h.kind === "box" && h.name === "pi");
         const [a, b] = hit.points;

@@ -1,5 +1,5 @@
 * Renderer defaults without a library stylesheet (--no-std)
-* @RNL(type="header") { @VERSION("0.3") }
+* @RNL(type="header") { @VERSION("0.4") }
 * @RNL {
 *   @LINE {(0, -4) (20, -4)};
 *   @LINE(linewidth=0) {(0, -7) (20, -7)};

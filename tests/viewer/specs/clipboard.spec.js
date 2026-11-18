@@ -62,7 +62,7 @@ test("what the text is read as is guessed from it, and can be chosen", async ({ 
     ["// Spectre\nsubckt inv (a y)\nends inv\n", "Spectre netlist (.scs)"],
     ["simulator lang=spectre\nR1 (a b) resistor r=1k\n", "Spectre netlist (.scs)"],
     ["* a SPICE title\nR1 a b 1k\n// @RNL { }\n", "Spectre netlist (.scs)"],
-    ['@RNL(type="header") { @VERSION("0.2")}\n@RNL {\n}\n', "RNL package, checked on its own (.rnl)"],
+    ['@RNL(type="header") { @VERSION("0.4")}\n@RNL {\n}\n', "RNL package, checked on its own (.rnl)"],
   ];
   for (const [text, kind] of guesses) {
     await clipboard(page, text);

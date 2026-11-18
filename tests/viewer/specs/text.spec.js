@@ -43,14 +43,15 @@ test("the host statements and the records are highlighted", async ({ viewer }) =
   ]);
   expect(await highlighted(viewer, 20)).toEqual([
     ["*", "marker"], ["#", "host"], ["@SELECT-INSTANCE", "keyword"], ["(", "punct"], ["name", "param"], ["=", "punct"],
-    ['"R*"', "string"], [")", "punct"], ["=>", "punct"], ["@SET-SYMBOL", "keyword"], ["$RES_IEC", "def"],
+    ['"R*"', "string"], [",", "punct"], ["recursive", "param"], ["=", "punct"], ["true", "free"], [")", "punct"], ["=>", "punct"],
+    ["@SET-SYMBOL", "keyword"], ["$RES_IEC", "def"],
   ]);
   expect(await highlighted(viewer, 22)).toEqual([
     ["*", "marker"], ["%amp_block", "local"], ["=", "punct"], ["@DEFINE-SYMBOL", "keyword"], ["{", "punct"],
   ]);
-  expect(await highlighted(viewer, 60)).toEqual([
+  expect(await highlighted(viewer, 64)).toEqual([
     ["*", "marker"], ["&c", "net"], ["@WIRE", "keyword"], ["(", "punct"], ["mode", "param"], ["=", "punct"],
-    ['"vertical-horizontal"', "string"], [")", "punct"], ["{", "punct"], ["#X2", "host"], [":", "punct"], ["out", "net"],
+    ['"auto"', "string"], [")", "punct"], ["{", "punct"], ["#X2", "host"], [":", "punct"], ["out", "net"],
     ["#X3", "host"], [":", "punct"], ["top", "net"], ["}", "punct"],
   ]);
 
@@ -112,12 +113,12 @@ test("failed and overridden statements are greyed, and the checkbox hides their 
       .evaluateAll((els) => els.map((e) => e.textContent).join(""));
     expect(marked).toContain(want);
   }
-  // on line 44 an override, then a failure
-  await expect(viewer.line(44).locator(".x-overridden").first()).toHaveAttribute("title", /^Overridden/);
-  await expect(viewer.line(44).locator(".x-failed").first()).toHaveAttribute("title", /^Failed/);
+  // on line 46 an override, then a failure
+  await expect(viewer.line(46).locator(".x-overridden").first()).toHaveAttribute("title", /^Overridden/);
+  await expect(viewer.line(46).locator(".x-failed").first()).toHaveAttribute("title", /^Failed/);
 
-  await expect(viewer.line(44)).toHaveClass(/inactive-line/);
-  expect(await viewer.line(44).locator('.code').evaluate(el => Number(getComputedStyle(el).opacity))).toBeLessThan(1);
+  await expect(viewer.line(46)).toHaveClass(/inactive-line/);
+  expect(await viewer.line(46).locator('.code').evaluate(el => Number(getComputedStyle(el).opacity))).toBeLessThan(1);
 
   const box = page.locator("#show-failed");
   await expect(box).toBeChecked();
@@ -127,11 +128,11 @@ test("failed and overridden statements are greyed, and the checkbox hides their 
   // the setting is kept for the next start
   await viewer.open("12-diagnostics");
   await expect(box).not.toBeChecked();
-  await expect(viewer.line(44)).toHaveCount(0);
+  await expect(viewer.line(46)).toHaveCount(0);
   // the label's text turns it back on
   await page.locator(".failed-toggle span", { hasText: "Failed statements" }).click();
   await expect(box).toBeChecked();
-  await expect(viewer.line(44)).toHaveClass(/inactive-line/);
+  await expect(viewer.line(46)).toHaveClass(/inactive-line/);
   expect(await viewer.stored("show-failed")).toBe(true);
 });
 
@@ -139,32 +140,32 @@ test("clicking a problem shows its line in the middle of the text and flashes it
   await viewer.open("12-diagnostics");
   const problem = (text) => page.locator("#diags li.diag", { hasText: text });
   await expect(problem("PRIORITY takes constraints")).toHaveClass(/\blocated\b/);
-  expect(await viewer.within(viewer.line(44))).toBe(false);
+  expect(await viewer.within(viewer.line(46))).toBe(false);
 
   await problem("PRIORITY takes constraints").click();
-  await expect.poll(() => viewer.within(viewer.line(44))).toBe(true);
-  await expect(viewer.line(44)).toHaveClass(/\bflash\b/);
+  await expect.poll(() => viewer.within(viewer.line(46))).toBe(true);
+  await expect(viewer.line(46)).toHaveClass(/\bflash\b/);
   // in the middle of the text
-  const [line, source] = [await viewer.line(44).boundingBox(), await page.locator("#source").boundingBox()];
+  const [line, source] = [await viewer.line(46).boundingBox(), await page.locator("#source").boundingBox()];
   expect(Math.abs(line.y + line.height / 2 - (source.y + source.height / 2))).toBeLessThan(line.height);
 
   // one at the end, as far as the text scrolls
   await problem("formal tokens after the record").click();
-  await expect.poll(() => viewer.within(viewer.line(72))).toBe(true);
-  await expect(viewer.line(72)).toHaveClass(/\bflash\b/);
+  await expect.poll(() => viewer.within(viewer.line(81))).toBe(true);
+  await expect(viewer.line(81)).toHaveClass(/\bflash\b/);
 
   // one near the top: the text scrolls back
   await problem("package no-such-package").click();
-  await expect.poll(() => viewer.within(viewer.line(16))).toBe(true);
-  await expect(viewer.line(16)).toHaveClass(/\bflash\b/);
-  expect(await viewer.within(viewer.line(72))).toBe(false);
+  await expect.poll(() => viewer.within(viewer.line(17))).toBe(true);
+  await expect(viewer.line(17)).toHaveClass(/\bflash\b/);
+  expect(await viewer.within(viewer.line(81))).toBe(false);
 });
 
 test("selecting on the drawing shows the file and the line of the statement", async ({ page, viewer }) => {
   await viewer.open("04-hierarchy");
-  expect(await viewer.within(viewer.line(50))).toBe(false);
+  expect(await viewer.within(viewer.line(54))).toBe(false);
   await viewer.click("X2");
-  await expect.poll(() => viewer.within(viewer.line(50))).toBe(true);
+  await expect.poll(() => viewer.within(viewer.line(54))).toBe(true);
   const main = await page.locator("#source").evaluate((s) => s.scrollTop);
   expect(main).toBeGreaterThan(0);
 
@@ -175,7 +176,7 @@ test("selecting on the drawing shows the file and the line of the statement", as
   await viewer.click("R2");
   await viewer.selected("instance R2 in rdiv");
   await expect(page.locator("#source-file")).toHaveText("04-hierarchy-lib.inc");
-  expect(await viewer.markedLines()).toEqual([4]);
+  expect(await viewer.markedLines()).toEqual([5]);
 
   // each file keeps its own scroll
   await showSource(page, TOP);
@@ -191,7 +192,7 @@ test("a line to show waits until the text pane is shown", async ({ page, viewer 
   await viewer.selected(`instance X2 in ${TOP}`);
   await page.keyboard.press("Control+B");
   await expect(page.locator("#sidebar")).toBeVisible();
-  await expect.poll(() => viewer.within(viewer.line(50))).toBe(true);
+  await expect.poll(() => viewer.within(viewer.line(54))).toBe(true);
 
   // the hierarchy view shown instead of the text
   await page.locator("#tab-hierarchy").click();
@@ -199,7 +200,7 @@ test("a line to show waits until the text pane is shown", async ({ page, viewer 
   await viewer.click("Vin");
   await viewer.selected(`instance Vin in ${TOP}`);
   await page.locator("#tab-netlist").click();
-  await expect.poll(() => viewer.within(viewer.line(53))).toBe(true);
+  await expect.poll(() => viewer.within(viewer.line(57))).toBe(true);
 });
 
 test("characters outside the BMP move no place of an object, a record or a failed statement", async ({ viewer }) => {
