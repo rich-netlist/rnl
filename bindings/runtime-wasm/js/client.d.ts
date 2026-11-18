@@ -50,7 +50,7 @@ export interface CoreWorker {
   build(request: Request): Promise<Document>;
   /** Build the snapshot of a request with `parts`: the editor interface's view of the document. */
   snapshot(request: Request): Promise<Snapshot>;
-  /** Write and build. Draft 0.4 refusals reject with EditError, carrying a code and host diagnostics. */
+  /** Write and build. Refusals reject with EditError, carrying a code and host diagnostics. */
   write(request: WriteRequest): Promise<Written>;
   /**
    * Replace the records of a level of a netlist that has records already, in the file that holds the

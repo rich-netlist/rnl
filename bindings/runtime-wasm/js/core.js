@@ -48,8 +48,8 @@
  *   The netlist, without RNL records, its dialect, the author of the records, the ops as the
  *   editor interface draft writes them, and the name the netlist is saved under when it is known,
  *   such as `top.net`: a Spectre netlist that is not a `.scs` file is read in the SPICE mode up to
- *   its `simulator lang=spectre`. `language_version` explicitly selects "0.3" or "0.4";
- *   omitting it retains the released writer default. Ops follow the public `Op` declaration,
+ *   its `simulator lang=spectre`. `language_version` can only be "0.4", which is also
+ *   written when it is left out. Ops follow the public `Op` declaration,
  *   including RNL 0.4 pin identities and fixed text direction.
  * @property {Record<string, string>} [files] Further files, such as packages.
  * @property {string[]} [package_dirs]
@@ -134,7 +134,7 @@
  *   `parts`, as build builds the Document.
  * @property {(request: WriteRequest | string) => { text: string, document: object }} write Write the
  *   ops of a request into its netlist, and build what was written. Throws an Error with the core's
- *   message when an op cannot be written. Draft 0.4 adds code, diagnosticName and diagnostics
+ *   message when an op cannot be written, with code, diagnosticName and diagnostics added
  *   to that Error; respond keeps the error string and adds code, name and diagnostics.
  * @property {(request: ReplaceRecordsRequest | string) => Replaced} replaceRecords Replace the records
  *   of a level of a netlist that has records already, in the file that holds the level, and give that
