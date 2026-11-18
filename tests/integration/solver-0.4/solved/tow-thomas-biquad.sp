@@ -59,7 +59,7 @@ R1 lpn n1 10k
 *   %fb2 = {#XOA2}(forward) {#C2}(feedback) @AS $FEEDBACK_LOOP => @GROUP;
 *   %c2_over_xoa2 = #C2 #XOA2 @ORDER("top-to-bottom");
 *   %fb3 = {#XOA3}(forward) {#R4}(feedback) @AS $FEEDBACK_LOOP => @GROUP;
-*   %r4_over_xoa2 = #R4 #XOA2 @ORDER("top-to-bottom");
+*   %r4_over_xoa3 = #R4 #XOA3 @ORDER("top-to-bottom");
 *   %stages = {%fb1 #R2 %fb2 #R3 %fb3} @AS $CASCADE => @GROUP;
 *   %loop_outer = {%stages}(forward) {#R1}(feedback) @AS $FEEDBACK_LOOP => @GROUP;
 *   %r1_over_stages = #R1 %stages @ORDER("top-to-bottom");
@@ -88,7 +88,7 @@ R1 lpn n1 10k
 *   /* only the source is oriented */
 *   %source_orient = #VIN @ORIENT("R0");
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:3b05a2c0d1f2dda7.dfa2893df8788152", numbering="8ff66e12e3137d98") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:f06454d411e4df5e.f272bbf377ade317", numbering="8ff66e12e3137d98") {
 *   %ground_stub_VIN_n = $GROUND_STUB @ATTACH(gap=3) #VIN::n;
 *   %ground_stub_XOA1_inp = $GROUND_STUB @ATTACH(gap=3) #XOA1::inp;
 *   %ground_stub_XOA2_inp = $GROUND_STUB @ATTACH(gap=3) #XOA2::inp;

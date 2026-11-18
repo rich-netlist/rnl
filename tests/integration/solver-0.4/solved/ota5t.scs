@@ -52,7 +52,7 @@ M4 (out x vdd vdd) pch w=10u l=0.5u
 //   /* the block symbol drawn for the instances of ota5t */
 //   # @SET-SYMBOL(terminals=[[1, "inp"], [2, "inn"], [3, "out"], [4, "vp"], [5, "vn"]]) $OPAMP_SUPPLY
 // }
-// @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:a0a0989e2ab621c5.f879253eb18bac0c", numbering="b8776e2560247fa3") {
+// @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:e339f989289e9cee.8c36d26e99b71782", numbering="23ee3fac098544e7") {
 //   %ground_stub_M6_s = $GROUND_STUB @ATTACH(gap=3) #M6::s;
 //   %ground_stub_M5_s = $GROUND_STUB @ATTACH(gap=3) #M5::s;
 //   %supply_stub_IREF_p = $SUPPLY_STUB @ATTACH(gap=3) #IREF::p;
@@ -60,50 +60,50 @@ M4 (out x vdd vdd) pch w=10u l=0.5u
 //   %supply_stub_M4_s = $SUPPLY_STUB @ATTACH(gap=3) #M4::s;
 //   %io_port_vdd = $IO_PORT @ATTACH &vdd;
 //   %io_port_vss = $IO_PORT @ATTACH &vss;
-//   %rt1 = (34, 21);
-//   %rt2 = (10, 12);
-//   %rt3 = (19, 8);
-//   %rt4 = (28, 12);
-//   %rt5 = (22, 21);
-//   %rt6 = (28, 26);
-//   #IREF @PLACE(10, 16) => @ORIENT("R0");
-//   #M6 @PLACE(10, 8) => @ORIENT("MY");
-//   #M5 @PLACE(28, 8) => @ORIENT("R0");
-//   #M1 @PLACE(22, 16) => @ORIENT("R0");
-//   #M2 @PLACE(34, 16) => @ORIENT("MY");
-//   #M3 @PLACE(22, 26) => @ORIENT("MY");
-//   #M4 @PLACE(34, 26) => @ORIENT("R0");
-//   %p_inp @PLACE(17, 16) => @ORIENT("R0");
-//   %p_inn @PLACE(39, 16) => @ORIENT("MY");
-//   %p_out @PLACE(37, 21) => @ORIENT("MY");
-//   %dp @PLACE(28, 16);
-//   %#1 @PLACE(22, 16);
-//   %#2 @PLACE(28, 16);
-//   %cm_load @PLACE(17, 26);
-//   %cm_bias @PLACE(4, 8);
-//   %amp @PLACE(22, 16);
-//   %#3 @PLACE(22, 16);
-//   %#4 @PLACE(22, 16);
-//   %bias @PLACE(22, 16);
-//   %flow_ota @PLACE(22, 16);
-//   %br_bias @PLACE(10, -1.95);
-//   %#5 @PLACE(22, 16);
-//   %br_left @PLACE(22, -1.95);
-//   %#6 @PLACE(22, 16);
-//   %br_right @PLACE(34, -1.95);
-//   %#7 @PLACE(22, 16);
-//   %ground_stub_M6_s @PLACE(22, 16);
-//   %ground_stub_M6_s::g @PLACE(10, 4) => @ORIENT("R0");
-//   %ground_stub_M5_s @PLACE(22, 16);
-//   %ground_stub_M5_s::g @PLACE(28, 4) => @ORIENT("R0");
-//   %supply_stub_IREF_p @PLACE(22, 16);
-//   %supply_stub_IREF_p::s @PLACE(10, 21) => @ORIENT("R0");
-//   %supply_stub_M3_s @PLACE(22, 16);
-//   %supply_stub_M3_s::s @PLACE(22, 30) => @ORIENT("R0");
-//   %supply_stub_M4_s @PLACE(22, 16);
-//   %supply_stub_M4_s::s @PLACE(34, 30) => @ORIENT("R0");
-//   %io_port_vdd @PLACE(4, 4) => @ORIENT("R0");
-//   %io_port_vss @PLACE(4, 0) => @ORIENT("R0");
+//   %rt1 = (32, 21);
+//   %rt2 = (8, 12);
+//   %rt3 = (17, 8);
+//   %rt4 = (26, 12);
+//   %rt5 = (20, 21);
+//   %rt6 = (26, 26);
+//   #IREF @PLACE(8, 16) => @ORIENT("R0");
+//   #M6 @PLACE(8, 8) => @ORIENT("MY");
+//   #M5 @PLACE(26, 8) => @ORIENT("R0");
+//   #M1 @PLACE(20, 16) => @ORIENT("R0");
+//   #M2 @PLACE(32, 16) => @ORIENT("MY");
+//   #M3 @PLACE(20, 26) => @ORIENT("MY");
+//   #M4 @PLACE(32, 26) => @ORIENT("R0");
+//   %p_inp @PLACE(15, 16) => @ORIENT("R0");
+//   %p_inn @PLACE(37, 16) => @ORIENT("MY");
+//   %p_out @PLACE(35, 21) => @ORIENT("MY");
+//   %dp @PLACE(26, 16);
+//   %#1 @PLACE(20, 16);
+//   %#2 @PLACE(26, 16);
+//   %cm_load @PLACE(15, 26);
+//   %cm_bias @PLACE(2, 8);
+//   %amp @PLACE(20, 16);
+//   %#3 @PLACE(20, 16);
+//   %#4 @PLACE(20, 16);
+//   %bias @PLACE(20, 16);
+//   %flow_ota @PLACE(20, 16);
+//   %br_bias @PLACE(8, -1.95);
+//   %#5 @PLACE(20, 16);
+//   %br_left @PLACE(20, -1.95);
+//   %#6 @PLACE(20, 16);
+//   %br_right @PLACE(32, -1.95);
+//   %#7 @PLACE(20, 16);
+//   %ground_stub_M6_s @PLACE(20, 16);
+//   %ground_stub_M6_s::g @PLACE(8, 4) => @ORIENT("R0");
+//   %ground_stub_M5_s @PLACE(20, 16);
+//   %ground_stub_M5_s::g @PLACE(26, 4) => @ORIENT("R0");
+//   %supply_stub_IREF_p @PLACE(20, 16);
+//   %supply_stub_IREF_p::s @PLACE(8, 21) => @ORIENT("R0");
+//   %supply_stub_M3_s @PLACE(20, 16);
+//   %supply_stub_M3_s::s @PLACE(20, 30) => @ORIENT("R0");
+//   %supply_stub_M4_s @PLACE(20, 16);
+//   %supply_stub_M4_s::s @PLACE(32, 30) => @ORIENT("R0");
+//   %io_port_vdd @PLACE(2, 4) => @ORIENT("R0");
+//   %io_port_vss @PLACE(2, 0) => @ORIENT("R0");
 //   &inp @WIRE(mode="straight") {%p_inp::pin #M1::g};
 //   &inn @WIRE(mode="straight") {#M2::g %p_inn::pin};
 //   &out @WIRE(mode="straight") {#M2::d %rt1};
@@ -111,23 +111,23 @@ M4 (out x vdd vdd) pch w=10u l=0.5u
 //   &out @WIRE(mode="straight") {%rt1 %p_out::pin};
 //   &nb @WIRE(mode="straight") {#M6::d %rt2};
 //   &nb @WIRE(mode="straight") {%rt2 #IREF::n};
-//   &nb @WIRE(mode="straight") {%rt2 (19, 12) %rt3};
+//   &nb @WIRE(mode="straight") {%rt2 (17, 12) %rt3};
 //   &nb @WIRE(mode="straight") {#M6::g %rt3};
 //   &nb @WIRE(mode="straight") {%rt3 #M5::g};
 //   &tail @WIRE(mode="straight") {%rt4 #M5::d};
-//   &tail @WIRE(mode="straight") {%rt4 (22, 12) #M1::s};
-//   &tail @WIRE(mode="straight") {%rt4 (34, 12) #M2::s};
+//   &tail @WIRE(mode="straight") {%rt4 (20, 12) #M1::s};
+//   &tail @WIRE(mode="straight") {%rt4 (32, 12) #M2::s};
 //   &x @WIRE(mode="straight") {#M1::d %rt5};
 //   &x @WIRE(mode="straight") {%rt5 #M3::d};
-//   &x @WIRE(mode="straight") {%rt5 (28, 21) %rt6};
+//   &x @WIRE(mode="straight") {%rt5 (26, 21) %rt6};
 //   &x @WIRE(mode="straight") {#M3::g %rt6};
 //   &x @WIRE(mode="straight") {%rt6 #M4::g};
-//   $JUNCTION @ATTACH %rt1 => @PLACE(34, 21);
-//   $JUNCTION @ATTACH %rt2 => @PLACE(10, 12);
-//   $JUNCTION @ATTACH %rt3 => @PLACE(19, 8);
-//   $JUNCTION @ATTACH %rt4 => @PLACE(28, 12);
-//   $JUNCTION @ATTACH %rt5 => @PLACE(22, 21);
-//   $JUNCTION @ATTACH %rt6 => @PLACE(28, 26)
+//   $JUNCTION @ATTACH %rt1 => @PLACE(32, 21);
+//   $JUNCTION @ATTACH %rt2 => @PLACE(8, 12);
+//   $JUNCTION @ATTACH %rt3 => @PLACE(17, 8);
+//   $JUNCTION @ATTACH %rt4 => @PLACE(26, 12);
+//   $JUNCTION @ATTACH %rt5 => @PLACE(20, 21);
+//   $JUNCTION @ATTACH %rt6 => @PLACE(26, 26)
 // }
 ends ota5t
 

@@ -46,7 +46,7 @@ R1 lpn n1 10k
 *   %fb2 = {#XOA2}(forward) {#C2}(feedback) @AS $FEEDBACK_LOOP => @GROUP;
 *   %c2_over_xoa2 = #C2 #XOA2 @ORDER("top-to-bottom");
 *   %fb3 = {#XOA3}(forward) {#R4}(feedback) @AS $FEEDBACK_LOOP => @GROUP;
-*   %r4_over_xoa2 = #R4 #XOA2 @ORDER("top-to-bottom");
+*   %r4_over_xoa3 = #R4 #XOA3 @ORDER("top-to-bottom");
 *   %stages = {%fb1 #R2 %fb2 #R3 %fb3} @AS $CASCADE => @GROUP;
 *   %loop_outer = {%stages}(forward) {#R1}(feedback) @AS $FEEDBACK_LOOP => @GROUP;
 *   %r1_over_stages = #R1 %stages @ORDER("top-to-bottom");
