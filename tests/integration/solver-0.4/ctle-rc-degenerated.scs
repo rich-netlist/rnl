@@ -46,6 +46,11 @@ MT2 (s2 vb vss vss) nch w=30u l=0.3u
 //      CS, between the two columns */
 //   %bridge_order = {%br_left %rc_deg %br_right} @ORDER("left-to-right");
 //
+//   /* the two tail current sinks are mirror images of each other, the gate of the left one facing left: both
+//      gates face outwards, like those of the input pair */
+//   %tails_mirrored = #MT1 #MT2 @ORIENT-RELATION("MY");
+//   %mt1_gate_left = #MT1:g @ORIENT("left");
+//
 //   /* the block symbol drawn for the instances of ctle */
 //   $CTLE_SYM = @DEFINE-SYMBOL(box=[-5, -3, 5, 3]) {
 //     (-5, 1) @PIN(terminal="inp", direction="left");
