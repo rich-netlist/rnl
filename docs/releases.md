@@ -69,7 +69,8 @@ tag, **never publishes**. Core release also runs as a PR check for relevant chan
 validate everything first. Its filename stays unchanged because npm's trusted publisher is
 bound to it. After every build, test, parity check and checksum passes, it publishes the
 packed npm tarball via OIDC, smoke-tests the published version, then creates **RNL core X.Y.Z**
-with `--latest`. The npm version equals the core tag's version. No `runtime-v*` tag triggers
+with `--latest`, or with `--latest=false` under the dist-tag `legacy-0.3` (below). The npm
+version equals the core tag's version. No `runtime-v*` tag triggers
 publication anymore: historical `runtime-v0.1.0-preview.N` tags belonged to the former,
 independently numbered npm previews (including preview.15). Their published packages remain
 available and unchanged. Use an exact npm version to avoid ambiguity while the first core
@@ -97,7 +98,9 @@ as complete.
 Do not republish or unpublish an existing npm version. Inspect the failed run and compare
 the published package's integrity with the tested tarball; resolve the failure, rerun only
 the failed smoke/release jobs with that run's retained artifacts. If a partial GitHub release
-exists, repair its assets/checksums explicitly before setting it latest. Any recovery still
+exists, repair its assets/checksums explicitly; then set it latest only if its publication
+would have: a release published under `legacy-0.3` stays not latest, and the release GitHub
+showed as latest before stays so. Any recovery still
 needs the original release approval. A new version needs a new reviewed tag and notes.
 
 ## Other lines
