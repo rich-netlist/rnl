@@ -1,6 +1,6 @@
 {
   "The standard package, used at the root of every netlist by default. It only references other packages and has no content of its own.": "標準套件，預設載入於每份網表的根層級。它僅引用其他套件，本身不含定義內容。",
-  "The smallest collection: styles, symbols and the rules that give them, enough to draw the netlist and nothing more — no grounds, supplies or port tags filled in.": "最小組合：包含樣式、符號與指定符號的規則，剛好足以繪出網表，不含任何額外自動補齊——不會自動補上接地、電源或連接埠標籤。",
+  "The smallest collection: styles, symbols and the rules that give them, enough to draw the netlist and nothing more — no grounds, supplies or port tags filled in.": "最小組合：包含樣式、符號與指定符號的規則，剛好足以繪出網表，不含任何額外自動補齊——不會自動補上接地、電源或連接埠標記。",
   "The styles $base, $bus, $signal, $note and $grey, and the rules that give every kind of object its default style.": "樣式 $base、$bus、$signal、$note 與 $grey，以及為各類物件設定預設樣式的規則。",
   "The symbols of instances, and the rules that give an instance its symbol by element letter, by Spectre master and by model type.": "實例的符號，以及依實例首字母、Spectre 的 master 與模型類型為實例指定符號的規則。",
   "The virtual elements — ground, supply, port, no-connect mark, junction, current arrow — their symbols and the rules that give them, and the ground and supply stubs.": "虛擬元件——接地、電源、連接埠、未連接標記、交接點、電流箭頭——它們的符號與指定規則，以及接地與電源短截線（stub）。",
@@ -8,8 +8,8 @@
   "The symbols of diodes, MOS transistors, BJTs and JFETs.": "二極體、MOS 電晶體、BJT 與 JFET 的符號。",
   "The symbol rules of SPICE netlists: by element letter first, then by model type.": "SPICE 網表的符號規則：先依實例首字母，再依模型類型。",
   "The symbol rules of Spectre netlists: primitives by master, instances of model cards by model type.": "Spectre 網表的符號規則：基本元件依 master，模型卡實例依模型類型。",
-  "The automatic fill: a ground or supply for every unwired pin on such a net, a port tag for every port net; and the sets a file edits.": "自動補齊：為接地與電源網路上每個未連線的接腳補上接地或電源符號，為每個連接埠網路補上連接埠標籤；以及供檔案增刪的集合。",
-  "Automatic fill rules: adds a ground or supply symbol for every unwired terminal on a ground or supply net, adds a port tag for every port net except ground and supply nets, and draws the net name under ground symbols on non-0 ground nets such as vss. Also defines the sets a file can edit.": "自動補齊規則：為接地或電源網路上每個未連線的端子補上接地或電源符號；為除接地與電源網路外的每個連接埠網路補上連接埠標籤；並在名稱非 0 的接地網路（如 vss）上，於接地符號下方顯示網路名稱。另定義檔案可編輯的集合。",
+  "The automatic fill: a ground or supply for every unwired pin on such a net, a port tag for every port net; and the sets a file edits.": "自動補齊：為接地與電源網路上每個未連線的接腳補上接地或電源符號，為每個連接埠網路補上連接埠標記；以及供檔案增刪的集合。",
+  "Automatic fill rules: adds a ground or supply symbol for every unwired terminal on a ground or supply net, adds a port tag for every port net except ground and supply nets, and draws the net name under ground symbols on non-0 ground nets such as vss. Also defines the sets a file can edit.": "自動補齊規則：為接地或電源網路上每個未連線的端子補上接地或電源符號；為除接地與電源網路外的每個連接埠網路補上連接埠標記；並在名稱非 0 的接地網路（如 vss）上，於接地符號下方顯示網路名稱。另定義檔案可編輯的集合。",
   "Semantic definitions, such as a differential pair or a current mirror: roles only, nothing drawn.": "語義定義，例如差動對或電流鏡：僅包含角色，不繪製任何圖形。",
   "Layout definitions: a mirrored pair, a tail centered under a pair, the direction of signal flow.": "佈局定義：鏡像對、差動對下方置中的尾端電晶體、訊號流向。",
   "Structures: differential pair, current mirror, branch, chain, cascade, mirrored, flow and more. Some carry a default drawing, all of priority low: what the author writes comes first, and PRIORITY on a usage turns it off.": "結構定義：差動對、電流鏡、支路、鏈、串級、鏡像對稱、訊號流向等。部分結構自帶優先順序為 low 的預設畫法：作者編寫的約束優先，且可透過用例上的 PRIORITY 將其關閉。",

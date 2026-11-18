@@ -350,6 +350,14 @@
    "kind": "rnl"
   },
   {
+   "en": "net label",
+   "term": "網路標籤",
+   "avoid": [
+    "網名標籤"
+   ],
+   "kind": "rnl"
+  },
+  {
    "en": "netlist",
    "term": "網表",
    "kind": "rnl"
@@ -399,6 +407,15 @@
    "en": "port",
    "term": "連接埠",
    "kind": "rnl"
+  },
+  {
+   "en": "port tag",
+   "term": "連接埠標記",
+   "avoid": [
+    "連接埠標籤"
+   ],
+   "kind": "rnl",
+   "note": "Not 連接埠符號, which is a port symbol: the symbol a port tag is drawn with, $IO_PORT_SYMBOL."
   },
   {
    "en": "power",
