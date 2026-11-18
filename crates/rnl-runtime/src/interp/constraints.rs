@@ -364,11 +364,21 @@ impl Interp<'_> {
                 })
                 .collect();
         }
-        // a combination that takes one object twice is left out (14.1, 14.5)
+        // a combination that takes one object twice is left out (14.1, 14.5); in a level of 0.4 a
+        // usage that may stand for its members (14.1) is not yet one object: it is kept until the
+        // symbols are known and each side has stood for its members (`split_usage_constraints`)
+        let deferred = self.follows_0_4(self.level_unit[self.scenes[s].level])
+            && matches!(
+                template.kind,
+                ConstraintKind::Align | ConstraintKind::Order | ConstraintKind::Distribute | ConstraintKind::Distance
+            );
         if template.kind != ConstraintKind::OrientRelation && !combinations.is_empty() {
             combinations.retain(|row| {
                 let mut seen = HashSet::new();
-                row.iter().all(|m| seen.insert(self.one_object(m.object)))
+                row.iter().all(|m| {
+                    let object = self.one_object(m.object);
+                    seen.insert(object) || (deferred && matches!(self.o(object), ObjData::Usage(_)))
+                })
             });
             if combinations.is_empty() {
                 self.hint_at(ctx, codes::CONSTRAINT_EXPANSION_TOO_FEW_PLACES, format!("{kw} relates no two different objects once a combination that takes one object twice is left out, so its constraints hold trivially (14.1)"), seg.start);
@@ -511,6 +521,14 @@ impl Interp<'_> {
             let columns: Vec<Vec<ObjId>> =
                 row.iter().map(|&o| self.standing_for(s, o, &ctx, &cd.chain, &mut through)).collect();
             if through.is_empty() {
+                // a usage with a symbol is one object: written twice, the combination is left out
+                let mut seen = HashSet::new();
+                if !row.iter().all(|&o| seen.insert(self.one_object(o))) {
+                    self.diag_site(crate::diag::Severity::Hint, codes::CONSTRAINT_EXPANSION_TOO_FEW_PLACES, &cd.site, cd.off,
+                        format!("{kw} relates no two different objects once a combination that takes one object twice is left out, so its constraints hold trivially (14.1)", kw = cd.kind.as_str()));
+                    self.scenes[s].constraints.retain(|&x| x != c);
+                    self.remove_from_collection(cd.name_owner, c);
+                }
                 continue;
             }
             self.hint_members_placed_apart(s, &cd, &row, &columns);

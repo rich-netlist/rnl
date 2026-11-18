@@ -155,19 +155,16 @@ impl Sub {
         for it in &self.items {
             match *it {
                 SubItem::One(k) => out.push(k),
+                // from a toward b by the step, never past b, on the whole range of u64: a step
+                // that would pass b, or the end of the numbers, ends the range
                 SubItem::Range(a, b, s) => {
-                    if b >= a {
-                        let mut k = a;
-                        while k <= b {
-                            out.push(k);
-                            k += s;
+                    let mut k = a;
+                    loop {
+                        out.push(k);
+                        if s == 0 || k.abs_diff(b) < s {
+                            break;
                         }
-                    } else {
-                        let mut k = a as i64;
-                        while k >= b as i64 {
-                            out.push(k as u64);
-                            k -= s as i64;
-                        }
+                        k = if b >= a { k + s } else { k - s };
                     }
                 }
             }
@@ -2056,6 +2053,21 @@ fn walk_val<'a>(v: &'a Value, out: &mut Vec<RefOrHole<'a>>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_subscript_range_counts_on_the_whole_range_of_its_numbers() {
+        let range = |a: u64, b: u64, s: u64| Sub { bracket: '<', items: vec![SubItem::Range(a, b, s)] }.expand();
+        // past i64::MAX, both ways
+        let top = 1u64 << 63;
+        assert_eq!(range(top, top - 1, 1), [top, top - 1]);
+        assert_eq!(range(top - 1, top, 1), [top - 1, top]);
+        // to the end of the numbers and back from it, with a step that would pass it
+        assert_eq!(range(u64::MAX - 1, u64::MAX, 1), [u64::MAX - 1, u64::MAX]);
+        assert_eq!(range(u64::MAX, u64::MAX - 4, 3), [u64::MAX, u64::MAX - 3]);
+        assert_eq!(range(1, 0, 1), [1, 0]);
+        assert_eq!(range(0, 5, 2), [0, 2, 4]);
+        assert_eq!(range(3, 3, 1), [3]);
+    }
 
     fn places(text: &str) -> MemberPlaces {
         let r = parse_record_features(&format!("@RNL {{ %a{{{text}}} }}"), true, true);
