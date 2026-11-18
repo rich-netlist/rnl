@@ -182,7 +182,7 @@ Complete files that follow these points; each checks without errors and solves.
 | File | What it shows |
 | --- | --- |
 | [solver-cs-amp.sp](../examples/solver-cs-amp.sp) | A common-source stage: one column for the DC path, the load capacitor and the output port to its right, the output net routed |
-| [solver-ota5t.sp](../examples/solver-ota5t.sp) | A five-transistor OTA with its bias mirror: the bias diode and the two branches in three columns, the pair and its load wired, both inputs alike |
+| [ota5t.sp](../examples/ota5t.sp) | A five-transistor OTA with its bias mirror: the bias diode and the two branches in three columns, the pair and its load wired, both inputs alike |
 | [solver-cascode-mirror.sp](../examples/solver-cascode-mirror.sp) | A cascode current mirror: two columns of three; only the tops of the columns aligned by hand |
 | [solver-miller-ota.sp](../examples/solver-miller-ota.sp) | A two-stage Miller op-amp: a sideways compensation network between the stages, the signal nets routed, the bias net left to its name |
 | [solver-pi-follower.sp](../examples/solver-pi-follower.sp) | A pi filter and a source follower: a signal path from left to right through series parts |

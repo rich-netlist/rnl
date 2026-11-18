@@ -155,12 +155,12 @@ FILE is a SPICE netlist, a Spectre netlist (`.scs`) or a package file (`.rnl`). 
 `rnl check` prints one line per diagnostic, `error`, `violation`, `warning` or `hint`, with the file and line and its kind (a number and a short name), and ends with a count. It exits with 1 only when there are errors or violations; read the warnings as well. For the example in `SKILL.md`:
 
 ```text
-hint ota5t.sp:4: RNL9404 unplaced-objects: ota5t: 8 objects have no position and are left to a solver; they are not drawn: #M1, #M2, %g0, %l, %l, %l, %l, %l
-status ota5t: 8 without a position; constraints: 21 unsolved
+hint ota5t.sp:4: RNL9404 unplaced-objects: ota5t: 15 objects have no position and are left to a solver; they are not drawn: #M1, #M2, #M5, %g0, %l, %l, %l, %l, %l, a usage of $IO_PORT, a usage of $IO_PORT, a usage of $IO_PORT, …
+status ota5t: 15 without a position; constraints: 34 unsolved
 0 errors, 0 violations, 0 warnings, 1 hint
 ```
 
-The hint is expected for a file without positions. Without a solver, `render` draws only what has coordinates; `examples/ota5t-placed.sp` gives every object a position and is drawn completely. `rnl catalog` prints what [packages.md](packages.md) lists, from the packages the command bundles.
+The hint is expected for a file without positions. `render` draws only what has coordinates: solve the file first (`rnl solve`, below), then render the solved file, as in [good-drawings.md](good-drawings.md#check-solve-and-look). `rnl catalog` prints what [packages.md](packages.md) lists, from the packages the command bundles.
 
 `rnl groups circuit.sp` prints the tree of groups of each level, the one the solver lays out: the level, `(level)`, then each group under the smallest group that holds it. Each line names the group (a group a structure makes goes by its usage and definition, `%dp · $DIFFERENTIAL_PAIR_N`), lists the devices it holds directly, those in no group under it, counts its virtual parts (ports, grounds, supplies, dots; `--all` names them too), and ends with its number of devices and, in brackets, where the file writes it. Groups that are not blocks follow under `outside the tree:`, such as one that `CROSSES` another. Run it after writing the constraints: a level or group that holds many devices directly is a place to add a group ([good-drawings.md](good-drawings.md#groups)); `rnl check` gives the hint `crowded-node` where one holds more than 20. `--level TITLE` shows one level, `--json` gives the tree as JSON.
 
