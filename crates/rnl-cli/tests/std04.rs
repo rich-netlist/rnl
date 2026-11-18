@@ -1114,3 +1114,27 @@ fn no_instance_labels_hides_the_labels_of_instances_only() {
     let own = net(true, "; #R1 @TEXT(\"R1\", key=\"name\", textvisible=true)");
     assert!(shown(&own, "#R1", "name") && !shown(&own, "#R1", "value"));
 }
+
+#[test]
+fn a_bus_pin_takes_a_rail_stub_only_when_all_its_nets_are_of_that_rail() {
+    let read04 = |devices: &str, body: &str| {
+        let r = read(&MemoryProvider::new().with("t.sp", &with_std04(devices, body)), &Options::default());
+        assert!(by_severity(&r, Severity::Error).is_empty(), "{body}: {:?}", by_severity(&r, Severity::Error));
+        r
+    };
+    let stubs = |r: &Interpretation, definition: &str| {
+        level(r).objects.iter().filter(|o| o.definition.as_deref() == Some(definition)).count()
+    };
+    // the second pin of the bundle is on c and on the ground: a net label for the bus, no ground
+    let mixed = read04("R1 a b 1k\nR2 b c 1k\nR3 c 0 1k\n", "{#R2 #R3} @BUNDLE;");
+    assert_eq!((stubs(&mixed, "$NET_LABEL_STUB"), stubs(&mixed, "$GROUND_STUB")), (4, 0));
+    // on a ground and a supply net, it is neither
+    let rails = read04("R2 b 0 1k\nR3 c vdd 1k\n", "&vdd @ADD-TO $SUPPLY_NET_SET; {#R2 #R3} @BUNDLE;");
+    assert_eq!(
+        (stubs(&rails, "$NET_LABEL_STUB"), stubs(&rails, "$GROUND_STUB"), stubs(&rails, "$SUPPLY_STUB")),
+        (2, 0, 0)
+    );
+    // both members on the ground: one net, so the pin takes a ground stub
+    let ground = read04("R1 a b 1k\nR2 b 0 1k\nR3 c 0 1k\n", "{#R2 #R3} @BUNDLE;");
+    assert_eq!((stubs(&ground, "$NET_LABEL_STUB"), stubs(&ground, "$GROUND_STUB")), (3, 1));
+}
