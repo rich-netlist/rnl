@@ -266,7 +266,14 @@ fn every_fact_kept_in_the_solver_cases_holds_on_the_drawing() {
         .collect();
     assert!(!cases.is_empty());
     for case in cases {
-        let shown = preview(&path(&case), &FsProvider::new(&[]), &unlimited(), &WallClock::new(), &|_| true).unwrap();
+        // a case of 0.4 within a fixed work: its lines layout searches on as long as nothing stops it
+        let mut options = unlimited();
+        if std::fs::read_to_string(&case).is_ok_and(|t| t.contains("@VERSION(\"0.4\")")) {
+            options.solver.run_limit = Some(rnl_solver::RunLimit::Work(100_000_000));
+            // no safety limit, which a debug build on a slow machine may reach before the work
+            options.solver.safety_seconds = None;
+        }
+        let shown = preview(&path(&case), &FsProvider::new(&[]), &options, &WallClock::new(), &|_| true).unwrap();
         for level in &shown.report.levels {
             for f in &level.facts {
                 if f.status == "kept" {
@@ -298,8 +305,9 @@ fn the_measure_reads_the_text_written_and_not_the_solution() {
     let (without, with) = (read(false), read(true));
     let p = &without.problems[0];
     let drawn = rnl_runtime::previous::drawn(p, &with);
-    let holds: Vec<Option<bool>> =
-        p.facts.iter().map(|f| rnl_solver::holds_as_drawn(p, &drawn, &f.kind, options.solver.tolerance)).collect();
+    let holds: Vec<Option<bool>> = (0..p.facts.len())
+        .map(|k| rnl_solver::problem_fact_holds_as_drawn(p, &drawn, k, options.solver.tolerance))
+        .collect();
     let align = p.facts.iter().position(|f| f.kind.name() == "ALIGN").unwrap();
     assert_eq!(holds[align], Some(false), "{:?}", p.facts[align]);
     assert_eq!(shown.report.levels[0].facts[align].holds, Some(true));

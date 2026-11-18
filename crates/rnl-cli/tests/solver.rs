@@ -202,33 +202,41 @@ fn facts_are_in_the_order_of_8_5() {
     assert_eq!(p.facts[0].kind, FactKind::Place { at: PointRef::Origin(m1), axis: Axis::Y, value: 0.0 });
     assert_eq!(p.facts[1].kind, FactKind::Place { at: PointRef::Origin(m1), axis: Axis::X, value: 0.0 });
     assert!(p.facts[..2].iter().all(|f| f.priority == Priority::High));
-    // then the later first: the second record before the first, each from its end
+    // then the later first: the second record before the first, each from its end; the DISTANCE
+    // of two groups of line 41 is one fact for each pair of their members, the ORIENT of line 37 one
+    // for each object, and the ORDER of line 36 one for each choice of a member of each of its
+    // usages
     let direct: Vec<u32> =
         p.facts.iter().filter(|f| f.priority == Priority::Normal && f.chain.is_empty()).map(line_of).collect();
-    assert_eq!(direct, [40, 39, 38, 30, 29, 28, 27]);
+    let mut expected = vec![51, 50, 49, 44, 43, 42];
+    expected.extend([41; 15]);
+    expected.push(40);
+    expected.extend([37; 5]);
+    expected.extend([36; 30]);
+    assert_eq!(direct, expected);
+    let stages: Vec<_> = p.facts.iter().filter(|f| line_of(f) == 41).collect();
+    assert!(
+        stages.iter().all(|f| matches!(&f.kind,
+        FactKind::Distance { axis: Axis::X, sense: Sense::Increasing, min: Some(3.0), max: None, from, to }
+            if from.len() == 1 && to.len() == 1)),
+        "{stages:?}"
+    );
+    // the one low statement
+    let low: Vec<u32> =
+        p.facts.iter().filter(|f| f.priority == Priority::Low && f.chain.is_empty()).map(line_of).collect();
+    assert_eq!(low, [45]);
     // the expansions take the place of their AS, after the statements written later; the fill
     // of the standard package comes last of all
     let first_expanded = p.facts.iter().position(|f| !f.chain.is_empty()).unwrap();
-    assert_eq!(p.usages[p.facts[first_expanded].chain[0]].definition, "$TAIL_CENTER");
-    let n = p.facts.len();
-    assert_eq!((p.facts[n - 2].kind.name(), p.facts[n - 2].priority), ("ORDER", Priority::Low));
-    assert_eq!(p.usages[p.facts[n - 2].chain[0]].definition, "$FLOW");
-    assert_eq!((p.facts[n - 1].kind.name(), line_of(&p.facts[n - 1])), ("ALIGN", 31));
-    // a set given to DISTANCE counts by its extent, one given to ORDER by its centre
-    let stages = p.facts.iter().find(|f| line_of(f) == 27).unwrap();
-    let FactKind::Distance { axis: Axis::X, sense: Sense::Increasing, min: Some(3.0), max: None, from, to } =
-        &stages.kind
-    else {
-        panic!("{:?}", stages.kind)
-    };
-    assert_eq!((from.len(), to.len()), (5, 3));
-    let FactKind::Order { members, .. } = &p.facts[n - 2].kind else { unreachable!() };
-    assert!(matches!(&members[0], PointRef::Centre(c) if c.len() == 2));
-    // ORIENT-RELATION of the mirror pairs, and the groups
-    assert_eq!(p.facts.iter().filter(|f| f.kind.name() == "ORIENT-RELATION").count(), 2);
+    assert_eq!(first_expanded, 2 + 57 + 1);
+    assert_eq!(p.usages[p.facts[first_expanded].chain[0]].definition, "$CURRENT_MIRROR_P");
+    let last = p.facts.last().unwrap();
+    assert!(last.chain.iter().any(|&u| p.usages[u].definition == "$GROUND_STUB"), "{last:?}");
+    // ORIENT-RELATION of the mirrored layouts and of the mirror, and the groups
+    assert_eq!(p.facts.iter().filter(|f| f.kind.name() == "ORIENT-RELATION").count(), 4);
     assert_eq!(
         p.groups.iter().map(|g| (g.label.as_str(), g.members.len())).collect::<Vec<_>>(),
-        [("%stage1", 5), ("%stage2", 3)]
+        [("%stage1", 5), ("%stage2", 3), ("%src", 2)]
     );
     // the slots: the first coordinate fact of each axis in this order
     let m2 = object(p, "#M2");
@@ -237,19 +245,6 @@ fn facts_are_in_the_order_of_8_5() {
         Position::Own { x: Slot::Fixed { value: 0.0, fact: 1 }, y: Slot::Fixed { value: 0.0, fact: 0 } }
     );
     assert!(matches!(p.objects[m2].position, Position::Own { x: Slot::Free, y: Slot::Fixed { value: 3.0, .. } }));
-    // the free axis point of the mirror pairs is named, and so is the middle point of the tail,
-    // through the name of its usage
-    assert_eq!(p.objects[object(p, "%ax")].reference, Reference::Name("%ax".into()));
-    assert_eq!(p.objects[object(p, "%mid")].reference, Reference::Name("%tc::mid".into()));
-    // without that name it is reached only through the number of its usage, the third without a
-    // name (the draft 0.3, 5.9)
-    let f = solver_case("T4-miller-conflicts.sp");
-    let fs = FsProvider::new(&[]);
-    let text = fs.read(&path_str(&f)).unwrap().replace("%tc = #M1(a)", "#M1(a)");
-    let unnamed = MemoryProvider::new().with(&path_str(&f), &text);
-    let ps = problems(&f, &Layered { layers: vec![&unnamed, &fs] });
-    let p = &ps[0];
-    assert_eq!(p.objects[object(p, "%mid")].reference, Reference::Number { number: 3, path: vec!["::mid".into()] });
 }
 
 #[test]
@@ -692,16 +687,16 @@ fn has_key(v: &serde_json::Value, key: &str) -> bool {
 #[test]
 fn a_usage_has_the_place_it_is_written() {
     // where each usage is written (UsageEntry::source), so that the hints of 8.5 can name it by its
-    // line: the AS of the level for the mirror pairs, the rule of the standard package for a stub
-    // that it makes, and the body of $GND_STUB for the ground in it
+    // line: the AS of the level for the mirrored layouts, the rule of the standard package for a
+    // stub that it makes, and the body of $GROUND_STUB for the ground in it
     let ps = problems(&solver_case("T4-miller-conflicts.sp"), &FsProvider::new(&[]));
     let p = &ps[0];
     let at = |u: &UsageEntry| u.source.as_ref().map(|l| (l.file.clone(), l.line)).unwrap();
-    let pairs: Vec<(String, u32)> = p.usages.iter().filter(|u| u.definition == "$MIRROR_PAIR").map(at).collect();
-    assert_eq!(pairs, [("T4-miller-conflicts.sp".to_string(), 22), ("T4-miller-conflicts.sp".to_string(), 23)]);
-    let stub = p.usages.iter().position(|u| u.definition == "$GND_STUB" && u.rule_made).unwrap();
+    let pairs: Vec<(String, u32)> = p.usages.iter().filter(|u| u.definition == "$MIRRORED_LAYOUT").map(at).collect();
+    assert_eq!(pairs, [("T4-miller-conflicts.sp".to_string(), 29), ("T4-miller-conflicts.sp".to_string(), 30)]);
+    let stub = p.usages.iter().position(|u| u.definition == "$GROUND_STUB" && u.rule_made).unwrap();
     assert_eq!(at(&p.usages[stub]).0, "rnl-std-fill.rnl");
     let ground = p.usages.iter().find(|u| u.parent == Some(stub)).unwrap();
-    assert_eq!((ground.definition.as_str(), at(ground).0.as_str()), ("$GND", "rnl-std-virtual.rnl"));
+    assert_eq!((ground.definition.as_str(), at(ground).0.as_str()), ("$GROUND", "rnl-std-basic.rnl"));
     // like every place, it is left out of the hash: the test of the hash moves lines down
 }

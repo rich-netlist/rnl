@@ -1,0 +1,187 @@
+// Five-transistor OTA with its bias mirror, and a testbench
+// An NMOS input pair M1/M2 loaded by the PMOS mirror M3/M4; its tail M5 is mirrored from the reference current IREF
+// through M6. The top level is an open-loop testbench with two antiphase input sources.
+// @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4") }
+simulator lang=spectre
+
+model nch mos1 type=n vto=0.5 kp=200u lambda=0.1
+model pch mos1 type=p vto=-0.5 kp=80u lambda=0.1
+
+subckt ota5t inp inn out vdd vss
+IREF (vdd nb) isource dc=20u
+M6 (nb nb vss vss) nch w=4u l=1u
+M5 (tail nb vss vss) nch w=8u l=1u
+M1 (x inp tail vss) nch w=10u l=0.5u
+M2 (out inn tail vss) nch w=10u l=0.5u
+M3 (x x vdd vdd) pch w=10u l=0.5u
+M4 (out x vdd vdd) pch w=10u l=0.5u
+// @RNL {
+//   &vdd @ADD-TO $SUPPLY_NET_SET;
+//   &vss @ADD-TO $GROUND_NET_SET;
+//   $IO_PORT @ATTACH &inp => %p_inp;
+//   $IO_PORT @ATTACH &inn => %p_inn;
+//   $IO_PORT @ATTACH &out => %p_out;
+//   %routed_nets = # @SELECT-NET;
+//   %routed_nets @ROUTE-NET;
+//
+//   /* the static currents (15.2), for the solver to draw them downwards; not criteria */
+//   {#IREF:p #M6:d #M5:d #M1:d #M2:d #M3:s #M4:s} @CURRENT("in");
+//   {#IREF:n #M6:s #M5:s #M1:s #M2:s #M3:d #M4:d} @CURRENT("out");
+//
+//   /* what the circuit is: an NMOS pair M1/M2 loaded by the PMOS mirror M3/M4, its tail M5 mirrored from IREF through M6 */
+//   %dp = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;
+//   %cm_load = {#M3}(ref) {#M4}(out) @AS $CURRENT_MIRROR_P;
+//   %cm_bias = {#M6}(ref) {#M5}(out) @AS $CURRENT_MIRROR_N;
+//   %amp = %dp(transconductor) %cm_load(load) @AS $TRANSCONDUCTOR_Z_AMPLIFIER;
+//
+//   /* the amplifier and its signal ports are one block */
+//   %amp_group = %amp %p_inp %p_inn %p_out @GROUP;
+//   %diode_connected = {#M3 #M6} @AS $DIODE_CONNECTED;
+//   %bias = {#IREF #M6} @AS $BIAS_CIRCUIT;
+//   %flow_ota = {%dp %cm_load}(path) {&inp &inn}(source) {&out}(load) @AS $SIGNAL_FLOW;
+//
+//   /* the supply-to-ground paths, each a branch from the top down: the bias branch and the two sides of the pair
+//      (the tail M5 is the pair's) */
+//   %br_bias = {#IREF #M6} @AS $BRANCH;
+//   %br_left = {#M3 #M1} @AS $BRANCH;
+//   %br_right = {#M4 #M2} @AS $BRANCH;
+//
+//   /* the bias branch stands left of the pair, the output on the right */
+//   %stage_order = {%br_bias %amp %p_out} @ORDER("left-to-right");
+//
+//   /* the block symbol drawn for the instances of ota5t */
+//   # @SET-SYMBOL(terminals=[[1, "inp"], [2, "inn"], [3, "out"], [4, "vp"], [5, "vn"]]) $OPAMP_SUPPLY
+// }
+// @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:a0a0989e2ab621c5.f879253eb18bac0c", numbering="b8776e2560247fa3") {
+//   %ground_stub_M6_s = $GROUND_STUB @ATTACH(gap=3) #M6::s;
+//   %ground_stub_M5_s = $GROUND_STUB @ATTACH(gap=3) #M5::s;
+//   %supply_stub_IREF_p = $SUPPLY_STUB @ATTACH(gap=3) #IREF::p;
+//   %supply_stub_M3_s = $SUPPLY_STUB @ATTACH(gap=3) #M3::s;
+//   %supply_stub_M4_s = $SUPPLY_STUB @ATTACH(gap=3) #M4::s;
+//   %io_port_vdd = $IO_PORT @ATTACH &vdd;
+//   %io_port_vss = $IO_PORT @ATTACH &vss;
+//   %rt1 = (34, 21);
+//   %rt2 = (10, 12);
+//   %rt3 = (19, 8);
+//   %rt4 = (28, 12);
+//   %rt5 = (22, 21);
+//   %rt6 = (28, 26);
+//   #IREF @PLACE(10, 16) => @ORIENT("R0");
+//   #M6 @PLACE(10, 8) => @ORIENT("MY");
+//   #M5 @PLACE(28, 8) => @ORIENT("R0");
+//   #M1 @PLACE(22, 16) => @ORIENT("R0");
+//   #M2 @PLACE(34, 16) => @ORIENT("MY");
+//   #M3 @PLACE(22, 26) => @ORIENT("MY");
+//   #M4 @PLACE(34, 26) => @ORIENT("R0");
+//   %p_inp @PLACE(17, 16) => @ORIENT("R0");
+//   %p_inn @PLACE(39, 16) => @ORIENT("MY");
+//   %p_out @PLACE(37, 21) => @ORIENT("MY");
+//   %dp @PLACE(28, 16);
+//   %#1 @PLACE(22, 16);
+//   %#2 @PLACE(28, 16);
+//   %cm_load @PLACE(17, 26);
+//   %cm_bias @PLACE(4, 8);
+//   %amp @PLACE(22, 16);
+//   %#3 @PLACE(22, 16);
+//   %#4 @PLACE(22, 16);
+//   %bias @PLACE(22, 16);
+//   %flow_ota @PLACE(22, 16);
+//   %br_bias @PLACE(10, -1.95);
+//   %#5 @PLACE(22, 16);
+//   %br_left @PLACE(22, -1.95);
+//   %#6 @PLACE(22, 16);
+//   %br_right @PLACE(34, -1.95);
+//   %#7 @PLACE(22, 16);
+//   %ground_stub_M6_s @PLACE(22, 16);
+//   %ground_stub_M6_s::g @PLACE(10, 4) => @ORIENT("R0");
+//   %ground_stub_M5_s @PLACE(22, 16);
+//   %ground_stub_M5_s::g @PLACE(28, 4) => @ORIENT("R0");
+//   %supply_stub_IREF_p @PLACE(22, 16);
+//   %supply_stub_IREF_p::s @PLACE(10, 21) => @ORIENT("R0");
+//   %supply_stub_M3_s @PLACE(22, 16);
+//   %supply_stub_M3_s::s @PLACE(22, 30) => @ORIENT("R0");
+//   %supply_stub_M4_s @PLACE(22, 16);
+//   %supply_stub_M4_s::s @PLACE(34, 30) => @ORIENT("R0");
+//   %io_port_vdd @PLACE(4, 4) => @ORIENT("R0");
+//   %io_port_vss @PLACE(4, 0) => @ORIENT("R0");
+//   &inp @WIRE(mode="straight") {%p_inp::pin #M1::g};
+//   &inn @WIRE(mode="straight") {#M2::g %p_inn::pin};
+//   &out @WIRE(mode="straight") {#M2::d %rt1};
+//   &out @WIRE(mode="straight") {%rt1 #M4::d};
+//   &out @WIRE(mode="straight") {%rt1 %p_out::pin};
+//   &nb @WIRE(mode="straight") {#M6::d %rt2};
+//   &nb @WIRE(mode="straight") {%rt2 #IREF::n};
+//   &nb @WIRE(mode="straight") {%rt2 (19, 12) %rt3};
+//   &nb @WIRE(mode="straight") {#M6::g %rt3};
+//   &nb @WIRE(mode="straight") {%rt3 #M5::g};
+//   &tail @WIRE(mode="straight") {%rt4 #M5::d};
+//   &tail @WIRE(mode="straight") {%rt4 (22, 12) #M1::s};
+//   &tail @WIRE(mode="straight") {%rt4 (34, 12) #M2::s};
+//   &x @WIRE(mode="straight") {#M1::d %rt5};
+//   &x @WIRE(mode="straight") {%rt5 #M3::d};
+//   &x @WIRE(mode="straight") {%rt5 (28, 21) %rt6};
+//   &x @WIRE(mode="straight") {#M3::g %rt6};
+//   &x @WIRE(mode="straight") {%rt6 #M4::g};
+//   $JUNCTION @ATTACH %rt1 => @PLACE(34, 21);
+//   $JUNCTION @ATTACH %rt2 => @PLACE(10, 12);
+//   $JUNCTION @ATTACH %rt3 => @PLACE(19, 8);
+//   $JUNCTION @ATTACH %rt4 => @PLACE(28, 12);
+//   $JUNCTION @ATTACH %rt5 => @PLACE(22, 21);
+//   $JUNCTION @ATTACH %rt6 => @PLACE(28, 26)
+// }
+ends ota5t
+
+VDD (vdd 0) vsource dc=1.8
+VIP (inp 0) vsource dc=0.9 mag=0.5
+VIN (inn 0) vsource dc=0.9 mag=0.5 phase=180
+XU1 (inp inn out vdd 0) ota5t
+CL (out 0) capacitor c=1p
+// @RNL {
+//   &vdd @ADD-TO $SUPPLY_NET_SET;
+//   %routed_nets = # @SELECT-NET;
+//   {$GROUND_NET_SET $SUPPLY_NET_SET $BIAS_NET_SET} @REMOVE-FROM %routed_nets;
+//   %routed_nets @ROUTE-NET;
+//
+//   /* what the circuit is: the OTA driven by two antiphase sources, loaded by CL */
+//   %flow = {#XU1}(path) {#VIP #VIN}(source) {#CL}(load) @AS $SIGNAL_FLOW;
+//
+//   /* from left to right the two input sources (VIP, to the upper pin, first), the amplifier and the load; the supply
+//      source stands at least 4 to the left */
+//   %testbench_order = {#VIP #VIN #XU1 #CL} @ORDER("left-to-right");
+//   %supply_distance = #VDD {#VIP #VIN #XU1 #CL} @DISTANCE("left-to-right", min=4);
+//
+//   /* only the sources and the load are turned */
+//   %upright_parts = {#VDD #VIP #VIN #CL} @ORIENT("R0");
+// }
+// @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:7c6786db3408ead6.a20d5ccdcea5f78d") {
+//   %ground_stub_VDD_n = $GROUND_STUB @ATTACH(gap=3) #VDD::n;
+//   %ground_stub_VIP_n = $GROUND_STUB @ATTACH(gap=3) #VIP::n;
+//   %ground_stub_VIN_n = $GROUND_STUB @ATTACH(gap=3) #VIN::n;
+//   %ground_stub_XU1_vn = $GROUND_STUB @ATTACH(gap=3) #XU1::vn;
+//   %ground_stub_CL_n = $GROUND_STUB @ATTACH(gap=3) #CL::n;
+//   %supply_stub_VDD_p = $SUPPLY_STUB @ATTACH(gap=3) #VDD::p;
+//   %supply_stub_XU1_vp = $SUPPLY_STUB @ATTACH(gap=3) #XU1::vp;
+//   #VDD @PLACE(3, 0) => @ORIENT("R0");
+//   #VIP @PLACE(10, 0) => @ORIENT("R0");
+//   #VIN @PLACE(16, 0) => @ORIENT("R0");
+//   #XU1 @PLACE(23, 5) => @ORIENT("R0");
+//   #CL @PLACE(31, 0) => @ORIENT("R0");
+//   %flow @PLACE(3, 2);
+//   %ground_stub_VDD_n @PLACE(3, 2);
+//   %ground_stub_VDD_n::g @PLACE(3, -4) => @ORIENT("R0");
+//   %ground_stub_VIP_n @PLACE(3, 2);
+//   %ground_stub_VIP_n::g @PLACE(10, -4) => @ORIENT("R0");
+//   %ground_stub_VIN_n @PLACE(3, 2);
+//   %ground_stub_VIN_n::g @PLACE(16, -4) => @ORIENT("R0");
+//   %ground_stub_XU1_vn @PLACE(3, 2);
+//   %ground_stub_XU1_vn::g @PLACE(23, 0) => @ORIENT("R0");
+//   %ground_stub_CL_n @PLACE(3, 2);
+//   %ground_stub_CL_n::g @PLACE(31, -4) => @ORIENT("R0");
+//   %supply_stub_VDD_p @PLACE(3, 2);
+//   %supply_stub_VDD_p::s @PLACE(3, 4) => @ORIENT("R0");
+//   %supply_stub_XU1_vp @PLACE(3, 2);
+//   %supply_stub_XU1_vp::s @PLACE(23, 10) => @ORIENT("R0");
+//   &inp @WIRE(mode="straight") {#VIP::p (10, 6) #XU1::inp};
+//   &inn @WIRE(mode="straight") {#VIN::p (16, 4) #XU1::inn};
+//   &out @WIRE(mode="straight") {#XU1::out (31, 5) #CL::p}
+// }

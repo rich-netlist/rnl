@@ -1,0 +1,98 @@
+// Continuous-time linear equalizer (CTLE): source RC-degenerated NMOS differential pair
+// The RC bridge RS || CS between the two sources gives the peaking; matched resistor loads and matched tail current
+// sinks. The top level drives it with differential sine sources.
+// @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-PACKAGE(name="rnl-std-no-instance-labels", version="0.4"); @USE-PACKAGE(name="rnl-std-semantics", version="0.4"); @VERSION("0.4")}
+simulator lang=spectre
+
+model nch mos1 type=n vto=0.45 kp=200u lambda=0.05
+
+subckt ctle inp inn outp outn vdd vss vb
+RD1 (vdd outn) resistor r=1.5k
+RD2 (vdd outp) resistor r=1.5k
+M1 (outn inp s1 vss) nch w=60u l=0.3u
+M2 (outp inn s2 vss) nch w=60u l=0.3u
+RS (s1 s2) resistor r=1k
+CS (s1 s2) capacitor c=200f
+MT1 (s1 vb vss vss) nch w=30u l=0.3u
+MT2 (s2 vb vss vss) nch w=30u l=0.3u
+// @RNL {
+//   &vdd @ADD-TO $SUPPLY_NET_SET;
+//   &vss @ADD-TO $GROUND_NET_SET;
+//   &vb @ADD-TO $BIAS_NET_SET;
+//   $IO_PORT @ATTACH &inp => %p_inp;
+//   $IO_PORT @ATTACH &inn => %p_inn;
+//   $IO_PORT @ATTACH &outn => %p_outn;
+//   $IO_PORT @ATTACH &outp => %p_outp;
+//   %routed_nets = # @SELECT-NET;
+//   %routed_nets @ROUTE-NET;
+//
+//   {#RD1:p #RD2:p #M1:d #M2:d #MT1:d #MT2:d} @CURRENT("in");
+//   {#RD1:n #RD2:n #M1:s #M2:s #MT1:s #MT2:s} @CURRENT("out");
+//
+//   /* what the circuit is: a differential pair whose sources are bridged by RS || CS, giving a zero (the equalizer's
+//      boost), loaded by matched resistors, with a matched tail current sink for each side */
+//   %rc_deg = {#RS #CS} @AS $PARALLEL_VERTICAL;
+//   %dp_h = #M1(left) #M2(right) #MT1(tailleft) #MT2(tailright) %rc_deg(bridge) @AS $DEGENERATED_DIFFERENTIAL_PAIR_TYPE_H;
+//   %rd = {#RD1 #RD2} @AS $MATCHED_RESISTOR;
+//   %amp = %dp_h(transconductor) %rd(load) @AS $TRANSCONDUCTOR_Z_AMPLIFIER;
+//   %flow = {%dp_h #RD1 #RD2}(path) {%p_inp %p_inn}(source) {%p_outn %p_outp}(load) @AS $SIGNAL_FLOW;
+//
+//   /* the two columns are branches from the supply to the ground: the load resistor on top, the input NMOS in the
+//      middle, the matched tail current sink at the bottom */
+//   %br_left = {#RD1 #M1 #MT1} @AS $BRANCH;
+//   %br_right = {#RD2 #M2 #MT2} @AS $BRANCH;
+//
+//   /* the parallel degeneration bridge RS and CS lies vertically across the H between the two source nodes, RS above
+//      CS, between the two columns */
+//   %bridge_order = {%br_left %rc_deg %br_right} @ORDER("left-to-right");
+//
+//   /* the block symbol drawn for the instances of ctle */
+//   $CTLE_SYM = @DEFINE-SYMBOL(box=[-5, -3, 5, 3]) {
+//     (-5, 1) @PIN(terminal="inp", direction="left");
+//     (-5, -1) @PIN(terminal="inn", direction="left");
+//     (5, 1) @PIN(terminal="outp", direction="right");
+//     (5, -1) @PIN(terminal="outn", direction="right");
+//     (0, 3) @PIN(terminal="vdd", direction="up");
+//     (0, -3) @PIN(terminal="vss", direction="down");
+//     (-2, 3) @PIN(terminal="vb", direction="up");
+//     @LINE {(-4, 2.5) (-4, -2.5) (4, -1.5) (4, 1.5) (-4, 2.5)};
+//     @LINE {(-5, 1) (-4, 1)};
+//     @LINE {(-5, -1) (-4, -1)};
+//     @LINE {(4, 1) (5, 1)};
+//     @LINE {(4, -1) (5, -1)};
+//     @LINE {(0, 2.0) (0, 3)};
+//     @LINE {(0, -2.0) (0, -3)};
+//     @LINE {(-2, 2.25) (-2, 3)};
+//     ? @TEXT("${name}", key="name") => @PLACE(1.0, 2.8)
+//   };
+//   # @SET-SYMBOL $CTLE_SYM
+// }
+ends ctle
+
+VDD (vdd 0) vsource dc=1.8
+VB (vb 0) vsource dc=0.65
+VIP (inp 0) vsource dc=1.0 mag=0.5
+VIN (inn 0) vsource dc=1.0 mag=0.5 phase=180
+X1 (inp inn outp outn vdd 0 vb) ctle
+CLD (outp outn) capacitor c=50f
+// @RNL {
+//   {#VIP #VIN} @SET-SYMBOL $SINE_VOLTAGE_SOURCE;
+//   &vdd @ADD-TO $SUPPLY_NET_SET;
+//   &vb @ADD-TO $BIAS_NET_SET;
+//   $NET_LABEL @ATTACH &outp => %p_outp;
+//   $NET_LABEL @ATTACH &outn => %p_outn;
+//   %routed_nets = # @SELECT-NET;
+//   %routed_nets @ROUTE-NET;
+//
+//   /* what the circuit is: the CTLE driven by the differential sine sources, loaded by the capacitor CLD */
+//   %flow = {#X1}(path) {#VIP #VIN}(source) {#CLD %p_outp %p_outn}(load) @AS $SIGNAL_FLOW;
+//
+//   /* signal flow left to right: the supply and bias sources, the differential input sources VIP and VIN, X1, the
+//      differential load capacitor CLD, the output tags; the sources stand in one row, X1 and CLD too */
+//   %testbench_order = {#VDD #VB #VIP #VIN #X1 #CLD {%p_outp %p_outn}} @ORDER("left-to-right");
+//   %source_align = {#VDD #VB #VIP #VIN} @ALIGN("y");
+//   %amp_load_align = #X1 #CLD @ALIGN("y");
+//
+//   /* only the amplifier, the sources and the load are oriented */
+//   %upright_parts = {#X1 #VIP #VIN #CLD #VDD #VB} @ORIENT("R0");
+// }

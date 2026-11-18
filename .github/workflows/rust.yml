@@ -145,6 +145,9 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Tests
         run: cargo test --workspace
+      - name: The twelve reviewed cases of 0.4, each solved whole in a release build
+        if: matrix.os == 'ubuntu-24.04'
+        run: cargo test --release -p rnl-cli --test cli -- --ignored solve::every_reviewed_case
       - name: Public package tests skip locally and fail when missing in CI
         if: matrix.os == 'ubuntu-24.04'
         shell: bash

@@ -62,6 +62,8 @@ export const FILES = {
  * the Document of that file with the constraints of its levels (`rnl view --constraints`).
  */
 export const PREVIEWS = ["T4-miller-conflicts", "04-hierarchy"];
+/** The limits a preview of a file of 0.4 is solved within, by its name: a fixed work, so that the facts kept are the same everywhere. */
+const PREVIEW_LIMITS = { "T4-miller-conflicts": ["--solver-config", 'limit="work",work=100000000'] };
 
 /**
  * The fixtures of netlists that only a solver draws, and the files of tests/integration/solver they
@@ -452,7 +454,9 @@ export function writeFixtures(rnl, dir) {
   fs.writeFileSync(path.join(dir, "long.json"), view(rnl, "long.sp", dir));
 
   for (const name of PREVIEWS) {
-    const out = execFileSync(rnl, ["preview", FILES[name], "--solver-options", "time_limit=none"], {
+    // a file of 0.4 within a fixed work, the same on every machine (its time limit is not); one before 0.4 without a limit
+    const limit = PREVIEW_LIMITS[name] ?? ["--solver-options", "time_limit=none"];
+    const out = execFileSync(rnl, ["preview", FILES[name], ...limit], {
       cwd: root,
       encoding: "utf8",
       maxBuffer: 1 << 28,
