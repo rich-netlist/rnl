@@ -590,6 +590,7 @@ mod tests {
                 item("solve-respace", "&Respace", None),
                 item("solve-respace-all", "Respace All Circuits", None),
                 item("solve-close", "&Close Preview", None),
+                check("toggle-solve-on-open", "As&k to Solve on Open", None),
                 Shown::Separator,
                 keyed("solve-save", "Save Solved &Copy As...", "Ctrl+Shift+S", "CmdOrCtrl+Shift+S"),
                 item("solve-save-utf8", "Save Solved Copy As UTF-8...", None),
