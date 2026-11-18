@@ -358,11 +358,9 @@ mod tests {
 
     #[test]
     fn symbols_follow_actual_assignments_and_keep_their_original_definitions() {
-        // a file without a header record: the reading adds the standard package (16.3)
+        // a file of 0.4 that uses rnl-std-all, its records of meaning on lines 14 and 33
         let text = include_str!("../../../../tests/viewer/inputs/symbol-inspector.sp");
-        let runtime = rnl_runtime::Options { include_std: true, ..Default::default() };
-        let options = BuildOptions { runtime, ..Default::default() };
-        let d = build("a.sp", &MemoryProvider::new().with("a.sp", text), &options).unwrap();
+        let d = build("a.sp", &MemoryProvider::new().with("a.sp", text), &BuildOptions::default()).unwrap();
         assert!(d.diagnostics.iter().all(|d| d.severity != "error"), "{:?}", d.diagnostics);
         assert_eq!(d.files[0].semantics, [14, 33]);
         let root = &d.levels[0];
