@@ -139,3 +139,34 @@ fn junction_tool_metadata_changes_options_and_writeback_but_not_file_identity() 
     // The writable alias itself is preserved in the record, so it is a distinct option identity.
     assert_ne!(results[1].1, results[3].1);
 }
+
+/// After a stop by the safety limit, which the clock decides, the options a level is signed with
+/// are printed as its options, not as options that replay it; after a stop by its work, they are.
+#[test]
+fn a_level_the_safety_limit_stopped_prints_no_replay_options() {
+    use rnl_solver::StopReason;
+    let files = MemoryProvider::new().with(
+        "main.sp",
+        "* two grounded resistors\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nR1 a 0 1k\nR2 a 0 2k\n* @RNL {\n* $S = @DEFINE-SYMBOL { (-1,0) @PIN(terminal=1); (1,0) @PIN(terminal=2); (-0.5,-0.5) (0.5,0.5) @RECTANGLE };\n* {#R1 #R2} @SET-SYMBOL $S => @ORIENT(\"R0\");\n* &a @ROUTE-NET; &0 @ROUTE-NET\n* }\n.end\n",
+    );
+    let options = SolveOptions {
+        std: false,
+        solver: SolverOptions::default().with_config("limit=\"work\",work=0,safety_seconds=1").unwrap(),
+        ..SolveOptions::default()
+    };
+    let options_line = |clock: &dyn Clock| {
+        let run = solve_with_clock(Path::new("main.sp"), &files, &options, clock).unwrap();
+        let level = &run.levels[0];
+        let line = rnl_cli::solve::report(level, false).into_iter().find(|l| l.contains("options: ")).unwrap();
+        (level.solved.report.budget.unwrap().reason, line)
+    };
+    // a stopped clock: the work stops it, and its options replay it
+    let (reason, line) = options_line(&StoppedClock);
+    assert_eq!(reason, StopReason::Work);
+    assert!(line.starts_with("  replay options: "), "{line}");
+    // a second on at each reading: the safety limit passes at the first step past the work
+    let (reason, line) = options_line(&Ticks(Cell::new(0)));
+    assert_eq!(reason, StopReason::Safety);
+    assert!(!line.contains("replay options"), "{line}");
+    assert!(line.starts_with("  options: ") && line.contains("not replayed"), "{line}");
+}
