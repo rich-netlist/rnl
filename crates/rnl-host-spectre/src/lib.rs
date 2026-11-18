@@ -704,7 +704,7 @@ impl Reader<'_, '_> {
                     }
                     ".lib" => {
                         let card = rnl_host_spice::strip_inline_comment(stripped);
-                        let toks: Vec<&str> = card.split_whitespace().collect();
+                        let toks = rnl_host_spice::quoted_words(&card);
                         if toks.len() < 2 {
                             self.cx.doc.note_input_diagnostic(
                                 level,
@@ -715,10 +715,9 @@ impl Reader<'_, '_> {
                                 Loc::line(&fname, no),
                             );
                         } else if toks.len() == 2 {
-                            skip_section = Some((toks[1].to_string(), no));
+                            skip_section = Some((toks[1].clone(), no));
                         } else if toks.len() >= 3 {
-                            let target = unquote(toks[1]);
-                            self.cx.include(&target, Some(toks[2]), no, &fname, path, st.cur, st.circ, stack, true);
+                            self.cx.include(&toks[1], Some(&toks[2]), no, &fname, path, st.cur, st.circ, stack, true);
                         }
                         continue;
                     }
@@ -1095,7 +1094,10 @@ impl Reader<'_, '_> {
             let master = toks[k - 1].clone();
             (toks[1..k - 1].to_vec(), master, toks[k..].to_vec())
         };
-        if ANALYSES.contains(&master.to_lowercase().as_str()) {
+        // an analysis is a keyword of Spectre mode, in its case unless the mode is case-insensitive:
+        // `X1 (a b) AC` instantiates a subcircuit `AC`, as `IF` names an instance
+        let analysis = if st.insensitive { master.to_lowercase() } else { master.clone() };
+        if ANALYSES.contains(&analysis.as_str()) {
             return None;
         }
         // a coupling of two inductors by their names, `K1 mutual_inductor ind1=L1 ind2=L2`, has no
@@ -1129,8 +1131,8 @@ impl Reader<'_, '_> {
         let low = body.to_lowercase();
         let first = low.split_whitespace().next().unwrap_or("");
         if first.starts_with(".inc") {
-            if let Some(t) = body.split_whitespace().nth(1) {
-                self.cx.include(&unquote(t), None, no, fname, path, st.cur, st.circ, stack, true);
+            if let Some(target) = rnl_host_spice::quoted_words(&body).get(1) {
+                self.cx.include(target, None, no, fname, path, st.cur, st.circ, stack, true);
             } else {
                 self.cx.doc.note_input_diagnostic(
                     st.cur,
@@ -1855,5 +1857,29 @@ mod tests {
         assert_eq!(named(&doc, "MP_scs_sp").default_terminals, Some(words(&["d", "g", "s", "b"])));
         // a model that no card names is still a subcircuit of the file's own
         assert!(named(&doc, "Q_scs").is_subckt);
+    }
+
+    #[test]
+    fn a_subcircuit_named_like_an_analysis_in_another_case_has_instances() {
+        // Spectre mode reads `ac` as an analysis in that case only: `AC` names a subcircuit, as `IF`
+        // names an instance; with `insensitive=yes` the analysis is read in any case
+        let doc = read_one(
+            "// t\nsimulator lang=spectre\nsubckt AC (p n)\nR1 (p n) resistor r=1k\nends AC\nX1 (a b) AC\nac1 ac start=1 stop=1G\n",
+        );
+        assert_eq!(named(&doc, "X1").model.as_deref(), Some("AC"));
+        assert!(named(&doc, "X1").is_subckt);
+        assert!(doc.main().instances.iter().all(|i| i.name != "ac1"));
+        let doc = read_one("// t\nsimulator lang=spectre insensitive=yes\nX1 (a b) AC\n");
+        assert!(doc.main().instances.is_empty());
+    }
+
+    #[test]
+    fn an_include_with_spaces_in_its_name_in_spice_mode() {
+        let net = "// t\nsimulator lang=spice\n.include \"two words.inc\"\nsimulator lang=spectre\nX1 (a) cell\n";
+        let p = MemoryProvider::new().with("a.scs", net).with("two words.inc", "* inc\n.subckt cell a\n.ends\n");
+        let mut sink = Sink::new();
+        let doc = read("a.scs", &p, &mut sink).unwrap();
+        assert!(sink.all().is_empty(), "{:?}", sink.all());
+        assert!(doc.subckt("cell").is_some());
     }
 }

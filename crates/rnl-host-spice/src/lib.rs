@@ -850,7 +850,7 @@ impl Reader<'_, '_> {
             }
             if first == ".lib" {
                 let card = strip_inline_comment(stripped);
-                let toks: Vec<&str> = card.split_whitespace().collect();
+                let toks = quoted_words(&card);
                 if toks.len() < 2 {
                     self.cx.doc.note_input_diagnostic(
                         level,
@@ -862,10 +862,9 @@ impl Reader<'_, '_> {
                     );
                 } else if toks.len() == 2 {
                     // a section definition met while reading the file as a whole: not selected
-                    skip_lib = Some((toks[1].to_string(), no));
+                    skip_lib = Some((toks[1].clone(), no));
                 } else if toks.len() >= 3 {
-                    let file = unquote(toks[1]);
-                    self.cx.include(&file, Some(toks[2]), no, &fname, path, cur, circ, stack, true);
+                    self.cx.include(&toks[1], Some(&toks[2]), no, &fname, path, cur, circ, stack, true);
                 }
                 continue;
             }
@@ -993,9 +992,8 @@ impl Reader<'_, '_> {
         let low = body.to_lowercase();
         let first = low.split_whitespace().next().unwrap_or("");
         if first.starts_with(".inc") {
-            if let Some(target) = body.split_whitespace().nth(1) {
-                let target = unquote(target);
-                self.cx.include(&target, None, no, fname, path, cur, circ, stack, true);
+            if let Some(target) = quoted_words(&body).get(1) {
+                self.cx.include(target, None, no, fname, path, cur, circ, stack, true);
             } else {
                 self.cx.doc.note_input_diagnostic(
                     cur,
@@ -1034,8 +1032,8 @@ impl Reader<'_, '_> {
         }
         if first == ".hdl" {
             // HSPICE's Verilog-A file, read once the version of this file is known (2.9)
-            if let Some(target) = body.split_whitespace().nth(1) {
-                self.cx.include_hdl(&unquote(target), None, no, fname, path, cur);
+            if let Some(target) = quoted_words(&body).get(1) {
+                self.cx.include_hdl(target, None, no, fname, path, cur);
             }
             return;
         }
@@ -1108,8 +1106,38 @@ pub fn card_names(card: &str) -> Vec<String> {
     out
 }
 
-fn unquote(s: &str) -> String {
-    s.trim_matches(|c| c == '\'' || c == '"').to_string()
+/// The words of a card, split at blanks, where a word in quotes, `"two words.inc"` or `'a b.lib'`,
+/// is one word without its quotes: the filename of an include, a library or a Verilog-A file may
+/// have spaces (2.2). A quote left open runs to the end of the card.
+pub fn quoted_words(card: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut chars = card.chars().peekable();
+    while let Some(&c) = chars.peek() {
+        if c.is_whitespace() {
+            chars.next();
+            continue;
+        }
+        let mut word = String::new();
+        if c == '"' || c == '\'' {
+            chars.next();
+            for c2 in chars.by_ref() {
+                if c2 == c {
+                    break;
+                }
+                word.push(c2);
+            }
+        } else {
+            while let Some(&c2) = chars.peek() {
+                if c2.is_whitespace() {
+                    break;
+                }
+                word.push(c2);
+                chars.next();
+            }
+        }
+        words.push(word);
+    }
+    words
 }
 
 /// The warning for a comment line between a statement, a `.subckt` with its ports among them, and
@@ -1577,6 +1605,32 @@ mod tests {
         // a card named in a different case, and one defined after the element, are found
         let (insts, _) = read_all("* t\nM1 d g s b NCH\nJ1 d g s Jn\n.model nch nmos\n.model JN njf\n.end\n");
         assert!(insts.iter().all(|i| !i.model_missing), "{:?}", insts.iter().map(|i| &i.name).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn a_filename_in_quotes_is_one_word_with_its_spaces() {
+        assert_eq!(quoted_words(".include \"two words.inc\""), [".include", "two words.inc"]);
+        assert_eq!(quoted_words(".lib 'my models.lib' tt"), [".lib", "my models.lib", "tt"]);
+        assert_eq!(quoted_words(".hdl  plain.va "), [".hdl", "plain.va"]);
+        assert_eq!(quoted_words(".include \"open"), [".include", "open"]);
+    }
+
+    #[test]
+    fn includes_libraries_and_verilog_a_files_with_spaces_in_their_names() {
+        let net = "* t\n.include \"two words.inc\"\n.lib 'my models.lib' tt\nX1 a cell\nM1 d g 0 0 nch\n.end\n";
+        let p = MemoryProvider::new()
+            .with("t.sp", net)
+            .with("two words.inc", "* inc\n.subckt cell a\n.ends\n")
+            .with("my models.lib", "* models\n.lib tt\n.model nch nmos\n.endl tt\n");
+        let mut sink = Sink::new();
+        let doc = read("t.sp", &p, &mut sink).unwrap();
+        assert!(sink.all().is_empty(), "{:?}", sink.all());
+        assert!(doc.subckt("cell").is_some());
+        assert_eq!(
+            doc.levels.iter().find(|l| l.section.is_some()).map(|l| l.name.as_str()),
+            Some("my models.lib (tt)")
+        );
+        assert_eq!(doc.main().instances[1].mtype.as_deref(), Some("nmos"));
     }
 }
 
