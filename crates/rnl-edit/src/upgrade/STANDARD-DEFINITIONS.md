@@ -52,4 +52,4 @@ For a directed distance and nonnegative lower bound d, `min(B)-max(A) >= d` is e
 
 ## Completed package-sync rules
 
-`OPAMP_5TERM`/`COMPARATOR_5TERM` from 0.3 rename to 3-terminal `OPAMP`/`COMPARATOR` with explicit `[1, 2, 5]` terminal maps, net-displaying virtual parts rewrite `key="name"` to `key="netname"`, `TRANSCONDUCTOR` rewrites `key="formula"` to `key="label"`, and scenes that used 0.3 four-terminal MOS symbols retain their default symbol rules and ground/supply bulk-pin fill.
+`OPAMP_5TERM`/`COMPARATOR_5TERM` from 0.3 rename to 3-terminal `OPAMP`/`COMPARATOR` with explicit `[1, 2, 5]` terminal maps, net-displaying virtual parts rewrite `key="name"` to `key="netname"`, `TRANSCONDUCTOR` and `DIFFERENTIAL_TRANSCONDUCTOR` rewrite `key="formula"` to `key="label"`, and scenes that used 0.3 four-terminal MOS symbols retain their default symbol rules and ground/supply bulk-pin fill.

@@ -278,7 +278,7 @@ impl References {
                             ) {
                                 result.netname_key_objects.insert((level.level, object.id.clone()));
                             }
-                            if symbol.name == "$TRANSCONDUCTOR" {
+                            if matches!(symbol.name.as_str(), "$TRANSCONDUCTOR" | "$DIFFERENTIAL_TRANSCONDUCTOR") {
                                 result.transconductor_objects.insert((level.level, object.id.clone()));
                             }
                         }
@@ -530,7 +530,7 @@ impl References {
                                                     | "IO_PORT_SYMBOL"
                                             )
                                         } else {
-                                            n == "TRANSCONDUCTOR"
+                                            matches!(n, "TRANSCONDUCTOR" | "DIFFERENTIAL_TRANSCONDUCTOR")
                                         }
                                 })
                             }
