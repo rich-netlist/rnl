@@ -1147,12 +1147,12 @@ impl Reader<'_, '_> {
             return;
         }
         if first == "ahdl_include" {
-            // in SPICE mode too (2.9); the line is still the element it has been read as
-            let toks: Vec<&str> = body.split_whitespace().collect();
+            // in SPICE mode too (2.9); the line is still the element it has been read as. A name in
+            // quotes may hold spaces, as in Spectre mode and in a SPICE `.include`
+            let toks = rnl_host_spice::quoted_words(&body);
             if let Some(target) = toks.get(1) {
-                let master = toks.iter().position(|t| *t == "-master").and_then(|k| toks.get(k + 1));
-                let master = master.map(|t| unquote(t));
-                self.cx.include_hdl(&unquote(target), master.as_deref(), no, fname, path, st.cur);
+                let master = toks.iter().position(|t| t == "-master").and_then(|k| toks.get(k + 1));
+                self.cx.include_hdl(target, master.map(String::as_str), no, fname, path, st.cur);
             }
         }
         if first == ".model" {

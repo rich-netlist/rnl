@@ -78,6 +78,20 @@ fn a_module_that_ahdl_include_brings_in_gives_its_instances_its_block_symbol() {
 }
 
 #[test]
+fn ahdl_include_in_spice_mode_reads_a_name_in_quotes_with_spaces() {
+    // Spectre switched into SPICE mode reads `ahdl_include` too (2.9), and its file name in quotes
+    // may hold spaces, as in Spectre mode
+    let text = "// t\n// @RNL(type=\"header\") { @VERSION(\"0.4\")}\nsimulator lang=spice\n\
+                ahdl_include \"two words.va\" -master \"vco\"\nsimulator lang=spectre\nI1 (ctl out vdd 0) vco\n\
+                // @RNL { #I1:vin @ASSERT-TERMINAL(net=\"ctl\") }\n";
+    let files = MemoryProvider::new().with("t.scs", text).with("two words.va", VCO);
+    let r = interpret_file(Path::new("t.scs"), None, &files, &Options { std: false, ..Options::default() }).unwrap();
+    assert!(holds(&r), "{:?}", r.diagnostics().iter().map(|d| r.sink.render(d)).collect::<Vec<_>>());
+    assert_eq!(symbol(&r, "I1"), "%vco");
+    assert!(r.doc.levels.iter().any(|l| l.file == "two words.va"));
+}
+
+#[test]
 fn hdl_brings_in_a_module_with_one_terminal_for_each_bit_of_a_vector_port() {
     let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.hdl 'dac.va'\nX1 a3 a2 a1 a0 b0 b1 b2 y DAC\n\
                 * @RNL { #X1:d[3] @ASSERT-TERMINAL(net=\"a3\"); #X1:d[0] @ASSERT-TERMINAL(net=\"a0\"); \
