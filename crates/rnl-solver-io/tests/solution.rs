@@ -189,6 +189,65 @@ R2 a 0 2k
     .unwrap();
 }
 
+/// A point named in RNL that no wire is written through joins the wires that pass it (13.1): a
+/// result whose wires of two nets both pass it is refused, and one whose wires of one net do is
+/// taken.
+#[test]
+fn two_nets_routed_through_one_named_point_are_refused() {
+    use rnl_runtime::problem::PointRef;
+    use rnl_runtime::solution::{RoutedWire, WirePoint};
+    let text = r#"* two nets and a point
+* @RNL(type="header") { @VERSION("0.4") }
+R1 a b 1k
+R2 a b 2k
+* @RNL {
+* $S = @DEFINE-SYMBOL { (-1,0) @PIN(terminal=1); (1,0) @PIN(terminal=2) };
+* {#R1 #R2} @SET-SYMBOL $S => @ORIENT("R0");
+* #R1 @PLACE(-3,0); #R2 @PLACE(3,0); %q=(0,2);
+* &a @ROUTE-NET; &b @ROUTE-NET
+* }
+.end
+"#;
+    let files = MemoryProvider::new().with("test.sp", text);
+    let read = rnl_view::interpret("test.sp", None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    let p = read.problems[0].clone();
+    let q = p.objects.iter().position(|o| o.label == "%q").unwrap();
+    let through_q = |route: usize| {
+        let pins = &p.routes[route].pins;
+        RoutedWire {
+            route,
+            points: vec![
+                WirePoint::Anchor(pins[0].clone()),
+                WirePoint::Anchor(PointRef::Origin(q)),
+                WirePoint::Anchor(pins[1].clone()),
+            ],
+        }
+    };
+    let decode = |wires: Vec<RoutedWire>| {
+        let s = Solution { wires, ..Solution::default() };
+        decode_solution(&encode_solution(&s).unwrap(), &p)
+    };
+    let route = |net: &str| p.routes.iter().position(|r| r.net == net).unwrap();
+    let (a, b) = (route("a"), route("b"));
+    decode(vec![through_q(a)]).unwrap();
+    let err = decode(vec![through_q(a), through_q(b)]).unwrap_err();
+    assert_eq!(err.path, "$.wires[1].points[1].point", "{err:?}");
+    assert!(err.message.contains("&a") && err.message.contains("&b"), "{err:?}");
+    // the same point twice on one net
+    decode(vec![through_q(a), through_q(a)]).unwrap();
+    // a pin the problem puts on both nets, as a bundle's bus pin is on each net of its members,
+    // takes a wire of each
+    let mut p = p.clone();
+    let shared = p.routes[a].pins[0].clone();
+    p.nets.iter_mut().find(|n| n.name == "b").unwrap().pins.push(shared.clone());
+    let to_shared = |route: usize| RoutedWire {
+        route,
+        points: vec![WirePoint::Anchor(p.routes[route].pins[1].clone()), WirePoint::Anchor(shared.clone())],
+    };
+    let s = Solution { wires: vec![to_shared(a), to_shared(b)], ..Solution::default() };
+    decode_solution(&encode_solution(&s).unwrap(), &p).unwrap();
+}
+
 /// A wire written on one net through a pin of another, which the reading only warns of, is routed
 /// again through the points its author wrote: a result that does so is taken, and one that takes
 /// another net's pin the author did not write is refused.
