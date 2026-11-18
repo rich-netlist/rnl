@@ -75,14 +75,17 @@ const framedKeys = new WeakMap();
 /**
  * The objects a usage's frame goes round, as a key: those that fill its roles, instances, pins and points alike, nets
  * left out; a usage among them for the objects it goes round in turn, and itself too when it has a symbol of its own, as
- * a port, which is drawn; the same objects, the same key; "" for none.
+ * a port, which is drawn; a point by its name, or a position by it (`points`, not an object), so that two usages of the
+ * same instance at other points are not the same; the same objects, the same key; "" for none.
  */
 function framedKey(u) {
   if (framedKeys.has(u)) return framedKeys.get(u);
   const by = usageByObject();
   const framed = new Set();
+  const points = new Set();
   const seen = new Set([u.object]);
   const take = (x) => {
+    for (const r of x.roles) for (const p of r.points ?? []) points.add(p);
     for (const r of x.roles) for (const o of r.objects ?? []) {
       const inner = by.get(o);
       if (inner) {
@@ -92,7 +95,7 @@ function framedKey(u) {
     }
   };
   take(u);
-  const key = [...framed].sort((a, b) => a - b).join(",");
+  const key = [...framed].sort((a, b) => a - b).join(",") + (points.size ? ` ${[...points].sort().join(" ")}` : "");
   framedKeys.set(u, key);
   return key;
 }

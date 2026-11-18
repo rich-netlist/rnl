@@ -274,6 +274,12 @@ export type UsageRole = {
   members: Array<string>,
   objects: Array<number>,
   /**
+   * The points among its members, which are not objects: a named point by its name, one written as a position by it,
+   * as `members` writes them; absent when it has none. Two usages that frame the same objects at other points are not
+   * the same.
+   */
+  points?: Array<string>,
+  /**
    * SVG groups to keep at full opacity while focusing this role.
    */
   groups: Array<string>,

@@ -129,6 +129,27 @@ function address(url) {
   }
 }
 
+/**
+ * `url` when it is an https address, which a page may link: the only addresses a manifest's author and source link to;
+ * null for anything else, such as a javascript: or data: address.
+ */
+export function webLink(url) {
+  if (typeof url !== "string") return null;
+  try {
+    return new URL(url).protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The source a manifest gives, its url kept only when it is an https address (`webLink`); null for none. */
+function sourceOf(source) {
+  if (!source || typeof source !== "object" || Array.isArray(source)) return null;
+  const { url, ...rest } = source;
+  const link = webLink(url);
+  return link ? { ...rest, url: link } : rest;
+}
+
 /** The id a manifest without one gets: its entry's name, without the extension, in the id's letters. */
 function defaultId(entry) {
   const name = String(entry ?? "").split("/").pop().replace(/\.[^.]*$/, "").replace(/[^A-Za-z0-9_.-]+/g, "-").replace(/^[.-]+|[.-]+$/g, "");
@@ -304,7 +325,7 @@ export async function loadManifest(json, { fetch = globalThis.fetch, readFile, o
     title: manifest.title ?? null,
     description: manifest.description ?? null,
     author: manifest.author ?? null,
-    source: manifest.source ?? null,
+    source: sourceOf(manifest.source),
     license: manifest.license ?? null,
     entry: root + manifest.entry,
     level: manifest.level,

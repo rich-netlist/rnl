@@ -3,6 +3,7 @@ import { append, locale, m, setAttr, setText, uiLanguages } from "./i18n.js";
 // that says where they come from, with what the manifest gives of its title, author and source, and
 // the level the manifest names.
 import { notice } from "./drawing.js";
+import { webLink } from "./manifest.js";
 import { doc } from "./state.js";
 import { enterRoot } from "./subcircuits.js";
 import { $ } from "./util.js";
@@ -18,7 +19,7 @@ function authors(author) {
   const list = Array.isArray(author) ? author : author ? [author] : [];
   return list.map((a) => (typeof a === "string" ? { name: a } : { name: a?.name, url: a?.url }))
     .filter((a) => typeof a.name === "string" && a.name.trim())
-    .map((a) => ({ name: a.name, url: typeof a.url === "string" && /^https:\/\//i.test(a.url) ? a.url : null }));
+    .map((a) => ({ name: a.name, url: webLink(a.url) }));
 }
 
 /**
@@ -28,7 +29,9 @@ function authors(author) {
 export function showManifestBar(external) {
   const bar = $("manifest-bar");
   shownExternal = external;
-  const { repo, commit, url } = external?.source || {};
+  const { repo, commit } = external?.source || {};
+  // as an author's, a source's address is linked only when it is an https one (manifest.js checks it when it loads too)
+  const url = webLink(external?.source?.url);
   // a manifest writes its title in the codes of i18n/languages.json, such as zh
   const lang = uiLanguages().find((l) => l.code === locale())?.lang;
   const title = external && ((lang && external.title?.[lang]) || external.title?.en);
