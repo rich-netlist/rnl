@@ -177,6 +177,7 @@ $JUNCTION @ATTACH %j; /* the dot is written */
 - The structures draw the wires inside them at low. What joins two structures is a net label unless you write a ROUTE.
 - Wire what reads better as a wire, not everything: the solver draws only what WIRE, ROUTE-NET and ROUTE-OBJECT ask for, and the fill gives every other unwired pin a ground, supply or net-label stub. Route the main signal path and the connections within and between neighbouring structures; leave long or crowded connections, such as bias lines and nets shared across the drawing, to labels.
 - In a small circuit every net but the rails usually reads well as wires: route them as in the last line above. `# @SELECT-NET => @ROUTE-NET;` draws the same, since the fill unroutes ground, supply and bias nets at high anyway, but each rail net then gets a hint that its tree lost all its pins.
+- A net routed to a port of its level reaches the port only when the port tag is written: `$IO_PORT @ATTACH &x;`, or `$IO_PORT_STUB` on the pin it drives. The fill adds its port tags after it has decided which pins are wired, so a net with one pin of its own, such as an input that drives one gate, makes a tree of one point: that pin gets a net label, and no wire reaches the port.
 
 ## Texts
 
