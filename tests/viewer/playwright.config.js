@@ -22,6 +22,8 @@
 // the web viewer's tests skip; RNL_WEB=1 builds it in any case.
 
 import net from "node:net";
+import os from "node:os";
+import path from "node:path";
 import { preparePublicPackageFixture } from "../../scripts/packages.mjs";
 import { defineConfig, devices } from "@playwright/test";
 import { root } from "./fixtures.js";
@@ -57,6 +59,11 @@ function pageSpecsOnly() {
 
 // the workers load this file too, and inherit whether the runner builds the site, and its port
 process.env.RNL_WEB ??= pageSpecsOnly() ? "0" : "1";
+// What every page starts with in the browser's storage, which global-setup.js writes: Solve › Ask to
+// Solve on Open turned off at the web viewer's origin, so that a netlist opened with components not
+// drawn asks nothing of a test that does not test the question (the fake shell turns it off for its
+// pages itself). The workers inherit the main process's path.
+process.env.RNL_STORAGE_STATE ||= path.join(os.tmpdir(), `rnl-viewer-storage-${process.pid}.json`);
 const web = process.env.RNL_WEB !== "0";
 if (web) {
   process.env.RNL_WEB_PORT ||= String(await freePort());
@@ -71,7 +78,7 @@ export default defineConfig({
   forbidOnly: ci,
   retries: 0,
   reporter: ci ? [["list"], ["html", { open: "never" }]] : "list",
-  use: { trace: "retain-on-failure" },
+  use: { trace: "retain-on-failure", storageState: process.env.RNL_STORAGE_STATE },
   webServer: web
     ? {
         command: `node apps/web/build.mjs --samples ${process.env.RNL_WEB_NO_CORE ? "--no-core" : ""} && node apps/web/serve.mjs --port ${process.env.RNL_WEB_PORT}`,

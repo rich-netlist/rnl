@@ -244,8 +244,8 @@ export function scopeSource(i) {
 }
 
 /**
- * Grey the statements of the objects of level `i` that are not drawn, those that have no position
- * and those that cannot be drawn at all, the way the text outside the subcircuit drawn is dimmed;
+ * Grey the statements of the objects of level `i` that are not drawn, those that have no position,
+ * the way the text outside the subcircuit drawn is dimmed;
  * the statements of the level drawn before are no longer greyed.
  */
 export function markUnplaced(i) {
