@@ -275,8 +275,9 @@ test("real 0.4 write refusals keep diagnostic fields through the Worker", async 
   const worker = startCore();
   try {
     await assert.rejects(worker.write(request), diagnostic);
-    const legacy = { ...request, write: { ...request.write, language_version: undefined } };
-    await assert.rejects(worker.write(legacy), error => !Object.hasOwn(error, "code") && !Object.hasOwn(error, "diagnostics"));
+    // a write that names no version is written in 0.4, and refused the same way
+    const unversioned = { ...request, write: { ...request.write, language_version: undefined } };
+    await assert.rejects(worker.write(unversioned), diagnostic);
   } finally {
     worker.terminate();
   }

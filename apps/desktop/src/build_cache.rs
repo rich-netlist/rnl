@@ -527,7 +527,7 @@ R2 b c 1k
         cache.build("/top.sp", &files, &none(), false).unwrap();
         let enabled = LibraryProvider { files: &files, index: &index, enabled: true };
         let imported = cache.build("/top.sp", &enabled, &none(), false).unwrap();
-        assert!(!imported.hit && imported.json.contains("added by Auto Include"));
+        assert!(!imported.hit && imported.json.contains("subcircuit cell was added from /cell.inc by Auto Include"));
         assert!(cache.build("/top.sp", &enabled, &none(), false).unwrap().hit);
         index.update(&["/cell.inc".into(), "/duplicate.inc".into()], &files, false);
         let collision = LibraryProvider { files: &files, index: &index, enabled: true };
