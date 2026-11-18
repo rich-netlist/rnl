@@ -514,7 +514,9 @@ test("public packages: failed catalogs preserve built-ins and altered package by
   await page.locator('#tab-files').click();
   await expect(page.locator('#public-package-status')).toContainText('Built-in standard packages remain available');
   await page.locator('[data-group="builtin"] .lib-toggle').click();
-  await expect(page.locator('[data-group="builtin"] .pool-row')).toHaveCount(25);
+  // the files of the one standard series, 0.4
+  const standard = fs.readdirSync(new URL('../../../libraries/standard/0.4/', import.meta.url)).filter(f => f.endsWith('.rnl'));
+  await expect(page.locator('[data-group="builtin"] .pool-row')).toHaveCount(standard.length);
   await page.unroute('**/public-packages/catalog.json');
   await page.route('**/public-packages/packages/analog-canvas-extensions/**/analog-canvas-extensions.rnl', route => route.fulfill({ body: 'altered package' }));
   const error = await page.evaluate(async () => {

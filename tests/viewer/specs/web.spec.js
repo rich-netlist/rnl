@@ -15,6 +15,8 @@ import { PICK, root, UNCALLED } from "../fixtures.js";
 import { packageLocks, publicPackageDir, publicPackagesAvailable, publicPackageText } from "../../../scripts/packages.mjs";
 import { zh } from "../zh.js";
 const hasPublicPackages = publicPackagesAvailable();
+/** The built-in standard packages, as the Library names them: the files of the one series, 0.4. */
+const STANDARD = fs.readdirSync(path.join(root, "libraries", "standard", "0.4")).filter((f) => f.endsWith(".rnl")).map((f) => `0.4/${f}`);
 /** A public package as packages.lock.json locks it, its first version: that version, and the language of its own VERSION. */
 const locked = (name) => {
   const { version } = packageLocks.find((p) => p.name === name);
@@ -1300,7 +1302,7 @@ test("the web library adds SKY130 without duplicating built-ins, which open read
   await start(page);
   await page.locator("#tab-files").click();
   await page.locator('[data-group="builtin"] .lib-toggle').click();
-  await expect(page.getByRole("button", { name: "Open 0.2/rnl-std.rnl", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open 0.4/rnl-std-all.rnl", exact: true })).toBeVisible();
   await expect(page.locator('[data-group="builtin"]').getByRole("button", { name: /Exclude/ })).toHaveCount(0);
   await page.locator("#include-library").click();
   const dialog = page.locator("dialog.dialog");
@@ -1315,7 +1317,7 @@ test("the web library adds SKY130 without duplicating built-ins, which open read
   const doc = await shown(page);
   expect(doc.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
   await page.locator("#tab-files").click();
-  const builtin = await opened(page, () => page.getByRole("button", { name: "Open 0.3/rnl-std.rnl", exact: true }).click());
+  const builtin = await opened(page, () => page.getByRole("button", { name: "Open 0.4/rnl-std-basic.rnl", exact: true }).click());
   expect(builtin.path).toContain("<bundled>");
   await expect(page.locator("#source")).toContainText("@PACKAGE");
   // read only limits saving, not editing
@@ -1346,9 +1348,8 @@ test("a missing published Canvas package offers Include and rebuilds; other vers
   await expect(page.getByRole("button", { name: "Exclude analog-canvas-extensions 0.7", exact: true })).toBeVisible();
   const builtin = page.locator('[data-group="builtin"]');
   await builtin.locator(".lib-toggle").click();
-  await expect(builtin.locator(".pool-row")).toHaveCount(25);
-  expect(await builtin.locator(".pool-open").allTextContents()).toEqual(expect.arrayContaining(["0.3/rnl-std.rnl", "0.2/rnl-std.rnl"]));
-  for (const name of await builtin.locator(".pool-open").allTextContents()) expect(name).toMatch(/^0\.[23]\/rnl-(std|zh)/);
+  await expect(builtin.locator(".pool-row")).toHaveCount(STANDARD.length);
+  expect([...await builtin.locator(".pool-open").allTextContents()].sort()).toEqual([...STANDARD].sort());
   if (process.env.RNL_PACKAGE_SCREENSHOTS && info.project.name === "chromium") {
     await page.screenshot({ path: path.join(process.env.RNL_PACKAGE_SCREENSHOTS, "web-library-standard-builtins.png") });
   }
