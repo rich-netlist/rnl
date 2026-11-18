@@ -492,22 +492,32 @@ def check_manifest() -> list[str]:
     return errors
 
 
+# The guide whose examples examples/ holds: each example is linked from it, and SKILL.md links only the folder.
+EXAMPLES_GUIDE = "references/good-drawings.md"
+
+
 def check_links() -> list[str]:
-    """Every relative link of the package's Markdown files leads to a file of the package, and SKILL.md links
-    every file of references/ and examples/."""
-    errors, linked = [], set()
+    """Every relative link of the package's Markdown files leads to a file of the package; SKILL.md links every
+    file of references/ and the folder examples/, and the guide to good drawings links every file of examples/."""
+    errors, linked = [], {}
     for md in sorted(SKILL.rglob("*.md")):
+        name = md.relative_to(SKILL).as_posix()
         for target in re.findall(r"\]\(([^)\s]+)\)", re.sub(r"```.*?```", "", read(md), flags=re.S)):
             if re.match(r"([a-z][a-z0-9+.-]*:|#|//)", target):
                 continue
             path = (md.parent / target.split("#")[0]).resolve()
             if not path.exists():
-                errors.append(f"{md.relative_to(SKILL).as_posix()}: the link {target} leads nowhere")
-            elif md.name == "SKILL.md":
-                linked.add(path.relative_to(SKILL.resolve()).as_posix())
-    for f in skill_files():
-        if f.startswith(("references/", "examples/")) and f not in linked:
+                errors.append(f"{name}: the link {target} leads nowhere")
+            else:
+                linked.setdefault(name, set()).add(path.relative_to(SKILL.resolve()).as_posix())
+    files = skill_files()
+    for f in files:
+        if f.startswith("references/") and f not in linked.get("SKILL.md", ()):
             errors.append(f"SKILL.md does not link {f}")
+        if f.startswith("examples/") and f not in linked.get(EXAMPLES_GUIDE, ()):
+            errors.append(f"{EXAMPLES_GUIDE} does not link {f}")
+    if any(f.startswith("examples/") for f in files) and "examples" not in linked.get("SKILL.md", ()):
+        errors.append("SKILL.md does not link the folder examples/")
     return errors
 
 
