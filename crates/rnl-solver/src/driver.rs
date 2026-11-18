@@ -213,9 +213,9 @@ fn solve_exact_mode(
         drop(phase);
         let mut all: Vec<Placing> = Vec::new();
         for (candidate_id, c) in candidates.into_iter().enumerate() {
-            if !crate::budget::permit(
+            if !crate::budget::permit_size(
                 crate::budget::Step::Placement,
-                problem.objects.len().saturating_add(crate::annotation::estimated_work(problem)),
+                crate::annotation::with_estimated_work(problem.objects.len(), problem),
             ) && !all.is_empty()
             {
                 break;
@@ -287,9 +287,9 @@ fn solve_exact_mode(
             .filter(|&&i| all[i].entry.written_path_error.is_none() && all[i].entry.annotation_error.is_none())
             .take(beam)
         {
-            if !crate::budget::permit(
+            if !crate::budget::permit_size(
                 crate::budget::Step::Route,
-                problem.routes.len().saturating_add(crate::annotation::estimated_work(problem)),
+                crate::annotation::with_estimated_work(problem.routes.len(), problem),
             ) && !finals.is_empty()
             {
                 break;
@@ -391,9 +391,9 @@ fn solve_exact_mode(
                         if !seen.insert(c.code(&structure)) {
                             continue;
                         }
-                        if !crate::budget::permit(
+                        if !crate::budget::permit_size(
                             crate::budget::Step::Placement,
-                            structure.objects.len().saturating_add(crate::annotation::estimated_work(problem)),
+                            crate::annotation::with_estimated_work(structure.objects.len(), problem),
                         ) {
                             break 'search;
                         }

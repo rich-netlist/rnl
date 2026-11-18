@@ -281,14 +281,12 @@ pub(super) fn lab_measure(
     use rnl_runtime::problem::PointRef;
     let weights = ranking.weights;
     use rnl_runtime::solution::WirePoint;
-    if !permit(
+    if !crate::budget::permit_size(
         Step::Structure,
-        problem
-            .objects
-            .len()
-            .saturating_add(problem.wires.len())
-            .saturating_add(routing.wires.len())
-            .saturating_add(crate::annotation::estimated_work(problem)),
+        crate::annotation::with_estimated_work(
+            problem.objects.len().saturating_add(problem.wires.len()).saturating_add(routing.wires.len()),
+            problem,
+        ),
     ) {
         return LabOrder::interrupted(weights);
     }

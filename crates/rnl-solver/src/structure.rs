@@ -2135,7 +2135,7 @@ fn group_tree(problem: &LevelProblem, objects: &[ObjectInfo], elements: &[usize]
     let mut absorbed: Vec<BTreeSet<usize>> = Vec::new();
     let laminar = |a: &BTreeSet<usize>, b: &BTreeSet<usize>| a.is_disjoint(b) || a.is_subset(b) || b.is_subset(a);
     for (g, group) in problem.groups.iter().enumerate() {
-        if !crate::budget::permit(crate::budget::Step::Structure, elements.len().saturating_mul(g + 1)) {
+        if !crate::budget::permit_size(crate::budget::Step::Structure, crate::budget::product(elements.len(), g + 1)) {
             return fallback();
         }
         let set = elements_of(g);
@@ -2427,7 +2427,10 @@ fn current_depths_checked(s: &Structure) -> Option<Vec<Option<u32>>> {
     // who stands above whom, by the nets
     let mut below: BTreeMap<usize, BTreeSet<usize>> = BTreeMap::new();
     for net in &c.nets {
-        if !crate::budget::permit(crate::budget::Step::Structure, net.pins.len().saturating_mul(net.pins.len())) {
+        if !crate::budget::permit_size(
+            crate::budget::Step::Structure,
+            crate::budget::product(net.pins.len(), net.pins.len()),
+        ) {
             return None;
         }
         let marked = |out: bool| {

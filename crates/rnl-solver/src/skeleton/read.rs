@@ -199,9 +199,9 @@ fn read_with_facts(
     crosses: bool,
     repair_fixed: bool,
 ) -> Option<Skeleton> {
-    if !crate::budget::permit(
+    if !crate::budget::permit_size(
         crate::budget::Step::Structure,
-        problem.objects.len().saturating_add(crate::annotation::estimated_work(problem)),
+        crate::annotation::with_estimated_work(problem.objects.len(), problem),
     ) {
         return None;
     }

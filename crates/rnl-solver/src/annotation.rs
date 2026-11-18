@@ -157,8 +157,8 @@ pub(crate) fn overlaps(
 }
 
 /// Deterministic admission estimate for materialization/geometry work. This is not an A* count.
-pub(crate) fn estimated_work(problem: &LevelProblem) -> usize {
-    let source = problem.annotations.iter().fold(0usize, |total, annotation| {
+pub(crate) fn estimated_work(problem: &LevelProblem) -> u64 {
+    let source = problem.annotations.iter().fold(0u64, |total, annotation| {
         let graphics = annotation.view.graphics.iter().fold(0usize, |count, graphic| {
             let primitive = &graphic.primitive;
             count
@@ -168,20 +168,26 @@ pub(crate) fn estimated_work(problem: &LevelProblem) -> usize {
                 .saturating_add(graphic.text_refs.len())
                 .saturating_add(graphic.lines.iter().fold(0usize, |n, line| n.saturating_add(line.len())))
         });
-        total.saturating_add(graphics.saturating_add(1).saturating_mul(16))
+        total.saturating_add((graphics as u64).saturating_add(1).saturating_mul(16))
     });
     source.saturating_add(collision_estimate(problem.annotations.len(), problem.objects.len()).saturating_mul(16))
 }
 
+/// A count of the level's own, with [`estimated_work`] for its annotations, as a size: in `u64`,
+/// the same on any target.
+pub(crate) fn with_estimated_work(count: usize, problem: &LevelProblem) -> u64 {
+    (count as u64).saturating_add(estimated_work(problem))
+}
+
 // One comparison per annotation/component and unordered annotation pair. The object count is a
 // conservative upper bound on components. Halve before multiplication to preserve saturation.
-fn collision_estimate(n: usize, objects: usize) -> usize {
+fn collision_estimate(n: usize, objects: usize) -> u64 {
     let pair = if n % 2 == 0 {
-        (n / 2).saturating_mul(n.saturating_sub(1))
+        crate::budget::product(n / 2, n.saturating_sub(1))
     } else {
-        n.saturating_mul(n.saturating_sub(1) / 2)
+        crate::budget::product(n, n.saturating_sub(1) / 2)
     };
-    n.saturating_mul(objects).saturating_add(pair)
+    crate::budget::product(n, objects).saturating_add(pair)
 }
 
 #[cfg(test)]
@@ -191,6 +197,8 @@ mod estimate_tests {
     fn comparisons_include_pairs_and_saturate() {
         assert_eq!(collision_estimate(0, usize::MAX), 0);
         assert_eq!(collision_estimate(2, 5), 11);
-        assert_eq!(collision_estimate(usize::MAX, usize::MAX), usize::MAX);
+        assert_eq!(collision_estimate(usize::MAX, usize::MAX), u64::MAX);
+        // past what a 32-bit usize holds, the same on any target
+        assert_eq!(collision_estimate(65_536, 65_536), (1u64 << 32) + 32_768 * 65_535);
     }
 }

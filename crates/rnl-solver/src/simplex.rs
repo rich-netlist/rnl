@@ -648,9 +648,9 @@ impl<T: Clone + Ord> Simplex<T> {
         Ok(())
     }
 
-    fn out_of_budget(&self, cost: usize) -> bool {
+    fn out_of_budget(&self, cost: u64) -> bool {
         self.pivot_limit.is_some_and(|limit| self.pivots >= limit)
-            || !crate::budget::permit(crate::budget::Step::Pivot, cost)
+            || !crate::budget::permit_size(crate::budget::Step::Pivot, cost)
     }
 
     /// The work of the next step of [`Simplex::check`] or [`Simplex::minimize`]: a pass over the
@@ -658,11 +658,11 @@ impl<T: Clone + Ord> Simplex<T> {
     /// when the variable `xj` enters the basis in row `r`, the terms its pivot writes: the row
     /// made from `r` again into each other row that `xj` occurs in. Not the size of the tableau:
     /// a row holds a few of its variables, and a pivot touches the rows of one.
-    fn pivot_cost(&self, exchange: Option<(usize, Var)>) -> usize {
+    fn pivot_cost(&self, exchange: Option<(usize, Var)>) -> u64 {
         let rewritten = exchange.map_or(0, |(r, xj)| {
-            (self.occurrences[xj] as usize).saturating_mul(self.rows[r].terms.len().saturating_add(1))
+            crate::budget::product(self.occurrences[xj] as usize, self.rows[r].terms.len().saturating_add(1))
         });
-        self.rows.len().saturating_add(rewritten)
+        (self.rows.len() as u64).saturating_add(rewritten)
     }
 
     /// The tags of the bounds that keep the basic variable of row `r` out of its bounds: its own

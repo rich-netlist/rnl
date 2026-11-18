@@ -55,10 +55,10 @@ pub(crate) fn analyse(
         .collect();
     let mut permit = |step: Step| {
         let size = match step {
-            Step::Declaration(g) => problem.groups[g].members.len(),
-            Step::Compare(n) | Step::Place(n) => elements.len().saturating_mul(n),
+            Step::Declaration(g) => problem.groups[g].members.len() as u64,
+            Step::Compare(n) | Step::Place(n) => crate::budget::product(elements.len(), n),
         };
-        crate::budget::permit(crate::budget::Step::Structure, size)
+        crate::budget::permit_size(crate::budget::Step::Structure, size)
     };
     let Some(Selection { fates, order, taken }) = select(&declarations, &mut permit) else {
         return fallback();

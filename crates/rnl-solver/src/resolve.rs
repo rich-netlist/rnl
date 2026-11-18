@@ -1877,7 +1877,10 @@ fn taken_as_written(
     kept: &[usize],
     work: &mut Work,
 ) -> Option<(Witness, bool, Model)> {
-    if !crate::budget::permit(crate::budget::Step::Resolve, problem.facts.len().saturating_mul(problem.objects.len())) {
+    if !crate::budget::permit_size(
+        crate::budget::Step::Resolve,
+        crate::budget::product(problem.facts.len(), problem.objects.len()),
+    ) {
         return None;
     }
     let n = problem.objects.len();
@@ -1914,7 +1917,7 @@ fn held_as_written(problem: &LevelProblem, model: &Model, kept: &[usize], work: 
     let n = problem.objects.len();
     let mut exact = BTreeSet::new();
     for &f in kept {
-        if !crate::budget::permit(crate::budget::Step::Resolve, problem.facts.len().saturating_mul(n)) {
+        if !crate::budget::permit_size(crate::budget::Step::Resolve, crate::budget::product(problem.facts.len(), n)) {
             break;
         }
         let widened = matches!(

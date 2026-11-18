@@ -725,7 +725,10 @@ fn again(
     }
     let widened: Vec<[Q; 4]> = taken.iter().map(|b| [&b[0] - &gap, &b[1] - &gap, &b[2] + &gap, &b[3] + &gap]).collect();
     let routing = &pre.1;
-    if !permit(BudgetStep::Structure, routing.wires.len().saturating_mul(widened.len().max(1))) {
+    if !crate::budget::permit_size(
+        BudgetStep::Structure,
+        crate::budget::product(routing.wires.len(), widened.len().max(1)),
+    ) {
         return None;
     }
     for (w, (wire, path)) in routing.wires.iter().zip(&routing.paths).enumerate() {

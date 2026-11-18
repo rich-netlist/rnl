@@ -1706,9 +1706,9 @@ fn route_in_order(layout: &Layout, order: &[usize], budget: u64, expansions: &mu
     crate::profile::set("grid_states", grid.best.len() as u64);
     let mut outs: Vec<NetOut> = vec![NetOut::default(); layout.nets.len()];
     for &i in order {
-        if !crate::budget::permit(
+        if !crate::budget::permit_size(
             crate::budget::Step::Route,
-            layout.nets[i].anchors.len().saturating_mul(layout.nets[i].anchors.len()),
+            crate::budget::product(layout.nets[i].anchors.len(), layout.nets[i].anchors.len()),
         ) {
             let parts = parts_of(&layout.nets[i]);
             outs[i] = NetOut { parts, failure: (parts > 1).then_some(Failure::Budget), ..NetOut::default() };
