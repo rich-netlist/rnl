@@ -88,6 +88,53 @@ fn a_combination_with_an_object_twice_is_left_out() {
     assert_eq!(count(&r, codes::CONSTRAINT_EXPANSION_TOO_FEW_PLACES), 1, "{:?}", r.diagnostics());
 }
 
+/// The members of each DISTANCE, by their labels, `from` then `to`.
+fn distances(r: &Interpretation) -> Vec<Vec<String>> {
+    let p = &r.problems[0];
+    let name = |m: &PointRef| match m {
+        PointRef::Origin(i) => p.objects[*i].label.clone(),
+        other => format!("{other:?}"),
+    };
+    p.facts
+        .iter()
+        .filter_map(|f| match &f.kind {
+            FactKind::Distance { from, to, .. } => Some(from.iter().chain(to).map(name).collect()),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn a_usage_written_on_both_sides_stands_for_its_members_on_each() {
+    // each side stands for #R1 and #R2: the pairs of two different members are kept, as when the
+    // members are written (14.1, 14.5)
+    let written = read("{#R1 #R2} {#R1 #R2} @DISTANCE(\"left-to-right\", exact=0)");
+    let r = read(&format!("{PAIR} %u = #R1(a) #R2(b) @AS $D; %u %u @DISTANCE(\"left-to-right\", exact=0)"));
+    assert_eq!(errors(&r), [], "{:?}", r.diagnostics());
+    let sorted = |r: &Interpretation| {
+        let mut d = distances(r);
+        d.sort();
+        d
+    };
+    assert_eq!(sorted(&r), strs(&[&["#R1", "#R2"], &["#R2", "#R1"]]));
+    assert_eq!(sorted(&r), sorted(&written));
+    assert_eq!(count(&r, codes::CONSTRAINT_EXPANSION_TOO_FEW_PLACES), 0, "{:?}", r.diagnostics());
+    // its own point on one side, its members on the other
+    let r = read(&format!("{PAIR} %u = #R1(a) #R2(b) @AS $D; %u::position %u @DISTANCE(\"left-to-right\", exact=0)"));
+    assert_eq!(errors(&r), [], "{:?}", r.diagnostics());
+    assert_eq!(distances(&r).len(), 2, "{:?}", distances(&r));
+}
+
+#[test]
+fn a_usage_with_a_symbol_written_twice_relates_nothing() {
+    let r = read(
+        "$D = @DEFINE(roles=[\"a\", \"b\"]) { ? @SET-SYMBOL $S }; %u = #R2(a) #R3(b) @AS $D; %u %u @DISTANCE(\"left-to-right\", exact=0)",
+    );
+    assert_eq!(errors(&r), [], "{:?}", r.diagnostics());
+    assert_eq!(distances(&r), Vec::<Vec<String>>::new());
+    assert_eq!(count(&r, codes::CONSTRAINT_EXPANSION_TOO_FEW_PLACES), 1, "{:?}", r.diagnostics());
+}
+
 #[test]
 fn the_constraints_split_off_a_named_one_keep_its_name_and_priority() {
     let r = read(&format!(
