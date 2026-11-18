@@ -4,7 +4,9 @@
 //! written anywhere the user did not choose: the app keeps, for each window, the archive and the folder its dialogs gave,
 //! and writes the archive to that one alone and a project's files only by their names within that folder, never through a
 //! link or a junction, and each file as Save writes one (atomic.rs): an archive that cannot be written whole leaves the
-//! old one as it was.
+//! old one as it was. A file of the folder that has other names, hard links, is the one exception: Save keeps them, but
+//! a project's file replaces it at its name in the folder alone (`atomic::write_own`), so that a name outside the folder
+//! the user chose keeps what it had.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -97,7 +99,8 @@ pub async fn write_project_file(
     let bytes = bytes.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let path = inside(&root, &relative, true)?;
-        crate::atomic::write(&path, &bytes).map_err(|e| format!("{}: {e}", path.display()))
+        // (a file of the folder with other names, hard links, is replaced at its name in the folder alone)
+        crate::atomic::write_own(&path, &bytes).map_err(|e| format!("{}: {e}", path.display()))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -322,6 +325,26 @@ mod tests {
         // the folder chosen may itself be reached by a link: the user chose it
         let at = inside(&root.join("lib"), "a.inc", true).unwrap();
         assert!(at.starts_with(std::fs::canonicalize(&outside).unwrap()));
+    }
+
+    #[test]
+    fn a_file_with_another_name_outside_the_folder_is_replaced_at_its_name_in_the_folder_alone() {
+        let dir = Dir::new("hard-link");
+        let root = dir.0.join("root");
+        std::fs::create_dir(&root).unwrap();
+        let outside = dir.0.join("outside.sp");
+        std::fs::write(&outside, "* outside\n").unwrap();
+        if std::fs::hard_link(&outside, root.join("top.sp")).is_err() {
+            eprintln!("no hard link could be made here: nothing to try");
+            return;
+        }
+        let at = inside(&root, "top.sp", true).unwrap();
+        crate::atomic::write_own(&at, b"* the project's\n").unwrap();
+        assert_eq!(std::fs::read_to_string(&at).unwrap(), "* the project's\n");
+        assert_eq!(std::fs::read_to_string(&outside).unwrap(), "* outside\n", "the name outside keeps what it had");
+        // a file of one name is replaced as Save replaces it
+        crate::atomic::write_own(&outside, b"* again\n").unwrap();
+        assert_eq!(std::fs::read_to_string(&outside).unwrap(), "* again\n");
     }
 
     #[test]
