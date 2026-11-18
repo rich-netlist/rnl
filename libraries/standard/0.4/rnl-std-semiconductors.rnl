@@ -1,7 +1,7 @@
 /* rnl-std-semiconductors 0.4, a package of the standard series 0.4 (16.3).
-   The symbols of diodes and MOS, bipolar and JFET transistors.
+   The symbols of diodes and of MOS, bipolar, JFET and unijunction (UJT, PUT) transistors.
    Coordinates are y-up; one unit is one grid step, ten Analog Canvas units. The pins are named with
-   the standard terminal names of SPICE, in SPICE's order (a k, d g s b, c b e, d g s), and bind the
+   the standard terminal names of SPICE, in SPICE's order (a k, d g s b, c b e, d g s; e b1 b2 for the UJT, a g k for the PUT), and bind the
    terminal of that name (6.12, 11.3), so #M1::d is the pin of #M1:d. The model label of each symbol
    is empty by default; a file shows it with # @SELECT-INSTANCE => @TEXT("${model}", key="model"). */
 @RNL(type="header") {
