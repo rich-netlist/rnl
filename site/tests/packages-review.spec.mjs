@@ -12,6 +12,8 @@ for (const language of ['zh', 'en']) {
   test(`standard package file label stays unchanged: ${language}`, async ({ page }) => {
     await page.goto(`/${language}/packages.html?series=standard-0.3&package=rnl-std-style`);
     await expect(page.locator('.gl-meta a').first()).toHaveText('libraries/standard/0.3/rnl-std-style.rnl');
+    // an archived series links its files at the tag of the last core of the 0.5 line, not on main
+    await expect(page.locator('.gl-meta a').first()).toHaveAttribute('href', 'https://github.com/rich-netlist/rnl/blob/core-v0.5.6/libraries/standard/0.3/rnl-std-style.rnl');
   });
 }
 

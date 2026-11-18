@@ -1,7 +1,8 @@
 # Builds the project site and publishes it to GitHub Pages: the pages in site/ (the introduction, the
 # language tour, the page of the tools, the gallery of the standard packages and the page for agents),
 # the pages of the language standard (scripts/spec/), the RNL skill package for agents, as a zip and as
-# plain text, with llms.txt (scripts/skill/), the web viewer with its samples (apps/web) under viewer/,
+# plain text, with llms.txt (scripts/skill/), the web viewer with its samples (apps/web) under viewer/, as it is
+# at the last release of the 0.5 line (LAST_05_RELEASE below, until the site moves to the language 0.4),
 # the same viewer frozen at an older tag, for 0.3 files, under viewer-0.3/, and the gallery's data, from
 # libraries/, under gallery/. It publishes on a push to main; after a revision
 # of the standard is released, so that its pages carry the new revision label; and after a release of
@@ -92,6 +93,12 @@ env:
   # web viewer). It is the newest release of the viewer while 0.3 is the current version of the language; when
   # 0.4 is released it is the tag of the last release of the 0.5 line, which reads 0.3 files.
   FROZEN_VIEWER_TAG: viewer-v0.5.3
+  # The last release of the 0.5 line of the core, which reads 0.2, 0.3 and 0.4. Until the site moves to the language
+  # 0.4, the site is built with it, not with main, whose core reads 0.4 only: the web viewer at viewer/ is built at
+  # this tag (so it no longer changes with every merge into main), the site's example netlists and the logo are
+  # checked with its command line, and the gallery draws its symbols with its npm package @rich-netlist/runtime.
+  # Moving to a newer release of the 0.5 line is this line alone.
+  LAST_05_RELEASE: core-v0.5.6
 
 jobs:
   build:
@@ -152,38 +159,54 @@ jobs:
       - name: Build the skill package for agents
         run: python3 scripts/skill/build.py --site site/dist
 
-      # The web viewer, one copy for every language: the core as WebAssembly, the page of
-      # apps/viewer-ui with its web fonts, and the conformance corpus as samples.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      # The core of the release LAST_05_RELEASE: its command line for Linux, and its npm package
+      # @rich-netlist/runtime, the core as WebAssembly, each checked against the release's SHA256SUMS.txt (the npm
+      # package is the same file as the release's rich-netlist-runtime-X.Y.Z.tgz). RNL_BIN, which scripts/brand.mjs
+      # reads too, names the command line, and RNL_GALLERY_CORE the package, which site/gallery/build.mjs draws with.
+      - name: Download the core of the last release of the 0.5 line
+        run: |
+          core="$RUNNER_TEMP/core-0.5"
+          version="${LAST_05_RELEASE#core-v}"
+          mkdir -p "$core/bin"
+          cd "$core"
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$LAST_05_RELEASE"
+          curl -fsSL --retry 3 -o SHA256SUMS.txt "$base/SHA256SUMS.txt"
+          curl -fsSL --retry 3 -o rnl-x86_64-unknown-linux-musl.tar.gz "$base/rnl-x86_64-unknown-linux-musl.tar.gz"
+          npm pack "@rich-netlist/runtime@$version" --silent
+          grep -E " \*?(rnl-x86_64-unknown-linux-musl\.tar\.gz|rich-netlist-runtime-$version\.tgz)$" SHA256SUMS.txt | sed 's/ \*/  /' > check.txt
+          test "$(wc -l < check.txt)" -eq 2
+          sha256sum -c check.txt
+          tar -xzf rnl-x86_64-unknown-linux-musl.tar.gz -C bin
+          tar -xzf "rich-netlist-runtime-$version.tgz"
+          rnl="$(find "$core/bin" -type f -name rnl | head -n 1)"
+          "$rnl" --version | grep -q "^rnl $version "
+          test -f package/rnl_runtime_wasm.wasm
+          echo "RNL_BIN=$rnl" >> "$GITHUB_ENV"
+          echo "RNL_GALLERY_CORE=$core/package" >> "$GITHUB_ENV"
+      - name: Check and render the site's example netlists
+        run: python3 site/build.py --check --rnl "$RNL_BIN"
+
+      # The web viewer at viewer/, one copy for every language: the core as WebAssembly, the page of
+      # apps/viewer-ui with its web fonts, and the conformance corpus as samples, as they are at the tag
+      # LAST_05_RELEASE. The tag is checked out beside the workspace and built there with its own scripts, fonts
+      # and WebAssembly cache, as the frozen viewer below is; main's web viewer is tested by web.yml.
       - name: Install Rust with the WebAssembly target
         id: rust
         run: |
           rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
           echo "version=$(rustc --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
-      # the crates the core depends on, and what was built of them for WebAssembly
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/wasm/
-            target/wasm32-unknown-unknown/
-          key: pages-wasm-${{ steps.rust.outputs.version }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: pages-wasm-${{ steps.rust.outputs.version }}-
-      - name: Check and render the site's example netlists
-        run: |
-          cargo build -p rnl-cli
-          python3 site/build.py --check --rnl target/debug/rnl
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24
+      - name: Check out the tag of the web viewer
+        run: git worktree add --detach "$RUNNER_TEMP/viewer" "refs/tags/$LAST_05_RELEASE"
       # Writing the web fonts from the pinned fonts takes scripts/fonts.py a minute or two, and what it
-      # writes changes only with the script, so it is kept between runs.
+      # writes changes only with the tag, so it is kept between runs.
       - id: fonts
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: apps/viewer-ui/fonts/
-          key: web-fonts-${{ hashFiles('scripts/fonts.py') }}
+          path: ${{ runner.temp }}/viewer/apps/viewer-ui/fonts/
+          key: web-fonts-viewer-${{ env.LAST_05_RELEASE }}
       - if: steps.fonts.outputs.cache-hit != 'true'
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
@@ -191,19 +214,31 @@ jobs:
       # downloads the pinned fonts and writes apps/viewer-ui/fonts/, the drawing's web fonts
       - name: Write the web fonts
         if: steps.fonts.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}/viewer
         run: pip install fonttools brotli && python scripts/fonts.py web
+      # the crates the core depends on, and what was built of them for WebAssembly
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            ${{ runner.temp }}/viewer-target/
+          key: pages-viewer-wasm-${{ steps.rust.outputs.version }}-${{ env.LAST_05_RELEASE }}
       # writes apps/web/dist/, including libraries/*.rnl, index.json and bundled.json,
       # and puts it at site/dist/viewer/, where the pages of every language link
       - name: Build the web viewer, with samples and the package library
+        working-directory: ${{ runner.temp }}/viewer
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/viewer-target
         run: |
-          node --test apps/web/*.test.mjs
           node apps/web/build.mjs --samples
-          cp -r apps/web/dist site/dist/viewer
+          cp -r apps/web/dist "$GITHUB_WORKSPACE/site/dist/viewer"
 
       # The frozen viewer for 0.3 files, site/dist/viewer-0.3/: the web viewer as it was at the tag
       # FROZEN_VIEWER_TAG, with its own page, core and WebAssembly, and a banner that says it is the old
       # viewer and links ../viewer/ (apps/web/freeze.mjs). The tag is checked out beside the workspace and
-      # built there, as the step above builds main, with its own fonts and its own WebAssembly cache.
+      # built there, as the viewer above is, with its own fonts and its own WebAssembly cache.
       - name: Check out the tag of the frozen viewer
         run: git worktree add --detach "$RUNNER_TEMP/frozen-viewer" "refs/tags/$FROZEN_VIEWER_TAG"
       - id: frozen-fonts
@@ -238,11 +273,12 @@ jobs:
           test -f site/dist/viewer-0.3/frozen-banner.js
           grep -q 'frozen-banner.js' site/dist/viewer-0.3/index.html
           test -f site/dist/viewer-0.3/core/rnl_runtime_wasm.wasm
-          cmp -s site/dist/viewer-0.3/core/rnl_runtime_wasm.wasm site/dist/viewer/core/rnl_runtime_wasm.wasm && { echo "the frozen viewer has the core of main, not of $FROZEN_VIEWER_TAG"; exit 1; } || true
+          test -f site/dist/viewer/core/rnl_runtime_wasm.wasm
+          test ! -f site/dist/viewer/frozen-banner.js
 
       # The data of the gallery of the standard packages (packages.html), which the pages of both
-      # languages load: every package file in libraries/ read, and every symbol drawn by the core the
-      # step above built into bindings/runtime-wasm/dist/, written into site/dist/gallery/. The tests of
+      # languages load: every package file in libraries/ read, and every symbol drawn by the core of
+      # LAST_05_RELEASE (RNL_GALLERY_CORE, above), written into site/dist/gallery/. The tests of
       # its reading of package files run first.
       - name: Build the gallery of the standard packages
         run: |

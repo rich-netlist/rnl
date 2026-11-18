@@ -15,6 +15,12 @@
   /* Where the data is, from a page of either language */
   var DATA = '../gallery/';
   var REPO = 'https://github.com/rich-netlist/rnl/blob/main/';
+  /* The archived series 0.2 and 0.3 leave libraries/ on main; their files are linked where they stay, at the tag of
+     the last core of the 0.5 line, which holds them as they were when their data in site/gallery/frozen/ was drawn */
+  var ARCHIVED_REPO = 'https://github.com/rich-netlist/rnl/blob/core-v0.5.6/';
+  function sourceUrl(pkg) {
+    return pkg.source || (/^libraries\/standard\/0\.[23]\//.test(pkg.path) ? ARCHIVED_REPO : REPO) + pkg.path;
+  }
 
   /* What each package is for, in both languages; a package without a line here shows the comment
      its file starts with. A line holds for every version of the package, unless one is written for
@@ -78,7 +84,7 @@
   /* A long name may break after its underscores and hyphens */
   function breakable(n) { return esc(n).replace(/([_-])/g, '$1<wbr>'); }
   function lineLink(pkg, line, end) {
-    var href = (pkg.source || REPO + pkg.path) + '#L' + line + (end && end !== line ? '-L' + end : '');
+    var href = sourceUrl(pkg) + '#L' + line + (end && end !== line ? '-L' + end : '');
     return '<a class="gl-line" href="' + href + '" title="<en>See these lines on GitHub</en>">' +
       (end && end !== line ? fill('<en>lines {a}–{b}</en>', { a: line, b: end }) : fill('<en>line {a}</en>', { a: line })) + '</a>';
   }
@@ -196,7 +202,7 @@
     h += '<p class="gl-sum">' + (sum || esc(pkg.description.split('\n\n')[0])) + '</p>';
     h += '<dl class="gl-meta">';
     var sourcePath = pkg.source ? new URL(pkg.source).pathname.replace(/^\/[^/]+\/[^/]+\/blob\/[^/]+\//, '') : pkg.path;
-    h += '<div><dt><en>File</en></dt><dd><a href="' + esc(pkg.source || REPO + pkg.path) + '">' + esc(sourcePath) + '</a></dd></div>';
+    h += '<div><dt><en>File</en></dt><dd><a href="' + esc(sourceUrl(pkg)) + '">' + esc(sourcePath) + '</a></dd></div>';
     if (pkg.references.length) {
       h += '<div><dt><en>References</en></dt><dd>' + pkg.references.map(function (r) {
         return '<a class="gl-ref" href="#' + esc(r.name) + '" data-goto="' + esc(r.name) + '">' + esc(r.name) + '</a>';
