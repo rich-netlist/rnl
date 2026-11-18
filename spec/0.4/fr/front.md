@@ -1,5 +1,5 @@
-<!-- translated from en/front.md sha256:96a6e2a65dbe -->
-# Norme du langage RNL, version 0.4 (projet)
+<!-- translated from en/front.md sha256:0cc8c8aaa953 -->
+# Norme du langage RNL, version 0.4
 
 RNL (Rich Netlist) s’écrit dans les commentaires d’une netlist de circuit. Il décrit comment le circuit est dessiné sous forme de schéma et ce que signifient ses parties, tandis que la netlist seule définit le circuit. Ce document est la norme de la version 0.4 du langage.
 
@@ -7,4 +7,4 @@ RNL (Rich Netlist) s’écrit dans les commentaires d’une netlist de circuit. 
 - La liste de mots `rnl-words-0.4.json` et son schéma `rnl-words-0.4.schema.json` font partie de cette norme (5.3, Annexe A).
 - Les principes de RNL figurent dans `rich-netlist.md` (en anglais, texte faisant foi ; traductions : `rich-netlist.<lang>.md`) ; la présente norme s’y réfère sous le nom de « Principes ».
 - Les versions 0.x ne font aucune promesse de compatibilité entre elles (16.1).
-- Ce texte révise la version 0.3 selon le projet de version 0.4 du dépôt de recherche rnl-dev, commit {SOURCE} ; l’Annexe D en énumère les modifications.
+- Ce texte révise la version 0.3 selon le projet de version 0.4 du 2026-11-19 ; l’Annexe D en énumère les modifications.
