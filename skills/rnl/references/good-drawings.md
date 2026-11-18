@@ -189,8 +189,8 @@ Complete files that follow these points; each checks without errors and solves.
 
 | File | What it shows |
 | --- | --- |
-| [solver-cs-amp.sp](../examples/solver-cs-amp.sp) | A common-source stage: one column for the DC path, the load capacitor and the output port to its right, the output net routed |
-| [two-stage-amp.sp](../examples/two-stage-amp.sp) | A two-stage op-amp, a five-transistor OTA and a common-source stage: the bias diode, the two branches of the first stage and the second stage in four columns, the pair and its load wired, the gates of each mirror facing each other, both inputs alike, the signal nets routed, the bias of the second stage left to its name |
-| [solver-cascode-mirror.sp](../examples/solver-cascode-mirror.sp) | A cascode current mirror: two columns of three; only the tops of the columns aligned by hand |
-| [solver-pi-follower.sp](../examples/solver-pi-follower.sp) | A pi filter and a source follower: a signal path from left to right through series parts |
+| [solver-cs-amp.sp](../examples/solver-cs-amp.sp) | A common-source stage: one column for the DC path; the input port, the stage, the load capacitor and the output port from left to right, the capacitor level with the transistor; every net routed |
+| [two-stage-amp.sp](../examples/two-stage-amp.sp) | A two-stage op-amp, a five-transistor OTA and a common-source stage: the bias diode, the two branches of the first stage, the second stage and the output port in one order; every net routed, the gates of each mirror facing each other, both inputs alike, the bias of the second stage left to its name |
+| [solver-cascode-mirror.sp](../examples/solver-cascode-mirror.sp) | A cascode current mirror: two columns of three and the output port, every net routed; nothing aligned by hand |
+| [solver-pi-follower.sp](../examples/solver-pi-follower.sp) | A pi filter and a source follower: a signal path from left to right, each block a group, every net routed |
 | [solver-sampler-inverter.sp](../examples/solver-sampler-inverter.sp) | A transmission-gate sampler and an inverter: switches turned sideways by one pin direction, no CURRENT |
