@@ -42,7 +42,7 @@ Four places, the same for every language:
 | Catalogs of short texts and of the site's pages, keyed by the English | `i18n/<lang>/` | `i18n/ja/viewer.json`, `i18n/ja/site/index.html.json` |
 | Whole documents | beside their source, `<name>.<lang>.<ext>` | `spec/rnl-0.3-guide.ja.md`, `spec/rich-netlist.ja.md` |
 | The standard's chapters | `spec/<version>/<lang>/` | `spec/0.3/ja/ch01.md` |
-| An alias package, so that files can be written with the language's own words | `libraries/standard/<series>/rnl-<lang>.rnl` | `libraries/standard/0.3/rnl-zh.rnl` |
+| An alias package, so that files can be written with the language's own words | `libraries/standard/<series>/alias-<lang>.rnl` | `libraries/standard/0.4/alias-zh.rnl` |
 
 The catalogs of the site are named after the file of their English, `i18n/<lang>/site/<path under site/src/>.json`, such as `timeline.json.json` for the timeline and the releases' summaries; the shared messages of `languages.json` are in `i18n/<lang>/site/messages.json`, keyed by their names, such as `intro`, rather than by their English.
 
