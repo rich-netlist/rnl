@@ -66,7 +66,7 @@ class Policy(unittest.TestCase):
     def test_scale_and_diagnostic_caps(self):
         caps=json.loads((prepare_inputs.SOURCE/'manifest.json').read_text(encoding='utf-8'))['caps']
         self.assertEqual(b.profile_cap({'family':'chain'},{'status':'TIMEOUT'},caps),120)
-        self.assertEqual(b.profile_cap({'family':'chain'},{'status':'COMPLETE'},caps),10)
+        self.assertEqual(b.profile_cap({'family':'chain'},{'status':'COMPLETE'},caps),30)
         self.assertEqual(b.off_cap({'family':'chain'},caps),10)
         self.assertEqual(b.off_cap({'case_id':'reviewed-0.4/x.sp'},caps),60)
         self.assertEqual(b.profile_cap({'case_id':'reviewed-0.4/x.sp'},{'status':'TIMEOUT'},caps),60)

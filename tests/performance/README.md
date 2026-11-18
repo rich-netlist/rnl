@@ -102,7 +102,8 @@ empty working directory and no `RNL_SOLVER_CONFIG` override.
   about 4 to 13 seconds for one of them, a level of each within the work. There
   are no retries. Whether an off command took 10 seconds or less is recorded too.
 * Each scale family doubles from n=2. Off has ten seconds. A complete off gets
-  one ten-second on, then continues; the first off timeout gets one diagnostic
+  one on capped at 30 seconds, so that a point near ten seconds still has its
+  profile, then continues; the first off timeout gets one diagnostic
   on capped at 120 seconds, then stops the family. Other off errors mark on
   NOT_RUN and stop the family. n=1024 is a queue guard, not a measured boundary.
 * The cap covers CreateProcess through owned-tree exit, including CLI writeback.

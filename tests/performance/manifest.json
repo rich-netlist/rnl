@@ -15,7 +15,7 @@
   "caps": {
     "representative_seconds": 60,
     "synthetic_off_seconds": 10,
-    "synthetic_profile_seconds": 10,
+    "synthetic_profile_seconds": 30,
     "synthetic_profile_after_timeout_seconds": 120,
     "within_seconds": 10
   },

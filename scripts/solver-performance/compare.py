@@ -85,7 +85,8 @@ def main():
     labels=list(summaries)
     lines+=['','| Point | '+' | '.join(f'{label} off s' for label in labels)+' |','| --- |'+' ---: |'*len(labels)]
     observed={label:{key(p):p for p in summary['pairs']} for label,summary in summaries.items()}
-    for point in sorted({k for pairs in observed.values() for k in pairs},key=str):
+    # n as a number: 2, 4, ..., 1024
+    for point in sorted({k for pairs in observed.values() for k in pairs},key=lambda k:(k[0],k[1],k[2] if len(k)>2 else 0)):
         cells=[]
         for label in labels:
             p=observed[label].get(point)
