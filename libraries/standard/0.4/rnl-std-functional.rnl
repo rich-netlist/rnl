@@ -320,7 +320,7 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.65, 2.65);
   };
 
-  /* A transconductor with a differential input: inp, inn, out. */
+  /* A transconductor with a differential input and a text of key formula, g_m by default: inp, inn, out. */
   $DIFFERENTIAL_TRANSCONDUCTOR = @DEFINE-SYMBOL(box=[-3, -3.9, 3, 3.9]) {
     %inp = (-3, 1) @PIN(terminal="inp", direction="left");
     %inn = (-3, -1) @PIN(terminal="inn", direction="left");
@@ -336,7 +336,7 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 3.85);
   };
 
-  /* A differential-input transconductor with supply pins: inp, inn, out, vp, vn. */
+  /* A differential-input transconductor with supply pins and a text of key formula, g_m by default: inp, inn, out, vp, vn. */
   $DIFFERENTIAL_TRANSCONDUCTOR_SUPPLY = @DEFINE-SYMBOL(box=[-3, -4, 3, 4]) {
     %inp = (-3, 1) @PIN(terminal="inp", direction="left");
     %inn = (-3, -1) @PIN(terminal="inn", direction="left");
@@ -356,7 +356,7 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.65, 2.65);
   };
 
-  /* A differential-input transconductor with supply pins, its inputs swapped (inn above, inp below)
+  /* A differential-input transconductor with supply pins and a text of key formula, g_m by default, its inputs swapped (inn above, inp below)
      and its supplies kept (vp above, vn below), as $DIFFERENTIAL_TRANSCONDUCTOR_SUPPLY turned MX would
      not: inp, inn, out, vp, vn. */
   $DIFFERENTIAL_TRANSCONDUCTOR_INVERTED_SUPPLY = @DEFINE-SYMBOL(box=[-3, -4, 3, 4]) {

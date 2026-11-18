@@ -5,7 +5,7 @@
    Coordinates are y-up; one unit is one grid step, ten Analog Canvas units. The pins of a device
    symbol are named with the standard terminal names of SPICE, in SPICE's order, and bind the
    terminal of that name (6.12, 11.3), so #R1::p is the pin of #R1:p. The transformer takes the
-   terminal order p1 n1 p2 n2; the closed and externally controlled switches take p n cp cn. A
+   terminal order p1 n1 p2 n2; the externally controlled switch takes p n cp and the voltage-controlled switch p n cp cn. A
    one-pin virtual part names its pin pin. The header record tells a solver to mark wire junctions
    with $JUNCTION (SOLVER-CONFIG junction, 14.10). */
 @RNL(type="header") {
@@ -551,11 +551,11 @@
 
   /* ---------------------------------------------------------------- virtual parts, marks and figures (9.4, 12) */
 
-  /* A ground on a net, drawn at a point of its own with its pin facing up, the bars below the pin: on the net 0 it is the three bars alone, and on any other net it shows the name of its net, by the rule at the end of this package. */
+  /* A ground on a net, drawn at a point of its own with its pin facing up at priority low, the bars below the pin: on the net 0 it is the three bars alone, and on any other net it shows the name of its net, by the rule at the end of this package. */
   $GROUND = @DEFINE(roles=[["p", "net"]]) { ? @SELECT-PIN => @ORIENT("up", priority="low"); };
   # @SELECT-USAGE(recursive=true) $GROUND => @SET-SYMBOL $GROUND_SYMBOL;
 
-  /* A supply on a net, drawn at a point of its own with its pin facing down, the bar above the pin. */
+  /* A supply on a net, drawn at a point of its own with its pin facing down at priority low, the bar above the pin. */
   $SUPPLY = @DEFINE(roles=[["p", "net"]]) { ? @SELECT-PIN => @ORIENT("down", priority="low"); };
   # @SELECT-USAGE(recursive=true) $SUPPLY => @SET-SYMBOL $SUPPLY_SYMBOL;
 
@@ -618,7 +618,7 @@
     {? ?at} @ALIGN("y");
   };
 
-  /* A port tag on every port net of a level that does not already have an $IO_PORT, in one column at least 6 units left of the instances of the level, each at R0 with its pin to the right, as rnl-std-fill draws them; the fill then adds none in that level (12.4). */
+  /* A port tag on every port net of a level that does not already have an $IO_PORT, in one column, ordered from the top down and grouped, at least 6 units left of the instances of the level, each at R0 with its pin to the right, all at priority low, as rnl-std-fill draws them; the fill then adds none in that level (12.4). */
   $PORT_LIST = @DEFINE(roles=[]) {
     %port_net_set = # @SELECT-NET(port=true); # @SELECT-NET(port=true) => @REMOVE-FROM $PORT_FILL_SET;
     # @SELECT-USAGE $IO_PORT => @SELECT-NET => @REMOVE-FROM %port_net_set;
@@ -633,7 +633,7 @@
 
   /* ---------------------------------------------------------------- stubs (10.5) */
 
-  /* A ground near a pin, with its own wire: level with the pin or below it, at most gap units away vertically (priority low). */
+  /* A ground near a pin, upright, with its own wire: level with the pin or below it, at most gap units away vertically (priority low). */
   $GROUND_STUB = @DEFINE(roles=[["t", "pin"]], parameters=[["gap", 3]]) {
     %g = $GROUND @ATTACH ?t::net;
     ?t::net @WIRE {?t %g::pin};
@@ -642,7 +642,7 @@
     %g @ORIENT("R0", priority="low");
   };
 
-  /* A supply near a pin, with its own wire: level with the pin or above it, at most gap units away vertically (priority low). */
+  /* A supply near a pin, upright, with its own wire: level with the pin or above it, at most gap units away vertically (priority low). */
   $SUPPLY_STUB = @DEFINE(roles=[["t", "pin"]], parameters=[["gap", 3]]) {
     %s = $SUPPLY @ATTACH ?t::net;
     ?t::net @WIRE {?t %s::pin};
@@ -670,7 +670,7 @@
     %p @UNROUTE-OBJECT(priority="high");
   };
 
-  /* A net label directly on a pin, its one-unit lead serving as the stub's short wire; on a bus pin, one label for the bus. */
+  /* A net label directly on a pin, its one-unit lead serving as the stub's short wire; on a bus pin, one label for the bus; the pin and the label are left unrouted. */
   $NET_LABEL_STUB = @DEFINE(roles=[["t", "pin"]]) {
     %l = $NET_LABEL @ATTACH ?t;
     ?t %l::pin @ORIENT-RELATION("R180");
