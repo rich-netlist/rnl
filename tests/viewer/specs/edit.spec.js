@@ -401,6 +401,25 @@ test.describe("saving", () => {
     expect(file.text.split("\r\n")).toHaveLength(6);
   });
 
+  test("a line left as it was keeps its line end, between two edits of a file with both", async ({ page, viewer }) => {
+    await open(viewer, page);
+    const written = await page.evaluate(async () => {
+      const edits = await import("./edits.js");
+      const at = (path, text, change) => {
+        edits.resetBuffers({ files: [{ path, name: path, text }] });
+        edits.setText(path, change(edits.textOf(path)));
+        return edits.dirty()[0].text;
+      };
+      return [
+        at("mixed.sp", "* A\r\nR1 a 0 1k\nR2 b 0 2k\r\n* last\n.end\r\n", (t) => "* new\n" + t.replace("* last", "* changed")),
+        at("moved.sp", "* A\r\nR1 a 0 1k\nR2 b 0 2k\r\nR3 c 0 3k\n.end\r\n", (t) => t.replace("R1 a 0 1k\n", "").replace("R3 c 0 3k\n", "R3 c 0 3k\nR1 a 0 1k\nR4 d 0 4k\n")),
+      ];
+    });
+    // each untouched line as it was; a line put in the place of one with that one's end, a line added or moved with the most
+    expect(written[0]).toBe("* new\r\n* A\r\nR1 a 0 1k\nR2 b 0 2k\r\n* changed\n.end\r\n");
+    expect(written[1]).toBe("* A\r\nR2 b 0 2k\r\nR3 c 0 3k\nR1 a 0 1k\r\nR4 d 0 4k\r\n.end\r\n");
+  });
+
   test("the shell is given what was read of each file, to look for on disk", async ({ page, viewer }) => {
     await open(viewer, page, "04-hierarchy");
     await showSource(page, "lib.inc");

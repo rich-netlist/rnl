@@ -12,14 +12,26 @@
 // Solve > Settings draws its dialog from, is TABLE below; otherwise it offers the web's commands and the page
 // shows its own menu bar.
 //
+// Solve > Ask to Solve on Open (solve-on-open.js) is off to begin with here, so that a fixture with
+// components not drawn asks nothing of a test that does not test the question: `ask-solve=1` leaves it
+// on, as the page has it. It is put where the page reads it, the browser's storage under the build's
+// prefix or the settings of `settings`, unless a value is there already.
+//
 // A build gives the Document as the real shells' cores do: without the drawings of the objects that
 // have no position, which it keeps and gives on request (`unplacedDrawings`), the fixture having
 // them; a solve's Document carries them, as the desktop's does.
 
 import { fileFormats } from "../formats.js";
 import { sourcePath } from "../source-path.js";
+import { STORAGE_PREFIX } from "../storage-prefix.js";
 
 const params = new URLSearchParams(location.search);
+const askSolve = params.get("ask-solve") === "1";
+if (!askSolve) {
+  try {
+    if (localStorage.getItem(`${STORAGE_PREFIX}solve-on-open`) === null) localStorage.setItem(`${STORAGE_PREFIX}solve-on-open`, "false");
+  } catch { /* no storage */ }
+}
 // the core's parse formats, as Document.formats lists them
 const FORMATS = [
   { name: "spice", title: "SPICE", extensions: [], fallback: true },
@@ -417,6 +429,7 @@ export default {
     loadSettings: async (legacy) => {
       fake.legacy = legacy;
       const values = JSON.parse(sessionStorage.getItem("fake-settings") || JSON.stringify(legacy));
+      if (!askSolve && !Object.hasOwn(values, "solve-on-open")) values["solve-on-open"] = false;
       sessionStorage.setItem("fake-settings", JSON.stringify(values));
       return { path: "/user/config/settings.json", values };
     },

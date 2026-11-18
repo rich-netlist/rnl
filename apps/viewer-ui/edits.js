@@ -2,8 +2,9 @@
 // read, the last saved snapshot, what the editor holds now, and what the Document was built from. The editor
 // (editor.js) changes the text; a change is not applied to the Document until the user says so, and
 // not saved to the file until the user says that. Text is kept with its line ends as `\n`, as a text
-// box gives it, and written with the line ends the file had: each line the edit leaves as it was with its own, a
-// line written in the place of one with that one's, and a line added with the one the file has most of.
+// box gives it, and written with the line ends the file had: each line the edit leaves as it was with its own (found by
+// a diff of the lines), a line written in the place of one with that one's, and a line added with the one the file has
+// most of.
 
 /**
  * @type {Map<string, { name: string, original: string, base: string, text: string, applied: string, eol: string,
@@ -30,25 +31,96 @@ function add(file) {
   buffers.set(file.path, { name: file.name, original: text, base: text, text, applied: text, eol: eolOf(file.text), ends: endsOf(file.text) });
 }
 
+/** The most lines a diff of the lines changes (`common`); past it, the lines between the first and last change pair up in order. */
+const MOST_CHANGES = 2000;
+
 /**
- * The text of a buffer as a file has it: with the line ends the file had (`ends`, those of `original`). The lines
- * before the first one changed and after the last keep their own; each line between has the end of the line between it
- * replaces, the first the first's and so on, and those past them the end the file has most of (`eol`).
+ * The lines `a` and `b` have in common, in their order, as pairs of their indexes: a longest such run (Myers' diff),
+ * or none when it takes more than MOST_CHANGES lines added or taken out.
+ * @param {string[]} a
+ * @param {string[]} b
+ * @returns {[number, number][]}
+ */
+function common(a, b) {
+  const n = a.length, m = b.length, max = n + m;
+  if (!n || !m) return [];
+  const v = new Int32Array(2 * max + 3); // by diagonal k = x - y, at k + max + 1: the furthest x reached on it
+  const at = (k) => k + max + 1;
+  const trace = []; // before each round d, v on the diagonals -d..d, at k + d
+  for (let d = 0; d <= Math.min(max, MOST_CHANGES); d++) {
+    trace.push(v.slice(at(-d), at(d) + 1));
+    for (let k = -d; k <= d; k += 2) {
+      let x = k === -d || (k !== d && v[at(k - 1)] < v[at(k + 1)]) ? v[at(k + 1)] : v[at(k - 1)] + 1;
+      let y = x - k;
+      while (x < n && y < m && a[x] === b[y]) { x++; y++; }
+      v[at(k)] = x;
+      if (x >= n && y >= m) return path(trace, n, m);
+    }
+  }
+  return [];
+}
+
+/** The pairs of lines in common on the path a diff found, going back from its end. */
+function path(trace, n, m) {
+  const pairs = [];
+  let x = n, y = m;
+  for (let d = trace.length - 1; d >= 0; d--) {
+    if (d === 0) {
+      while (x > 0 && y > 0) pairs.push([--x, --y]);
+      break;
+    }
+    const was = trace[d], get = (k) => was[k + d];
+    const k = x - y;
+    const down = k === -d || (k !== d && get(k - 1) < get(k + 1));
+    const pk = down ? k + 1 : k - 1;
+    const px = get(pk), py = px - pk;
+    const sx = down ? px : px + 1, sy = sx - k;
+    while (x > sx && y > sy) pairs.push([--x, --y]);
+    x = px;
+    y = py;
+  }
+  return pairs.reverse();
+}
+
+/** For each line of `now`, the line of `was` it is when the edit left it as it was, else -1. */
+function sameLines(now, was) {
+  const same = new Array(now.length).fill(-1);
+  let head = 0;
+  while (head < now.length && head < was.length && now[head] === was[head]) {
+    same[head] = head;
+    head++;
+  }
+  let tail = 0;
+  while (tail < now.length - head && tail < was.length - head && now[now.length - 1 - tail] === was[was.length - 1 - tail]) {
+    same[now.length - 1 - tail] = was.length - 1 - tail;
+    tail++;
+  }
+  for (const [i, j] of common(now.slice(head, now.length - tail), was.slice(head, was.length - tail))) same[head + i] = head + j;
+  return same;
+}
+
+/**
+ * The text of a buffer as a file has it: with the line ends the file had (`ends`, those of `original`). A line the
+ * edit left as it was keeps its own, wherever it is; between two of them, the lines written have the ends of the lines
+ * there before, the first the first's and so on, and those past them the end the file has most of (`eol`).
  */
 function written(b, text) {
   if (b.ends.every((end) => end === b.eol)) return b.eol === "\n" ? text : text.replace(/\n/g, b.eol);
   const lines = text.split("\n");
   const was = b.original.split("\n");
-  let head = 0;
-  while (head < lines.length - 1 && head < was.length - 1 && lines[head] === was[head]) head++;
-  let tail = 0;
-  while (tail < lines.length - 1 - head && tail < was.length - 1 - head && lines[lines.length - 1 - tail] === was[was.length - 1 - tail]) tail++;
+  const same = sameLines(lines, was);
+  // the line of `was` after the next line left as it was, for each line
+  const until = new Array(lines.length + 1);
+  until[lines.length] = was.length;
+  for (let k = lines.length - 1; k >= 0; k--) until[k] = same[k] >= 0 ? same[k] : until[k + 1];
   let out = "";
+  let next = 0; // the line of `was` the next line written in the place of one replaces
   for (let k = 0; k < lines.length; k++) {
     out += lines[k];
+    let from = same[k];
+    if (from >= 0) next = from + 1;
+    else from = next < until[k] ? next++ : -1;
     if (k === lines.length - 1) break;
-    // (a line between: the k-th of them has the end of the k-th line it replaces, while there is one)
-    const from = lines.length - 1 - k <= tail ? k - lines.length + was.length : k < was.length - tail ? k : -1;
     out += b.ends[from] ?? b.eol;
   }
   return out;
