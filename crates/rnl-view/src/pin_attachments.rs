@@ -146,28 +146,6 @@ fn pin_attachments_expose_parent_chains_without_inheriting_the_field() {
 }
 
 #[test]
-fn pin_attachments_do_not_add_fields_to_old_versions() {
-    for version in ["0.2", "0.3"] {
-        let s = read(
-            version,
-            r#"
-            $S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1) }; #R1 @SET-SYMBOL $S;
-            $INNER = @DEFINE(roles=["t"]) {};
-            $OUTER = @DEFINE(roles=["t"]) { %child = ?t @AS $INNER };
-            %u = #R1:1 @AS $OUTER
-        "#,
-        );
-        let value = serde_json::to_value(s).unwrap();
-        for o in value["levels"][0]["model"]["objects"].as_array().unwrap() {
-            assert!(o.get("pin_of").is_none() && o.get("parent").is_none());
-        }
-        for u in value["drawing"]["levels"][0]["usages"].as_array().unwrap() {
-            assert!(u.get("pin_of").is_none() && u.get("parent").is_none());
-        }
-    }
-}
-
-#[test]
 fn pin_attachments_recognize_all_four_standard_stubs() {
     let imported = read_unchecked("0.4", &format!(r#"@USE-PACKAGE(name="rnl-std-basic"); {SYMBOLS}"#));
     let errors = |s: &Snapshot| {
@@ -254,29 +232,34 @@ fn pin_attachments_expand_converted_set_roles() {
 }
 
 #[test]
-fn pin_attachments_follow_the_creating_file_in_mixed_includes() {
-    for (outer, inner) in [("0.4", "0.3"), ("0.3", "0.4")] {
-        let files = MemoryProvider::new()
-            .with("top.sp", &format!(r#"* mixed
-* @RNL(type="header") {{ @VERSION("{outer}") }}
+fn pin_attachments_reach_a_subcircuit_of_an_included_file() {
+    // a usage written from the main file into a subcircuit that an included file defines
+    let files = MemoryProvider::new()
+        .with(
+            "top.sp",
+            r#"* included
+* @RNL(type="header") { @VERSION("0.4") }
 .include new.sp
-* @RNL(scope="child") {{
-* $S = @DEFINE-SYMBOL {{ (0,0) @PIN(terminal=1) }};
+* @RNL(scope="child") {
+* $S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1) };
 * #R1 @SET-SYMBOL $S;
-* $D = @DEFINE(roles=["t"]) {{}}; %u = #R1:1 @AS $D
-* }}
+* $D = @DEFINE(roles=["t"]) {}; %u = #R1:1 @AS $D
+* }
 .end
-"#))
-            .with("new.sp", &format!("* child\n* @RNL(type=\"header\") {{ @VERSION(\"{inner}\") }}\n.subckt child a b\nR1 a b 1k\n.ends\n"));
-        let options =
-            BuildOptions { runtime: rnl_runtime::Options { std: false, ..Default::default() }, ..Default::default() };
-        let s = crate::snapshot("top.sp", &files, &options, Parts { drawing: true, host: false, model: true }).unwrap();
-        assert!(!s.diagnostics.iter().any(|d| d.severity == "error"), "{:?}", s.diagnostics);
-        let doc = s.drawing.as_ref().unwrap();
-        let usage = doc.levels.iter().flat_map(|l| &l.usages).find(|u| u.id == "%u").unwrap();
-        assert_eq!(usage.pin_of.map(|i| doc.objects[i].name.as_str()), (outer == "0.4").then_some("R1"));
-        let view =
-            s.levels.iter().filter_map(|l| l.model.as_ref()).flat_map(|m| &m.objects).find(|o| o.id == "%u").unwrap();
-        assert_eq!(view.pin_of.as_deref(), (outer == "0.4").then_some("#R1"));
-    }
+"#,
+        )
+        .with(
+            "new.sp",
+            "* child\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child a b\nR1 a b 1k\n.ends\n",
+        );
+    let options =
+        BuildOptions { runtime: rnl_runtime::Options { std: false, ..Default::default() }, ..Default::default() };
+    let s = crate::snapshot("top.sp", &files, &options, Parts { drawing: true, host: false, model: true }).unwrap();
+    assert!(!s.diagnostics.iter().any(|d| d.severity == "error"), "{:?}", s.diagnostics);
+    let doc = s.drawing.as_ref().unwrap();
+    let usage = doc.levels.iter().flat_map(|l| &l.usages).find(|u| u.id == "%u").unwrap();
+    assert_eq!(usage.pin_of.map(|i| doc.objects[i].name.as_str()), Some("R1"));
+    let view =
+        s.levels.iter().filter_map(|l| l.model.as_ref()).flat_map(|m| &m.objects).find(|o| o.id == "%u").unwrap();
+    assert_eq!(view.pin_of.as_deref(), Some("#R1"));
 }

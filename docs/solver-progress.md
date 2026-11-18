@@ -30,7 +30,7 @@ and shows an event or a stage it does not know by its name.
 | `event` | When | Fields |
 | --- | --- | --- |
 | `run` | Before the first level | `progress`: the format version, 1; `levels`: how many levels the run solves |
-| `level` | A level begins | `level`, `title`, `again`; `limit`: `"time"` with `seconds`, `"work"` with `work`, `"seed"` or `"none"`, with the level's own settings applied and its share of `--timeall` |
+| `level` | A level begins | `level`, `title`; `limit`: `"time"` with `seconds`, `"work"` with `work`, `"seed"` or `"none"`, with the level's own settings applied and its share of `--timeall` |
 | `stage` | A level enters a stage | `level`, `stage`, `work`, `elapsed` |
 | `work` | More work | `level`, `stage`, `work`, `elapsed`, `tried`; `fraction`, the share of the limit used from 0 to 1, for a time or a work limit |
 | `best` | A better candidate than any before in the level | `level`, `tried`, `work`, `elapsed`; `cost`, numbers to compare element by element, lower first, with no promised meaning |
@@ -43,8 +43,6 @@ and shows an event or a stage it does not know by its name.
 - **`tried`:** the candidates the solver has taken up so far in the level. It never goes down.
 - **`best` and layouts:** the rows layout tells each better candidate. The tree and lines
   layouts tell their result once, at the end of the layout.
-- **`again`:** whether the level is solved a second time, after its file was raised to a newer
-  version. It goes away with the 0.2 and 0.3 support.
 
 ## Stages
 

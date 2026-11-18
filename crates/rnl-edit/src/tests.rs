@@ -38,13 +38,13 @@ fn a_named_pin_vertex_writes_its_reference_without_turning_it_into_a_terminal() 
 fn every_op_into_a_spice_subcircuit() {
     let level = "subckt:rc_lowpass";
     let ops = json!([
-        {"level": level, "op": "use-package", "name": "rnl-std", "version": "0.3"},
-        {"level": level, "op": "use-package", "name": "rnl-std-no-labels", "version": "0.3"},
-        {"level": level, "op": "use-package", "name": "rnl-std", "version": "0.3"},
-        {"level": level, "op": "set", "object": "#R1", "symbol": "$RES", "at": [19, -16], "orient": "R90"},
+        {"level": level, "op": "use-package", "name": "rnl-std-all", "version": "0.4"},
+        {"level": level, "op": "use-package", "name": "rnl-std-no-labels", "version": "0.4"},
+        {"level": level, "op": "use-package", "name": "rnl-std-all", "version": "0.4"},
+        {"level": level, "op": "set", "object": "#R1", "symbol": "$RESISTOR", "at": [19, -16], "orient": "R90"},
         {"level": "subckt:RC_LOWPASS", "op": "set", "object": "#C1", "at": [29, -22.0000001], "orient": "R0"},
-        {"level": level, "op": "add-usage", "name": "%gnd1", "definition": "$GND", "attach": {"p": "&VSS"},
-         "symbol": "$GROUND", "at": [10, -25], "orient": "R0"},
+        {"level": level, "op": "add-usage", "name": "%gnd1", "definition": "$GROUND", "attach": {"p": "&VSS"},
+         "symbol": "$GROUND_SYMBOL", "at": [10, -25], "orient": "R0"},
         {"level": level, "op": "add-point", "name": "%j1", "at": [11, 2], "junction": true},
         {"level": level, "op": "remove-from", "items": ["&VSS"], "set": "$PORT_FILL_SET"},
         {"level": level, "op": "add-wire", "nets": ["&in"], "mode": "straight",
@@ -61,24 +61,26 @@ fn every_op_into_a_spice_subcircuit() {
         out,
         r#"
 * @RNL(type="header") {
-*   @VERSION("0.3");
-*   @USE-PACKAGE(name="rnl-std", version="0.3");
-*   @USE-PACKAGE(name="rnl-std-no-labels", version="0.3")
+*   @VERSION("0.4");
+*   @USE-PACKAGE(name="rnl-std-all", version="0.4");
+*   @USE-PACKAGE(name="rnl-std-no-labels", version="0.4")
 * }
 .subckt rc_lowpass VSS
 C1 out VSS 10n
 R1 in out 10k
 * @RNL(author="test") {
-*   #R1 @SET-SYMBOL $RES => @PLACE(19, -16) => @ORIENT("R90");
+*   #R1 @SET-SYMBOL $RESISTOR => @PLACE(19, -16) => @ORIENT("R90");
 *   #C1 @PLACE(29, -22) => @ORIENT("R0");
-*   $GND @ATTACH &VSS(p) => @SET-SYMBOL $GROUND => @PLACE(10, -25) => @ORIENT("R0") => %gnd1;
+*   $GROUND @ATTACH &VSS(p) => @SET-SYMBOL $GROUND_SYMBOL => @PLACE(10, -25) => @ORIENT("R0") => %gnd1;
 *   %j1 = (11, 2);
-*   $JUNCTION @ATTACH %j1;
 *   &VSS @REMOVE-FROM $PORT_FILL_SET;
 *   &in @WIRE(mode="straight") {#R1:1 (10, -16) %j1 %gnd1:p};
 *   #R1 @TEXT("\textit{R}_{1}", key="name", dx=1, dy=-0.5, halign="start", size=1.5116);
 *   (4.5, -5) @TEXT("\textbf{a\_b \{c\} \$x\% \& \# \^ \textbackslash{} ""q""}", size=1.5116);
 *   &out @TEXT("\textit{out}", size=1.5116) => @PLACE(26, -15)
+* }
+* @RNL(author="test") {
+*   $JUNCTION @ATTACH %j1
 * }
 .ends rc_lowpass
 "#
@@ -89,13 +91,13 @@ R1 in out 10k
 fn spectre_with_its_carrier_and_a_short_header() {
     let net = "simulator lang=spectre\n\nsubckt top (a b)\nR1 (a b) resistor r=1k\nends top\n";
     let ops = json!([
-        {"level": "subckt:top", "op": "use-package", "name": "rnl-std", "version": "0.3"},
-        {"level": "subckt:top", "op": "set", "object": "#R1", "symbol": "$RES", "at": [0, 0]}
+        {"level": "subckt:top", "op": "use-package", "name": "rnl-std-all", "version": "0.4"},
+        {"level": "subckt:top", "op": "set", "object": "#R1", "symbol": "$RESISTOR", "at": [0, 0]}
     ]);
     let out = write(&request("spectre", net, ops)).unwrap();
     assert_eq!(
         out,
-        "simulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.3\")}\n\nsubckt top (a b)\nR1 (a b) resistor r=1k\n// @RNL(author=\"test\") {\n//   #R1 @SET-SYMBOL $RES => @PLACE(0, 0)\n// }\nends top\n"
+        "simulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\")}\n\nsubckt top (a b)\nR1 (a b) resistor r=1k\n// @RNL(author=\"test\") {\n//   #R1 @SET-SYMBOL $RESISTOR => @PLACE(0, 0)\n// }\nends top\n"
     );
     // Spectre names are case-sensitive
     let wrong = json!([{"level": "subckt:TOP", "op": "set", "object": "#R1", "at": [0, 0]}]);
@@ -109,7 +111,7 @@ fn the_file_level_line_endings_and_a_missing_last_newline() {
     let out = write(&request("spice", net, ops)).unwrap();
     assert_eq!(
         out,
-        "* title\r\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\r\nR1 a 0 1k\r\n* @RNL(author=\"test\") {\r\n*   #R1 @PLACE(1, 2)\r\n* }\r\n.end"
+        "* title\r\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\r\nR1 a 0 1k\r\n* @RNL(author=\"test\") {\r\n*   #R1 @PLACE(1, 2)\r\n* }\r\n.end"
     );
     // without .end the record goes at the end of the file
     let out = write(&request(
@@ -118,19 +120,19 @@ fn the_file_level_line_endings_and_a_missing_last_newline() {
         json!([{"level": "file:x", "op": "set", "object": "#R1", "at": [0, 0]}]),
     ))
     .unwrap();
-    assert_eq!(out, "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\n* @RNL(author=\"test\") {\n*   #R1 @PLACE(0, 0)\n* }\n");
+    assert_eq!(out, "* title\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\nR1 a 0 1k\n* @RNL(author=\"test\") {\n*   #R1 @PLACE(0, 0)\n* }\n");
 }
 
 #[test]
 fn the_header_goes_after_what_continues_line_one() {
     let out = write(&request("spice", "title\n+ more of it\nR1 a 0 1k\n", json!([]))).unwrap();
-    assert_eq!(out, "title\n+ more of it\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\n");
+    assert_eq!(out, "title\n+ more of it\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\nR1 a 0 1k\n");
     let out =
         write(&request("spectre", "simulator lang=spectre \\\n  insensitive=no\nR1 (a b) resistor r=1k\n", json!([])))
             .unwrap();
-    assert_eq!(out, "simulator lang=spectre \\\n  insensitive=no\n// @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 (a b) resistor r=1k\n");
+    assert_eq!(out, "simulator lang=spectre \\\n  insensitive=no\n// @RNL(type=\"header\") { @VERSION(\"0.4\")}\nR1 (a b) resistor r=1k\n");
     // an empty netlist still keeps line 1 for the title
-    assert_eq!(write(&request("spice", "", json!([]))).unwrap(), "\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n");
+    assert_eq!(write(&request("spice", "", json!([]))).unwrap(), "\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n");
 }
 
 #[test]
@@ -142,7 +144,7 @@ fn a_netlist_saved_under_a_name_is_read_as_that_file() {
     let saved = |netlist: &str, file: Option<&str>| {
         write(&WriteRequest { file: file.map(String::from), ..request("spectre", netlist, ops.clone()) }).unwrap()
     };
-    let header = "@RNL(type=\"header\") { @VERSION(\"0.3\")}";
+    let header = "@RNL(type=\"header\") { @VERSION(\"0.4\")}";
     let record = |m: &str| format!("{m} @RNL(author=\"test\") {{\n{m}   #R1 @PLACE(0, 0)\n{m} }}\n");
     let first = "* title\nsimulator lang=spectre\nR1 (a 0) resistor r=1k\n";
     assert_eq!(
@@ -209,7 +211,7 @@ fn an_edit_on_a_file_that_is_not_a_netlist_is_refused() {
 
 #[test]
 fn an_edit_on_a_package_file_is_refused_and_a_netlist_named_rnl_is_written() {
-    let package = "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"acme\", version=\"1.0\")}\n";
+    let package = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"acme\", version=\"1.0\")}\n";
     let ops = json!([{"level": "file:acme.pkg", "op": "add-text", "at": [0, 0], "markup": "x"}]);
     let r = WriteRequest { file: Some("acme.pkg".into()), ..request("rnl", package, ops) };
     assert_eq!(
@@ -220,7 +222,7 @@ fn an_edit_on_a_package_file_is_refused_and_a_netlist_named_rnl_is_written() {
     let ops = json!([{"level": "subckt:rc_lowpass", "op": "set", "object": "#R1", "at": [0, 0]}]);
     let r = WriteRequest { file: Some("rc.rnl".into()), ..request("spice", RC, ops) };
     let out = write(&r).unwrap();
-    assert!(out.contains("\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n"), "{out}");
+    assert!(out.contains("\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n"), "{out}");
     assert!(out.contains("\n* @RNL(author="), "{out}");
 }
 
@@ -321,7 +323,7 @@ fn in_a_spice_section_of_a_spectre_netlist_a_record_is_carried_by_a_star() {
     let out = write(&request("spectre", net, ops)).unwrap();
     assert_eq!(
         out,
-        "// t\n// @RNL(type=\"header\") { @VERSION(\"0.3\")}\nsimulator lang=spice\n.subckt cell a b\nR1 a b 1k\n\
+        "// t\n// @RNL(type=\"header\") { @VERSION(\"0.4\")}\nsimulator lang=spice\n.subckt cell a b\nR1 a b 1k\n\
          * @RNL(author=\"test\") {\n*   #R1 @PLACE(0, 0)\n* }\n.ends cell\nsimulator lang=spectre\nX1 (n1 n2) cell\n\
          // @RNL(author=\"test\") {\n//   #X1 @PLACE(0, 0)\n// }\n"
     );
@@ -382,8 +384,7 @@ fn structured_math_preserves_roots_scripts_fractions_and_upright_runs() {
     for source in [r"\(g_m=2\mathrm{V}\)", r"\(\sqrt{x^2+\frac{a}{b}}\)", r"\textbf{\(\sqrt{x_1}\)}"] {
         let lines: Vec<_> = markup::parse_with_name_formats(source, true).iter().map(|l| ours(l)).collect();
         let content = crate::ops::TextContent::Lines(lines.clone());
-        form::check_math_content(&content, "0.4").unwrap();
-        assert!(form::check_math_content(&content, "0.3").unwrap_err().contains("language_version 0.4"));
+        form::check_math_content(&content).unwrap();
         assert!(markup::problems_with_name_formats(&form::markup(&lines), true).is_empty());
     }
 }
@@ -392,7 +393,7 @@ fn structured_math_preserves_roots_scripts_fractions_and_upright_runs() {
 fn structured_math_refuses_to_drop_literal_spaces_or_styles() {
     let input = markup::expand_math(r"\(\sqrt{${value}}\)", |_| "A B".into());
     let lines = markup::parse_with_name_formats(&input, true).iter().map(|l| ours(l)).collect();
-    let error = form::check_math_content(&crate::ops::TextContent::Lines(lines), "0.4").unwrap_err();
+    let error = form::check_math_content(&crate::ops::TextContent::Lines(lines)).unwrap_err();
     assert!(error.contains("original markup"));
 }
 
@@ -405,7 +406,6 @@ fn structured_math_json_requires_draft_output_and_writes_a_formula() {
         ]}
     ]]}]);
     let mut req = request("spice", "\nR1 a b 1k\n", ops);
-    assert!(write(&req).unwrap_err().contains("language_version 0.4"));
     req.language_version = Some("0.4".into());
     let written = write(&req).unwrap();
     assert!(written.contains(r"\(\sqrt{x^{\mathrm{2}}}\)"), "{written}");
@@ -417,6 +417,7 @@ fn what_it_writes_interprets_without_errors() {
     let net = "\n.subckt amp in out VSS\nR1 in out 10k\nC1 out VSS 1p\n.ends amp\n";
     let level = "subckt:amp";
     let ops = json!([
+        {"level": level, "op": "use-package", "name": "rnl-std-basic", "version": "0.4"},
         {"level": level, "op": "set", "object": "#R1", "symbol": "$RESISTOR", "at": [4, 0], "orient": "R90"},
         {"level": level, "op": "set", "object": "#C1", "at": [8, -4]},
         {"level": level, "op": "add-usage", "name": "%gnd1", "definition": "$GROUND", "attach": {"p": "&VSS"}, "at": [8, -8]},
@@ -435,12 +436,14 @@ fn what_it_writes_interprets_without_errors() {
     assert!(loud.is_empty(), "{out}\n{}", loud.join("\n"));
 }
 
-/// How the model draws the label `name` of the usage `%p1`, a port, after the ops are written and
-/// read: its alignments and rotation, and the statement that wrote it.
+/// How the model draws the label `netname` of the usage `%p1`, a port, after the ops are written and
+/// read: its alignments and rotation, and the statement that wrote it. The net of a port is a port
+/// of its level, here of the subcircuit `cell`.
 fn port_label(label: Option<Value>) -> (String, String, f64, String) {
-    let net = "* port\nR1 a 0 1k\n.end\n";
+    let net = "* port\n.subckt cell a\nR1 a 0 1k\n.ends cell\n.end\n";
     let mut ops = vec![
-        json!({"level": "file", "op": "add-usage", "name": "%p1", "definition": "$IO_PORT", "attach": {"p": "&a"}, "at": [0, 0]}),
+        json!({"level": "subckt:cell", "op": "use-package", "name": "rnl-std-basic", "version": "0.4"}),
+        json!({"level": "subckt:cell", "op": "add-usage", "name": "%p1", "definition": "$IO_PORT", "attach": {"p": "&a"}, "at": [0, 0]}),
     ];
     ops.extend(label);
     let out = write(&request("spice", net, Value::Array(ops))).unwrap();
@@ -451,20 +454,21 @@ fn port_label(label: Option<Value>) -> (String, String, f64, String) {
         r.diagnostics().iter().filter(|d| d.severity != Severity::Hint).map(|d| r.sink.render(d)).collect();
     assert!(loud.is_empty(), "{out}\n{}", loud.join("\n"));
     let texts = r.model.levels.iter().flat_map(|l| &l.texts);
-    let name = texts.into_iter().find(|t| t.attach.as_deref() == Some("%p1") && t.key.as_deref() == Some("name"));
-    let t = name.unwrap_or_else(|| panic!("the port has no label `name`:\n{out}"));
+    let name = texts.into_iter().find(|t| t.attach.as_deref() == Some("%p1") && t.key.as_deref() == Some("netname"));
+    let t = name.unwrap_or_else(|| panic!("the port has no label `netname`:\n{out}"));
     let written = out.lines().find(|l| l.contains("@TEXT")).unwrap_or_default().trim_start_matches('*').trim();
     (t.halign.clone(), t.valign.clone(), t.rotate, written.to_string())
 }
 
 #[test]
 fn a_text_with_a_key_keeps_the_alignment_and_rotation_it_was_given() {
-    // the label `name` of a port is the symbol's: right-aligned and centred vertically. A statement
+    // the label `netname` of a port is the symbol's: right-aligned and centred vertically. A statement
     // with the key overrides it parameter by parameter, and a parameter it leaves out stays the
     // symbol's (13.3, 8.4), so a request that gives start, baseline and no rotation, which are the
     // defaults of a text without a key, has to have them written
     let label = |extra: Value| {
-        let mut op = json!({"level": "file", "op": "add-text", "attach": "%p1", "key": "name", "markup": "a"});
+        let mut op =
+            json!({"level": "subckt:cell", "op": "add-text", "attach": "%p1", "key": "netname", "markup": "a"});
         op.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
         Some(op)
     };
@@ -473,7 +477,7 @@ fn a_text_with_a_key_keeps_the_alignment_and_rotation_it_was_given() {
     assert_eq!((h.as_str(), v.as_str(), r), ("end", "middle", 0.0));
     let (h, v, r, written) = port_label(label(json!({"halign": "start", "valign": "baseline", "rotate": 0})));
     assert_eq!((h.as_str(), v.as_str(), r), ("start", "baseline", 0.0), "{written}");
-    assert!(written.contains(r#"key="name", halign="start", valign="baseline", rotate=0)"#), "{written}");
+    assert!(written.contains(r#"key="netname", halign="start", valign="baseline", rotate=0)"#), "{written}");
     // each on its own: the others stay the symbol's
     let (h, v, r, _) = port_label(label(json!({"halign": "start"})));
     assert_eq!((h.as_str(), v.as_str(), r), ("start", "middle", 0.0));
@@ -506,14 +510,17 @@ fn a_text_without_a_key_leaves_out_what_is_the_default() {
 
 #[test]
 fn a_usage_reads_back_with_the_roles_of_the_request() {
-    // by order alone the objects would fill the roles of $DIFFERENTIAL_PAIR in its own order, in_p
-    // then in_n, whatever roles the request gave them (9.4); with its role, each fills its own
+    // by order alone the objects would fill the roles of $PSEUDO_DIFFERENTIAL_PAIR in its own order, left
+    // then right, whatever roles the request gave them (9.4); with its role, each fills its own
     let net = "* pair\nM1 a g 0 0 nch\nM2 b g 0 0 nch\n.end\n";
     let pair = |attach: Value| {
         request(
             "spice",
             net,
-            json!([{"level": "file", "op": "add-usage", "name": "%m", "definition": "$DIFFERENTIAL_PAIR", "attach": attach}]),
+            json!([
+                {"level": "file", "op": "add-usage", "name": "%m", "definition": "$PSEUDO_DIFFERENTIAL_PAIR", "attach": attach},
+                {"level": "file", "op": "use-package", "name": "rnl-std-semantics", "version": "0.4"}
+            ]),
         )
     };
     let read = |out: &str| {
@@ -525,8 +532,8 @@ fn a_usage_reads_back_with_the_roles_of_the_request() {
         r.diagnostics().iter().filter(|d| d.severity == Severity::Error).map(|d| r.sink.render(d)).collect()
     };
     for (attach, written) in [
-        (json!({"in_n": "#M2", "in_p": "#M1"}), "$DIFFERENTIAL_PAIR @ATTACH #M2(in_n) #M1(in_p) => %m"),
-        (json!({"in_p": "#M1", "in_n": "#M2"}), "$DIFFERENTIAL_PAIR @ATTACH #M1(in_p) #M2(in_n) => %m"),
+        (json!({"right": "#M2", "left": "#M1"}), "$PSEUDO_DIFFERENTIAL_PAIR @ATTACH #M2(right) #M1(left) => %m"),
+        (json!({"left": "#M1", "right": "#M2"}), "$PSEUDO_DIFFERENTIAL_PAIR @ATTACH #M1(left) #M2(right) => %m"),
     ] {
         let out = write(&pair(attach)).unwrap();
         assert!(out.contains(&format!("*   {written}\n")), "{out}");
@@ -534,21 +541,21 @@ fn a_usage_reads_back_with_the_roles_of_the_request() {
         assert!(errors(&r).is_empty(), "{out}\n{}", errors(&r).join("\n"));
         let m = r.model.levels.iter().flat_map(|lv| &lv.objects).find(|o| o.id == "%m").unwrap();
         let filled = |role: &str| m.attach.iter().find(|(r, _)| r == role).map(|(_, a)| a.clone());
-        assert_eq!(filled("in_p"), Some(Attach::Object("#M1".into())), "{out}");
-        assert_eq!(filled("in_n"), Some(Attach::Object("#M2".into())), "{out}");
+        assert_eq!(filled("left"), Some(Attach::Object("#M1".into())), "{out}");
+        assert_eq!(filled("right"), Some(Attach::Object("#M2".into())), "{out}");
     }
     // a role the definition lacks fails when the netlist is read, instead of filling another
-    let out = write(&pair(json!({"in": "#M1", "in_n": "#M2"}))).unwrap();
-    assert!(out.contains("*   $DIFFERENTIAL_PAIR @ATTACH #M1(in) #M2(in_n) => %m\n"), "{out}");
+    let out = write(&pair(json!({"in": "#M1", "right": "#M2"}))).unwrap();
+    assert!(out.contains("*   $PSEUDO_DIFFERENTIAL_PAIR @ATTACH #M1(in) #M2(right) => %m\n"), "{out}");
     let r = read(&out);
     assert!(
-        errors(&r).iter().any(|e| e.contains("the ordinary definition $DIFFERENTIAL_PAIR has no role in (9.4)")),
+        errors(&r).iter().any(|e| e.contains("the ordinary definition $PSEUDO_DIFFERENTIAL_PAIR has no role in (9.4)")),
         "{out}"
     );
     // a role that is not an ASCII name is written in quotes, the name itself (16.5); one that no
     // name can be is refused
     let out = write(&pair(json!({"1st": "#M1", "the out": "#M2"}))).unwrap();
-    assert!(out.contains(r#"*   $DIFFERENTIAL_PAIR @ATTACH #M1("1st") #M2("the out") => %m"#), "{out}");
+    assert!(out.contains(r#"*   $PSEUDO_DIFFERENTIAL_PAIR @ATTACH #M1("1st") #M2("the out") => %m"#), "{out}");
     assert_eq!(write(&pair(json!({"": "#M1"}))).unwrap_err(), r#"op 0 (add-usage): `attach` role "" is not a name"#);
 }
 
@@ -569,23 +576,26 @@ fn read_roles(out: &str, record: &str) -> (Vec<String>, Vec<(String, Attach)>) {
 
 #[test]
 fn a_set_role_is_written_with_its_members_in_braces() {
-    // ref and out of $CURRENT_MIRROR are set roles (9.4): a list of members, none, one or several
+    // ref and out of $CURRENT_MIRROR_N are set roles (9.4): a list of members, none, one or several
     let mirror = |attach: Value| {
         request(
             "spice",
             FOUR,
-            json!([{"level": "file", "op": "add-usage", "name": "%m", "definition": "$CURRENT_MIRROR", "attach": attach}]),
+            json!([
+                {"level": "file", "op": "add-usage", "name": "%m", "definition": "$CURRENT_MIRROR_N", "attach": attach},
+                {"level": "file", "op": "use-package", "name": "rnl-std-semantics", "version": "0.4"}
+            ]),
         )
     };
     let out = write(&mirror(json!({"ref": ["#M1", "#M3"], "out": ["#M2"]}))).unwrap();
-    assert!(out.contains("*   $CURRENT_MIRROR @ATTACH {#M1 #M3}(ref) {#M2}(out) => %m\n"), "{out}");
+    assert!(out.contains("*   $CURRENT_MIRROR_N @ATTACH {#M1 #M3}(ref) {#M2}(out) => %m\n"), "{out}");
     let (errors, attach) = read_roles(&out, "");
     assert!(errors.is_empty(), "{out}\n{errors:?}");
     let set = |ids: &[&str]| Attach::Set(ids.iter().map(|id| Attach::Object(id.to_string())).collect());
     assert_eq!(attach, [("ref".to_string(), set(&["#M1", "#M3"])), ("out".to_string(), set(&["#M2"]))]);
     // none, written as an empty set; a single id stays a role of one
     let out = write(&mirror(json!({"ref": [], "out": "#M2"}))).unwrap();
-    assert!(out.contains("*   $CURRENT_MIRROR @ATTACH {}(ref) #M2(out) => %m\n"), "{out}");
+    assert!(out.contains("*   $CURRENT_MIRROR_N @ATTACH {}(ref) #M2(out) => %m\n"), "{out}");
     let (errors, attach) = read_roles(&out, "");
     assert!(errors.is_empty(), "{out}\n{errors:?}");
     assert_eq!(attach, [("ref".to_string(), set(&[])), ("out".to_string(), set(&["#M2"]))]);
@@ -655,7 +665,7 @@ fn graphics_and_a_symbol_in_the_file_level() {
     assert_eq!(
         out,
         r##"
-* @RNL(type="header") { @VERSION("0.3")}
+* @RNL(type="header") { @VERSION("0.4")}
 .subckt top a b
 X1 a b blk
 * @RNL(author="test") {
@@ -754,6 +764,7 @@ fn a_long_text_breaks_between_its_parameters() {
 fn several_items_of_add_to_and_remove_from_are_one_set() {
     let level = "subckt:rc_lowpass";
     let ops = json!([
+        {"level": level, "op": "use-package", "name": "rnl-std-basic", "version": "0.4"},
         {"level": level, "op": "remove-from", "items": ["&in", "&VSS"], "set": "$PORT_FILL_SET"},
         {"level": level, "op": "add-to", "items": ["&VSS"], "set": "$GROUND_NET_SET"}
     ]);
@@ -814,7 +825,7 @@ fn an_orientation_given_is_written_r0_too() {
 
 /// A package of the tests of parameters: a definition that draws nothing, with a parameter of each
 /// kind of literal, and three of analog-canvas-extensions 0.2 as that package writes them.
-const PARAMS_PACKAGE: &str = r#"@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="params-test", version="0.1")}
+const PARAMS_PACKAGE: &str = r#"@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="params-test", version="0.1")}
 @RNL {
   $NOTE = @DEFINE(roles=[["dev", "instance"]], parameters=[["s", ""], ["n", 1], ["on", false], ["pts", []]]) {};
   $CANVAS_NAME = @DEFINE(roles=[["part", "instance"]], parameters=["name"]) {};
@@ -913,7 +924,7 @@ fn a_parameter_the_definition_lacks_fails_as_a_written_one_does() {
     let mut files = MemoryProvider::new()
         .with(
             entry("spice"),
-            "* params\nR1 a 0 1k\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"params-test\", version=\"0.1\")}\n\
+            "* params\nR1 a 0 1k\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"params-test\", version=\"0.1\")}\n\
              * @RNL { #R1 @PLACE(0, 0); $CANVAS_NAME @ATTACH(nmae=\"M1\") #R1(part) => %u }\n.end\n",
         )
         .with("pkgs/params-test.rnl", PARAMS_PACKAGE);
@@ -975,6 +986,7 @@ fn a_style_is_written_as_a_definition_that_set_style_gives_and_reads_back_as_giv
     let (out, diagnostics, levels) = written_and_snapshot(
         net,
         json!([
+            {"level": "file", "op": "use-package", "name": "rnl-std-all", "version": "0.4"},
             {"level": "file", "op": "set", "object": "#R1", "style": blue, "at": [0, 0]},
             // the same properties in another order are the same style
             {"level": "file", "op": "set", "object": "#R2", "style": {"textcolor": "#2275e2", "linecolor": "#2275e2"}, "at": [4, 0]},
@@ -1088,7 +1100,6 @@ fn independent_pin_names_bus_shape_and_unbound_pins_round_trip_in_0_4() {
         {"level":"file","op":"set","object":"#R1","symbol":"$S"}
     ]);
     let mut req = request("spice", "* pins\nR1 a b 1k\n.end\n", ops);
-    assert!(write(&req).unwrap_err().contains("language_version 0.4"));
     req.language_version = Some("0.4".into());
     let out = write(&req).unwrap();
     assert!(out.contains("@VERSION(\"0.4\")"), "{out}");
@@ -1154,7 +1165,6 @@ fn upright_and_fractional_rotation_write_back_explicitly() {
         let ops =
             json!([{"level":"file", "op":"add-text", "at":[0,0], "markup":"arrow", "upright":upright, "rotate":30.5}]);
         let mut req = request("spice", "* text\n.end\n", ops);
-        assert!(write(&req).is_err());
         req.language_version = Some("0.4".into());
         let out = write(&req).unwrap();
         assert!(out.contains(&format!("upright={upright}")), "{out}");
@@ -1180,7 +1190,6 @@ fn fixed_rotation_round_trips_explicit_false_over_a_symbol_label() {
     for fixed in [true, false] {
         let ops = json!([{"level":"file", "op":"add-text", "attach":"#R1", "key":"name", "markup":"new", "fix_rotate":fixed}]);
         let mut req = request("spice", net, ops.clone());
-        assert!(write(&req).unwrap_err().contains("language_version 0.4"));
         req.language_version = Some("0.4".into());
         let out = write(&req).unwrap();
         assert!(out.contains(&format!("fix_rotate={fixed}")), "{out}");
@@ -1248,7 +1257,7 @@ fn binding_warnings(out: &str) -> usize {
     let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options { std: false, ..Options::default() })
         .unwrap();
     assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{out}");
-    r.diagnostics().iter().filter(|d| d.code.number().as_deref() == Some("RNL4119")).count()
+    r.diagnostics().iter().filter(|d| d.code.number() == "RNL4119").count()
 }
 
 #[test]
@@ -1286,15 +1295,13 @@ fn terminals_of_a_usage_and_a_host_terminal_by_name_are_written() {
 }
 
 #[test]
-fn terminals_need_the_language_0_4_a_symbol_and_pairs() {
+fn terminals_need_a_symbol_and_pairs() {
     let set = |extra: Value| {
         let mut op = json!({"level": "subckt:top", "op": "set", "object": "#X1", "symbol": "$S", "at": [0, 0]});
         op.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
         json!([op])
     };
     let mut req = request("spice", CALL, set(json!({"terminals": [[1, "d"]]})));
-    assert!(write(&req).unwrap_err().contains("terminals"), "released output refuses it");
-    assert!(write(&req).unwrap_err().contains("language_version 0.4"));
     req.language_version = Some("0.4".into());
     assert!(write(&req).is_ok());
     // an empty list is no terminals
@@ -1351,7 +1358,6 @@ C1 a b 1n
          "action": {"op": "add-text", "markup": "x", "key": "value", "halign": "end", "offset": [1, -2], "size": 1.5}}
     ]);
     let mut req = request("spice", net, ops);
-    assert!(write(&req).unwrap_err().contains("language_version 0.4"));
     req.language_version = Some("0.4".into());
     let out = write(&req).unwrap();
     assert!(out.contains("# @SELECT-INSTANCE(name=\"R*\") => @TEXT(\"\", key=\"name\")"), "{out}");
@@ -1423,10 +1429,6 @@ fn a_rule_of_the_file_sets_the_symbol_of_the_dots_of_a_subcircuit_as_well() {
     assert_eq!(junction.definition, "$JUNCTION", "{out}");
     let symbol = junction.symbol.as_deref().expect("the dot's symbol");
     assert!(symbol.contains("大点"), "the dot of the subcircuit is drawn with the rule's symbol: {symbol}");
-    // the language 0.3 has no rules
-    let mut old = request("spice", RC, json!([ops[2].clone()]));
-    old.language_version = None;
-    assert!(write(&old).unwrap_err().contains("language_version 0.4"));
 }
 
 #[test]
@@ -1550,7 +1552,6 @@ fn an_annotation_is_written_at_a_point_or_on_an_object_and_reads_back() {
         {"level": "file", "op": "add-annotation", "attach": "#R1", "source": "$ARROW", "rotate": 0, "mirror": false},
     ]);
     let mut req = request("spice", net, ops);
-    assert!(write(&req).unwrap_err().contains("(add-annotation): requires language_version 0.4"));
     req.language_version = Some("0.4".into());
     let out = write(&req).unwrap();
     assert!(
@@ -1624,7 +1625,6 @@ fn a_device_is_declared_in_the_header_and_reads_back() {
         {"op": "declare-device", "level": "file", "name": "X2", "terminals": ["p", "n"]},
     ]);
     let mut req = request("spice", net, ops);
-    assert!(write(&req).unwrap_err().contains("(declare-device): requires language_version 0.4"));
     req.language_version = Some("0.4".into());
     let out = write(&req).unwrap();
     let header = r#"@RNL(type="header") {
@@ -1674,4 +1674,16 @@ fn a_device_that_says_nothing_or_names_a_terminal_twice_is_refused() {
     assert!(why(json!({"model": "cell", "terminals": ["d", "D"]})).contains("names `D` twice"));
     let spectre = device(json!({"model": "cell", "terminals": ["d", "D"]}));
     assert!(refused("spectre", spectre).is_none());
+}
+
+#[test]
+fn the_writer_writes_only_0_4() {
+    let mut req = request("spice", RC, json!([]));
+    assert!(write(&req).unwrap().contains("@VERSION(\"0.4\")"));
+    for version in ["0.2", "0.3", "0.5"] {
+        req.language_version = Some(version.into());
+        let refused = write(&req).unwrap_err();
+        assert!(refused.contains(&format!("unsupported output language version `{version}`")), "{refused}");
+        assert!(refused.contains("this writer writes only 0.4"), "{refused}");
+    }
 }

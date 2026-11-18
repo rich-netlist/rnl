@@ -123,7 +123,7 @@ fn math_runs(list: &[Run], outer: RunStyle) -> String {
 
 /// A structured formula must have an exact textual representation. For example, an expanded
 /// attribute with spaces needs its original markup; silently dropping its spaces is not an edit.
-pub(crate) fn check_math_content(content: &TextContent, version: &str) -> Result<(), String> {
+pub(crate) fn check_math_content(content: &TextContent) -> Result<(), String> {
     fn has_math(runs: &[Run]) -> bool {
         runs.iter().any(|run| match run {
             Run::Text { style, .. } => style.upright,
@@ -166,9 +166,6 @@ pub(crate) fn check_math_content(content: &TextContent, version: &str) -> Result
     let TextContent::Lines(lines) = content else { return Ok(()) };
     if !lines.iter().any(|line| has_math(line)) {
         return Ok(());
-    }
-    if version != "0.4" {
-        return Err("structured math requires language_version 0.4".into());
     }
     let text = markup(lines);
     let parsed = rnl_runtime::markup::parse_with_name_formats(&text, true);
@@ -333,18 +330,8 @@ pub fn statements(op: &Op, style: Option<&str>) -> Vec<String> {
 }
 
 /// Statements with the junction definition resolved by the caller in the target level (13.2).
-/// None writes points without dots. Use this entry for draft 0.4.
+/// None writes points without dots. A wire on no net is written on the empty node (6.3, 13.1).
 pub fn statements_with_junction(op: &Op, style: Option<&str>, definition: Option<&str>) -> Vec<String> {
-    statements_for_language(op, style, definition, false)
-}
-
-/// The modern writer can express a wire on no net with the empty node (6.3, 13.1).
-pub(crate) fn statements_for_language(
-    op: &Op,
-    style: Option<&str>,
-    definition: Option<&str>,
-    modern: bool,
-) -> Vec<String> {
     match op {
         Op::Set { object, symbol, terminals, at, orient, .. } => {
             let mut facts: Vec<String> = symbol.iter().map(|s| set_symbol(s, terminals)).collect();
@@ -392,7 +379,7 @@ pub(crate) fn statements_for_language(
                 .collect();
             // several nets are one set, which the net slot takes whole: a bus (5.2.1, 13.1)
             let nets = match nets.as_slice() {
-                [] if modern => "&".into(),
+                [] => "&".into(),
                 [one] => one.clone(),
                 _ => format!("{{{}}}", nets.join(" ")),
             };

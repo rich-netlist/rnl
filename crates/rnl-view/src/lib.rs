@@ -66,7 +66,7 @@ pub use snapshot::{
 include!(concat!(env!("OUT_DIR"), "/bundled.rs"));
 
 /// The directory of the bundled packages, as the runtime names it. Each version of the standard
-/// series has a directory of its own in it, as in `libraries/standard`, such as `<bundled>/0.2`.
+/// series has a directory of its own in it, as in `libraries/standard`, such as `<bundled>/0.4`.
 /// Extension and PDK packages are supplied by the frontend or its search paths.
 pub const BUNDLED_DIR: &str = "<bundled>";
 
@@ -83,8 +83,7 @@ pub fn bundled() -> MemoryProvider {
     p
 }
 
-/// The bundled package files of a draft series, by their paths in [`bundled`], such as
-/// `<bundled>/0.4/rnl-std.rnl`: those written in a language version newer than the tool's default
+/// The bundled package files of a draft series, by their paths in [`bundled`]: those written in a language version newer than the tool's default
 /// (16.1), whose standard is not released yet. A frontend that lists the bundled packages, as the
 /// desktop viewer does, leaves them out, as the web viewer's library does; the core reads them all
 /// the same, so a file of that version uses them (16.3).
@@ -625,7 +624,7 @@ mod tests {
     const NETLIST: &str = "* untitled
 R1 a 0 1k
 C1 a 0 1p
-* @RNL(type=\"header\") { @VERSION(\"0.2\")}
+* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\")}
 * @RNL {
 *   #R1 @PLACE(0, 0);
 *   #C1 @PLACE(4, 0)
@@ -652,7 +651,7 @@ C1 a 0 1p
         // a block as an editor draws it: pins one unit outside its body, a lead from each to it
         let netlist = "* block
 X1 a b blk
-* @RNL(type=\"header\") { @VERSION(\"0.2\")}
+* @RNL(type=\"header\") { @VERSION(\"0.4\")}
 * @RNL {
 *   $blk = @DEFINE-SYMBOL(box=[-3, -2, 3, 2]) {
 *     (-3, 0) @PIN(terminal=1, label=\"IN\", direction=\"left\");
@@ -711,7 +710,7 @@ X1 a b part
     fn a_package_file_by_path_is_missing_until_given() {
         let text = "* top
 R1 a 0 1k
-* @RNL(type=\"header\") { @VERSION(\"0.2\"); @USE-PACKAGE(name=\"acme\", path=\"pkg/acme.rnl\")}
+* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"acme\", path=\"pkg/acme.rnl\")}
 .end
 ";
         let files = MemoryProvider::new().with("top.sp", text);
@@ -725,7 +724,7 @@ R1 a 0 1k
     fn a_package_by_name_comes_from_the_package_directories_and_is_never_missing() {
         let text = "* top
 R1 a 0 1k
-* @RNL(type=\"header\") { @VERSION(\"0.2\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}
+* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}
 .end
 ";
         let files = MemoryProvider::new().with("/w/top.sp", text);
@@ -735,7 +734,9 @@ R1 a 0 1k
         assert!(error(&d), "{:?}", d.diagnostics);
 
         // a frontend gives its package directories before it builds
-        let package = "@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"acme\", version=\"1.0\")}";
+        // a package that defines something: one that only declares itself is an alias package (16.5)
+        let package = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"acme\", version=\"1.0\")}\n\
+                       @RNL { $ACME_MARK = @DEFINE(roles=[\"p\"]) {} }\n";
         let mut files = files.with("/w/packages/acme.rnl", package);
         files.package_dirs.push("/w/packages".into());
         let d = build("/w/top.sp", &files, &BuildOptions::default()).unwrap();
@@ -834,16 +835,20 @@ R1 p q 1k
 
     #[test]
     fn the_standard_package_can_be_left_out() {
-        let files = MemoryProvider::new().with("a.sp", NETLIST);
-        let options = BuildOptions { runtime: Options { std: false, ..Options::default() }, ..BuildOptions::default() };
-        let without = build("a.sp", &files, &options).unwrap();
-        let with = build("a.sp", &files, &BuildOptions::default()).unwrap();
+        // a file that uses no package, read with the setting that adds the standard package (16.3)
+        let text = NETLIST.replace("; @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\")", "");
+        assert_ne!(text, NETLIST);
+        let files = MemoryProvider::new().with("a.sp", &text);
+        let runtime = |std: bool| Options { std, include_std: true, ..Options::default() };
+        let options = |std: bool| BuildOptions { runtime: runtime(std), ..BuildOptions::default() };
+        let without = build("a.sp", &files, &options(false)).unwrap();
+        let with = build("a.sp", &files, &options(true)).unwrap();
         assert_ne!(without.diagnostics.len(), with.diagnostics.len());
     }
 
     #[test]
     fn a_package_file_is_checked_on_its_own() {
-        let d = build(&format!("{BUNDLED_DIR}/0.2/rnl-std.rnl"), &MemoryProvider::new(), &BuildOptions::default());
+        let d = build(&format!("{BUNDLED_DIR}/0.4/rnl-std-all.rnl"), &MemoryProvider::new(), &BuildOptions::default());
         let d = d.unwrap();
         assert!(d.diagnostics.is_empty(), "{:?}", d.diagnostics);
         assert!(d.missing.is_empty());
@@ -854,52 +859,32 @@ R1 p q 1k
 
     #[test]
     fn the_bundled_packages_are_by_version() {
-        // each series of libraries/standard with its Chinese aliases in a directory of its own, by
-        // version: 0.2, 0.3 and the draft 0.4
+        // the series of libraries/standard with its Chinese aliases in a directory of its own, by
+        // version: the series 0.4
         let names: Vec<&str> = BUNDLED.iter().map(|(path, _)| *path).collect();
-        let series = |v: &str| names.iter().filter(|n| n.starts_with(&format!("{v}/"))).count();
         assert_eq!(
-            names[..9],
+            names,
             [
-                "0.2/rnl-std-core.rnl",
-                "0.2/rnl-std-fill.rnl",
-                "0.2/rnl-std-layout.rnl",
-                "0.2/rnl-std-semantics.rnl",
-                "0.2/rnl-std-style.rnl",
-                "0.2/rnl-std-symbols.rnl",
-                "0.2/rnl-std-virtual.rnl",
-                "0.2/rnl-std.rnl",
-                "0.2/rnl-zh.rnl",
+                "0.4/alias-zh.rnl",
+                "0.4/rnl-std-45deg.rnl",
+                "0.4/rnl-std-all.rnl",
+                "0.4/rnl-std-basic.rnl",
+                "0.4/rnl-std-fill.rnl",
+                "0.4/rnl-std-functional.rnl",
+                "0.4/rnl-std-logic.rnl",
+                "0.4/rnl-std-no-instance-labels.rnl",
+                "0.4/rnl-std-no-labels.rnl",
+                "0.4/rnl-std-rf.rnl",
+                "0.4/rnl-std-semantics.rnl",
+                "0.4/rnl-std-semiconductors.rnl",
+                "0.4/rnl-std-signal-flow.rnl",
+                "0.4/rnl-std-spectre.rnl",
+                "0.4/rnl-std-spice.rnl",
+                "0.4/rnl-std-style.rnl",
             ]
         );
-        let mut dirs: Vec<&str> = Vec::new();
-        for name in &names {
-            let dir = name.split('/').next().unwrap();
-            if !dirs.contains(&dir) {
-                dirs.push(dir);
-            }
-        }
-        assert_eq!(dirs[..3], ["0.2", "0.3", "0.4"]);
-        let key = rnl_runtime::interp::catalog::version_key;
-        assert!(dirs.windows(2).all(|d| key(d[0]) < key(d[1])), "{dirs:?}");
-        // 0.3 has the packages of 16.3 of the language 0.3 and rnl-zh; 0.4 has the single
-        // collection rnl-std-all, rnl-std-semantics and alias-zh
-        assert_eq!(series("0.3"), 16);
-        assert_eq!(series("0.4"), 16);
-        for name in
-            ["rnl-std", "rnl-std-core", "rnl-std-basic", "rnl-std-spice", "rnl-std-spectre", "rnl-std-full", "rnl-zh"]
-        {
-            assert!(names.contains(&format!("0.3/{name}.rnl").as_str()), "0.3/{name}");
-        }
-        for name in
-            ["rnl-std-all", "rnl-std-basic", "rnl-std-spice", "rnl-std-spectre", "rnl-std-semantics", "alias-zh"]
-        {
-            assert!(names.contains(&format!("0.4/{name}.rnl").as_str()), "0.4/{name}");
-        }
-        assert_eq!(names.len(), 9 + dirs[1..].iter().map(|d| series(d)).sum::<usize>());
         let p = bundled();
-        let dirs: Vec<String> = dirs.iter().map(|d| format!("{BUNDLED_DIR}/{d}")).collect();
-        assert_eq!(p.package_dirs, dirs);
+        assert_eq!(p.package_dirs, [format!("{BUNDLED_DIR}/0.4")]);
         assert_eq!(p.package_files().len(), names.len());
     }
 
@@ -921,11 +906,12 @@ R1 p q 1k
     #[test]
     fn a_bundled_package_file_is_read_like_any_host_file() {
         let mut sink = Sink::new();
-        let path = format!("{BUNDLED_DIR}/0.2/rnl-std.rnl");
+        let path = format!("{BUNDLED_DIR}/0.4/rnl-std-all.rnl");
         let doc = read_host(&path, None, &MemoryProvider::new(), &mut sink).unwrap();
-        assert_eq!(doc.main().file, "rnl-std.rnl");
-        let text = BUNDLED.iter().find(|(p, _)| *p == "0.2/rnl-std.rnl").map(|(_, text)| *text);
-        assert_eq!(doc.source("rnl-std.rnl"), text);
+        assert_eq!(doc.main().file, "rnl-std-all.rnl");
+        let text = BUNDLED.iter().find(|(p, _)| *p == "0.4/rnl-std-all.rnl").map(|(_, text)| *text);
+        assert!(text.is_some());
+        assert_eq!(doc.source("rnl-std-all.rnl"), text);
     }
 
     #[test]
@@ -1042,15 +1028,15 @@ R1 p q 1k
 
     #[test]
     fn a_corpus_case_builds_from_the_disk() {
-        let d = build(&corpus("cases/04-hierarchy.sp"), &Disk, &BuildOptions::default()).unwrap();
+        let d = build(&corpus("cases-0.4/from-0.2/04-hierarchy.sp"), &Disk, &BuildOptions::default()).unwrap();
         let names: Vec<&str> = d.files.iter().map(|f| f.name.as_str()).collect();
         assert_eq!(names, ["04-hierarchy.sp", "04-hierarchy-lib.inc"]);
         assert!(d.missing.is_empty(), "{:?}", d.missing);
         // a subcircuit's definition, from its header to its .ends, in the file that has it
         let lines = |title: &str| d.levels.iter().find(|l| l.title == title).and_then(|l| l.lines);
         assert_eq!((d.levels[0].kind, d.levels[0].lines), ("file", None));
-        assert_eq!(lines("amp"), Some([0, 8, 48]));
-        assert_eq!(lines("rdiv"), Some([1, 2, 19]));
+        assert_eq!(lines("amp"), Some([0, 8, 52]));
+        assert_eq!(lines("rdiv"), Some([1, 3, 32]));
     }
 
     #[test]

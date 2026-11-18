@@ -145,14 +145,7 @@ fn symbol_inclusion_keeps_fixed_text_and_label_settings() {
 }
 
 #[test]
-fn fixed_rotation_is_versioned_and_requires_a_boolean() {
-    for version in ["0.2", "0.3"] {
-        for value in ["true", "false"] {
-            let r = read(version, &format!("(0,0) @TEXT(\"bad\", fix_rotate={value}); (1,1) @TEXT(\"good\")"));
-            assert!(r.diagnostics().iter().any(|d| d.severity == Severity::Error && d.message.contains("fix_rotate")));
-            assert!(r.model.levels[0].texts.iter().any(|t| t.markup == "good"));
-        }
-    }
+fn fixed_rotation_requires_a_boolean() {
     for value in ["1", "\"true\"", "[true]"] {
         let r = read("0.4", &format!("(0,0) @TEXT(\"bad\", fix_rotate={value})"));
         assert!(r.diagnostics().iter().any(|d| d.severity == Severity::Error));

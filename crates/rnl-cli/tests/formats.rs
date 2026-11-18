@@ -96,7 +96,7 @@ fn a_model_library_is_spectre_by_its_simulator_statement() {
     let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/models.lib", lib);
     let (doc, _) = host("/w/top.sp", &files, &[]);
     let m1 = &doc.levels[0].instances[0];
-    assert_eq!((m1.mtype.as_deref(), m1.model_missing), (Some("nmos"), false));
+    assert_eq!(m1.mtype.as_deref(), Some("nmos"));
     assert_eq!(doc.file_format("models.lib").map(|f| f.format.as_str()), Some("spectre"));
 }
 
@@ -234,7 +234,9 @@ fn a_name_found_in_files_of_another_format_is_not_unique_when_two_are() {
 fn subcircuits_one_format_tells_apart_keep_their_own_block_symbols() {
     // `Amp` and `amp` of a Spectre file, under a SPICE netlist whose own names ignore case
     let top = "* top\n.include \"cells.scs\"\nX1 a 0 Amp\nX2 b 0 amp\n.end\n";
-    let cells = "simulator lang=spectre\nsubckt Amp (p n)\n// @RNL { # @SET-SYMBOL $RESISTOR }\nends Amp\n\
+    let cells = "simulator lang=spectre\n\
+                 // @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-basic\", version=\"0.4\") }\n\
+                 subckt Amp (p n)\n// @RNL { # @SET-SYMBOL $RESISTOR }\nends Amp\n\
                  subckt amp (p n)\n// @RNL { # @SET-SYMBOL $CAPACITOR }\nends amp\n";
     let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/cells.scs", cells);
     let options = BuildOptions { formats: set(&[("/w/cells.scs", "spectre")]), ..BuildOptions::default() };
@@ -273,7 +275,7 @@ fn model_cards_are_found_across_formats() {
     let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/models.scs", models).with("/w/spice.inc", spice);
     let (doc, sink) = host("/w/top.sp", &files, &[("/w/models.scs", "spectre")]);
     let inst = |name: &str| doc.levels[0].instances.iter().find(|i| i.name == name).unwrap();
-    assert_eq!((inst("M1").mtype.as_deref(), inst("M1").model_missing), (Some("nmos"), false));
+    assert_eq!(inst("M1").mtype.as_deref(), Some("nmos"));
     // Spectre's `pch_s` finds SPICE's `PCH_S`, whose card ignores case
     assert_eq!(inst("M4").mtype.as_deref(), Some("pmos"));
     // `nmix` is spelt as no card is, and two are found for it; `Nmix` too
@@ -572,7 +574,7 @@ fn check_of_a_verilog_a_file_prints_the_hint_and_succeeds() {
     assert_eq!(
         out,
         "hint res.va:1: RNL9010 host-text-file-not-read: `res.va` is not a netlist (Verilog-A); it is not read
-0 errors, 0 violations, 0 warnings, 1 hints
+0 errors, 0 violations, 0 warnings, 1 hint
 "
     );
     // a format set for it reads it as SPICE, with SPICE's warnings
@@ -583,14 +585,15 @@ fn check_of_a_verilog_a_file_prints_the_hint_and_succeeds() {
 
 /// A package file as 2.7 shows one: its first record, at the start of a line, a header record with
 /// PACKAGE; then a remark and a record.
-const ACME: &str = "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"acme\", version=\"1.0\")}\n\n\
+const ACME: &str = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"acme\", version=\"1.0\"); \
+                    @USE-PACKAGE(name=\"rnl-std-semiconductors\", version=\"0.4\")}\n\n\
                     ACME house style: NMOS symbol and its rule.\n@RNL {\n  $NMOS_ACME = @DEFINE-SYMBOL {\n    $NMOS;\n    \
                     ? @TEXT(\"${name}\", key=\"name\") => @PLACE(-2.5, 1.5)\n  };\n  \
                     # @SELECT-INSTANCE(type=\"nmos\") => @SET-SYMBOL $NMOS_ACME\n}\n";
 
 /// A netlist that uses the package `acme` by name.
 const USES_ACME: &str =
-    "* top\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}\nR1 a 0 1k\n.end\n";
+    "* top\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}\nR1 a 0 1k\n.end\n";
 
 /// The diagnostics of a Document that are not hints.
 fn loud(d: &Document) -> Vec<(&str, &str, u32, &str)> {

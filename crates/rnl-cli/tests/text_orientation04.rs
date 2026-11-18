@@ -73,17 +73,6 @@ fn fixed_rotation_preserves_its_own_box_when_the_owner_has_no_turn() {
 }
 
 #[test]
-fn released_baselines_keep_their_original_side() {
-    for keyed in [false, true] {
-        let a = drawing("0.3", Orient::R0, 0, false, keyed).1.bbox;
-        let (result, b) = drawing("0.3", Orient::MX, 0, false, keyed);
-        close(a[1], b.bbox[1]);
-        close(a[3], b.bbox[3]);
-        assert!(result.problems[0].objects.iter().filter_map(|o| o.text.as_ref()).all(|t| !t.baseline_mirrors));
-    }
-}
-
-#[test]
 fn reflected_multiline_formulas_keep_their_reading_order_and_bars() {
     for markup in [r"ABC\\DEF", r"\frac{ABC}{DEF}", r"\sqrt{ABC}"] {
         for vertical in [false, true] {
@@ -142,27 +131,24 @@ const COLUMN: &str = r#"? @TEXT("TOP",key="a") => @PLACE(2,3); ? @TEXT("BOTTOM",
 
 #[test]
 fn columns_keep_label_identities_and_reverse_positions_in_four_orientations() {
-    for version in ["0.3", "0.4"] {
-        for rotate in [0, 90, 180, 270] {
-            let body = COLUMN.replace("key=", &format!("rotate={rotate},key="));
-            for turn in Orient::ALL {
-                let result = columns(version, turn, &body, "");
-                let reverse =
-                    version == "0.4" && matches!(turn, Orient::MX | Orient::R180 | Orient::R270 | Orient::MXR90);
-                for (key, y) in [("a", if reverse { -2.0 } else { 3.0 }), ("b", if reverse { 3.0 } else { -2.0 })] {
-                    let offset = turn.apply((2.0, y));
-                    assert_eq!(anchor(&result, key), (10.0 + offset.0, 20.0 + offset.1));
-                }
-                let a = result.model.levels[0].texts.iter().find(|t| t.key.as_deref() == Some("a")).unwrap();
-                assert_eq!(rnl_runtime::markup::plain(&a.lines[0]), "TOP");
-                let problem = &result.problems[0];
-                let a = problem
-                    .objects
-                    .iter()
-                    .find(|o| o.text.as_ref().is_some_and(|t| t.key.as_deref() == Some("a")))
-                    .unwrap();
-                assert_eq!(a.text.as_ref().unwrap().column_position, (version == "0.4").then_some((2.0, -2.0)));
+    for rotate in [0, 90, 180, 270] {
+        let body = COLUMN.replace("key=", &format!("rotate={rotate},key="));
+        for turn in Orient::ALL {
+            let result = columns("0.4", turn, &body, "");
+            let reverse = matches!(turn, Orient::MX | Orient::R180 | Orient::R270 | Orient::MXR90);
+            for (key, y) in [("a", if reverse { -2.0 } else { 3.0 }), ("b", if reverse { 3.0 } else { -2.0 })] {
+                let offset = turn.apply((2.0, y));
+                assert_eq!(anchor(&result, key), (10.0 + offset.0, 20.0 + offset.1));
             }
+            let a = result.model.levels[0].texts.iter().find(|t| t.key.as_deref() == Some("a")).unwrap();
+            assert_eq!(rnl_runtime::markup::plain(&a.lines[0]), "TOP");
+            let problem = &result.problems[0];
+            let a = problem
+                .objects
+                .iter()
+                .find(|o| o.text.as_ref().is_some_and(|t| t.key.as_deref() == Some("a")))
+                .unwrap();
+            assert_eq!(a.text.as_ref().unwrap().column_position, Some((2.0, -2.0)));
         }
     }
 }

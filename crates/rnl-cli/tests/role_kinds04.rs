@@ -29,17 +29,6 @@ fn nonstring_kind_entries_fail_the_definition_and_keep_other_members() {
 }
 
 #[test]
-fn released_versions_keep_ignoring_nonstring_kind_entries() {
-    for version in ["0.2", "0.3"] {
-        for kinds in ["[\"instance\", 7]", "[false, \"instance\"]", "[[\"net\"], \"instance\"]"] {
-            let r = read(MemoryProvider::new().with("main.sp", &source(version, &body(kinds))));
-            assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", r.diagnostics());
-            assert_eq!(r.problems.iter().flat_map(|p| &p.usages).filter(|u| u.definition == "$D").count(), 1);
-        }
-    }
-}
-
-#[test]
 fn valid_kind_alternatives_still_accept_either_kind() {
     let body = "$D = @DEFINE(roles=[[\"member\", [\"instance\", \"net\"]]]) {}; #R1 @AS $D; &a @AS $D";
     let r = read(MemoryProvider::new().with("main.sp", &source("0.4", body)));
@@ -48,19 +37,13 @@ fn valid_kind_alternatives_still_accept_either_kind() {
 }
 
 #[test]
-fn an_included_definition_uses_its_source_version() {
-    for (main, child, failed) in [("0.3", "0.4", true), ("0.4", "0.3", false)] {
-        let top = format!("{}\n.include child.sp\nX1 a child\n", source(main, ""));
-        let included = format!("* child\n* @RNL(type=\"header\") {{ @VERSION(\"{child}\") }}\n.subckt child a\nR2 a 0 2k\n* @RNL {{ $D = @DEFINE(roles=[[\"member\", [\"instance\", 7]]]) {{}}; #R2 @AS $D }}\n.ends child\n");
-        let r = read(MemoryProvider::new().with("main.sp", &top).with("child.sp", &included));
-        let errors: Vec<_> = r.diagnostics().into_iter().filter(|d| d.code == codes::DEFINE_ROLE_MALFORMED).collect();
-        assert_eq!(!errors.is_empty(), failed, "{:?}", r.diagnostics());
-        if failed {
-            assert!(errors[0].loc.as_ref().unwrap().file.ends_with("child.sp"));
-        } else {
-            assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", r.diagnostics());
-        }
-    }
+fn an_included_definition_reports_at_its_source() {
+    let top = format!("{}\n.include child.sp\nX1 a child\n", source("0.4", ""));
+    let included = "* child\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child a\nR2 a 0 2k\n* @RNL { $D = @DEFINE(roles=[[\"member\", [\"instance\", 7]]]) {}; #R2 @AS $D }\n.ends child\n";
+    let r = read(MemoryProvider::new().with("main.sp", &top).with("child.sp", included));
+    let errors: Vec<_> = r.diagnostics().into_iter().filter(|d| d.code == codes::DEFINE_ROLE_MALFORMED).collect();
+    assert!(!errors.is_empty(), "{:?}", r.diagnostics());
+    assert!(errors[0].loc.as_ref().unwrap().file.ends_with("child.sp"));
 }
 
 #[test]

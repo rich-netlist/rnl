@@ -83,11 +83,3 @@ fn a_set_whose_members_are_all_found_is_unchanged() {
     assert_eq!(errors(&r), Vec::new());
     assert!(has_fact(problem(&r), "ALIGN") && has_fact(problem(&r), "ORDER"));
 }
-
-#[test]
-fn a_file_of_0_3_drops_the_failed_member_as_it_did() {
-    let r = read("0.3", "{#R1 #R2 #R9} @ALIGN(\"y\")");
-    let e = errors(&r);
-    assert_eq!(e, vec![codes::REF_NO_INSTANCE]);
-    assert!(has_fact(problem(&r), "ALIGN"));
-}

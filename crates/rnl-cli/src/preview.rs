@@ -38,7 +38,7 @@ pub struct Preview {
 /// What became of the facts, level by level, each line located in the texts of the Document.
 #[derive(Clone, Debug, Serialize)]
 pub struct Report {
-    /// The lines of the files raised to 0.3 or kept at 0.2 (16.1), and of the levels not solved.
+    /// The lines of the levels not solved.
     pub notes: Vec<String>,
     pub levels: Vec<LevelReport>,
     /// How many errors the netlist has as a solver reads it, and the solver reported.
@@ -312,8 +312,7 @@ fn report(
             check: checked.iter().position(|c| c.title.as_deref() == Some(p.title.as_str())).map(|i| checked.remove(i)),
         });
     }
-    let mut notes: Vec<String> = run.raised.iter().flat_map(crate::solve::raised).collect();
-    notes.extend(run.not_solved.iter().map(crate::solve::not_solved));
+    let notes: Vec<String> = run.not_solved.iter().map(crate::solve::not_solved).collect();
     let named = |path: &str| {
         let path = normalize(path);
         document
@@ -395,7 +394,6 @@ impl Copy {
             files: self.files.clone(),
             read: self.read.clone(),
             errors: 0,
-            raised: Vec::new(),
         }
     }
 }

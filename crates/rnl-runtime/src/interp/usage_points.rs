@@ -1,4 +1,4 @@
-//! Own points of usages and coordinates in general definition bodies (0.4, 9.4, 12.1).
+//! Own points of usages and coordinates in general definition bodies (9.4, 12.1).
 
 use super::ctx::{Ctx, FrameKind};
 use super::obj::*;
@@ -356,15 +356,16 @@ impl Interp<'_> {
             }
         }
     }
-    /// Versioning follows the file that creates the usage, including mixed-version includes.
+    /// Does a usage have a point of its own? One written in a statement does, unless it is made in
+    /// a symbol.
     pub(super) fn usage_own_point(&self, usage: ObjId) -> bool {
         let u = self.usage(usage);
-        !u.in_symbol && u.site.as_ref().is_some_and(|c| self.follows_0_4(self.source_unit(c)))
+        !u.in_symbol && u.site.is_some()
     }
 
     /// Body coordinates translate with this point; symbol coordinates keep their rigid frame.
     pub(super) fn coordinate_base(&self, ctx: &Ctx) -> Option<ObjId> {
-        if ctx.frame_kind() == Some(FrameKind::Definition) && self.follows_0_4(self.source_unit(ctx)) {
+        if ctx.frame_kind() == Some(FrameKind::Definition) {
             ctx.frame_usage()
         } else {
             None

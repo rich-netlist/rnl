@@ -13,25 +13,34 @@ use rnl_runtime::model::{LevelPackage, LevelView};
 use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 
-/// The standard package as the root brings it in: the sub-packages each package collection
-/// references first, then the collection itself (16.3).
-const STD_ORDER: [&str; 8] = [
+/// The package collection of the standard series as a file's USE-PACKAGE brings it in: the packages
+/// it references first, then the rule packages of the dialects, each of which acts on the sections
+/// of its own language (2.8), then the collection itself (16.3).
+const STD_ORDER: [&str; 12] = [
     "rnl-std-style",
-    "rnl-std-symbols",
-    "rnl-std-virtual",
-    "rnl-std-core",
+    "rnl-std-basic",
+    "rnl-std-semiconductors",
     "rnl-std-fill",
     "rnl-std-semantics",
-    "rnl-std-layout",
-    "rnl-std",
+    "rnl-std-functional",
+    "rnl-std-rf",
+    "rnl-std-logic",
+    "rnl-std-signal-flow",
+    "rnl-std-spice",
+    "rnl-std-spectre",
+    "rnl-std-all",
 ];
+
+/// The USE-PACKAGE of the package collection of the standard series, which the files of these
+/// tests write first in their header record.
+const STD: &str = "@USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\")";
 
 const NETLIST: &str = "R1 a 0 1k\nR2 a b 1k\n";
 
 /// A package file. A reference is (name, version, path); an empty path is left out, so that the
 /// package is found by name in the package directories (16.2).
 fn pk(name: &str, version: &str, refs: &[(&str, &str, &str)], body: &str) -> String {
-    let mut head = vec!["@VERSION(\"0.2\")".to_string(), format!("@PACKAGE(name=\"{name}\", version=\"{version}\")")];
+    let mut head = vec!["@VERSION(\"0.4\")".to_string(), format!("@PACKAGE(name=\"{name}\", version=\"{version}\")")];
     for (n, v, path) in refs {
         let path = if path.is_empty() { String::new() } else { format!(", path=\"{path}\"") };
         head.push(format!("@USE-PACKAGE(name=\"{n}\", version=\"{v}\"{path})"));
@@ -49,13 +58,19 @@ fn refs<'a>(list: &'a [(&'a str, &'a str, String)]) -> Vec<(&'a str, &'a str, &'
     list.iter().map(|(n, v, p)| (*n, *v, p.as_str())).collect()
 }
 
-/// A netlist with its header record right after `netlist` (line 4 after `NETLIST`) and one more
-/// record after that, as given.
+/// A netlist with its header record on line 2, which uses the standard series ([`STD`]) and then
+/// `header`, `netlist`, and one more record after that, as given.
 fn doc(header: &str, body: &str, netlist: &str) -> String {
+    let header = if header.is_empty() { STD.to_string() } else { format!("{STD}; {header}") };
+    doc_with(&header, body, netlist)
+}
+
+/// [`doc`] with `header` alone after the VERSION.
+fn doc_with(header: &str, body: &str, netlist: &str) -> String {
     let header = if header.is_empty() { String::new() } else { format!("; {header}") };
     let body = if body.is_empty() { String::new() } else { format!("* @RNL {{ {body} }}\n") };
     // the header record is the first record of the file, above the subcircuits (2.8)
-    format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\"){header}}}\n{netlist}{body}.end\n")
+    format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"){header}}}\n{netlist}{body}.end\n")
 }
 
 fn read(files: &MemoryProvider, entry: &str) -> Interpretation {
@@ -107,8 +122,18 @@ fn roles(lv: &LevelView, name: &str) -> Vec<String> {
     o.attach.iter().map(|(role, _)| role.clone()).collect()
 }
 
-/// The virtual elements of the standard package, which its fill adds.
-const VIRTUAL: [&str; 5] = ["$GND", "$SUPPLY", "$IOPORT", "$GND_STUB", "$SUPPLY_STUB"];
+/// The virtual parts of the standard series that its fill adds, and those their stubs make.
+const VIRTUAL: [&str; 9] = [
+    "$GROUND",
+    "$SUPPLY",
+    "$BIAS",
+    "$IO_PORT",
+    "$NET_LABEL",
+    "$GROUND_STUB",
+    "$SUPPLY_STUB",
+    "$BIAS_STUB",
+    "$NET_LABEL_STUB",
+];
 
 /// The definitions of the usages of a level but those of the virtual elements, sorted.
 fn usages(lv: &LevelView) -> Vec<&str> {
@@ -143,13 +168,23 @@ fn linecolor<'a>(lv: &'a LevelView, id: &str) -> &'a str {
 
 #[test]
 fn a_package_brings_in_what_it_references_first() {
-    // the standard package is a package collection whose rules keep the order of the old single
-    // file: the sub-packages each collection references come first, each once (16.3)
+    // the standard series has a package collection: the packages it references come first, each
+    // once, then the collection itself, all placed at the USE-PACKAGE that brings it in (16.3)
     let r = read_doc(&doc("", "#R1 @PLACE(0, 0)", NETLIST));
     assert_eq!(errors(&r), "");
     let top = level(&r, "t.sp");
     assert_eq!(root_names(top), STD_ORDER);
-    assert!(top.packages.iter().all(|p| p.version == "0.2" && p.via.is_none()), "{:?}", top.packages);
+    assert!(top.packages.iter().all(|p| p.version == "0.4"), "{:?}", top.packages);
+    // each is brought in by the USE-PACKAGE of rnl-std-all that the file writes, the collection too
+    assert_eq!(
+        package(top, "rnl-std-all").via.as_ref().map(|v| (v.0.as_str(), v.1.file.as_str())),
+        Some(("rnl-std-all", "t.sp"))
+    );
+    assert!(
+        top.packages.iter().all(|p| p.via.as_ref().is_some_and(|v| v.0 == "rnl-std-all" && v.1.file == "t.sp")),
+        "{:?}",
+        top.packages
+    );
     let names: Vec<&str> = r.model.packages.iter().map(|(n, _)| n.as_str()).collect();
     assert_eq!(names, STD_ORDER);
 
@@ -279,21 +314,21 @@ fn a_later_reference_hides_an_earlier_one() {
 
 #[test]
 fn an_empty_inline_package_drops_the_fill() {
-    // an empty inline package of the same name drops a package of the standard package: no
-    // ground, supply or port tag is added any more; the stubs are in rnl-std-virtual and can
-    // still be applied by hand (16.3)
+    // an empty inline package of the same name drops a package of the standard series: no
+    // ground, supply or port tag is added any more; the stubs and the sets of nets are in
+    // rnl-std-basic, and the stubs can still be applied by hand (16.3)
     let net = "R1 a 0 1k\nR2 a vdd 1k\nX1 a 0 sub\n.subckt sub p n\nR9 p n 1k\n.ends\n";
     let r = read_doc(&doc("", "&vdd @ADD-TO $SUPPLY_NET_SET", net));
     assert_eq!(errors(&r), "");
     let before = virtual_usages(&r);
-    for x in [("file", "$GND_STUB"), ("file", "$SUPPLY_STUB"), ("subckt", "$IOPORT")] {
+    for x in [("file", "$GROUND_STUB"), ("file", "$SUPPLY_STUB"), ("subckt", "$IO_PORT")] {
         assert!(before.contains(&x), "{before:?}");
     }
     let drop = "@USE-PACKAGE(name=\"rnl-std-fill\") {}";
-    let r = read_doc(&doc(drop, "%g = $GND_STUB @ATTACH #R1:2", net));
+    let r = read_doc(&doc(drop, "%g = $GROUND_STUB @ATTACH #R1::n", net));
     assert_eq!(errors(&r), "");
     // only the one written
-    assert_eq!(virtual_usages(&r), [("file", "$GND"), ("file", "$GND_STUB")]);
+    assert_eq!(virtual_usages(&r), [("file", "$GROUND"), ("file", "$GROUND_STUB")]);
     // the empty package of that name takes its place
     let top = level(&r, "t.sp");
     assert_eq!(root_names(top), STD_ORDER);
@@ -303,21 +338,24 @@ fn an_empty_inline_package_drops_the_fill() {
         ("", Some(("rnl-std-fill", 2)))
     );
     let r = read_doc(&doc(drop, "&vdd @ADD-TO $SUPPLY_NET_SET", net));
-    assert!(errors(&r).contains("$SUPPLY_NET_SET cannot be found"), "{}", errors(&r));
+    assert_eq!(errors(&r), "");
+    assert!(virtual_usages(&r).is_empty(), "{:?}", virtual_usages(&r));
 }
 
 #[test]
-fn the_smallest_collection_alone() {
-    // drop rnl-std and use rnl-std-core: symbols and styles stay, no fill, no semantics (16.3)
-    let header = "@USE-PACKAGE(name=\"rnl-std\") {}; @USE-PACKAGE(name=\"rnl-std-core\", version=\"0.2\")";
-    let r = read_doc(&doc(header, "%d = #R1 #R2 @AS $DIFFPAIR; #R1 @PLACE(0, 0)", NETLIST));
+fn packages_named_one_by_one_without_the_collection() {
+    // the styles and the rule package of SPICE, which brings in the symbols: no fill, no
+    // semantics (16.3)
+    let header = "@USE-PACKAGE(name=\"rnl-std-style\", version=\"0.4\"); \
+                  @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\")";
+    let r = read_doc(&doc_with(header, "%d = {#R1 #R2} @AS $CASCADE; #R1 @PLACE(0, 0)", NETLIST));
     let top = level(&r, "t.sp");
-    assert_eq!(root_names(top), ["rnl-std-style", "rnl-std-symbols", "rnl-std-virtual", "rnl-std-core", "rnl-std"]);
+    assert_eq!(root_names(top), ["rnl-std-style", "rnl-std-basic", "rnl-std-semiconductors", "rnl-std-spice"]);
     let errors = messages(&r, Severity::Error);
     assert_eq!(errors.len(), 1, "{errors:?}");
-    assert!(errors[0].starts_with("$DIFFPAIR cannot be found"), "{errors:?}");
+    assert!(errors[0].starts_with("$CASCADE cannot be found"), "{errors:?}");
     let r1 = top.objects.iter().find(|o| o.id == "#R1").unwrap();
-    assert_eq!(r1.symbol.as_ref().unwrap().name, "$RES");
+    assert_eq!(r1.symbol.as_ref().unwrap().name, "$RESISTOR");
     assert_eq!(linecolor(top, "#R1"), "#1d1d1f");
     assert!(virtual_usages(&r).is_empty());
 }
@@ -326,13 +364,14 @@ fn the_smallest_collection_alone() {
 fn a_collection_of_ones_own_adds_by_reference() {
     // more: a collection that references a package of the standard package by name and one of
     // its own by path; a package that is already there is not added twice (16.3)
-    let list = [("rnl-std-semantics", "0.2", ""), ("mine", "1.0", "mine.rnl")];
+    let list = [("rnl-std-semantics", "0.4", ""), ("mine", "1.0", "mine.rnl")];
     let files = MemoryProvider::new()
         .with("mine.rnl", &pk("mine", "1.0", &[], "$MINE = @DEFINE(roles=[\"a\"]) {}"))
         .with("more.rnl", &pk("more", "1.0", &list, ""));
-    let header = "@USE-PACKAGE(name=\"rnl-std\") {}; @USE-PACKAGE(name=\"rnl-std-core\", version=\"0.2\"); \
+    let header = "@USE-PACKAGE(name=\"rnl-std-style\", version=\"0.4\"); \
+                  @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\"); \
                   @USE-PACKAGE(name=\"more\", version=\"1.0\", path=\"more.rnl\")";
-    let main = doc(header, "%d = #R1 #R2 @AS $DIFFPAIR; %m = #R1 @AS $MINE", NETLIST);
+    let main = doc_with(header, "%d = {#R1 #R2} @AS $CASCADE; %m = #R1 @AS $MINE", NETLIST);
     let r = read(&files.with("t.sp", &main), "t.sp");
     assert_eq!(errors(&r), "");
     let top = level(&r, "t.sp");
@@ -340,22 +379,21 @@ fn a_collection_of_ones_own_adds_by_reference() {
         root_names(top),
         [
             "rnl-std-style",
-            "rnl-std-symbols",
-            "rnl-std-virtual",
-            "rnl-std-core",
+            "rnl-std-basic",
+            "rnl-std-semiconductors",
+            "rnl-std-spice",
             "rnl-std-semantics",
-            "rnl-std",
             "mine",
             "more"
         ]
     );
-    assert_eq!((definition(top, "d"), definition(top, "m")), ("$DIFFPAIR", "$MINE"));
+    assert_eq!((definition(top, "d"), definition(top, "m")), ("$CASCADE", "$MINE"));
 
-    // the fill written again in the header: one copy of it, at its place in the standard package
-    let stubs = |r: &Interpretation| virtual_usages(r).iter().filter(|u| u.1 == "$GND_STUB").count();
+    // the fill written again in the header: one copy of it, at its place in the collection
+    let stubs = |r: &Interpretation| virtual_usages(r).iter().filter(|u| u.1 == "$GROUND_STUB").count();
     let n = stubs(&read_doc(&doc("", "", NETLIST)));
     assert!(n > 0);
-    let r = read_doc(&doc("@USE-PACKAGE(name=\"rnl-std-fill\", version=\"0.2\")", "", NETLIST));
+    let r = read_doc(&doc("@USE-PACKAGE(name=\"rnl-std-fill\", version=\"0.4\")", "", NETLIST));
     assert_eq!(errors(&r), "");
     assert_eq!(stubs(&r), n);
     assert_eq!(root_names(level(&r, "t.sp")), STD_ORDER);
@@ -436,13 +474,15 @@ fn a_reference_of_another_major_version_fails() {
         messages(&r, Severity::Error),
         [
             "package pk-c references package q 2.0, of another major version than the reference expanded first (pk-a references 1.0): this reference fails, and the statements of pk-c that use its names fail with it (16.2)",
+            // the body of pk-a's definition names $Q_NEW, which q 1.0 does not have (6.6)
+            "$Q_NEW cannot be found, did you mean $A_NEW? (6.6)",
             "$Q_TWO cannot be found: it is in package q, and the q in effect here does not have it (dropped, replaced, or its reference failed); this statement fails (16.2)",
         ]
     );
     let errors = shown(&r, Severity::Error);
     assert_eq!(
         files_of(&r, Severity::Error).iter().map(|f| f.0.as_str()).collect::<Vec<_>>(),
-        ["pk-c.rnl", "pk-c.rnl"]
+        ["pk-c.rnl", "pk-a.rnl", "pk-c.rnl"]
     );
     assert!(errors[0].origin.starts_with("brought in by the USE-PACKAGE of pk-c (t.sp:2:"), "{}", errors[0].origin);
     assert_eq!(linecolor(top, "#R1"), "#1d1d1f");
@@ -493,7 +533,7 @@ fn a_reference_that_closes_a_cycle_fails() {
 fn use_package_is_written_only_in_the_header_of_a_package_file() {
     // USE-PACKAGE in a package's other records, a reference with a body, and USE-PACKAGE in an
     // inline package are errors; the rest of each package stays (16.2)
-    let pk_b = "@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"pk-b\", version=\"1.0\"); \
+    let pk_b = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"pk-b\", version=\"1.0\"); \
                 @USE-PACKAGE(name=\"pk-a\", version=\"1.0\", path=\"pk-a.rnl\") {} }\n\
                 @RNL { $B = @DEFINE(roles=[\"a\"]) {} }\n";
     let files = MemoryProvider::new()
@@ -526,20 +566,20 @@ fn use_package_is_written_only_in_the_header_of_a_package_file() {
 #[test]
 fn a_dropped_package_that_another_uses() {
     // the statements of the package that use its names fail, with errors that say why; the rest
-    // of the standard package stays (16.2)
-    let r = read_doc(&doc("@USE-PACKAGE(name=\"rnl-std-virtual\") {}", "#R1 @PLACE(0, 0)", NETLIST));
+    // of the standard series stays (16.2)
+    let r = read_doc(&doc("@USE-PACKAGE(name=\"rnl-std-semiconductors\") {}", "#R1 @PLACE(0, 0)", NETLIST));
     let errors = shown(&r, Severity::Error);
     assert!(!errors.is_empty());
-    assert!(errors.iter().all(|d| d.loc.as_ref().is_some_and(|l| l.file == "rnl-std-fill.rnl")), "{errors:?}");
+    assert!(errors.iter().all(|d| d.loc.as_ref().is_some_and(|l| l.file == "rnl-std-spice.rnl")), "{errors:?}");
     let text: Vec<&str> = errors.iter().map(|d| d.message.as_str()).collect();
-    for name in ["$GND_STUB", "$SUPPLY_STUB", "$IOPORT", "$NC", "$GND", "$SUPPLY"] {
-        let want = format!("{name} cannot be found: it is in package rnl-std-virtual, and the rnl-std-virtual in effect here does not have it");
+    for name in ["$DIODE", "$NMOS_4TERM", "$PMOS_4TERM", "$NPN", "$NJFET", "$NMOS"] {
+        let want = format!("{name} cannot be found: it is in package rnl-std-semiconductors, and the rnl-std-semiconductors in effect here does not have it");
         assert!(text.iter().any(|m| m.starts_with(&want)), "{name}: {text:?}");
     }
     let top = level(&r, "t.sp");
-    assert!(virtual_usages(&r).is_empty());
+    assert!(!virtual_usages(&r).is_empty());
     let r1 = top.objects.iter().find(|o| o.id == "#R1").unwrap();
-    assert_eq!(r1.symbol.as_ref().unwrap().name, "$RES");
+    assert_eq!(r1.symbol.as_ref().unwrap().name, "$RESISTOR");
 }
 
 #[test]
@@ -562,7 +602,7 @@ fn a_reference_by_path_is_relative_to_the_package_file() {
     assert_eq!(definition(level(&r, "t.sp"), "i"), "$INNER");
 
     let files = MemoryProvider::new()
-        .with("zh.rnl", "@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"zh\", version=\"1.0\"); @ALIAS(\"@at\", \"@PLACE\")}\n")
+        .with("zh.rnl", "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"zh\", version=\"1.0\"); @ALIAS(\"@at\", \"@PLACE\")}\n")
         .with("p.rnl", &pk("p", "1.0", &[("zh", "1.0", "zh.rnl")], ""))
         .with("t.sp", &doc("@USE-PACKAGE(name=\"p\", version=\"1.0\", path=\"p.rnl\")", "", NETLIST));
     let r = read(&files, "t.sp");
@@ -579,11 +619,11 @@ fn a_referenced_package_gives_its_terminal_names_first() {
     // those of the packages it references, and wins (6.12)
     let device = |terms: &str| format!("@DEVICE(name=\"X*\", model=\"cell\", terminals=[{terms}])");
     let inner = format!(
-        "@RNL(type=\"header\") {{ @VERSION(\"0.2\"); @PACKAGE(name=\"inner\", version=\"1.0\"); {} }}\n",
+        "@RNL(type=\"header\") {{ @VERSION(\"0.4\"); @PACKAGE(name=\"inner\", version=\"1.0\"); {} }}\n",
         device("\"p\", \"q\"")
     );
     let outer = format!(
-        "@RNL(type=\"header\") {{ @VERSION(\"0.2\"); @PACKAGE(name=\"outer\", version=\"1.0\"); \
+        "@RNL(type=\"header\") {{ @VERSION(\"0.4\"); @PACKAGE(name=\"outer\", version=\"1.0\"); \
          @USE-PACKAGE(name=\"inner\", version=\"1.0\", path=\"inner.rnl\"); {} }}\n",
         device("\"in\", \"out\"")
     );
@@ -607,8 +647,8 @@ fn a_referenced_package_gives_its_terminal_names_first() {
 /// a version of the language that this tool cannot read.
 const COMMENTED: &str =
     "/* an example: @RNL(type=\"header\") { @VERSION(\"0.9\"); @PACKAGE(name=\"example\", version=\"9.9\") } */\n\
-                         @RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"real\", version=\"1.0\") }\n\
-                         @RNL { $REAL_SYMBOL = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1) } }\n";
+                         @RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"real\", version=\"1.0\") }\n\
+                         @RNL { $REAL_SYMBOL = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1, direction=\"up\") } }\n";
 
 #[test]
 fn a_package_is_found_by_what_its_header_record_declares() {

@@ -21,6 +21,9 @@ The header record of a file that uses the whole series, the optional `rnl-std-no
 | --- | --- | --- |
 | `alias-zh` 0.4 | – | Provides Chinese spellings for RNL 0.4 keywords and standard words, all $ names of the standard 0.4 packages, and role, parameter and public local names of standard definitions. |
 | `analog-canvas-extensions` 0.7 | – | Analog Canvas’s own package for the language 0.4: its look variants of standard symbols, its four-input gates and four-terminal MOSFETs, and the definitions of meaning only that bring a file it writes back to it unchanged. |
+| `eda-style` 0.2 | `rnl-std-basic` | An independent visual package for RNL 0.4: green hairlines, red symbol text, automatic red terminal squares on the pins of instances, grounds and supplies, and monospaced labels, for standard, eda-symbol and custom symbols, with rules that … |
+| `eda-symbol` 0.2 | `rnl-std-basic`, `rnl-std-signal-flow` | An independent package of 133 schematic symbols and selection rules for RNL 0.4, with no fixed colors: pins bind the terminal names of the standard series 0.4, the geometry of 0.1 is kept except that the diodes and the transformer stand … |
+| `pdk-sky130` 0.3 | `rnl-std-basic`, `rnl-std-semiconductors` | The SkyWater SKY130 PDK symbol package for RNL 0.4: the terminal names of every sky130_fd_pr device family and the kind of its transistors, model rules onto the symbols of the standard series 0.4, and eight symbols for devices with … |
 | `rnl-std-45deg` 0.4 | `rnl-std-basic` | 45-degree symbols for bridges, cross-coupled pairs, diagonal windings and 45-degree wires. |
 | `rnl-std-all` 0.4 | `rnl-std-style`, `rnl-std-basic`, `rnl-std-semiconductors`, `rnl-std-fill`, `rnl-std-semantics`, `rnl-std-functional`, `rnl-std-rf`, `rnl-std-logic`, `rnl-std-signal-flow`, `rnl-std-spice`, `rnl-std-spectre` | The one package collection of the series 0.4, with no content of its own: it brings in styles, basic and semiconductor symbols and definitions, automatic fill, circuit semantics, the four domain packages, and the rule package of each host … |
 | `rnl-std-basic` 0.4 | – | The symbols of passive parts, sources, switches, transmission lines, virtual parts and marks; the definitions of virtual parts, marks, figures and stubs, each with the rule that draws its usages; and the sets of ground, supply and bias … |
@@ -55,6 +58,12 @@ A definition is used as `#A(role) #B(role) @AS $DEFINITION` or `$DEFINITION @ATT
 | `$CANVAS_VARIANT` | `part` (instance) | `symbol` = `null` | – | – | The Analog Canvas symbol a part is drawn with, where RNL draws two of its symbols alike: an op-amp flipped top to bottom is drawn as the op-amp with its inputs swapped, unflipped. symbol is Analog Canvas's id of the symbol; without it, … |
 | `$CANVAS_CELL_NAME` | `level` | `name` = `null` | – | – | The name Analog Canvas gives the Cell a level is, where the netlist must write it otherwise: a subcircuit name has no spaces, so the Cell "Bootstrap switch" is the subcircuit Bootstrap_switch. Attached to the level, a lone # (6.3), in the … |
 | `$CANVAS_TOP` | `level` | – | – | – | The level is the Cell Analog Canvas opens as its project's top, which the netlist need not show: a Cell that calls it is printed too, so the netlist's top is that Cell. Attached to the level, a lone #, in the level's own record: … |
+
+### eda-style
+
+| Definition | Roles | Parameters (defaults) | Symbol | Group | Comment before it in the file |
+| --- | --- | --- | --- | --- | --- |
+| `$PIN_SQUARE` | `t` (pin) | – | – | – | Automatic red terminal square on the pins of instances (user-defined symbols too) and of grounds and supplies. Port models draw a solid red polygon instead. A file adds pins to $PIN_SQUARE_SET or removes them from it before the square rule … |
 
 ### rnl-std-45deg
 
@@ -224,6 +233,157 @@ A symbol is chosen by the rules of the next section, or by `@SET-SYMBOL $NAME` o
 | `$CANVAS_VOLTAGE_AMPLIFIER_LETTERED` | in:left out:right | formula, name | – |
 | `$CANVAS_XNOR_4INPUT` | a:left b:left c:left d:left y:right | name | – |
 | `$CANVAS_XOR_4INPUT` | a:left b:left c:left d:left y:right | name | – |
+
+### eda-symbol
+
+| Symbol | Pins | Labels | Definition |
+| --- | --- | --- | --- |
+| `$ADC` | in:left out:right | label, name | – |
+| `$ADDER_SYMBOL` | in1:left in2:down out:right | name, value | – |
+| `$AND_2INPUT` | a:left b:left y:right | name | – |
+| `$AND_3INPUT` | a:left b:left c:left y:right | name | – |
+| `$AND_4INPUT` | a:left b:left c:left d:left y:right | name | – |
+| `$ARROW_SYMBOL` | – | – | – |
+| `$BANDPASS_FILTER` | 1:left 2:right | name | – |
+| `$BANDSTOP_FILTER` | 1:left 2:right | name | – |
+| `$BATTERY` | n:down p:up | name, value | – |
+| `$BEHAVIORAL_SOURCE` | n:down p:up | name | – |
+| `$BUFFER` | a:left y:right | name | – |
+| `$CAPACITOR` | n:down p:up | name, value | – |
+| `$CENTER_TAP_INDUCTOR` | n1:left n2:right tap:down | name | – |
+| `$CGND` | 1:up | name | – |
+| `$CLOSED_SWITCH` | n:right p:left | name, value | – |
+| `$COMPARATOR` | inn:left inp:left out:right | name, value | – |
+| `$CONTROLLED_CURRENT_SOURCE` | n:down p:up | name, value | – |
+| `$CONTROLLED_VOLTAGE_SOURCE` | n:down p:up | name, value | – |
+| `$CURRENT_SOURCE` | n:down p:up | name, value | – |
+| `$DAC` | in:left out:right | label, name | – |
+| `$DEADBAND_DIFFAMP` | 1:left 2:left 3:right | name, value | – |
+| `$DELAY_CELL` | a:left y:right | name | – |
+| `$DEPLETION_NMOS` | d:up g:left s:down | name, model | – |
+| `$DEPLETION_NMOS_4TERM` | b:right d:up g:left s:down | name, model | – |
+| `$DEPLETION_PMOS` | d:down g:left s:up | name, model | – |
+| `$DEPLETION_PMOS_4TERM` | b:right d:down g:left s:up | name, model | – |
+| `$DIFFERENTIAL_OPAMP` | inn:left inp:left outn:right outp:right | name | – |
+| `$DIFFERENTIAL_TRANSCONDUCTOR` | inn:left inp:left out:right | value, name | – |
+| `$DIFFERENTIATOR` | 1:left 2:right | label, name | – |
+| `$DIODE` | a:up k:down | name, model | – |
+| `$DISCRETE_TIME_INTEGRATOR_SYMBOL` | in:left out:right | label, name | – |
+| `$DIVIDER` | 1:left 2:left 3:right | value, name | – |
+| `$D_FLIP_FLOP` | ck:left d:left q:right qb:right | name, value | – |
+| `$D_FLIP_FLOP_Q_ONLY` | ck:left d:left q:right | name, value | – |
+| `$D_FLIP_FLOP_WITH_RESET` | ck:left d:left q:right qb:right rst:down | name, value | – |
+| `$EGND` | 1:up | name | – |
+| `$EXTERNALLY_CONTROLLED_SWITCH` | cp:left n:down p:up | name, value | – |
+| `$GROUND_SYMBOL` | p:up | – | – |
+| `$HIGHPASS_FILTER` | 1:left 2:right | name | – |
+| `$IDEAL_BALUN` | 1:right 2:down 3:left 4:down | name | – |
+| `$INDUCTOR` | n:down p:up | name, value | – |
+| `$INTEGRATOR_SYMBOL` | in:left out:right | name | – |
+| `$INVERTER` | a:left y:right | name | – |
+| `$IO_PORT_SYMBOL` | p:right | netname | – |
+| `$IPIN` | p:right | netname | – |
+| `$IPROBE` | 1:down 2:down | name, value | – |
+| `$IPULSE` | n:down p:up | name, value | – |
+| `$IPWL` | n:down p:up | name, value | – |
+| `$ISIN` | n:down p:up | name, value | – |
+| `$JK_FF` | 1:left 2:left 3:left 4:right 5:right | name, value | – |
+| `$JUNCTION_SYMBOL` | – | – | – |
+| `$LIMITING_DIFFAMP` | 1:left 2:left 3:right | name, value | – |
+| `$LOWPASS_FILTER` | 1:left 2:right | name | – |
+| `$MIXER` | 1:left 2:down 3:right | name | – |
+| `$MULTIPLEXER` | 1:left 2:left 3:left 4:up 5:down 6:right | value, name | – |
+| `$MULTIPLIER_SYMBOL` | in1:left in2:down out:right | name, value | – |
+| `$NAMED_GROUND_SYMBOL` | p:up | netname | – |
+| `$NAND_2INPUT` | a:left b:left y:right | name | – |
+| `$NAND_3INPUT` | a:left b:left c:left y:right | name | – |
+| `$NAND_4INPUT` | a:left b:left c:left d:left y:right | name | – |
+| `$NDMOS` | d:up g:left s:down | name, model | – |
+| `$NDMOS_4TERM` | b:right d:up g:left s:down | name, model | – |
+| `$NJFET` | d:up g:left s:down | name, model | – |
+| `$NMES4` | 1:up 2:left 3:down 4:right | name, model | – |
+| `$NMOS` | d:up g:left s:down | name, model | – |
+| `$NMOS_4TERM` | b:right d:up g:left s:down | name, model | – |
+| `$NOR_2INPUT` | a:left b:left y:right | name | – |
+| `$NOR_3INPUT` | a:left b:left c:left y:right | name | – |
+| `$NOR_4INPUT` | a:left b:left c:left d:left y:right | name | – |
+| `$NO_CONNECT_SYMBOL` | – | – | – |
+| `$NPN` | b:left c:up e:down | name, model | – |
+| `$NPN4` | b:left c:up e:down s:right | name, model | – |
+| `$ON_PAGE_CONN` | 1:up | name | – |
+| `$OPAMP` | inn:left inp:left out:right | name, value | – |
+| `$OPAMP_6TERM` | 1:right 2:down 3:left 4:left 5:up 6:down | name, value | – |
+| `$OPIN` | p:left | netname | – |
+| `$OR_2INPUT` | a:left b:left y:right | name | – |
+| `$OR_3INPUT` | a:left b:left c:left y:right | name | – |
+| `$OR_4INPUT` | a:left b:left c:left d:left y:right | name | – |
+| `$OSC` | 1:up | name | – |
+| `$PDMOS` | d:down g:left s:up | name, model | – |
+| `$PDMOS_4TERM` | b:right d:down g:left s:up | name, model | – |
+| `$PJFET` | d:down g:left s:up | name, model | – |
+| `$PMOS` | d:down g:left s:up | name, model | – |
+| `$PMOS_4TERM` | b:right d:down g:left s:up | name, model | – |
+| `$PNP` | b:left c:down e:up | name, model | – |
+| `$PWR` | 1:down | name | – |
+| `$QUADRATURE` | 1:up 2:down | name | – |
+| `$QUANTIZER_SYMBOL` | in:left out:right | name, value | – |
+| `$RC_LINE` | a:left b:right ref:down | name, value | – |
+| `$RESISTOR` | n:down p:up | name, value | – |
+| `$RF_PORT` | n:down p:up | name, value | – |
+| `$SCHOTTKY` | a:up k:down | name, model | – |
+| `$SCR` | 1:up 2:up 3:down 4:down | name, value | – |
+| `$SP2TSWITCH` | 1:left 2:right 3:right | name, value | – |
+| `$SP3TSWITCH` | 1:left 2:right 3:right 4:right | name, value | – |
+| `$SP4TSWITCH` | 1:left 2:right 3:right 4:right 5:right | name, value | – |
+| `$SPDT_SWITCH_SYMBOL` | – | – | – |
+| `$SUBTRACTOR` | 1:left 2:left 3:right | value, name | – |
+| `$SUPPLY_SYMBOL` | p:down | netname | – |
+| `$SWITCH` | n:right p:left | name, value | – |
+| `$THYRISTOR` | 1:up 2:down 3:left | name, value | – |
+| `$TRANSCONDUCTOR` | in:left out:right | label, name | – |
+| `$TRANSFORMER` | n1:down n2:down p1:up p2:up | name, value | – |
+| `$TRANSMISSION_LINE` | n1:down n2:down p1:left p2:right | name, value | – |
+| `$T_COIL` | n1:left n2:right tap:down | name | – |
+| `$UNIT_DELAY_SYMBOL` | in:left out:right | label, name | – |
+| `$VARIABLE_CAPACITOR` | n:down p:up | name, value | – |
+| `$VARIABLE_GAIN_AMPLIFIER` | 1:left 2:left 3:up 4:down 5:right | value, name | – |
+| `$VARIABLE_INDUCTOR` | n:down p:up | name, value | – |
+| `$VARIABLE_RESISTOR` | n:down p:up | name, value | – |
+| `$VCCAP` | 1:up 2:down 3:right 4:right | name, value | – |
+| `$VCCSP` | 1:right 2:right 3:left 4:left | value, name | – |
+| `$VCCS_4TERM` | cn:left cp:left n:down p:up | name, value | – |
+| `$VCO` | 1:left 2:left 3:right | value, name | – |
+| `$VCRES` | 1:up 2:down 3:right 4:right | name, value | – |
+| `$VCVSP` | 1:right 2:right 3:left 4:left | value, name | – |
+| `$VCVS_4TERM` | cn:left cp:left n:down p:up | name, value | – |
+| `$VC_VG_DIFFAMP` | 1:left 2:left 3:up 4:down 5:right | name, value | – |
+| `$VOLTAGE_AMPLIFIER` | in:left out:right | value, name | – |
+| `$VOLTAGE_CONTROLLED_SWITCH` | cn:right cp:left n:right p:left | name, value | – |
+| `$VOLTAGE_SOURCE` | n:down p:up | name, value | – |
+| `$VPULSE` | n:down p:up | name, value | – |
+| `$VPWL` | n:down p:up | name, value | – |
+| `$VSIN` | n:down p:up | name, value | – |
+| `$VSS_SYMBOL` | 1:up | name | – |
+| `$XNOR_2INPUT` | a:left b:left y:right | name | – |
+| `$XNOR_3INPUT` | a:left b:left c:left y:right | name | – |
+| `$XNOR_4INPUT` | a:left b:left c:left d:left y:right | name | – |
+| `$XOR_2INPUT` | a:left b:left y:right | name | – |
+| `$XOR_3INPUT` | a:left b:left c:left y:right | name | – |
+| `$XOR_4INPUT` | a:left b:left c:left d:left y:right | name | – |
+| `$ZENER_DIODE` | a:up k:down | name, model | – |
+
+### pdk-sky130
+
+| Symbol | Pins | Labels | Definition |
+| --- | --- | --- | --- |
+| `$SKY130_CAPACITOR_3TERM` | 1:up 2:down 3:left | name, value | – |
+| `$SKY130_CAPACITOR_4TERM` | 1:up 2:down 3:left 4:right | name, value | – |
+| `$SKY130_INDUCTOR_4TERM` | 1:up 2:down 3:left 4:left | name, value | – |
+| `$SKY130_NMOS_5TERM` | 1:up 2:left 3:down 4:right 5:right | name, model | – |
+| `$SKY130_NPN_4TERM` | 1:up 2:left 3:down 4:right | name, model | – |
+| `$SKY130_PNP_4TERM` | 1:down 2:left 3:up 4:right | name, model | – |
+| `$SKY130_RESISTOR_3TERM` | 1:up 2:down 3:left | name, value | – |
+| `$SKY130_VARACTOR_3TERM` | 1:up 2:down 3:left | name, value | – |
 
 ### rnl-std-45deg
 
@@ -513,6 +673,7 @@ The sets of the packages; the fill of `rnl-std-fill` is decided by them. A file 
 
 | Set | Package |
 | --- | --- |
+| `$PIN_SQUARE_SET` | `eda-style` |
 | `$GROUND_NET_SET` | `rnl-std-basic` |
 | `$SUPPLY_NET_SET` | `rnl-std-basic` |
 | `$BIAS_NET_SET` | `rnl-std-basic` |

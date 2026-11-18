@@ -25,7 +25,7 @@ pub struct CurrentFact {
     pub terminal: Option<ObjId>,
     pub direction: String,
     pub loc: Option<Loc>,
-    source: Option<CurrentSource>,
+    source: CurrentSource,
 }
 
 impl Interp<'_> {
@@ -44,8 +44,7 @@ impl Interp<'_> {
         pos: Pos,
         ctx: &Ctx,
     ) -> R<()> {
-        let modern = self.follows_0_4(self.source_unit(ctx));
-        let after_symbols = modern && (self.late_input(input) || matches!(self.o(input), ObjData::ScenePin { .. }));
+        let after_symbols = self.late_input(input) || matches!(self.o(input), ObjData::ScenePin { .. });
         if !after_symbols && !self.current_host_terminal(input) {
             return self.fail(
                 ctx,
@@ -54,7 +53,7 @@ impl Interp<'_> {
                 off,
             );
         }
-        let source = modern.then(|| CurrentSource {
+        let source = CurrentSource {
             input,
             site: Rc::new(ctx.clone()),
             chain: self.apply_chain(ctx),
@@ -63,7 +62,7 @@ impl Interp<'_> {
             // Neither generation nor CURRENT rules can read the changes made in generation.
             visible_from: if after_symbols || self.scenes[scene].phase >= 5 { 6 } else { 3 },
             after_symbols,
-        });
+        };
         let fact = CurrentFact {
             pos: super::obj::order_pos(&pos, &ctx.segments),
             terminal: (!after_symbols).then_some(input),
@@ -130,9 +129,8 @@ impl Interp<'_> {
             .currents
             .iter()
             .enumerate()
-            .filter_map(|(index, fact)| {
-                fact.source.as_ref().filter(|source| source.after_symbols).map(|source| (index, source.clone()))
-            })
+            .filter(|(_, fact)| fact.source.after_symbols)
+            .map(|(index, fact)| (index, fact.source.clone()))
             .collect();
         for (index, source) in inputs {
             let value = if final_check {
@@ -171,7 +169,7 @@ impl Interp<'_> {
         if fact.terminal.is_none() {
             return false;
         }
-        let Some(source) = &fact.source else { return true };
+        let source = &fact.source;
         phase >= source.visible_from
             && source.site.header.priority != Some(Priority::Disabled)
             && !self.failed_body(&source.site)

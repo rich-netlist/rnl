@@ -92,10 +92,10 @@ def run(exe, *args):
 def smoke(exe, version, commit):
     code, stdout, stderr = run(exe, "--version")
     assert (code, stdout.strip(), stderr) == (0, f"rnl {version} ({commit})".encode(), b""), (code, stdout, stderr)
-    case = ROOT / "tests/conformance/cases/01-rc-lowpass.sp"
+    case = ROOT / "tests/conformance/cases-0.4/from-0.2/01-rc-lowpass.sp"
     code, stdout, stderr = run(exe, "check", case)
     assert code == 0 and b"0 errors, 0 violations, 0 warnings" in stdout and not stderr, (code, stdout, stderr)
-    code, stdout, stderr = run(exe, "check", ROOT / "tests/conformance/cases/12-diagnostics.sp")
+    code, stdout, stderr = run(exe, "check", ROOT / "tests/conformance/cases-0.4/from-0.2/12-diagnostics.sp")
     assert code == 1 and b"error " in stdout and b"no-such-package" in stdout, (code, stdout, stderr)
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp)
@@ -109,7 +109,7 @@ def smoke(exe, version, commit):
 
 
 def compare(exe, reference):
-    cases = sorted(p for folder in ("cases", "cases-0.3")
+    cases = sorted(p for folder in ("cases-0.4/from-0.2", "cases-0.4/from-0.3")
                    for p in (ROOT / "tests/conformance" / folder).iterdir() if p.suffix in (".sp", ".scs"))
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "svg"

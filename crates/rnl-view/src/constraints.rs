@@ -118,7 +118,7 @@ pub struct ConstraintObject {
 }
 
 /// How the level's own text refers to something: what it writes, a usage made by a rule and the
-/// path through it, a number in a file of the draft 0.3 (5.9), or nothing.
+/// path through it, a number (5.9), or nothing.
 #[derive(Serialize, Debug, Clone, PartialEq)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(untagged)]
@@ -292,21 +292,17 @@ pub struct ConstraintGroup {
     pub members: Vec<usize>,
 }
 
-fn reference(r: &Reference, numbers: bool) -> ConstraintReference {
+fn reference(r: &Reference) -> ConstraintReference {
     match r {
         Reference::Name(n) => ConstraintReference::Written(n.clone()),
         Reference::Generated { usage, path } => {
             ConstraintReference::Generated { generated_by: *usage, path: path.concat() }
         }
-        Reference::Number { number, path } if numbers => {
-            ConstraintReference::Number { number: *number, path: path.concat() }
-        }
-        Reference::GeneratedNumber { usage, index, path } if numbers => {
+        Reference::Number { number, path } => ConstraintReference::Number { number: *number, path: path.concat() },
+        Reference::GeneratedNumber { usage, index, path } => {
             ConstraintReference::GeneratedNumber { generated_by: *usage, number: *index, path: path.concat() }
         }
-        Reference::Number { .. } | Reference::GeneratedNumber { .. } | Reference::Anonymous => {
-            ConstraintReference::None
-        }
+        Reference::Anonymous => ConstraintReference::None,
     }
 }
 
@@ -318,7 +314,7 @@ fn point(r: &PointRef) -> ConstraintPoint {
         }
         // Constraints use the coordinate of either kind; their reference retains ::position.
         PointRef::SymbolPin { object, pin, reference: r } | PointRef::PinPosition { object, pin, reference: r } => {
-            ConstraintPoint::SymbolPin { object: *object, pin: *pin, reference: reference(r, true) }
+            ConstraintPoint::SymbolPin { object: *object, pin: *pin, reference: reference(r) }
         }
         PointRef::Centre(points) => ConstraintPoint::Centre { centre: points_of(points) },
     }
@@ -385,17 +381,12 @@ fn kind(f: &ProblemFact) -> ConstraintKind {
 /// The fact of rank `k` of a problem. `rnl problem` prints these, without `what`.
 pub fn constraint(p: &LevelProblem, k: usize) -> Constraint {
     let f = &p.facts[k];
-    let numbers = p.follows_0_3();
     Constraint {
         fact: kind(f),
         priority: f.priority.as_str(),
         label: f.label.clone(),
         what: fact_statement(p, k),
-        reference: match &f.reference {
-            Some(Reference::Number { .. } | Reference::GeneratedNumber { .. }) if !numbers => None,
-            Some(r) => Some(reference(r, numbers)),
-            None => None,
-        },
+        reference: f.reference.as_ref().map(reference),
         source: f.source.as_ref().map(|l| ConstraintSource { file: l.file.clone(), line: l.line, col: l.col }),
         chain: f.chain.clone(),
     }
@@ -414,7 +405,6 @@ pub(crate) fn level_constraints(
     level: &Level,
     objects: &[Object],
 ) -> LevelConstraints {
-    let numbers = p.follows_0_3();
     let ids = document_ids(p, shown);
     let usages: HashMap<&str, usize> = level.usages.iter().map(|u| (u.id.as_str(), u.object)).collect();
     let instances: HashMap<String, usize> = objects
@@ -446,7 +436,7 @@ pub(crate) fn level_constraints(
             .map(|(o, id)| ConstraintObject {
                 kind: o.kind.as_str(),
                 label: o.label.clone(),
-                reference: reference(&o.reference, numbers),
+                reference: reference(&o.reference),
                 generated: o.generated,
                 objects: id.as_deref().map(document).unwrap_or_default(),
                 pins: id.as_deref().map(pins).unwrap_or_default(),
@@ -461,7 +451,7 @@ pub(crate) fn level_constraints(
             .map(|(u, id)| ConstraintUsage {
                 definition: u.definition.clone(),
                 label: u.label.clone(),
-                reference: reference(&u.reference, numbers),
+                reference: reference(&u.reference),
                 generated: u.generated,
                 parent: u.parent,
                 object: id.as_deref().and_then(|id| usages.get(id).copied()),

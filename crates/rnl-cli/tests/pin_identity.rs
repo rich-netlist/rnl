@@ -26,25 +26,20 @@ const TWO: &str = "$S = @DEFINE-SYMBOL { (-3,0) @PIN(terminal=1); (3,0) @PIN(ter
 
 #[test]
 fn every_pin_remains_but_a_terminal_uses_its_last_pin() {
-    for version in ["0.2", "0.3", "0.4"] {
-        let r = read(version, TWO);
-        no_errors(&r);
-        let lv = &r.model.levels[0];
-        let item = &lv.items[0];
-        let count = if version == "0.4" { 2 } else { 1 };
-        assert_eq!(lv.symbols[item.symbol].pins.len(), count);
-        assert_eq!(item.pin_nets, vec![vec!["a"]; count]);
-        let info = lv.objects.iter().find(|o| o.id == "#R1").unwrap();
-        assert_eq!(info.pins.iter().map(|p| &p.nets).collect::<Vec<_>>(), vec![&vec!["&a".to_string()]; count]);
-        assert_eq!(lv.wires[0].points[0], (3.0, 0.0));
-        let p = &r.problems[0];
-        let net = p.nets.iter().find(|n| n.name == "a").unwrap();
-        assert_eq!(net.pins.len(), count);
-        assert_eq!(p.wires[0].anchors[0].pin_key(), Some((0, count - 1)));
-        if version == "0.4" {
-            assert!(matches!(net.pins[0], PointRef::SymbolPin { pin: 0, reference: Reference::Anonymous, .. }));
-        }
-    }
+    let r = read("0.4", TWO);
+    no_errors(&r);
+    let lv = &r.model.levels[0];
+    let item = &lv.items[0];
+    assert_eq!(lv.symbols[item.symbol].pins.len(), 2);
+    assert_eq!(item.pin_nets, vec![vec!["a"]; 2]);
+    let info = lv.objects.iter().find(|o| o.id == "#R1").unwrap();
+    assert_eq!(info.pins.iter().map(|p| &p.nets).collect::<Vec<_>>(), vec![&vec!["&a".to_string()]; 2]);
+    assert_eq!(lv.wires[0].points[0], (3.0, 0.0));
+    let p = &r.problems[0];
+    let net = p.nets.iter().find(|n| n.name == "a").unwrap();
+    assert_eq!(net.pins.len(), 2);
+    assert_eq!(p.wires[0].anchors[0].pin_key(), Some((0, 1)));
+    assert!(matches!(net.pins[0], PointRef::SymbolPin { pin: 0, reference: Reference::Anonymous, .. }));
 }
 
 #[test]
@@ -68,10 +63,7 @@ fn unbound_pins_are_drawn_and_stay_off_all_nets() {
     assert_eq!(lv.symbols[lv.items[0].symbol].pins.len(), 2);
     assert_eq!(lv.items[0].pin_nets, [Vec::<String>::new(), vec!["a".into()]]);
     assert!(r.problems[0].nets.iter().flat_map(|n| &n.pins).all(|p| p.pin_key() != Some((0, 0))));
-    for version in ["0.2", "0.3"] {
-        let old = read(version, "$S = @DEFINE-SYMBOL { (0,0) @PIN }");
-        assert!(old.diagnostics().iter().any(|d| d.severity == Severity::Error));
-    }
+
     let empty = read("0.4", "$S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=[]) }");
     assert!(empty.diagnostics().iter().any(|d| d.code == codes::PARAM_PIN_TERMINAL_EMPTY));
 }
@@ -156,16 +148,14 @@ fn solver_geometry_uses_the_pin_index_and_writeback_never_substitutes_a_later_pi
 }
 
 #[test]
-fn source_file_version_controls_pins_in_scoped_symbol_definitions() {
-    for (outer, inner, count) in [("0.4", "0.3", 2), ("0.3", "0.4", 1)] {
-        let files = MemoryProvider::new()
-            .with("t.sp", &format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\n.include \"inc.sp\"\n* @RNL(scope=\"child\") {{ $S = @DEFINE-SYMBOL {{ (0,0) @PIN(terminal=1); (2,0) @PIN(terminal=1) }}; #R1 @SET-SYMBOL $S => @PLACE(0,0) }}\n.end\n"))
-            .with("inc.sp", &format!("* inc\n* @RNL(type=\"header\") {{ @VERSION(\"{inner}\") }}\n.subckt child a\nR1 a 0 1k\n.ends\n"));
-        let r = interpret_file(Path::new("t.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
-        no_errors(&r);
-        let child = r.model.levels.iter().find(|l| l.items.iter().any(|i| i.id == "#R1")).unwrap();
-        assert_eq!(child.symbols[child.items[0].symbol].pins.len(), count);
-    }
+fn scoped_symbol_definitions_keep_every_pin() {
+    let files = MemoryProvider::new()
+        .with("t.sp", "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include \"inc.sp\"\n* @RNL(scope=\"child\") { $S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1); (2,0) @PIN(terminal=1) }; #R1 @SET-SYMBOL $S => @PLACE(0,0) }\n.end\n")
+        .with("inc.sp", "* inc\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child a\nR1 a 0 1k\n.ends\n");
+    let r = interpret_file(Path::new("t.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    no_errors(&r);
+    let child = r.model.levels.iter().find(|l| l.items.iter().any(|i| i.id == "#R1")).unwrap();
+    assert_eq!(child.symbols[child.items[0].symbol].pins.len(), 2);
 }
 
 #[test]

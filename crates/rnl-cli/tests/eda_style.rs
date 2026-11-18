@@ -12,11 +12,11 @@ use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 
 fn package_dir() -> PathBuf {
-    public_packages::package_dir("eda-style")
+    public_packages::version_dir("eda-style", "0.2")
 }
 
 fn symbol_dir() -> PathBuf {
-    public_packages::package_dir("eda-symbol")
+    public_packages::version_dir("eda-symbol", "0.2")
 }
 
 fn clean(r: &Interpretation) {
@@ -70,7 +70,7 @@ fn every_eda_symbol_has_its_pin_sides_on_its_outermost_pins() {
     }
     let c = symbols();
     assert_eq!(c.packages.len(), 1);
-    assert_eq!(c.symbols.len(), 137);
+    assert_eq!(c.symbols.len(), 133);
     for s in &c.symbols {
         let [x1, y1, x2, y2] = s.bbox;
         for p in &s.pins {
@@ -98,27 +98,32 @@ fn neither_package_is_builtin_and_neither_imports_the_other() {
     for name in ["eda-symbol", "eda-style"] {
         assert!(!c.packages.iter().any(|p| p.name == name));
     }
+    // each references only packages of the standard series, for the definitions its rules select
     let geometry = symbols();
-    assert!(geometry.packages[0].references.is_empty());
+    assert_eq!(geometry.packages[0].references, ["rnl-std-basic", "rnl-std-signal-flow"]);
     assert!(geometry.definitions.is_empty());
     let options = rnl_view::CatalogOptions { packages: Some(vec!["eda-style".into()]), ..Default::default() };
     let style = rnl_view::catalog(&FsProvider::new(&[package_dir()]), &options);
     assert_eq!(style.packages.len(), 1);
-    assert!(style.packages[0].references.is_empty());
+    assert_eq!(style.packages[0].references, ["rnl-std-basic"]);
     assert!(style.symbols.is_empty());
     assert_eq!(style.definitions.len(), 1);
     assert_eq!(style.definitions[0].definition, "$PIN_SQUARE");
 }
 
 #[test]
-fn all_93_shared_symbols_follow_standard_terminal_directions() {
+fn all_88_shared_symbols_follow_standard_terminal_directions() {
     if !public_packages::available() {
         return;
     }
     let geometry = symbols();
     let standard = rnl_view::catalog(&FsProvider::new(&[]), &rnl_view::CatalogOptions::default());
-    let shared: Vec<_> = standard.symbols.iter().filter(|s| s.version == "0.3").collect();
-    assert_eq!(shared.len(), 93);
+    let shared: Vec<_> = standard
+        .symbols
+        .iter()
+        .filter(|s| s.version == "0.4" && geometry.symbols.iter().any(|a| a.symbol == s.symbol))
+        .collect();
+    assert_eq!(shared.len(), 88);
     for s in shared {
         let actual = geometry.symbols.iter().find(|a| a.symbol == s.symbol).unwrap();
         assert_eq!(actual.pins.len(), s.pins.len(), "{}", s.symbol);
@@ -127,7 +132,11 @@ fn all_93_shared_symbols_follow_standard_terminal_directions() {
             assert_eq!(actual.direction, pin.direction, "{} terminal {:?}", s.symbol, pin.terminal);
         }
     }
-    for (name, count) in [("$SCHOTTKY", 2), ("$SP3TSWITCH", 4), ("$SP4TSWITCH", 5)] {
+    // the Schottky diode stands upright, its anode up, as the diodes of the standard series do
+    let s = geometry.symbols.iter().find(|s| s.symbol == "$SCHOTTKY").unwrap();
+    let pins: Vec<_> = s.pins.iter().map(|p| (p.at, p.direction)).collect();
+    assert_eq!(pins, [([0.0, 3.0], Some("up")), ([0.0, -3.0], Some("down"))]);
+    for (name, count) in [("$SP3TSWITCH", 4), ("$SP4TSWITCH", 5)] {
         let s = geometry.symbols.iter().find(|s| s.symbol == name).unwrap();
         assert_eq!(s.pins.len(), count);
         assert_eq!(s.pins[0].direction, Some("left"));

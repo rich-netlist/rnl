@@ -13,19 +13,19 @@ pub struct Usage {
     /// Shared frame and label anchors in SVG pixels; absent when no member is drawn.
     pub frame: Option<crate::UsageFrame>,
     pub object: usize,
-    /// For a 0.4 usage attached to pins of one owner: that owner's Document object index.
+    /// For a usage attached to pins of one owner: that owner's Document object index.
     /// Absent without a unique host; independent of the usage's symbol, coordinates and constraints.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub pin_of: Option<usize>,
-    /// The enclosing 0.4 usage's Document object index. Follow this chain for inherited pin attachment.
+    /// The enclosing usage's Document object index. Follow this chain for inherited pin attachment.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub parent: Option<usize>,
     /// "usage", or "group" for a set marked with GROUP (11.5), whose one role, `members`, holds
     /// its members.
     pub kind: &'static str,
-    /// For a group of a 0.4 level in the tree of groups: the group above it, by its Document
+    /// For a group in the tree of groups: the group above it, by its Document
     /// object index, as `pin_of`; absent at the top. The tree is that of the solver's rules on the
     /// members with a place of their own (`rnl_runtime::group_tree`); the solver's own may leave
     /// out a group of fewer than two of the objects it lays out.
@@ -42,7 +42,7 @@ pub struct Usage {
     #[cfg_attr(test, ts(optional))]
     pub crosses: Option<usize>,
     pub id: String,
-    /// Its definition, such as `$GROUND`, or in a 0.4 level, `%dot` for one a level defines, whose `%` a level before 0.4 leaves out; empty for a group.
+    /// Its definition, such as `$GROUND`, or `%dot` for one a level defines; empty for a group.
     pub definition: String,
     /// Whether the usage itself is a virtual part with its own symbol.
     pub has_symbol: bool,
@@ -54,7 +54,7 @@ pub struct Usage {
     pub roles: Vec<UsageRole>,
     /// "in-effect"; "overridden", a fact its statement writes lost a conflict to one of higher
     /// priority (8.5); "disabled", its priority, or that of the usage it is made in, is
-    /// "disabled" (14.8). A group is "in-effect" or "disabled" (11.5), and in a 0.4 level also
+    /// "disabled" (14.8). A group is "in-effect" or "disabled" (11.5), or
     /// "same", its members are those of another group (`same_as`), or "left-out", it crosses a
     /// group in the tree (`crosses`) or has no member with a place of its own. As `MemberOf::state`; an application that failed makes no
     /// usage and has no row.
@@ -241,7 +241,6 @@ fn inspect(
     let by_id: HashMap<_, _> = lv.objects.iter().map(|o| (o.id.as_str(), o)).collect();
     let point_ids: HashSet<&str> = lv.points.iter().map(|p| p.id.as_str()).collect();
     let mut memo = HashMap::new();
-    let modern = rnl_runtime::interp::unit::keeps_0_4(&lv.language);
     let mut usages: Vec<Usage> = listed
         .iter()
         .map(|o| {
@@ -366,16 +365,13 @@ fn inspect(
             }
         })
         .collect();
-    if modern {
-        tree_order(&mut usages);
-    }
+    tree_order(&mut usages);
     usages
 }
 
-/// Where a group of a 0.4 level stands in the tree of groups (`GroupInfo::place`), over its state
-/// as a usage: the group above it, the group it is, or the group it crosses, by their index in
-/// `LevelView::groups`. A usage, a group turned off, and a group of a level before 0.4 keep their
-/// state as it is.
+/// Where a group stands in the tree of groups (`GroupInfo::place`), over its state as a usage: the
+/// group above it, the group it is, or the group it crosses, by their index in
+/// `LevelView::groups`. A usage and a group turned off keep their state as it is.
 pub(super) struct Standing {
     pub state: &'static str,
     pub reason: Option<String>,
@@ -386,7 +382,7 @@ pub(super) struct Standing {
 
 pub(super) fn standing(lv: &LevelView, o: &ObjectInfo, (state, reason): (&'static str, Option<String>)) -> Standing {
     let mut out = Standing { state, reason, parent: None, same_as: None, crosses: None };
-    if o.kind != "group" || state == "disabled" || !rnl_runtime::interp::unit::keeps_0_4(&lv.language) {
+    if o.kind != "group" || state == "disabled" {
         return out;
     }
     let Some(row) = lv.groups.iter().position(|g| g.id == o.id) else { return out };
@@ -534,10 +530,46 @@ fn geometry(
 mod tests {
     use crate::{BuildOptions, MemoryProvider};
 
+    /// Usages of every kind of role, and one in a subcircuit of its own.
+    const USAGES: &str = r#"* Usage inspection and independent drawing scopes
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-basic", version="0.4"); @USE-PACKAGE(name="rnl-std-spice", version="0.4") }
+.subckt other p n
+Rother p n 1k
+* @RNL {
+*   $OTHER = @DEFINE(roles=["part"]) {};
+*   %other = #Rother @AS $OTHER;
+*   #Rother @PLACE(0, 0)
+* }
+.ends other
+R1 a b 1k
+R2 b c 2k
+R3 c d 3k
+R4 d e 4k
+* @RNL {
+*   $PAIR = @DEFINE(roles=["left", "right"]) {};
+*   $SET = @DEFINE(roles=["{members}"]) {};
+*   $NEST = @DEFINE(roles=[["inner", "usage"]]) {};
+*   $NET = @DEFINE(roles=[["signal", "net"]]) {};
+*   $PIN = @DEFINE(roles=[["pin", "terminal"]]) {};
+*   $POINT = @DEFINE(roles=[["axis", "point"]]) {};
+*   #R1 @PLACE(0, 0); #R2 @PLACE(9, 0); #R3 @PLACE(20, 0);
+*   %pair1 = #R1(left) #R2(right) @AS $PAIR;
+*   %pair2 = #R2(left) #R3(right) @AS $PAIR;
+*   %unseen = #R4(left) #R4(right) @AS $PAIR;
+*   %set1 = {#R1 #R3} @AS $SET;
+*   %nested = %pair1 @AS $NEST;
+*   %signal = &a @AS $NET;
+*   %pin1 = #R1:1 @AS $PIN;
+*   %axis = (4, 5) @AS $POINT;
+*   %ground = $GROUND @ATTACH #R1:2::net => @PLACE(0, -2);
+*   %wire = &a @WIRE {(-6, 2) #R1:1}
+* }
+.end
+"#;
+
     #[test]
     fn usages_keep_their_scope_source_identity_and_visible_roles() {
-        let p =
-            MemoryProvider::new().with("usages.sp", include_str!("../../../../tests/viewer/inputs/usage-inspector.sp"));
+        let p = MemoryProvider::new().with("usages.sp", USAGES);
         let d = crate::build("usages.sp", &p, &BuildOptions::default()).unwrap();
         assert!(!d.diagnostics.iter().any(|d| d.severity == "error"), "{:?}", d.diagnostics);
         let lv = &d.levels[0];
@@ -602,12 +634,6 @@ mod tests {
         assert_eq!((g("%e").state, g("%e").crosses, g("%e").group_parent), ("left-out", None, None));
         // the tree first, siblings by their first member, then the groups outside it
         assert_eq!(order, ["%again", "%cross", "%far", "%outer", "%inner", "%off", "%e"]);
-
-        let p = MemoryProvider::new().with("g.sp", &file("0.3"));
-        let d = crate::build("g.sp", &p, &BuildOptions::default()).unwrap();
-        let lv = &d.levels[0];
-        assert!(lv.usages.iter().all(|u| u.group_parent.is_none() && u.same_as.is_none() && u.crosses.is_none()));
-        assert!(lv.usages.iter().all(|u| u.state == "in-effect" || u.state == "disabled"));
     }
 
     #[test]
@@ -628,10 +654,6 @@ mod tests {
         let small = d.levels[0].usages.iter().find(|u| u.id == "%small").unwrap();
         let within: Vec<_> = d.objects[small.object].usages.iter().map(|e| e.id.as_str()).collect();
         assert_eq!(within, ["%big"], "a group is within the group above it in the tree");
-        let p = MemoryProvider::new().with("g.sp", &file("0.3"));
-        let d = crate::build("g.sp", &p, &BuildOptions::default()).unwrap();
-        let object = |name: &str| d.objects.iter().find(|o| o.name == name).unwrap();
-        assert!(object("R3").usages.iter().all(|e| e.state == "in-effect"), "0.3 has no tree of groups");
     }
 
     #[test]
@@ -663,7 +685,11 @@ R1 out 0 1k
     fn drawing_wrappers_are_distinct_from_pure_semantic_usages() {
         let p = MemoryProvider::new().with(
             "wrappers.sp",
-            "* wrappers\nR1 a 0 1k\n* @RNL { #R1 @PLACE(0, 0); %stub = $GROUND_STUB @ATTACH #R1:2; $ROUTER = @DEFINE(roles=[[\"signal\", \"net\"]]) { ?signal @ROUTE }; %r = &a @AS $ROUTER }\n.end\n",
+            "* wrappers\nR1 a 0 1k\n\
+             * @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-basic\", version=\"0.4\"); \
+             @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\") }\n\
+             * @RNL { #R1 @PLACE(0, 0); %stub = $GROUND_STUB @ATTACH #R1::n; \
+             $ROUTER = @DEFINE(roles=[[\"signal\", \"net\"]]) { ?signal @ROUTE-NET }; %r = &a @AS $ROUTER }\n.end\n",
         );
         let d = crate::build("wrappers.sp", &p, &BuildOptions::default()).unwrap();
         assert!(!d.diagnostics.iter().any(|d| d.severity == "error"), "{:?}", d.diagnostics);
@@ -689,8 +715,7 @@ R1 out 0 1k
     #[test]
     fn wire_fragments_and_quoted_virtual_pins_keep_all_visible_geometry() {
         use rnl_runtime::model::Attach;
-        let p =
-            MemoryProvider::new().with("usages.sp", include_str!("../../../../tests/viewer/inputs/usage-inspector.sp"));
+        let p = MemoryProvider::new().with("usages.sp", USAGES);
         let mut r = crate::interpret("usages.sp", None, &p, &Default::default()).unwrap();
         let lv = &mut r.model.levels[0];
         let k = lv.wires.iter().position(|w| w.object_id == "%wire").unwrap();

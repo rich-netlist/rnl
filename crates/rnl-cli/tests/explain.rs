@@ -16,7 +16,7 @@ R1 a b 1k
 R2 b c 1k
 R3 c 0 1k
 M1 d g 0 0 nch
-* @RNL(type="header") { @VERSION("0.3")}
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4") }
 * @RNL {
 *   $PAIR = @DEFINE(roles=["left", "right"]) {};
 *   $TWO = @DEFINE(roles=[["first", "usage"], "second"]) {};
@@ -33,7 +33,7 @@ M1 d g 0 0 nch
 *   %drain = #M1:d @AS $PIN;
 *   %sig = &b @AS $NET;
 *   # @SELECT-INSTANCE(name="R3") => @AS $LONE;
-*   %gnd = $GROUND @ATTACH #R3:2;
+*   %arrow = $CURRENT_ARROW @ATTACH #R3:2;
 *   %port = $IO_PORT @ATTACH &c => @PLACE(0, 0);
 *   %port @PLACE(5, 5, priority="high")
 * }
@@ -94,18 +94,23 @@ fn states_and_sources_of_the_usages() {
     assert_eq!((by("%bad").state, by("%bad").roles[0].role.as_str()), ("failed", "extra"));
     // a terminal of an instance, by its number and its name
     assert_eq!(
-        by("%gnd").roles,
+        by("%arrow").roles,
         [RoleOf { role: "p".into(), set: false, member: "#R3:2".into(), terminal: Some("n".into()) }]
     );
     // a usage a rule made, with where the rule is written
     let rule = r3.usages.iter().find(|e| e.source == "rule").unwrap();
     assert_eq!(rule.definition, "$LONE");
     assert_eq!(rule.rule, Some(RuleAt { package: String::new(), file: "explain.sp".into(), line: 23 }));
-    // a rule of a package: the standard package's ground stubs on the MOSFET's tied terminals
-    let m1 = object(&d, "instance", "M1");
-    let stubs: Vec<&MemberOf> = m1.usages.iter().filter(|e| e.source == "rule").collect();
-    assert!(!stubs.is_empty());
+    // a rule of a package: the standard package's stubs on the MOSFET's unwired pins
+    let stubs: Vec<&MemberOf> = d
+        .objects
+        .iter()
+        .filter(|o| o.kind == "pin" && o.name.starts_with("pin(#M1,"))
+        .flat_map(|o| o.usages.iter().filter(|e| e.source == "rule"))
+        .collect();
+    assert!(stubs.iter().any(|e| e.definition == "$GROUND_STUB"), "{stubs:?}");
     assert!(stubs.iter().all(|e| e.rule.as_ref().is_some_and(|r| r.package == "rnl-std-fill")), "{stubs:?}");
+    let m1 = object(&d, "instance", "M1");
     let drain = m1.usages.iter().find(|e| e.id == "%drain").unwrap();
     assert_eq!((drain.roles[0].member.as_str(), drain.roles[0].terminal.as_deref()), ("#M1:1", Some("d")));
     // a net, and a usage whose PLACE lost a conflict to one of higher priority
@@ -113,19 +118,22 @@ fn states_and_sources_of_the_usages() {
     let port = &object(&d, "net", "c").usages[0];
     assert_eq!((port.id.as_str(), port.state), ("%port", "overridden"));
     assert!(port.reason.as_deref().is_some_and(|r| r.contains("discarded in the order of 8.5")), "{port:?}");
-    // a usage that a solver wrote back, and one the body of a definition made
-    let files = MemoryProvider::new().with(
-        "/w/ota5t.sp",
-        &std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../site/examples/ota5t.sp")).unwrap(),
+    // a usage that a solver wrote back, and those the bodies of the stubs it wrote back made
+    let files = MemoryProvider::new().with("/w/ota5t.scs", &std::fs::read_to_string(solved_ota()).unwrap());
+    let d = rnl_view::build("/w/ota5t.scs", &files, &BuildOptions { svg: false, ..BuildOptions::default() }).unwrap();
+    let vdd = d.objects.iter().find(|o| o.kind == "net" && o.name == "vdd" && o.level_title == "ota5t").unwrap();
+    assert!(vdd.usages.iter().any(|e| e.id == "%io_port_vdd" && e.source == "solver"), "{:?}", vdd.usages);
+    let made: Vec<&MemberOf> = vdd.usages.iter().filter(|e| e.id != "%io_port_vdd").collect();
+    assert!(!made.is_empty());
+    assert!(
+        made.iter().all(|e| e.source == "body" && e.made_in.as_deref().is_some_and(|p| p.starts_with("%supply_stub_"))),
+        "{made:?}"
     );
-    let d = rnl_view::build("/w/ota5t.sp", &files, &BuildOptions { svg: false, ..BuildOptions::default() }).unwrap();
-    let m5 = object(&d, "instance", "M5");
-    assert!(m5.usages.iter().any(|e| e.id == "%gnd" && e.source == "solver"), "{:?}", m5.usages);
-    let vdd = object(&d, "net", "vdd");
-    assert!(vdd
-        .usages
-        .iter()
-        .all(|e| e.source == "body" && e.made_in.as_deref().is_some_and(|p| p.starts_with("%vdd"))));
+}
+
+/// The five-transistor OTA of the solver's cases, with its records of the solver.
+fn solved_ota() -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/integration/solver-0.4/solved/ota5t.scs")
 }
 
 #[test]
@@ -183,7 +191,7 @@ fn explain_prints_a_line_for_each_usage_and_the_chain_upward() {
     %outer is in turn first of usage %top (definition $TWO) · explain.sp:17 · written
   one of {members} of usage %all (definition $SET) · explain.sp:18 · written
   right of usage %off (definition $PAIR) · explain.sp:19 · written · DISABLED
-  p (through terminal n) of usage %gnd (definition $GROUND) · explain.sp:24 · written
+  p (through terminal n) of usage %arrow (definition $CURRENT_ARROW) · explain.sp:24 · written
   part of usage @explain.sp:23:38 (definition $LONE) · explain.sp:23 · made by the rule at explain.sp:23
   extra of usage %bad (definition $PAIR) · explain.sp:20 · written · FAILED: the ordinary definition $PAIR has no role extra (9.4)
 "
@@ -235,15 +243,26 @@ fn explain_refuses_an_unknown_reference_with_the_names_close_to_it() {
 
 #[test]
 fn explain_on_the_five_transistor_ota() {
-    let ota = rnl_cli::path_str(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../site/examples/ota5t.sp"));
+    let ota = rnl_cli::path_str(&solved_ota());
     let (code, out, _) = rnl(&["explain", &ota, "#M1"]);
     assert_eq!(code, 0);
-    assert_eq!(
-        out,
-        "#M1 in ota5t: 2 usages
-  in_p of usage %dp1 (definition $DIFFERENTIAL_PAIR) · ota5t.sp:12 · written
-  a of usage %sym12 (definition $MIRRORED) · ota5t.sp:19 · written
-"
+    // the usages written in the file, and those the bodies of the standard package's
+    // definitions make, each with where it is written
+    let lines: Vec<&str> = out.lines().collect();
+    assert_eq!(lines[0], "#M1 in ota5t: 5 usages, 3 groups");
+    for line in [
+        "  left of usage %dp (definition $DIFFERENTIAL_PAIR_N) · ota5t.scs:31 · written",
+        "    %dp is in turn transconductor of usage %amp (definition $TRANSCONDUCTOR_Z_AMPLIFIER) · ota5t.scs:35 · written",
+        "  one of {members} of usage %br_left (definition $BRANCH) · ota5t.scs:46 · written",
+        "  member of group %amp_group · ota5t.scs:37 · written",
+    ] {
+        assert!(lines.contains(&line), "{line}\n{out}");
+    }
+    assert!(
+        lines.iter().any(|l| l.starts_with("  left of usage @rnl-std-semantics.rnl:")
+            && l.contains("(definition $MIRRORED_LAYOUT)")
+            && l.ends_with("made by the body of %dp")),
+        "{out}"
     );
     // the level by its title
     let (code, same, _) = rnl(&["explain", &ota, "#M1", "--level", "ota5t"]);
@@ -255,7 +274,7 @@ const DEEP: &str = r#"* deep
 R1 a b 1k
 R2 b c 1k
 R3 c d 1k
-* @RNL(type="header") { @VERSION("0.3")}
+* @RNL(type="header") { @VERSION("0.4") }
 * @RNL {
 *   $PAIR = @DEFINE(roles=["left", "right"]) {};
 *   $TWO = @DEFINE(roles=[["first", "usage"], "second"]) {};
@@ -328,7 +347,7 @@ R2 b c 1k
 R3 c d 1k
 R4 d e 1k
 R5 e f 1k
-* @RNL(type="header") { @VERSION("0.3")}
+* @RNL(type="header") { @VERSION("0.4") }
 * @RNL {
 *   $PAIR = @DEFINE(roles=["left", "right"]) {};
 *   $BOXED = @DEFINE(roles=["a", "b"]) { %inner = {?a ?b} @GROUP };
@@ -367,9 +386,10 @@ fn groups_are_listed_with_the_usages() {
         kinds(r1),
         [
             ("usage", "%dp", "in-effect"),
-            ("group", "%stage1", "in-effect"),
-            ("group", "%pair", "in-effect"),
+            ("group", "%stage1", "left-out"),
+            ("group", "%pair", "left-out"),
             ("group", "%core", "in-effect"),
+            ("group", "%blocks", "in-effect"),
             ("group", "@groups.sp:20:5", "in-effect"),
         ]
     );
@@ -379,20 +399,27 @@ fn groups_are_listed_with_the_usages() {
         ("", Some("groups.sp"), 12, "written")
     );
     assert_eq!(stage1.roles, [RoleOf { role: "members".into(), set: true, member: "#R1".into(), terminal: None }]);
+    // a group that shares members with another while neither holds the other is no block (11.5)
+    assert_eq!(
+        stage1.reason.as_deref(),
+        Some("it shares members with the group @groups.sp:20:5 without either holding the other, so it is not a block")
+    );
     // a group is within the smallest groups that hold all its members, with no roles
     let g = |name: &str| object(&d, "group", name);
-    assert_eq!(kinds(g("%pair")), [("group", "%stage1", "in-effect")]);
-    assert!(g("%pair").usages[0].roles.is_empty());
-    assert_eq!(kinds(g("%stage1")), [("group", "%core", "in-effect")]);
+    assert_eq!(kinds(g("@groups.sp:20:5")), [("group", "%blocks", "in-effect")]);
+    assert!(g("@groups.sp:20:5").usages[0].roles.is_empty());
+    assert_eq!(kinds(g("%blocks")), [("group", "%core", "in-effect")]);
     assert_eq!(kinds(g("%core")), []);
-    // a usage written into a group, a group turned off, and a terminal
-    assert_eq!(kinds(object(&d, "usage", "%dp")), [("group", "%blocks", "in-effect")]);
+    assert_eq!(kinds(g("%pair")), []);
+    // a usage without a symbol written into a group is not a member: its members are (11.5); a
+    // group turned off, and a terminal
+    assert_eq!(kinds(object(&d, "usage", "%dp")), []);
     let r3 = object(&d, "instance", "R3");
     assert_eq!(r3.usages.iter().find(|e| e.id == "%off").unwrap().state, "disabled");
     let r5 = object(&d, "instance", "R5");
     let term = r5.usages.iter().find(|e| e.id == "@groups.sp:21:5").unwrap();
     assert_eq!((term.roles[0].member.as_str(), term.roles[0].terminal.as_deref()), ("#R5:2", Some("n")));
-    assert_eq!(kinds(object(&d, "net", "a")), [("group", "@groups.sp:21:5", "in-effect")]);
+    assert_eq!(kinds(object(&d, "net", "a")), [("group", "@groups.sp:21:5", "left-out")]);
     // made by the body of a definition, and by a rule
     let r4 = object(&d, "instance", "R4");
     let body = r4.usages.iter().find(|e| e.id == "@groups.sp:10:50").unwrap();
@@ -414,6 +441,7 @@ fn groups_are_listed_with_the_usages() {
     assert_eq!(state("%core"), ("in-effect", false));
     assert_eq!(state("%off"), ("disabled", false));
     assert_eq!(state("%dp"), ("in-effect", false));
+    assert_eq!(state("%pair"), ("left-out", true));
 }
 
 #[test]
@@ -457,8 +485,8 @@ fn the_snapshot_lists_the_groups() {
     assert!(core.get("usages").is_none());
     assert_eq!(groups[5]["state"], "disabled");
     assert_eq!(groups[6]["made_in"], "%b1");
-    assert_eq!(groups[2]["usages"][0]["id"], "%stage1");
-    assert_eq!(groups[2]["usages"][0]["kind"], "group");
+    assert_eq!(groups[7]["usages"][0]["id"], "%blocks");
+    assert_eq!(groups[7]["usages"][0]["kind"], "group");
     let r1 = model["objects"].as_array().unwrap().iter().find(|o| o["id"] == "#R1").unwrap();
     let listed: Vec<(&str, &str)> = r1["usages"]
         .as_array()
@@ -476,17 +504,16 @@ fn explain_says_the_groups_an_object_is_in() {
     assert_eq!((code, err.as_str()), (0, ""));
     assert_eq!(
         out,
-        "#R1 in groups.sp: 1 usage, 4 groups
+        "#R1 in groups.sp: 1 usage, 5 groups
   left of usage %dp (definition $PAIR) · groups.sp:11 · written
-    %dp is in turn a member of group %blocks · groups.sp:16 · written
-  member of group %stage1 · groups.sp:12 · written
-    %stage1 is in turn within group %core · groups.sp:15 · written
-  member of group %pair · groups.sp:14 · written
-    %pair is in turn within group %stage1 · groups.sp:12 · written
-      %stage1 is in turn within group %core · groups.sp:15 · written
+  member of group %stage1 · groups.sp:12 · written · LEFT-OUT: it shares members with the group @groups.sp:20:5 without either holding the other, so it is not a block
+  member of group %pair · groups.sp:14 · written · LEFT-OUT: it shares members with the group @groups.sp:20:5 without either holding the other, so it is not a block
   member of group %core · groups.sp:15 · written
+  member of group %blocks · groups.sp:16 · written
+    %blocks is in turn within group %core · groups.sp:15 · written
   member of group @groups.sp:20:5 · groups.sp:20 · written
-    @groups.sp:20:5 is in turn within group %core · groups.sp:15 · written
+    @groups.sp:20:5 is in turn within group %blocks · groups.sp:16 · written
+      %blocks is in turn within group %core · groups.sp:15 · written
 "
     );
     let (_, out, _) = rnl(&["explain", &file, "#R4"]);
@@ -494,14 +521,11 @@ fn explain_says_the_groups_an_object_is_in() {
         out,
         "#R4 in groups.sp: 1 usage, 4 groups
   a of usage %b1 (definition $BOXED) · groups.sp:19 · written
-  member of group %stage2 · groups.sp:13 · written
-    %stage2 is in turn within group %core · groups.sp:15 · written
+  member of group %stage2 · groups.sp:13 · written · LEFT-OUT: it shares members with the group @groups.sp:20:5 without either holding the other, so it is not a block
   member of group %core · groups.sp:15 · written
   member of group @groups.sp:10:50 · groups.sp:10 · made by the body of %b1
     @groups.sp:10:50 is in turn within group %core · groups.sp:15 · written
   member of group @groups.sp:22:38 · groups.sp:22 · made by the rule at groups.sp:22
-    @groups.sp:22:38 is in turn within group %stage2 · groups.sp:13 · written
-      %stage2 is in turn within group %core · groups.sp:15 · written
     @groups.sp:22:38 is in turn within group @groups.sp:10:50 · groups.sp:10 · made by the body of %b1
       @groups.sp:10:50 is in turn within group %core · groups.sp:15 · written
 "
@@ -511,20 +535,23 @@ fn explain_says_the_groups_an_object_is_in() {
     let (_, out, _) = rnl(&["explain", &file, "#R5:2"]);
     assert_eq!(
         out,
-        "#R5:2 in groups.sp: 1 group\n  member (through terminal n) of group @groups.sp:21:5 · groups.sp:21 · written\n"
+        "#R5:2 in groups.sp: 1 group\n  member (through terminal n) of group @groups.sp:21:5 · groups.sp:21 · written · LEFT-OUT: it has no members with a place of their own, so it is not a block\n"
     );
-    let (_, out, _) = rnl(&["explain", &file, "%pair"]);
+    let (_, out, _) = rnl(&["explain", &file, "@groups.sp:20:5"]);
     assert_eq!(
         out,
-        "%pair in groups.sp: 1 group
-  within group %stage1 · groups.sp:12 · written
-    %stage1 is in turn within group %core · groups.sp:15 · written
+        "@groups.sp:20:5 in groups.sp: 1 group
+  within group %blocks · groups.sp:16 · written
+    %blocks is in turn within group %core · groups.sp:15 · written
 "
     );
+    // a group left out is within none
+    let (_, out, _) = rnl(&["explain", &file, "%pair"]);
+    assert_eq!(out, "%pair in groups.sp: in no usage or group\n");
     let (_, out, _) = rnl(&["explain", &file, "%core"]);
     assert_eq!(out, "%core in groups.sp: in no usage or group\n");
     let (_, out, _) = rnl(&["explain", &file, "#R1", "--json"]);
     let v: serde_json::Value = serde_json::from_str(&out).unwrap();
-    assert_eq!(v["objects"][0]["usages"][1]["kind"], "group");
-    assert_eq!(v["objects"][0]["usages"][1]["outer"][0]["id"], "%core");
+    assert_eq!(v["objects"][0]["usages"][4]["kind"], "group");
+    assert_eq!(v["objects"][0]["usages"][4]["outer"][0]["id"], "%core");
 }

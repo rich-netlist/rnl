@@ -1,4 +1,4 @@
-// Netlists that only a solver draws: the global setup solved them with `rnl solve`, whose records
+// Netlists that only a solver draws: the reviewed cases of 0.4 as `rnl solve` wrote them, whose records
 // place every object and route the wires, and the page opens the files solved as any other. The
 // drawing is the solver's: no status of a level asks for a solver, every symbol and wire is drawn,
 // and the routed nets have wires. Each test saves screenshots of the page under test-results, named
@@ -11,7 +11,7 @@ import { expect, test } from "../viewer.js";
 /** Where the screenshots go: test-results of this directory, which Playwright empties as a run starts. */
 const RESULTS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../test-results");
 
-/** The path of the screenshot NAME.png, as solved-T3, in the project running: NAME-firefox.png in firefox. */
+/** The path of the screenshot NAME.png, as solved-ota5t, in the project running: NAME-firefox.png in firefox. */
 function screenshot(name) {
   const project = test.info().project.name;
   return path.join(RESULTS, project === "chromium" ? `${name}.png` : `${name}-${project}.png`);
@@ -67,16 +67,16 @@ async function drawn(page, viewer, { title, instances, nets, wired, shot }) {
   await page.screenshot({ path: screenshot(shot) });
 }
 
-test("T3, the five-transistor OTA in its testbench, is drawn as the solver placed and routed it", async ({ page, viewer }) => {
-  await viewer.open("T3-ota5t-solved");
+test("The five-transistor OTA in its testbench is drawn as the solver placed and routed it", async ({ page, viewer }) => {
+  await viewer.open("ota5t-solved");
   expect(await page.evaluate(() => window.viewer.doc.diagnostics.filter((d) => d.severity === "error"))).toEqual([]);
   await drawn(page, viewer, {
-    title: "T3-ota5t.sp",
-    instances: ["XU1", "VDD", "VB", "VIP", "VIN", "CL"],
-    // the ground stubs of XU1, VDD, VB, VIP, VIN and CL; the supply stubs of XU1 and VDD
-    nets: { 0: 6, vdd: 2 },
-    wired: ["inp", "inn", "out", "vb"],
-    shot: "solved-T3-top",
+    title: "ota5t.scs",
+    instances: ["XU1", "VDD", "VIP", "VIN", "CL"],
+    // the ground stubs of XU1, VDD, VIP, VIN and CL; the supply stubs of XU1 and VDD
+    nets: { 0: 5, vdd: 2 },
+    wired: ["inp", "inn", "out"],
+    shot: "solved-ota5t-top",
   });
 
   // the OTA's own level: the mirror on top, the pair below it, the tail at the bottom
@@ -85,12 +85,12 @@ test("T3, the five-transistor OTA in its testbench, is drawn as the solver place
   await page.locator("#tab-netlist").click();
   await drawn(page, viewer, {
     title: "ota5t",
-    instances: ["M1", "M2", "M3", "M4", "M5"],
-    // the supply stubs of M3 and M4 and the ground stub of M5, besides a port for each net; and the
-    // junction dots the solver writes, one on out, two on x and one on tail
-    nets: { vdd: 3, vss: 2, inp: 1, inn: 1, out: 2, vbias: 1, x: 2, tail: 1 },
-    wired: ["x", "tail", "out", "inp", "inn", "vbias"],
-    shot: "solved-T3",
+    instances: ["IREF", "M1", "M2", "M3", "M4", "M5", "M6"],
+    // three supply stubs and two ground stubs, besides a port for each port of the subcircuit; and the
+    // junction dots the solver writes, one on out, two on nb, one on tail and two on x
+    nets: { vdd: 4, vss: 3, inp: 1, inn: 1, out: 2, nb: 2, tail: 1, x: 2 },
+    wired: ["x", "tail", "out", "inp", "inn", "nb"],
+    shot: "solved-ota5t",
   });
   const middle = async (name) => (await viewer.where(name)).y;
   const [m1, m2, m3, m4, m5] = [await middle("M1"), await middle("M2"), await middle("M3"), await middle("M4"), await middle("M5")];
@@ -100,15 +100,15 @@ test("T3, the five-transistor OTA in its testbench, is drawn as the solver place
   expect(m1).toBeLessThan(m5);
 });
 
-test("T2, the common-source stage, is drawn as the solver placed and routed it", async ({ page, viewer }) => {
-  await viewer.open("T2-common-source-solved");
+test("The common-source amplifier is drawn as the solver placed and routed it", async ({ page, viewer }) => {
+  await viewer.open("cs-amplifier-solved");
   expect(await page.evaluate(() => window.viewer.doc.diagnostics.filter((d) => d.severity === "error"))).toEqual([]);
   await drawn(page, viewer, {
-    title: "T2-common-source.sp",
-    instances: ["M1", "RD", "VDD", "VIN"],
-    // the ground stubs of M1, VDD and VIN; the supply stubs of RD and VDD
-    nets: { 0: 3, vdd: 2 },
-    wired: ["in", "out"],
-    shot: "solved-T2",
+    title: "cs-amplifier.sp",
+    instances: ["M1", "RD", "RS", "CS", "RG1", "RG2", "CIN", "COUT", "RL", "VDD", "VSIG"],
+    // six ground stubs and three supply stubs; and the junction dots the solver writes, one each on g, d and s
+    nets: { 0: 6, vdd: 3, g: 1, d: 1, s: 1 },
+    wired: ["sig", "g", "d", "s", "out"],
+    shot: "solved-cs-amplifier",
   });
 });

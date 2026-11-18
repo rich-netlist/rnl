@@ -136,20 +136,6 @@ fn idle_hints_follow_facts_not_roles_and_skip_disabled_or_discarded_links() {
 }
 
 #[test]
-fn older_usages_keep_their_main_role_position_and_bare_hole_error() {
-    let r = read(
-        "0.3",
-        &format!("{SYMBOL} $D = @DEFINE(roles=[\"a\"]) {{ ?a @PLACE(1,2) }}; %u = #R1 @AS $D; %u @SET-SYMBOL $S"),
-    );
-    assert_eq!(errors(&r), []);
-    assert_eq!(at(&r, "%u"), Some((1.0, 2.0)));
-    assert!(r.problems[0].objects.iter().any(|o| o.label == "%u" && matches!(o.position, Position::At(_))));
-    let r = read("0.3", "$D = @DEFINE(roles=[\"a\"]) { ? @PLACE(0,0) }; %u = #R1 @AS $D; %u @PLACE(4,5)");
-    assert_eq!(errors(&r), [codes::REF_BARE_HOLE_OUTSIDE_SYMBOL, codes::PLACE_USAGE_NO_SYMBOL]);
-    assert!(!r.problems[0].objects.iter().any(|o| o.kind == ObjectKind::Usage));
-}
-
-#[test]
 fn parameters_and_point_literals_are_relative_but_free_axes_stay_free() {
     let r = read("0.4", "$D = @DEFINE(roles=[\"a\"],parameters=[[\"dx\",2]]) { %p = (?dx,3); %free = (_,4); ?a @PLACE(x=?dx) }; %u = #R1 @AS(dx=-5) $D; %u @PLACE(10,20); %u::p @CIRCLE(radius=1); %u::free @CIRCLE(radius=1)");
     assert_eq!(errors(&r), [], "{:?}", r.diagnostics());
@@ -190,20 +176,13 @@ fn disabled_usages_disable_body_point_coordinates_as_well_as_place() {
 }
 
 #[test]
-fn source_file_version_controls_usages_in_scoped_records() {
-    for (outer, inner) in [("0.4", "0.3"), ("0.3", "0.4")] {
-        let files = MemoryProvider::new()
-            .with("t.sp", &format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\n.include \"inc.sp\"\n* @RNL(scope=\"child\") {{ $D = @DEFINE(roles=[\"a\"]) {{}}; %u = #R1 @AS $D; %u @PLACE(4,5) }}\n.end\n"))
-            .with("inc.sp", &format!("* inc\n* @RNL(type=\"header\") {{ @VERSION(\"{inner}\") }}\n.subckt child a\nR1 a 0 1k\n.ends\n"));
-        let r = interpret_file(Path::new("t.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
-        if outer == "0.4" {
-            assert_eq!(errors(&r), []);
-            assert!(r.problems.iter().flat_map(|p| &p.objects).any(|o| o.kind == ObjectKind::Usage));
-        } else {
-            assert_eq!(errors(&r), [codes::PLACE_USAGE_NO_SYMBOL]);
-            assert!(!r.problems.iter().flat_map(|p| &p.objects).any(|o| o.kind == ObjectKind::Usage));
-        }
-    }
+fn a_usage_in_a_scoped_record_owns_its_point() {
+    let files = MemoryProvider::new()
+        .with("t.sp", "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include \"inc.sp\"\n* @RNL(scope=\"child\") { $D = @DEFINE(roles=[\"a\"]) {}; %u = #R1 @AS $D; %u @PLACE(4,5) }\n.end\n")
+        .with("inc.sp", "* inc\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child a\nR1 a 0 1k\n.ends\n");
+    let r = interpret_file(Path::new("t.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    assert_eq!(errors(&r), []);
+    assert!(r.problems.iter().flat_map(|p| &p.objects).any(|o| o.kind == ObjectKind::Usage));
 }
 
 #[test]

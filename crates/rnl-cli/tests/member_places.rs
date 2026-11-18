@@ -137,10 +137,7 @@ fn later_edits_in_nested_sets_and_definition_applications_take_effect() {
 }
 
 #[test]
-fn touching_braces_are_places_only_in_0_4() {
-    for version in ["0.2", "0.3"] {
-        assert!(errors(&read(version, "%a = #R1; %a{#R2} @ALIGN(\"y\")")).is_empty());
-    }
+fn touching_braces_are_places() {
     let e = errors(&read("0.4", "%a = #R1; %a{#R2} @ALIGN(\"y\"); #R3 @PLACE(2,3)"));
     assert_eq!(e.len(), 1, "{e:?}");
     assert_eq!(e[0].0, codes::SYNTAX_PLACES_TOUCHING_BRACES);
@@ -228,32 +225,30 @@ fn the_numbering_check_includes_member_places() {
 }
 
 #[test]
-fn the_source_file_version_controls_places_in_scoped_records() {
-    for (outer, inner) in [("0.4", "0.3"), ("0.3", "0.4")] {
-        let files = MemoryProvider::new()
-            .with("t.sp", &format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\n.include \"inc.sp\"\n* @RNL(scope=\"child\") {{ %a = {{#R1 #R2}}; %a{{2,1}} @ORDER(\"left-to-right\") }}\n.end\n"))
-            .with("inc.sp", &format!("* inc\n* @RNL(type=\"header\") {{ @VERSION(\"{inner}\") }}\n.subckt child a b\nR1 a b 1k\nR2 b 0 1k\n.ends\n"));
-        let r = interpret_file(Path::new("t.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
-        assert_eq!(errors(&r), Vec::new());
-        let p = r.problems.iter().find(|p| p.objects.iter().any(|o| o.label == "#R1")).unwrap();
-        let names: Vec<_> = p
-            .facts
-            .iter()
-            .find_map(|f| match &f.kind {
-                FactKind::Order { members, .. } => Some(
-                    members
-                        .iter()
-                        .map(|m| match m {
-                            PointRef::Origin(i) => p.objects[*i].label.as_str(),
-                            other => panic!("{other:?}"),
-                        })
-                        .collect(),
-                ),
-                _ => None,
-            })
-            .unwrap();
-        assert_eq!(names, if outer == "0.4" { ["#R2", "#R1"] } else { ["#R1", "#R2"] });
-    }
+fn places_are_read_in_scoped_records() {
+    let files = MemoryProvider::new()
+        .with("t.sp", "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include \"inc.sp\"\n* @RNL(scope=\"child\") { %a = {#R1 #R2}; %a{2,1} @ORDER(\"left-to-right\") }\n.end\n")
+        .with("inc.sp", "* inc\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child a b\nR1 a b 1k\nR2 b 0 1k\n.ends\n");
+    let r = interpret_file(Path::new("t.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    assert_eq!(errors(&r), Vec::new());
+    let p = r.problems.iter().find(|p| p.objects.iter().any(|o| o.label == "#R1")).unwrap();
+    let names: Vec<_> = p
+        .facts
+        .iter()
+        .find_map(|f| match &f.kind {
+            FactKind::Order { members, .. } => Some(
+                members
+                    .iter()
+                    .map(|m| match m {
+                        PointRef::Origin(i) => p.objects[*i].label.as_str(),
+                        other => panic!("{other:?}"),
+                    })
+                    .collect(),
+            ),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(names, ["#R2", "#R1"]);
 }
 
 #[test]

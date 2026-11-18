@@ -1,15 +1,15 @@
 // The page of smoke.mjs: the package as a frontend uses it, the core in its Worker. It builds a
-// netlist of 0.3 that draws a symbol of analog-canvas-extensions, explicitly added to the request pool, and writes
+// netlist of 0.4 that draws a symbol of analog-canvas-extensions, explicitly added to the request pool, and writes
 // an edit into a netlist without RNL records. #result gets what smoke.mjs checks, and its
 // data-state "done", or "failed" with the error.
 import { startCore } from "@rich-netlist/runtime";
 import canvasUrl from "rnl-public-canvas?url";
 
 const netlist = `* smoke
-* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="analog-canvas-extensions", version="0.1")}
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-PACKAGE(name="analog-canvas-extensions", version="0.7")}
 R1 a 0 1k
 E1 b 0 a 0 2
-* @RNL { #R1 @PLACE(0, 0); #E1 @SET-SYMBOL $CANVAS_VCVS_DIAMOND => @PLACE(10, 0) }
+* @RNL { #R1 @PLACE(0, 0); #E1 @SET-SYMBOL $CANVAS_VCVS_CIRCLE => @PLACE(10, 0) }
 .end
 `;
 

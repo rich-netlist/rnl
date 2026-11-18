@@ -111,17 +111,3 @@ fn nested_symbol_bodies_keep_their_own_context() {
     assert!(errors(&r).is_empty(), "{:?}", r.diagnostics());
     assert_eq!(r.model.levels[0].items.len(), 1);
 }
-
-#[test]
-fn released_versions_keep_their_partial_member_behavior() {
-    for version in ["0.2", "0.3"] {
-        let r = read(version, "%r=(0,0) @CIRCLE(radius=1)", "");
-        assert_eq!(
-            errors(&r),
-            [codes::DEFINE_LOCAL_NAME_CLASH, codes::PLACE_USAGE_NO_SYMBOL],
-            "{version}: {:?}",
-            r.diagnostics()
-        );
-        assert_eq!(r.model.levels[0].shapes.len(), 1, "{version}");
-    }
-}

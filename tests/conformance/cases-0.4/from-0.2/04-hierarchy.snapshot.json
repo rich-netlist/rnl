@@ -9,7 +9,7 @@
       "name": "04-hierarchy.sp",
       "file": 0,
       "line": 0,
-      "status": "1 without a position; constraints: 3 unsolved",
+      "status": "constraints: 1 unsolved, 2 ok",
       "host": {
         "ports": [],
         "instances": [
@@ -1420,7 +1420,7 @@
           },
           {
             "pin_of": "#X3",
-            "id": "@rnl-std-fill.rnl:57:3",
+            "id": "%net_label_stub_X3_mid",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL_STUB",
@@ -1432,7 +1432,10 @@
               "source": null
             },
             "at": {
-              "value": null,
+              "value": [
+                0.0,
+                0.0
+              ],
               "source": null
             },
             "orient": {
@@ -1443,7 +1446,7 @@
           },
           {
             "pin_of": "#X3",
-            "parent": "@rnl-std-fill.rnl:57:3",
+            "parent": "%net_label_stub_X3_mid",
             "id": "@rnl-std-basic.rnl:675:9",
             "kind": "usage",
             "host": [],
@@ -1456,7 +1459,10 @@
               "source": null
             },
             "at": {
-              "value": null,
+              "value": [
+                22.0,
+                -1.0
+              ],
               "source": null
             },
             "orient": {
@@ -1472,6 +1478,7 @@
                   "pin"
                 ],
                 "bus": false,
+                "reference": "%net_label_stub_X3_mid::l::pin",
                 "local_at": [
                   0.0,
                   0.0
@@ -1479,7 +1486,10 @@
                 "terminals": [
                   "p"
                 ],
-                "at": null,
+                "at": [
+                  22.0,
+                  -1.0
+                ],
                 "dir": 0,
                 "nets": [
                   "&d"
@@ -2282,6 +2292,41 @@
             ],
             "halign": "middle",
             "valign": "bottom",
+            "rotate": 0.0,
+            "fix_rotate": true,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "@rnl-std-basic.rnl:675:9::netname",
+            "attach": "@rnl-std-basic.rnl:675:9",
+            "attach_point": null,
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "d",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              20.7,
+              -1.0
+            ],
+            "halign": "end",
+            "valign": "middle",
             "rotate": 0.0,
             "fix_rotate": true,
             "size": 1.0,
@@ -3292,7 +3337,7 @@
       "name": "amp",
       "file": 0,
       "line": 8,
-      "status": "constraints: 3 ok, 3 unsolved",
+      "status": null,
       "host": {
         "ports": [
           "&in",
@@ -3380,7 +3425,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@rnl-std-fill.rnl:61:3",
+                "id": "%io_port_out",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -3390,14 +3435,9 @@
                     "terminal": null
                   }
                 ],
-                "file": null,
-                "line": 61,
-                "source": "rule",
-                "rule": {
-                  "package": "rnl-std-fill",
-                  "file": "rnl-std-fill.rnl",
-                  "line": 61
-                },
+                "file": 0,
+                "line": 47,
+                "source": "solver",
                 "state": "in-effect"
               }
             ]
@@ -3903,7 +3943,7 @@
             ]
           },
           {
-            "id": "@04-hierarchy.sp:40:5",
+            "id": "@04-hierarchy.sp:39:5",
             "kind": "usage",
             "host": [],
             "definition": "$JUNCTION",
@@ -3926,6 +3966,57 @@
               "source": null
             },
             "pins": []
+          },
+          {
+            "id": "%io_port_out",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IO_PORT",
+            "attach": {
+              "p": "&out"
+            },
+            "symbol": {
+              "value": "$IO_PORT_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                4.0,
+                3.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MY",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%io_port_out,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%io_port_out::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  4.0,
+                  3.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&out"
+                ]
+              }
+            ]
           },
           {
             "id": "%gs_M1_3",
@@ -4028,122 +4119,6 @@
                 ]
               }
             ]
-          },
-          {
-            "id": "@rnl-std-fill.rnl:61:3",
-            "kind": "usage",
-            "host": [],
-            "definition": "$IO_PORT",
-            "attach": {
-              "p": "&out"
-            },
-            "symbol": {
-              "value": "$IO_PORT_SYMBOL",
-              "source": null
-            },
-            "at": {
-              "value": [
-                4.0,
-                3.0
-              ],
-              "source": null
-            },
-            "orient": {
-              "value": "MY",
-              "source": null
-            },
-            "pins": [
-              {
-                "kind": "pin",
-                "id": "pin(@rnl-std-fill.rnl:61:3,0)",
-                "index": 0,
-                "names": [
-                  "pin"
-                ],
-                "bus": false,
-                "local_at": [
-                  0.0,
-                  0.0
-                ],
-                "terminals": [
-                  "p"
-                ],
-                "at": [
-                  4.0,
-                  3.0
-                ],
-                "dir": 180,
-                "nets": [
-                  "&out"
-                ]
-              }
-            ],
-            "usages": [
-              {
-                "kind": "usage",
-                "id": "@rnl-std-fill.rnl:61:59",
-                "definition": "%port_column",
-                "roles": [
-                  {
-                    "role": "tags",
-                    "set": true,
-                    "member": "@rnl-std-fill.rnl:61:3",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 61,
-                "source": "rule",
-                "rule": {
-                  "package": "rnl-std-fill",
-                  "file": "rnl-std-fill.rnl",
-                  "line": 61
-                },
-                "state": "in-effect"
-              },
-              {
-                "kind": "group",
-                "id": "@rnl-std-fill.rnl:59:104",
-                "definition": "",
-                "roles": [
-                  {
-                    "role": "members",
-                    "set": true,
-                    "member": "@rnl-std-fill.rnl:61:3",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 59,
-                "source": "body",
-                "made_in": "@rnl-std-fill.rnl:61:59",
-                "state": "in-effect"
-              }
-            ]
-          },
-          {
-            "id": "@rnl-std-fill.rnl:61:59",
-            "kind": "usage",
-            "host": [],
-            "definition": "%port_column",
-            "attach": {
-              "tags": [
-                "@rnl-std-fill.rnl:61:3"
-              ]
-            },
-            "symbol": {
-              "value": null,
-              "source": null
-            },
-            "at": {
-              "value": null,
-              "source": null
-            },
-            "orient": {
-              "value": "R0",
-              "source": null
-            },
-            "pins": []
           }
         ],
         "points": [
@@ -4221,7 +4196,7 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy.sp:39:5",
+            "id": "@04-hierarchy.sp:48:5",
             "nets": [
               "&out"
             ],
@@ -4230,10 +4205,8 @@
                 "point": "%jo"
               },
               {
-                "at": [
-                  4.0,
-                  3.0
-                ]
+                "usage": "%io_port_out",
+                "role": "p"
               }
             ],
             "points": [
@@ -4469,6 +4442,41 @@
             "style": {}
           },
           {
+            "id": "%io_port_out::netname",
+            "attach": "%io_port_out",
+            "attach_point": null,
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "out",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              5.25,
+              3.0
+            ],
+            "halign": "end",
+            "valign": "middle",
+            "rotate": 0.0,
+            "fix_rotate": true,
+            "size": 1.0,
+            "style": {}
+          },
+          {
             "id": "%gs_M1_3::netname",
             "attach": "%gs_M1_3",
             "attach_point": null,
@@ -4537,57 +4545,9 @@
             "fix_rotate": true,
             "size": 1.0,
             "style": {}
-          },
-          {
-            "id": "@rnl-std-fill.rnl:61:3::netname",
-            "attach": "@rnl-std-fill.rnl:61:3",
-            "attach_point": null,
-            "key": "netname",
-            "markup": {
-              "value": "${p}",
-              "source": null
-            },
-            "written": false,
-            "lines": [
-              [
-                {
-                  "kind": "text",
-                  "text": "out",
-                  "style": {
-                    "level": 0,
-                    "bold": false,
-                    "italic": false,
-                    "overline": false
-                  }
-                }
-              ]
-            ],
-            "anchor": [
-              5.25,
-              3.0
-            ],
-            "halign": "end",
-            "valign": "middle",
-            "rotate": 0.0,
-            "fix_rotate": true,
-            "size": 1.0,
-            "style": {}
           }
         ],
         "shapes": [],
-        "groups": [
-          {
-            "id": "@rnl-std-fill.rnl:59:104",
-            "members": [
-              "@rnl-std-fill.rnl:61:3"
-            ],
-            "file": null,
-            "line": 59,
-            "source": "body",
-            "made_in": "@rnl-std-fill.rnl:61:59",
-            "state": "in-effect"
-          }
-        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": "$JUNCTION_SYMBOL"

@@ -1,6 +1,7 @@
 //! The kinds of diagnostics (`diag::codes`), one constant for each entry of
 //! `data/diagnostics.json`, named by its short name: `param-wrong-type` is `PARAM_WRONG_TYPE`. A
-//! kind is added to the list, and so to the code, by adding its entry.
+//! kind is added to the list, and so to the code, by adding its entry; a kind no longer given moves
+//! to `retired`, whose numbers and names no kind takes again.
 
 use std::fmt::Write;
 use std::path::PathBuf;
@@ -19,20 +20,22 @@ fn main() {
             kind["sections"].as_array().map_or(Vec::new(), |s| s.iter().filter_map(|v| v.as_str()).collect());
         let constant = name.to_uppercase().replace('-', "_");
         let about = if sections.is_empty() { String::new() } else { format!(" ({})", sections.join(", ")) };
-        match kind["number"].as_str() {
-            Some(number) => {
-                let n: u16 =
-                    number.strip_prefix("RNL").and_then(|n| n.parse().ok()).expect("a number is RNL and four digits");
-                writeln!(out, "/// {number}, {severity}{about}.").unwrap();
-                writeln!(out, "pub const {constant}: Code = Code::new({n}, {name:?});").unwrap();
-            }
-            None => {
-                writeln!(out, "/// Without a number: a kind of the versions 0.2 and 0.3 alone; {severity}{about}.")
-                    .unwrap();
-                writeln!(out, "pub const {constant}: Code = Code::unnumbered({name:?});").unwrap();
-            }
-        }
+        let number = kind["number"].as_str().unwrap_or_else(|| panic!("the kind {name} has a number"));
+        let n: u16 = number.strip_prefix("RNL").and_then(|n| n.parse().ok()).expect("a number is RNL and four digits");
+        writeln!(out, "/// {number}, {severity}{about}.").unwrap();
+        writeln!(out, "pub const {constant}: Code = Code::new({n}, {name:?});").unwrap();
         all.push(constant);
+    }
+    // a retired kind keeps its number and its name: no kind of the list takes either
+    for gone in json["retired"].as_array().map_or(&[][..], |r| r.as_slice()) {
+        let (number, name) = (gone["number"].as_str(), gone["name"].as_str());
+        for kind in json["kinds"].as_array().unwrap() {
+            assert!(
+                number.is_none() || kind["number"].as_str() != number,
+                "{number:?} is retired and is not given again"
+            );
+            assert!(kind["name"].as_str() != name, "{name:?} is retired and is not given again");
+        }
     }
     writeln!(out, "/// Every kind, in the order of the list.").unwrap();
     writeln!(out, "pub const ALL: &[Code] = &[{}];", all.join(", ")).unwrap();

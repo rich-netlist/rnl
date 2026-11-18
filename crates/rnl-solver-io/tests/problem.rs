@@ -6,9 +6,8 @@ use rnl_runtime::{
 };
 use rnl_solver_io::{decode_problem, encode_problem, parse_json};
 
-fn read(version: &str, body: &str) -> LevelProblem {
-    let source=format!("* input protocol\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\nR1 a n 1k\nR2 n b 1k\n* @RNL {{ {} }}\n.end\n",body.replace('\n'," "));
-    let source = if version == "0.4" { source.replace("@ROUTE;", "@ROUTE-NET;") } else { source };
+fn read(body: &str) -> LevelProblem {
+    let source=format!("* input protocol\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\nR1 a n 1k\nR2 n b 1k\n* @RNL {{ {} }}\n.end\n",body.replace('\n'," "));
     let files = MemoryProvider::new().with("input.sp", &source);
     let r = rnl_view::interpret("input.sp", None, &files, &Options { std: false, ..Options::solver() }).unwrap();
     assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
@@ -16,7 +15,6 @@ fn read(version: &str, body: &str) -> LevelProblem {
 }
 fn rich() -> LevelProblem {
     read(
-        "0.4",
         r#"
         $DOT = @DEFINE(roles=[["p","point"]]) {};
         $S = @DEFINE-SYMBOL {
@@ -32,7 +30,7 @@ fn rich() -> LevelProblem {
         %u=#R1 @AS(dx=2) $D; %u @PLACE(20,10);
         @TABLE rows: {{#R1 #R2}};
         {#R1 #R2} @GROUP(spacing_x=3,spacing_y=1);
-        &n @ROUTE;
+        &n @ROUTE-NET;
         &a @WIRE(mode="manhattan45") {#R1::p::position (6,7)};
         @SOLVER-CONFIG(spacing_x=2,junction="$DOT")
     "#,
@@ -49,7 +47,6 @@ fn roundtrip(p: &LevelProblem) -> LevelProblem {
 #[test]
 fn group_declaration_identity_and_provenance_survive_the_protocol() {
     let problem = read(
-        "0.4",
         r#"
         $Disabled = @DEFINE(roles=["{members}"]) { ?members @GROUP };
         %pair={#R1 #R2}; %disabled=%pair @AS $Disabled => @PRIORITY("disabled"); %pair @GROUP;
@@ -73,17 +70,14 @@ fn group_declaration_identity_and_provenance_survive_the_protocol() {
 
 #[test]
 fn complete_runtime_inputs_round_trip_and_solve_identically() {
-    for version in ["0.2", "0.3", "0.4"] {
-        let p = read(
-            version,
-            r#"$S = @DEFINE-SYMBOL {(-1,-1) (1,1) @RECTANGLE; (-2,0) @PIN(terminal=1); (2,0) @PIN(terminal=2)}; {#R1 #R2} @SET-SYMBOL $S; &n @ROUTE; &a @WIRE {#R1:1 (-6,0)}"#,
-        );
-        assert!(!p.routes.is_empty());
-        assert!(p.routes.iter().all(|r| r.tree == (version == "0.4")));
-        let decoded = roundtrip(&p);
-        let options = rnl_solver::SolverOptions::without_time_limit();
-        assert_eq!(rnl_solver::solve(&decoded, &options), rnl_solver::solve(&p, &options));
-    }
+    let p = read(
+        r#"$S = @DEFINE-SYMBOL {(-1,-1) (1,1) @RECTANGLE; (-2,0) @PIN(terminal=1); (2,0) @PIN(terminal=2)}; {#R1 #R2} @SET-SYMBOL $S; &n @ROUTE-NET; &a @WIRE {#R1:1 (-6,0)}"#,
+    );
+    assert!(!p.routes.is_empty());
+    assert!(p.routes.iter().all(|r| r.tree));
+    let decoded = roundtrip(&p);
+    let options = rnl_solver::SolverOptions::without_time_limit();
+    assert_eq!(rnl_solver::solve(&decoded, &options), rnl_solver::solve(&p, &options));
 }
 
 #[test]

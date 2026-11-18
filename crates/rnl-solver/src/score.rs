@@ -671,13 +671,13 @@ mod tests {
     #[test]
     fn wires_written_mislead_over_pins_of_other_nets_and_where_they_meet_one() {
         let (p, s) = level(
-            "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n\
+            "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\") }\n\
              R1 c z1 1k\nR2 c z2 1k\nR3 b z3 1k\nR4 b z4 1k\nR5 Q<1> z5 1k\nR6 Q<0> z6 1k\nR7 d z7 1k\nR8 e z8 1k\n\
              R9 a z9 1k\n* @RNL {\n\
-             *   #R1 @PLACE(10, -3); #R2 @PLACE(100, -40); #R3 @PLACE(110, -40); #R4 @PLACE(120, -40);\n\
+             *   #R1 @PLACE(10, -2); #R2 @PLACE(100, -40); #R3 @PLACE(110, -40); #R4 @PLACE(120, -40);\n\
              *   #R5 @PLACE(130, -40); #R6 @PLACE(140, -40); #R7 @PLACE(150, -40); #R8 @PLACE(160, -40);\n\
              *   #R9 @PLACE(170, -40);\n\
-             *   {&b &c} @ROUTE;\n\
+             *   {&b &c} @ROUTE-NET;\n\
              *   &e @WIRE {(55, 20) (55, 15)};\n\
              *   &a @WIRE {(5, 0) (15, 0)};\n\
              *   &Q<1:0> @WIRE {(30, 0) (40, 0)};\n\

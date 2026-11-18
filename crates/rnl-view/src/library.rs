@@ -533,7 +533,6 @@ mod tests {
         let (doc, sink) = host(&files, &index, true, "/top.scs");
         let cell = &doc.levels[doc.subckt("Cell").unwrap()];
         assert_eq!(cell.instances[0].mtype.as_deref(), Some("nmos"));
-        assert!(!cell.instances[0].model_missing);
         assert!(doc.subckt("cell").is_none());
         assert_eq!(sink.all().len(), 1);
     }
@@ -704,7 +703,6 @@ mod tests {
             let (doc, _) = host(&files, &index, true, &top_path);
             let cell = &doc.levels[doc.subckt("cell").unwrap()];
             assert_eq!(cell.instances[0].mtype.as_deref(), Some("nmos"));
-            assert!(!cell.instances[0].model_missing);
         }
     }
 

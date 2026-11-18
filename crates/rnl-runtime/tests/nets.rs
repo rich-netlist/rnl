@@ -1,6 +1,6 @@
 //! How nets are drawn without a solver: a label on a net sits on one of the net's wires, or on one
-//! of its pins when no wire of it is drawn (13.3), a ROUTE draws flylines between the parts of its
-//! net that its wires do not join yet (13.7), and each part of a net has a place for the net's name.
+//! of its pins when no wire of it is drawn (13.3), flylines join the parts of a net that its wires
+//! do not join yet (13.7), and each part of a net has a place for the net's name.
 
 use rnl_runtime::diag::{Severity, Sink};
 use rnl_runtime::host::{Dialect, HostDocument, Instance, Level, LevelKind};
@@ -9,7 +9,7 @@ use rnl_runtime::records::{package_lines, scan_run};
 use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{interpret, Interpretation, Options};
 
-const RECORDS: &str = r#"@RNL(type="header") { @VERSION("0.2")}
+const RECORDS: &str = r#"@RNL(type="header") { @VERSION("0.4")}
 @RNL {
   $BAR = @DEFINE-SYMBOL {(0, 1) @PIN(terminal=1, direction="up"); (0, -1) @PIN(terminal=2, direction="down"); @LINE {(0, 1) (0, -1)}};
   # @SELECT-INSTANCE => @SET-SYMBOL $BAR;
@@ -23,8 +23,7 @@ const RECORDS: &str = r#"@RNL(type="header") { @VERSION("0.2")}
   &b @WIRE {%p #R2:1};
   &b @WIRE {#R1:2 #R2:1};
   &b @TEXT("on b");
-  &a @TEXT("on a");
-  {&b &c} @ROUTE
+  &a @TEXT("on a")
 }"#;
 
 /// R1 a b, R2 b c, R3 c d, with RECORDS written in the main file.
@@ -102,7 +101,7 @@ fn flylines_join_what_the_wires_of_a_net_leave_apart() {
 fn wires_through_junctions_leave_no_flyline() {
     // #R1:2 and #R2:1 on b are wired through two junctions, and the wire from one junction to the
     // other touches no pin: b has nothing left to join
-    let wired = r#"@RNL(type="header") { @VERSION("0.3")}
+    let wired = r#"@RNL(type="header") { @VERSION("0.4")}
 @RNL {
   $BAR = @DEFINE-SYMBOL {(0, 1) @PIN(terminal=1, direction="up"); (0, -1) @PIN(terminal=2, direction="down"); @LINE {(0, 1) (0, -1)}};
   # @SELECT-INSTANCE => @SET-SYMBOL $BAR;
@@ -110,17 +109,19 @@ fn wires_through_junctions_leave_no_flyline() {
   %j1 = (0, -3); %j2 = (4, -3);
   &b @WIRE {#R1:2 %j1};
   &b @WIRE {%j1 %j2};
-  &b @WIRE {%j2 #R2:1};
-  &b @ROUTE
+  &b @WIRE {%j2 #R2:1}
 }"#;
     let r = interpret_records(wired);
     let shown: Vec<String> = r.diagnostics().iter().map(|d| r.sink.render(d)).collect();
     assert!(shown.is_empty(), "{shown:?}");
     assert_eq!(ends_on(&r.model.levels[0], "b"), []);
     // without the wire between the junctions, the two halves are apart: a flyline joins them where
-    // they are nearest, from junction to junction
     let r = interpret_records(&wired.replace("  &b @WIRE {%j1 %j2};\n", ""));
-    assert_eq!(ends_on(&r.model.levels[0], "b"), [((0.0, -3.0), (4.0, -3.0))]);
+    // they are nearest: the wire from %j2 to R2:1, which leaves up, comes to the pin from the side
+    // and bends at (3, -3), nearer to %j1 than %j2 is (13.1)
+    let lv = &r.model.levels[0];
+    assert_eq!(lv.wires[1].points, [(4.0, -3.0), (3.0, -3.0), (3.0, 1.0), (4.0, 1.0)]);
+    assert_eq!(ends_on(lv, "b"), [((0.0, -3.0), (3.0, -3.0))]);
 }
 
 /// The errors and warnings of an interpretation, not its hints, such as those of the objects left
@@ -132,7 +133,7 @@ fn errors_and_warnings(r: &Interpretation) -> Vec<String> {
 /// The symbol $BAR with `body` after it.
 fn bars(body: &str) -> String {
     format!(
-        r#"@RNL(type="header") {{ @VERSION("0.3")}}
+        r#"@RNL(type="header") {{ @VERSION("0.4")}}
 @RNL {{
   $BAR = @DEFINE-SYMBOL {{(0, 1) @PIN(terminal=1, direction="up"); (0, -1) @PIN(terminal=2, direction="down"); @LINE {{(0, 1) (0, -1)}}}};
   # @SELECT-INSTANCE => @SET-SYMBOL $BAR;
@@ -143,16 +144,17 @@ fn bars(body: &str) -> String {
 
 #[test]
 fn a_flyline_is_the_shortest_in_a_straight_line() {
-    // R2:2 is at (0, -1) and R3:1 at (10, 1); the wire of c from R2:2 turns at (7, -2) and goes on
-    // to (10, 6). In a straight line (7, -2) is the nearer to R3:1, though not along the axes
+    // R2:2 is at (0, -1) and R3:1 at (10, 1); the wire of c from R2:2 turns at %t, (7, -2), and
+    // goes on to (10, 6). In a straight line (7, -2) is the nearer to R3:1, though not along the axes
     let records = bars(
         "#R2 @PLACE(0, 0); #R3 @PLACE(10, 0);
-  &c @WIRE(mode=\"straight\") {#R2:2 (7, -2)};
-  &c @WIRE(mode=\"straight\") {(7, -2) (10, 6)}",
+  %t = (7, -2);
+  &c @WIRE(mode=\"straight\") {#R2:2 %t};
+  &c @WIRE(mode=\"straight\") {%t (10, 6)}",
     );
     let r = interpret_records(&records);
     assert_eq!(errors_and_warnings(&r), Vec::<String>::new());
-    // the two wires meet at (7, -2): one part, which one flyline joins to R3:1
+    // the two wires meet at %t: one part, which one flyline joins to R3:1
     assert_eq!(ends_on(&r.model.levels[0], "c"), [((7.0, -2.0), (10.0, 1.0))]);
 }
 
@@ -177,8 +179,9 @@ fn wires_that_meet_at_their_ends_are_one_part_and_others_are_not() {
     // crosses it. R1:2 at (20, -1) and R2:1 at (30, 1) are apart
     let records = bars(
         "#R1 @PLACE(20, 0); #R2 @PLACE(30, 0);
-  &b @WIRE(mode=\"straight\") {(0, -3) (8, -3)};
-  &b @WIRE(mode=\"straight\") {(8, -3) (8, -6)};
+  %e = (8, -3);
+  &b @WIRE(mode=\"straight\") {(0, -3) %e};
+  &b @WIRE(mode=\"straight\") {%e (8, -6)};
   &b @WIRE(mode=\"straight\") {(4, -3) (4, -6)};
   &b @WIRE(mode=\"straight\") {(2, -1) (2, -5)}",
     );

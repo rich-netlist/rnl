@@ -29,7 +29,7 @@ fn fatal_geometry_preserves_existing_record_and_file() {
 #[test]
 fn ordinary_report_errors_keep_existing_writeback_behavior() {
     let text =
-        "* writeback fixture\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a b 1k\n* @RNL { %p=(_,_) }\n.end\n";
+        "* writeback fixture\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nR1 a b 1k\n* @RNL { %p=(_,_) }\n.end\n";
     let files = MemoryProvider::new().with("ordinary.sp", text);
     let backend = |problem: &rnl_runtime::problem::LevelProblem, _: &rnl_solver::SolverOptions| {
         let mut solved = Solved::default();

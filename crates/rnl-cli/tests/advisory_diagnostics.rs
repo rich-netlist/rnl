@@ -99,13 +99,14 @@ fn spectre_spice_mode_warns_about_ignored_rnl_after_the_main_end() {
 
 #[test]
 fn free_words_see_forward_declarations_across_records_and_definition_bodies() {
-    let text = "* title\nR1 a b 1k\n* @RNL { later (0,0) @TEXT(\"first\") }\n* @RNL { %later=(1,2); $D = @DEFINE(roles=[\"r\"],parameters=[[\"gap\",1]]) { local gap r (0,0) @TEXT(\"body\"); %local=(1,1) }; #R1 @AS $D; local (2,2) @TEXT(\"outside\") }\n.end\n";
+    let text = "* title\nR1 a b 1k\n* @RNL { later (0,0) @TEXT(\"first\") }\n* @RNL { %later=(1,2); $D = @DEFINE(roles=[\"r\"],parameters=[[\"gap\",1]]) { local gap r (0,0) @TEXT(\"body\"); %local=(1,1) }; #R1 @AS $D => @PLACE(3,3); local (2,2) @TEXT(\"outside\") }\n.end\n";
     let r = read("t.sp", text, &[]);
     let mut words = typo_words(&r);
     words.sort();
     assert_eq!(words, ["gap", "later", "local", "r"]);
     let later = r.diagnostics().into_iter().find(|d| d.message.starts_with("the free-text word later ")).unwrap();
     assert_eq!(later.loc.as_ref().unwrap().line, 3);
+    // the body draws its text at the point of the usage (9.4), placed here as a solver would
     assert_eq!(r.model.levels[0].texts.len(), 3);
 }
 

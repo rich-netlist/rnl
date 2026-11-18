@@ -1,6 +1,6 @@
-//! Names bound in records written into a subcircuit with scope= (standard 2.6, 6.6, 6.7, as the
-//! draft 0.3 makes clear in its 7.4): they are published to the subcircuit, in one name space with
-//! its own, so that its own records, and the solver's record written in its own text, use them. A
+//! Names bound in records written into a subcircuit with scope= (2.6, 6.6, 6.7, 7.4): they are
+//! published to the subcircuit, in one name space with its own, so
+//! that its own records, and the solver's record written in its own text, use them. A
 //! name bound again is an error, and the earlier binding is kept: the subcircuit's own text comes
 //! first, then the records written with scope=, the outer ones later. Before, such a name could
 //! not be found at all, not even in its own record, and the solver's view had no name for it.
@@ -19,7 +19,7 @@ use rnl_runtime::{Interpretation, Options};
 fn netlist(own: &str, scope: &str) -> String {
     let own = if own.is_empty() { String::new() } else { format!("* @RNL {{ {own} }}\n") };
     format!(
-        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\n.subckt ota a b\nR1 a b 1k\n{own}.ends ota\n\
+        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n.subckt ota a b\nR1 a b 1k\n{own}.ends ota\n\
          X1 n1 n2 ota\n* @RNL(scope=\"ota\") {{ {scope} }}\n.end\n"
     )
 }
@@ -103,7 +103,7 @@ fn a_name_bound_again_in_a_scope_record_is_an_error() {
 
     // of two levels that write into ota, the outer one comes later: the main file's binding fails
     let lib = "* the library\n.subckt ota a b\nR1 a b 1k\n.ends ota\n* @RNL(scope=\"ota\") { %q = (5, 6) }\n";
-    let main = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.include \"lib.inc\"\nX1 n1 n2 ota\n\
+    let main = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include \"lib.inc\"\nX1 n1 n2 ota\n\
                 * @RNL(scope=\"ota\") { %q = (1, 2); &a @WIRE {#R1:1 %q} }\n.end\n";
     let files = MemoryProvider::new().with("t.sp", main).with("lib.inc", lib);
     let r = interpret(&files, &Options::solver());
@@ -160,7 +160,7 @@ fn a_syntax_error_in_a_scope_record_fails_its_member() {
 fn hierarchy(own: &str, scope: &str) -> String {
     let own = if own.is_empty() { String::new() } else { format!("* @RNL {{ {own} }}\n") };
     format!(
-        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\n.model nch nmos level=1\n\
+        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }}\n.model nch nmos level=1\n\
          .subckt mid a b\n.subckt leaf x y\nM1 x y 0 0 nch\n.ends leaf\nXL a b leaf\nXO a b other\nM2 a b 0 0 nch\n\
          {own}.ends mid\n.subckt other p q\nM3 p q 0 0 nch\n.ends other\n\
          M4 n1 n2 0 0 nch\nX1 n1 n2 mid\n* @RNL(scope=\"mid\") {{ {scope} }}\n.end\n"
@@ -177,31 +177,32 @@ fn symbol<'a>(r: &'a Interpretation, level: &str, label: &str) -> &'a str {
 #[test]
 fn a_rule_in_a_scope_record_reaches_the_levels_below_the_target() {
     // as if written in mid: in mid, and in leaf, which mid contains in its text (6.1, 10.4); not
-    // in other, which mid only uses, nor in the main file above mid
-    let rule = "# @SELECT-INSTANCE(model=\"nch\") => @SET-SYMBOL $NMOS";
+    // in other, which mid only uses, nor in the main file above mid, which keep the package's symbol
+    // for a MOS whose bulk is on ground
+    let rule = "# @SELECT-INSTANCE(model=\"nch\", recursive=true) => @SET-SYMBOL $NMOS_LOGIC";
     let files = MemoryProvider::new().with("t.sp", &hierarchy("", rule));
     let r = interpret(&files, &Options::solver());
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
-    assert_eq!(symbol(&r, "mid", "#M2"), "$NMOS");
-    assert_eq!(symbol(&r, "leaf", "#M1"), "$NMOS");
-    assert_eq!(symbol(&r, "other", "#M3"), "$NMOS4");
-    assert_eq!(symbol(&r, "t.sp", "#M4"), "$NMOS4");
+    assert_eq!(symbol(&r, "mid", "#M2"), "$NMOS_LOGIC");
+    assert_eq!(symbol(&r, "leaf", "#M1"), "$NMOS_LOGIC");
+    assert_eq!(symbol(&r, "other", "#M3"), "$NMOS");
+    assert_eq!(symbol(&r, "t.sp", "#M4"), "$NMOS");
 
     // after mid's own text, there and below: written later, it wins the symbol queue (2.6, 8.3)
-    let own = "# @SELECT-INSTANCE(model=\"nch\") => @SET-SYMBOL $PMOS";
+    let own = "# @SELECT-INSTANCE(model=\"nch\", recursive=true) => @SET-SYMBOL $PMOS";
     let files = MemoryProvider::new().with("t.sp", &hierarchy(own, rule));
     let r = interpret(&files, &Options::solver());
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
-    assert_eq!(symbol(&r, "mid", "#M2"), "$NMOS");
-    assert_eq!(symbol(&r, "leaf", "#M1"), "$NMOS");
-    assert_eq!(symbol(&r, "other", "#M3"), "$NMOS4");
+    assert_eq!(symbol(&r, "mid", "#M2"), "$NMOS_LOGIC");
+    assert_eq!(symbol(&r, "leaf", "#M1"), "$NMOS_LOGIC");
+    assert_eq!(symbol(&r, "other", "#M3"), "$NMOS");
 }
 
 #[test]
 fn scope_written_inside_a_subcircuit_is_an_error_and_not_written() {
     // the RNL of a subcircuit covers only itself (2.6): one error, on the field, and the record is
     // read as ota's own, so its statements take effect there (2.8)
-    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.subckt ota a b\nR1 a b 1k\n\
+    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt ota a b\nR1 a b 1k\n\
                 * @RNL(scope=\"x\") { #R1 @PLACE(1, 2) }\n.ends ota\nX1 n1 n2 ota\n.end\n";
     let r = interpret(&MemoryProvider::new().with("t.sp", text), &Options::solver());
     let e = errors(&r);
@@ -235,10 +236,9 @@ fn scope_at_a_file_level_whose_target_is_not_found_fails_the_whole_record() {
 
 #[test]
 fn numbering_in_a_record_with_scope_is_not_written() {
-    // a field of the draft 0.3 for the record of the solver, which is in the level's own text
+    // a field for the record of the solver, which is in the level's own text
     // (2.6, 2.8): an error, and the field is treated as not written; the record still applies to ota
     let text = netlist("", "#R1 @PLACE(1, 2)")
-        .replace("\"0.2\"", "\"0.3\"")
         .replace("@RNL(scope=\"ota\")", "@RNL(type=\"generated\", scope=\"ota\", numbering=\"0123456789abcdef\")");
     let r = interpret(&MemoryProvider::new().with("t.sp", &text), &Options::default());
     let e = errors(&r);

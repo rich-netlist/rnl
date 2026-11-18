@@ -8,15 +8,18 @@ use rnl_runtime::source::MemoryProvider;
 use rnl_view::{BuildOptions, Parts};
 use serde_json::{json, Value};
 
-const NETLIST: &str = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\nR2 a 0 1k\nR3 a 0 1k\n* @RNL {\n\
+const NETLIST: &str = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
+R1 a 0 1k\nR2 a 0 1k\nR3 a 0 1k\n* @RNL {\n\
 *   $NOTE = @DEFINE(roles=[[\"dev\", \"instance\"]], parameters=[[\"name\", \"\"], [\"raw\", \"\"], [\"n\", 1], [\"on\", false], [\"pts\", []]]) {};\n\
 *   $NOTE @ATTACH(name=\"M1\", raw=\"100fF\", n=2.5, on=true, pts=[1, \"a\"]) #R1 => %n1;\n\
 *   $NOTE @ATTACH #R2 => %n2;\n\
-*   {#R1 #R2 #R3} @AS(direction=\"top-to-bottom\") $FLOW => %flow;\n\
-*   {#R2 #R3} @AS $FLOW => %plain\n* }\n.end\n";
+*   {#R1 #R2 #R3} @AS(text=\"top to bottom\") $COMMENT => %flow;\n\
+*   {#R2 #R3} @AS $COMMENT => %plain\n* }\n.end\n";
 
 /// Usages that draw nothing attached to texts: a label by its key, and a named text without one.
-const ON_TEXTS: &str = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\n* @RNL {\n\
+const ON_TEXTS: &str =
+    "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
+R1 a 0 1k\n* @RNL {\n\
 *   $TAG = @DEFINE(roles=[\"label\"], parameters=[[\"binding\", \"\"]]) {};\n\
 *   #R1 @PLACE(0, 0);\n\
 *   (0, 6) @TEXT(\"note\") => %t3;\n\
@@ -49,7 +52,7 @@ fn a_usage_gives_the_parameters_its_statement_writes_as_written() {
     // a number as the snapshot writes every number, 1 as 1.0
     assert_eq!(n1["params"], json!({ "name": "M1", "raw": "100fF", "n": 2.5, "on": true, "pts": [1.0, "a"] }));
     // a standard definition's parameter, written: the default is not repeated for the others
-    assert_eq!(object(&objects, "%flow")["params"], json!({ "direction": "top-to-bottom" }));
+    assert_eq!(object(&objects, "%flow")["params"], json!({ "text": "top to bottom" }));
 }
 
 #[test]

@@ -157,7 +157,7 @@ fn a_pin_role_can_fill_a_wire_net_slot_without_changing_the_role() {
 }
 
 #[test]
-fn wire_net_conversion_rejects_unbound_pins_and_preserves_old_versions() {
+fn wire_net_conversion_rejects_unbound_pins() {
     let r = read(
         "0.4",
         r#"
@@ -168,9 +168,6 @@ fn wire_net_conversion_rejects_unbound_pins_and_preserves_old_versions() {
     );
     assert!(r.diagnostics().iter().any(|d| d.code == rnl_runtime::diag::codes::WIRE_NET_WRONG_KIND));
     assert_eq!(r.problems[0].wires.len(), 1);
-    let old = read("0.3", "#R1:1 @WIRE {(0,0) (1,1)}");
-    assert!(old.diagnostics().iter().any(|d| d.code == rnl_runtime::diag::codes::WIRE_NET_WRONG_KIND));
-    assert!(old.problems[0].wires.is_empty());
 }
 
 fn checked(body: &str) -> Interpretation {
@@ -265,13 +262,6 @@ fn a_bus_pin_fails_a_single_role_without_repeating_creation() {
         assert!(r.diagnostics().iter().any(|d| d.severity == Severity::Error));
         assert!(r.problems[0].usages.is_empty());
     }
-}
-
-#[test]
-fn old_typed_roles_do_not_convert() {
-    let r = read("0.3", r#"$D = @DEFINE(roles=[["n","net"]]) {}; #R1:1 @AS $D"#);
-    assert!(r.diagnostics().iter().any(|d| d.severity == Severity::Error));
-    assert!(r.problems[0].usages.is_empty());
 }
 
 #[test]

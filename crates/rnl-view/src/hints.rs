@@ -1045,9 +1045,8 @@ impl<'a> Drawing<'a> {
                 );
             }
         }
-        // in 0.4, wires that start from a point where a wire that carries all their nets also
-        // passes or ends are taps of that wire, and not joined to each other (13.1)
-        let taps = rnl_runtime::interp::unit::keeps_0_4(&self.lv.language);
+        // wires that start from a point where a wire that carries all their nets also passes or
+        // ends are taps of that wire, and not joined to each other (13.1)
         for (w, wire) in self.wires.iter().enumerate() {
             for q in [wire.points[0], wire.points[wire.points.len() - 1]] {
                 let at = self.wires_at(q);
@@ -1061,7 +1060,7 @@ impl<'a> Drawing<'a> {
                     if v == w
                         || share(&wire.nets, &other.nets)
                         || self.pins_at(q).any(|(_, p)| share(&p.nets, &other.nets))
-                        || (taps && at.iter().any(|&u| u != w && u != v && carries(u)))
+                        || at.iter().any(|&u| u != w && u != v && carries(u))
                     {
                         continue;
                     }
@@ -1165,7 +1164,7 @@ impl<'a> Drawing<'a> {
                 let den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
                 let u = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
                 let at = (x1 + u * (x2 - x1), y1 + u * (y2 - y1));
-                if found.is_empty() && rnl_runtime::interp::unit::keeps_0_4(&self.lv.language) {
+                if found.is_empty() {
                     // The crossing has coordinates but no statement of its own. Link its
                     // summary to one of the first pair's wires instead of the level title.
                     first_loc = self.wires[t.wire].loc.as_ref().or(self.wires[s.wire].loc.as_ref());
@@ -1187,10 +1186,9 @@ impl<'a> Drawing<'a> {
     }
 
     /// A wire leaving a pin against the pin's direction: its first segment does not go the way the
-    /// pin points, within 60 degrees. In 0.4 a wire may leave a pin at a right angle to it, as the
-    /// default route of `auto` does (13.1): only a segment with a part against the pin is wrong.
+    /// pin points. A wire may leave a pin at a right angle to it, as the default route of `auto`
+    /// does (13.1): only a segment with a part against the pin is wrong.
     fn exits(&self, out: &mut Vec<Hint>) {
-        let right_angle = rnl_runtime::interp::unit::keeps_0_4(&self.lv.language);
         for (w, wire) in self.wires.iter().enumerate() {
             let pts = &wire.points;
             if pts.len() < 2 {
@@ -1211,12 +1209,7 @@ impl<'a> Drawing<'a> {
                 let go = unit((next.0 - end.0, next.1 - end.1));
                 if here.iter().any(|p| {
                     let d = p.dir.unwrap();
-                    let along = go.0 * d.0 + go.1 * d.1;
-                    if right_angle {
-                        along > -1e-9
-                    } else {
-                        along > 0.5
-                    }
+                    go.0 * d.0 + go.1 * d.1 > -1e-9
                 }) {
                     continue;
                 }
@@ -1341,10 +1334,8 @@ impl<'a> Drawing<'a> {
     /// A wire end on a wire or a pin of its net that the language does not join it to: neither it
     /// nor a wire it shares a named point or terminal with names that pin or a vertex of that wire.
     fn silent_opens(&self, out: &mut Vec<Hint>) {
-        // In 0.4 both kinds of visually joined but electrically separate connections warn.
-        // The level's own file controls this even without a solver problem or in an include.
-        let severity =
-            if rnl_runtime::interp::unit::keeps_0_4(&self.lv.language) { Severity::Warning } else { Severity::Hint };
+        // both kinds of visually joined but electrically separate connections warn
+        let severity = Severity::Warning;
         let nw = self.wires.len();
         let mut up = self.named_joins();
         let mut said: BTreeSet<(usize, usize, (i64, i64))> = BTreeSet::new();

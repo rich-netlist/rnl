@@ -110,32 +110,17 @@ fn a_literal_duplicate_points_to_the_second_written_parameter() {
 }
 
 #[test]
-fn released_versions_keep_the_separate_header_and_syntax_kinds() {
-    for version in ["0.2", "0.3"] {
-        assert_eq!(errors(&read(version, "@DEVICE(1)", "")), [codes::HEADER_PARAM_NOT_POSITIONAL]);
-        assert_eq!(errors(&read(version, "@DEVICE(nope=1)", "")), [codes::HEADER_PARAM_UNKNOWN]);
-        assert_eq!(errors(&read(version, "", "(0,0) @CIRCLE(radius=1,radius=2)")), [codes::SYNTAX_PARAM_TWICE]);
-        let r = read(version, "", "(0,0) @CIRCLE(半径=1)");
-        assert!(r.diagnostics().iter().any(|d| d.message.contains(" Is an alias package not loaded?")));
-    }
-}
-
-#[test]
-fn included_files_use_their_own_parameter_diagnostic_version() {
-    for (root, child) in [("0.4", "0.3"), ("0.3", "0.4")] {
-        let main = source(root, "@DEVICE(nope=1)", "") + ".include child.sp\n";
-        let r =
-            files(MemoryProvider::new().with("main.sp", &main).with("child.sp", &source(child, "@DEVICE(nope=1)", "")));
-        for (file, version) in [("main.sp", root), ("child.sp", child)] {
-            let expected = if version == "0.4" { codes::PARAM_UNKNOWN } else { codes::HEADER_PARAM_UNKNOWN };
-            assert!(
-                r.diagnostics()
-                    .iter()
-                    .any(|d| d.code == expected && d.loc.as_ref().is_some_and(|l| l.file.ends_with(file))),
-                "{:?}",
-                r.diagnostics()
-            );
-        }
+fn included_files_report_their_own_parameter_errors() {
+    let main = source("0.4", "@DEVICE(nope=1)", "") + ".include child.sp\n";
+    let r = files(MemoryProvider::new().with("main.sp", &main).with("child.sp", &source("0.4", "@DEVICE(nope=1)", "")));
+    for file in ["main.sp", "child.sp"] {
+        assert!(
+            r.diagnostics()
+                .iter()
+                .any(|d| d.code == codes::PARAM_UNKNOWN && d.loc.as_ref().is_some_and(|l| l.file.ends_with(file))),
+            "{:?}",
+            r.diagnostics()
+        );
     }
 }
 
@@ -164,14 +149,7 @@ fn package_parameter_errors_keep_the_package_and_source_location() {
 
 #[test]
 fn header_parameters_before_version_use_the_files_declared_version() {
-    for version in ["0.3", "0.4"] {
-        let text = format!("* header order\n* @RNL(type=\"header\") {{ @DEVICE(nope=1); @VERSION(\"{version}\") }}\n");
-        let r = files(MemoryProvider::new().with("main.sp", &text));
-        assert_eq!(
-            errors(&r),
-            [if version == "0.4" { codes::PARAM_UNKNOWN } else { codes::HEADER_PARAM_UNKNOWN }],
-            "{:?}",
-            r.diagnostics()
-        );
-    }
+    let text = "* header order\n* @RNL(type=\"header\") { @DEVICE(nope=1); @VERSION(\"0.4\") }\n";
+    let r = files(MemoryProvider::new().with("main.sp", text));
+    assert_eq!(errors(&r), [codes::PARAM_UNKNOWN], "{:?}", r.diagnostics());
 }

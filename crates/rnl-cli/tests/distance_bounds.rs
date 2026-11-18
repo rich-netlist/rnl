@@ -78,66 +78,37 @@ fn invalid_combinations_still_fail() {
     }
 }
 
-#[test]
-fn released_files_keep_negative_directed_bounds_and_an_omitted_min() {
-    for version in ["0.2", "0.3"] {
-        for (written, expected) in [
-            ("min=-2", (Some(-2.0), None)),
-            ("max=-1", (None, Some(-1.0))),
-            ("exact=-1", (Some(-1.0), Some(-1.0))),
-            ("max=10", (None, Some(10.0))),
-        ] {
-            let r = read(version, &format!("#R1 #R2 @DISTANCE(\"left-to-right\", {written})"));
-            assert_eq!(errors(&r), [], "{version}: {written}");
-            assert_eq!(bounds(&r), [expected], "{version}: {written}");
-        }
-        let r = read(version, "#R1 #R2 @DISTANCE(\"x\", min=-1)");
-        assert_eq!(errors(&r), [codes::PARAM_DISTANCE_NEGATIVE_WITHOUT_SENSE]);
-    }
+/// A file of 0.4 that includes `inc.sp`, whose subcircuit `child` has R1 and R2, and writes
+/// `statement` in a record scoped to it.
+fn scoped(statement: &str) -> Interpretation {
+    interpret(
+        MemoryProvider::new()
+            .with("t.sp", &format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n.include \"inc.sp\"\n* @RNL(scope=\"child\") {{ {statement} }}\n.end\n"))
+            .with("inc.sp", "* inc\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child a b\nR1 a b 1k\nR2 b 0 1k\n.ends\n"),
+    )
 }
 
 #[test]
-fn scoped_constraints_use_the_source_file_version() {
-    for (outer, inner) in [("0.4", "0.3"), ("0.3", "0.4")] {
-        for written in ["max=10", "min=-1"] {
-            let files = MemoryProvider::new()
-                .with("t.sp", &format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\n.include \"inc.sp\"\n* @RNL(scope=\"child\") {{ #R1 #R2 @DISTANCE(\"left-to-right\", {written}) }}\n.end\n"))
-                .with("inc.sp", &format!("* inc\n* @RNL(type=\"header\") {{ @VERSION(\"{inner}\") }}\n.subckt child a b\nR1 a b 1k\nR2 b 0 1k\n.ends\n"));
-            let r = interpret(files);
-            if written == "min=-1" && outer == "0.4" {
-                assert_eq!(errors(&r), [codes::DISTANCE_NEGATIVE_BOUND_04]);
-            } else {
-                assert_eq!(errors(&r), []);
-                let expected = if written == "min=-1" {
-                    (Some(-1.0), None)
-                } else {
-                    ((outer == "0.4").then_some(0.0), Some(10.0))
-                };
-                assert_eq!(bounds(&r), [expected], "{outer} into {inner}: {written}");
-            }
-        }
-    }
+fn scoped_constraints_have_the_bounds_of_0_4() {
+    let r = scoped("#R1 #R2 @DISTANCE(\"left-to-right\", max=10)");
+    assert_eq!(errors(&r), []);
+    assert_eq!(bounds(&r), [(Some(0.0), Some(10.0))]);
+    let r = scoped("#R1 #R2 @DISTANCE(\"left-to-right\", min=-1)");
+    assert_eq!(errors(&r), [codes::DISTANCE_NEGATIVE_BOUND_04]);
 }
 
 #[test]
-fn definition_bodies_use_the_same_language_as_the_file() {
-    for (host, package) in [("0.4", "0.4"), ("0.3", "0.3")] {
-        let files = MemoryProvider::new()
-            .with("p.rnl", &format!("@RNL(type=\"header\") {{ @VERSION(\"{package}\"); @PACKAGE(name=\"p\",version=\"1.0\") }}\n@RNL {{ $D = @DEFINE(roles=[\"a\",\"b\"]) {{ ?a ?b @DISTANCE(\"left-to-right\", max=10) }} }}"))
-            .with("t.sp", &netlist(host, "#R1 #R2 @AS $D").replace(" }\nR1 a b", "; @USE-PACKAGE(name=\"p\",version=\"1.0\",path=\"p.rnl\") }\nR1 a b"));
-        let r = interpret(files);
-        assert_eq!(errors(&r), []);
-        assert_eq!(bounds(&r), [((package == "0.4").then_some(0.0), Some(10.0))]);
-    }
+fn definition_bodies_of_a_package_have_the_bounds_of_0_4() {
+    let files = MemoryProvider::new()
+        .with("p.rnl", "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"p\",version=\"1.0\") }\n@RNL { $D = @DEFINE(roles=[\"a\",\"b\"]) { ?a ?b @DISTANCE(\"left-to-right\", max=10) } }")
+        .with("t.sp", &netlist("0.4", "#R1 #R2 @AS $D").replace(" }\nR1 a b", "; @USE-PACKAGE(name=\"p\",version=\"1.0\",path=\"p.rnl\") }\nR1 a b"));
+    let r = interpret(files);
+    assert_eq!(errors(&r), []);
+    assert_eq!(bounds(&r), [(Some(0.0), Some(10.0))]);
 }
 
 #[test]
-fn scoped_direction_signatures_follow_the_source_file() {
-    for (outer, inner, direction) in [("0.4", "0.3", "left-to-right"), ("0.3", "0.4", "x")] {
-        let files = MemoryProvider::new()
-            .with("t.sp", &format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\n.include \"inc.sp\"\n* @RNL(scope=\"child\") {{ {{#R1 #R2}} @DISTRIBUTE(\"{direction}\") }}\n.end\n"))
-            .with("inc.sp", &format!("* inc\n* @RNL(type=\"header\") {{ @VERSION(\"{inner}\") }}\n.subckt child a b\nR1 a b 1k\nR2 b 0 1k\n.ends\n"));
-        let r = interpret(files);
-        assert_eq!(errors(&r), [], "{outer} into {inner}");
-    }
+fn a_scoped_distribute_takes_a_direction() {
+    let r = scoped("{#R1 #R2} @DISTRIBUTE(\"left-to-right\")");
+    assert_eq!(errors(&r), []);
 }

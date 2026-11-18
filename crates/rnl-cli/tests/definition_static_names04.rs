@@ -65,18 +65,6 @@ fn header_keywords_fail_in_unused_definition_bodies() {
         let r = read("0.4", "@VERSION", used);
         assert_eq!(errors(&r), [codes::KEYWORD_HEADER_ONLY], "{:?}", r.diagnostics());
     }
-    assert!(errors(&read("0.3", "@VERSION", false)).is_empty());
-}
-
-#[test]
-fn released_versions_keep_application_time_reports() {
-    for version in ["0.2", "0.3"] {
-        for body in ["(?r,0)", "{{?r @NOT-A-KEYWORD}}", "{(0,0) @PIN(terminal=1)}"] {
-            assert!(errors(&read(version, body, false)).is_empty(), "{version}: {body}");
-            let r = read(version, body, true);
-            assert_eq!(errors(&r).len(), 2, "{version}: {body}: {:?}", r.diagnostics());
-        }
-    }
 }
 
 #[test]
@@ -109,12 +97,9 @@ fn declared_parameters_and_strings_are_not_role_literals() {
 }
 
 #[test]
-fn an_included_definition_uses_its_source_language() {
-    for (outer, inner, count) in [("0.3", "0.4", 1), ("0.4", "0.3", 2)] {
-        let main = format!("* main\n* @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\n.include child.sp\n");
-        let child =
-            source(inner, "(?r,0)", true).replace("R1 a b 1k", ".subckt child a b\nR1 a b 1k") + ".ends child\n";
-        let r = files(MemoryProvider::new().with("main.sp", &main).with("child.sp", &child));
-        assert_eq!(errors(&r).len(), count, "{outer}/{inner}: {:?}", r.diagnostics());
-    }
+fn an_included_definition_reports_once() {
+    let main = "* main\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include child.sp\n";
+    let child = source("0.4", "(?r,0)", true).replace("R1 a b 1k", ".subckt child a b\nR1 a b 1k") + ".ends child\n";
+    let r = files(MemoryProvider::new().with("main.sp", main).with("child.sp", &child));
+    assert_eq!(errors(&r).len(), 1, "{:?}", r.diagnostics());
 }

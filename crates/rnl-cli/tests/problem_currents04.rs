@@ -118,30 +118,15 @@ fn current_directions_affect_the_digest_but_source_locations_do_not() {
 }
 
 #[test]
-fn released_levels_keep_current_out_of_the_problem_and_digest() {
-    for version in ["0.2", "0.3"] {
-        let body = r#"$S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1) }; #R1 @SET-SYMBOL $S"#;
-        let plain = read(version, body);
-        let marked = read(version, &format!(r#"{body}; #R1:1 @CURRENT("in")"#));
-        clean(&plain);
-        clean(&marked);
-        assert!(marked.problems[0].currents.is_empty());
-        assert_eq!(rnl_cli::problem::level(&plain.problems[0], ""), rnl_cli::problem::level(&marked.problems[0], ""));
-    }
-}
-
-#[test]
-fn each_included_level_uses_its_own_version_for_the_interface() {
-    for (outer, inner) in [("0.4", "0.3"), ("0.3", "0.4")] {
-        let top = format!("* top\n* @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\n.include child.sp\n");
-        let child=format!("* child\n* @RNL(type=\"header\") {{ @VERSION(\"{inner}\") }}\n.subckt child a b\nR1 a b 1k\n* @RNL {{ $S = @DEFINE-SYMBOL {{ (0,0) @PIN(terminal=1) }}; #R1 @SET-SYMBOL $S; #R1:1 @CURRENT(\"in\") }}\n.ends\n");
-        let files = MemoryProvider::new().with("current.sp", &top).with("child.sp", &child);
-        let r = interpret_file(Path::new("current.sp"), None, &files, &Options { std: false, ..Options::solver() })
-            .unwrap();
-        clean(&r);
-        let p = r.problems.iter().find(|p| p.name == "child").unwrap();
-        assert_eq!(p.currents.len(), usize::from(inner == "0.4"));
-    }
+fn an_included_level_gives_its_currents_to_its_problem() {
+    let top = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include child.sp\n";
+    let child = "* child\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child a b\nR1 a b 1k\n* @RNL { $S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1) }; #R1 @SET-SYMBOL $S; #R1:1 @CURRENT(\"in\") }\n.ends\n";
+    let files = MemoryProvider::new().with("current.sp", top).with("child.sp", child);
+    let r =
+        interpret_file(Path::new("current.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    clean(&r);
+    let p = r.problems.iter().find(|p| p.name == "child").unwrap();
+    assert_eq!(p.currents.len(), 1);
 }
 
 #[test]

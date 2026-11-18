@@ -507,22 +507,17 @@ fn model_position(plain: &[String], is_model: impl Fn(&str) -> bool) -> Option<u
 }
 
 /// Tell nodes from the model name for M and Q once all model names are known, and a resistor,
-/// capacitor or inductor of a `.model` card, `R1 a b rpoly 10k`, from a value. A transistor whose
-/// model has no card, or names none, is marked: its polarity is not known (`Instance::model_missing`).
+/// capacitor or inductor of a `.model` card, `R1 a b rpoly 10k`, from a value.
 pub fn resolve_nodes(inst: &mut Instance, plain: &[String], models: &HashMap<String, String>) {
     let is_model = |t: &str| models.contains_key(&t.to_lowercase());
     match inst.letter {
-        Some('M') | Some('Q') => {
-            match model_position(plain, is_model) {
-                Some(k) => {
-                    inst.nodes = plain[..k].to_vec();
-                    inst.model = Some(plain[k].clone());
-                }
-                None => inst.nodes = plain.to_vec(),
+        Some('M') | Some('Q') => match model_position(plain, is_model) {
+            Some(k) => {
+                inst.nodes = plain[..k].to_vec();
+                inst.model = Some(plain[k].clone());
             }
-            inst.model_missing = !inst.model.as_deref().is_some_and(is_model);
-        }
-        Some('J') | Some('Z') => inst.model_missing = !inst.model.as_deref().is_some_and(is_model),
+            None => inst.nodes = plain.to_vec(),
+        },
         Some(letter @ ('R' | 'C' | 'L')) => {
             if let Some(m) = plain.get(2).filter(|m| is_model(m)) {
                 inst.model = Some(m.clone());
@@ -1589,22 +1584,20 @@ mod tests {
     }
 
     #[test]
-    fn a_transistor_whose_model_card_is_not_found_is_marked() {
-        // M, Q, J and Z: the polarity is told by the card alone, so a model that no card names, or
-        // none at all, leaves it unknown; the other elements are not marked
-        let net = "* t\n.model nch nmos\n.model qn npn\n.model jn njf\n\
+    fn a_transistor_whose_model_card_is_not_found_still_names_its_model() {
+        // a model that no card names is the last word that is not a number; none at all leaves
+        // every word a node
+        let net = "* t\n.model nch nmos\n.model qn npn\n\
                    M1 d g s b nch\nM2 d g s b pch\nM3 d g s\nM4 d g s s nch w=1u\n\
-                   Q1 c b e qn\nQ2 c b e 2n3904\nQ3 c b e s dt qn 2.0\n\
-                   J1 d g s jn\nJ2 d g s jp\nZ1 d g s zm\n\
-                   D1 a k dm\nR1 a b rm 1k\nC1 a b 1p\nX1 a b sub\n.end\n";
+                   Q1 c b e qn\nQ2 c b e 2n3904\nQ3 c b e s dt qn 2.0\n.end\n";
         let (insts, _) = read_all(net);
-        let marked: Vec<&str> = insts.iter().filter(|i| i.model_missing).map(|i| i.name.as_str()).collect();
-        assert_eq!(marked, ["M2", "M3", "Q2", "J2", "Z1"]);
         assert_eq!(find(&insts, "M2").model.as_deref(), Some("pch"));
         assert_eq!(find(&insts, "M3").model, None);
+        assert_eq!(find(&insts, "M4").nodes, ["d", "g", "s", "s"]);
+        assert_eq!(find(&insts, "Q3").model.as_deref(), Some("qn"));
         // a card named in a different case, and one defined after the element, are found
-        let (insts, _) = read_all("* t\nM1 d g s b NCH\nJ1 d g s Jn\n.model nch nmos\n.model JN njf\n.end\n");
-        assert!(insts.iter().all(|i| !i.model_missing), "{:?}", insts.iter().map(|i| &i.name).collect::<Vec<_>>());
+        let (insts, _) = read_all("* t\nM1 d g s b NCH 1u\n.model nch nmos\n.end\n");
+        assert_eq!((find(&insts, "M1").model.as_deref(), find(&insts, "M1").nodes.len()), (Some("NCH"), 4));
     }
 
     #[test]

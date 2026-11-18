@@ -10,7 +10,7 @@ use rnl_runtime::writeback::{record_type, remove_records, replace_generated, str
 use rnl_runtime::Options;
 
 fn cases() -> Vec<PathBuf> {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/cases");
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/cases-0.4/from-0.2");
     let mut out: Vec<PathBuf> = std::fs::read_dir(dir)
         .unwrap()
         .filter_map(|e| e.ok().map(|e| e.path()))

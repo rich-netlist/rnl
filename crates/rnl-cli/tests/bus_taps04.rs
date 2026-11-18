@@ -2,7 +2,7 @@
 //! from a point where a wire that carries all their nets also passes or ends, such as a trunk that
 //! ends at a junction and two narrower buses that leave it, are taps of that wire and do not look
 //! joined to each other. Two wires of different nets that meet with no such wire there still look
-//! joined, and a file of 0.3 reads them as it did.
+//! joined.
 
 use std::path::Path;
 
@@ -103,10 +103,4 @@ fn a_trunk_and_a_branch_of_another_net_still_look_joined() {
         low = bits(2, 0)
     );
     assert_eq!(joined(&hints("0.4", &wires)).len(), 2);
-}
-
-#[test]
-fn a_file_of_0_3_reads_them_as_it_did() {
-    let j = joined(&hints("0.3", &split()));
-    assert_eq!(j.len(), 4, "{j:#?}");
 }

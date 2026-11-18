@@ -122,40 +122,12 @@ fn decimal_versions_have_no_machine_integer_limit() {
 }
 
 #[test]
-fn legacy_version_and_path_handling_stays_unchanged() {
-    for language in ["0.2", "0.3"] {
-        for version in ["1", "+1.2", "1.-2"] {
-            let mut files = MemoryProvider::new().with(
-                "t.sp",
-                &source(
-                    language,
-                    &format!("@USE-PACKAGE(name=\"p\",version=\"{version}\",path=\"bad.rnl\")"),
-                    "#R1 @AS $D",
-                ),
-            );
-            files.package_dirs.push("pkg".into());
-            files.insert("bad.rnl", "not a package");
-            files.insert("pkg/p.rnl", &package(language, version, "", "D"));
-            let result = read(&files, "t.sp");
-            clean(&result);
-            assert_eq!(result.problems[0].usages.len(), 1);
-        }
-    }
-}
-
-#[test]
 fn repeated_package_declarations_keep_the_first_in_the_draft() {
-    for language in ["0.2", "0.3", "0.4"] {
-        let text = package(language, "1.0", r#"@PACKAGE(name="q",version="2.0")"#, "D");
-        let expected = if language == "0.4" { ("p", "1.0") } else { ("q", "2.0") };
-        assert_eq!(rnl_runtime::interp::unit::scan_package_decl(&text), Some((expected.0.into(), expected.1.into())));
-        let result = read(&MemoryProvider::new().with("p.rnl", &text), "p.rnl");
-        assert_eq!(result.checking_package, expected.0);
-        assert_eq!(
-            result.diagnostics().iter().filter(|d| d.code == codes::PACKAGE_DECLARED_TWICE).count(),
-            usize::from(language == "0.4")
-        );
-    }
+    let text = package("0.4", "1.0", r#"@PACKAGE(name="q",version="2.0")"#, "D");
+    assert_eq!(rnl_runtime::interp::unit::scan_package_decl(&text), Some(("p".into(), "1.0".into())));
+    let result = read(&MemoryProvider::new().with("p.rnl", &text), "p.rnl");
+    assert_eq!(result.checking_package, "p");
+    assert_eq!(result.diagnostics().iter().filter(|d| d.code == codes::PACKAGE_DECLARED_TWICE).count(), 1);
     let text = package("0.4", "bad", r#"@PACKAGE(name="p",version="1.0")"#, "D");
     assert!(rnl_runtime::interp::unit::scan_package_decl(&text).is_none());
     let result = read(&MemoryProvider::new().with("p.rnl", &text), "p.rnl");

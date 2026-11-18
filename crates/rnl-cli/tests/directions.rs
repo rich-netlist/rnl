@@ -1,7 +1,7 @@
 //! Positional facts written with their direction (14.1, 0.4): ORDER, DISTRIBUTE and DISTANCE take
 //! one of four directions, DISTRIBUTE as ORDER does, and "x" or "y" alone is an error; ORIENT takes a
 //! list of codes and the words for the four turns (11.2), and ORIENT-RELATION a list of relations
-//! and relates one object to one object (14.9). Files of 0.2 and 0.3 read as they did.
+//! and relates one object to one object (14.9).
 
 use std::path::Path;
 
@@ -57,10 +57,6 @@ fn distribute_takes_a_direction_in_0_4() {
         .facts
         .iter()
         .any(|f| matches!(&f.kind, FactKind::Distribute { axis: Axis::Y, sense: Sense::Increasing, .. })));
-    // 0.3 takes the axis, with no sense; a direction is not its value
-    let p = problem("0.3", "{#R1 #R2 #R3} @DISTRIBUTE(\"x\")");
-    assert!(p.facts.iter().any(|f| matches!(&f.kind, FactKind::Distribute { sense: Sense::Either, .. })));
-    error("0.3", "{#R1 #R2 #R3} @DISTRIBUTE(\"left-to-right\")", codes::PARAM_BAD_ENUM);
 }
 
 #[test]
@@ -74,10 +70,6 @@ fn an_axis_without_a_direction_is_an_error_in_0_4() {
     ] {
         let e = error("0.4", body, codes::PARAM_AXIS_WITHOUT_DIRECTION);
         assert!(e.contains("takes a direction, one of \"left-to-right\""), "{body}: {e}");
-    }
-    // 0.3 reads them as it did
-    for body in ["{#R1 #R2} @ORDER(\"x\")", "#R1 #R2 @DISTANCE(\"x\", min=1)"] {
-        problem("0.3", body);
     }
 }
 
@@ -94,9 +86,6 @@ fn orient_takes_a_list_of_codes_and_the_words_for_the_turns_in_0_4() {
     // a word is another spelling of its code; a list of one code is that code
     assert!(matches!(p.facts[orient("#M2")].kind, FactKind::Orient { code: Orient::R180, .. }));
     assert!(matches!(p.facts[orient("#M3")].kind, FactKind::Orient { code: Orient::R90, .. }));
-    // 0.3 takes one code, and no word
-    error("0.3", "#M1 @ORIENT([\"MY\", \"R0\"])", codes::PARAM_BAD_ENUM);
-    error("0.3", "#M1 @ORIENT(\"left\")", codes::PARAM_BAD_ENUM);
     error("0.4", "#M1 @ORIENT([])", codes::PARAM_EMPTY_LIST);
     error("0.4", "#M1 @ORIENT([\"R0\", \"R45\"])", codes::PARAM_BAD_ENUM);
 }
@@ -114,22 +103,10 @@ fn orient_relation_takes_a_list_and_relates_one_object_to_one_in_0_4() {
     let e =
         error("0.4", "{#M1 #M2} {#M3 #M4} @ORIENT-RELATION(\"MY\")", codes::CONSTRAINT_ORIENT_RELATION_SETS_BOTH_SIDES);
     assert!(e.contains("both its slots have more than one member, {#M1 #M2} and {#M3 #M4}"), "{e}");
-    problem("0.3", "{#M1 #M2} {#M3 #M4} @ORIENT-RELATION(\"MY\")");
-    error("0.3", "#M1 #M2 @ORIENT-RELATION([\"R0\", \"MY\"])", codes::PARAM_BAD_ENUM);
 }
 
 #[test]
-fn a_problem_without_lists_or_senses_has_the_digest_it_had() {
-    // the same statements in 0.3 and 0.4 give the same digest when 0.4 writes nothing new: only the
-    // version differs, which the digest does not cover; the instances have symbols of their own, as
-    // 0.3 draws one without a symbol with a stand-in of the viewer and 0.4 with the default block
-    // symbol (9.2.6)
-    let body = "$R = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1); (0,2) @PIN(terminal=2) }; \
-        $M = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1); (0,2) @PIN(terminal=2); (2,0) @PIN(terminal=3); (2,2) @PIN(terminal=4) }; \
-        {#R1 #R2 #R3 #R4} @SET-SYMBOL $R; {#M1 #M2 #M3 #M4} @SET-SYMBOL $M; \
-        {#R1 #R2} @ORDER(\"left-to-right\"); #M1 @ORIENT(\"MY\"); #M1 #M2 @ORIENT-RELATION(\"R0\")";
-    assert_eq!(input_digest(&problem("0.3", body)), input_digest(&problem("0.4", body)));
-    // a list, or a DISTRIBUTE with its sense, is in it
+fn an_orient_list_is_in_the_digest() {
     let plain = input_digest(&problem("0.4", "#M1 @ORIENT(\"MY\")"));
     assert_ne!(plain, input_digest(&problem("0.4", "#M1 @ORIENT([\"MY\", \"R0\"])")));
 }

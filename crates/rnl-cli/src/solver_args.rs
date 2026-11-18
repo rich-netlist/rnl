@@ -92,8 +92,6 @@ solve options (the levels are read without their type=\"generated\" records; -o 
   solve exits with 1 when an error was reported, once the files are written: one of the netlist as a
   solver reads it, whose number it gives on the standard error as rnl check --no-generated counts
   them, or one of the solver
-  the solver is a preview, whose layouts may be poor: solve and preview say so in a line on the
-  standard error each time they solve; what they print on the standard output and write is the same
 "
     };
 }
@@ -316,7 +314,6 @@ pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
         total_seconds: args.solver.timeall,
     };
     let entry = rnl_cli::path_str(&args.file);
-    eprintln!("{}", rnl_cli::SOLVER_PREVIEW_NOTICE);
     if !args.solver.progress_json {
         let shown = if args.solver.respace {
             rnl_cli::preview::respace(&entry, provider, &options, &WallClock::new(), &|_| true)?
@@ -467,7 +464,6 @@ fn solve_with(args: &Args, provider: &FsProvider) -> Result<(ExitCode, u8, usize
             rnl_cli::profile::ProfileClock::new(path).map_err(Said::from)
         })
         .transpose()?;
-    eprintln!("{}", rnl_cli::SOLVER_PREVIEW_NOTICE);
     let wall_clock = WallClock::new();
     let clock: &dyn rnl_solver::Clock = profile_clock.as_ref().map_or(&wall_clock as &dyn rnl_solver::Clock, |c| c);
     let observed = ProgressClock { inner: clock, enabled: args.solver.progress && !args.solver.progress_json };

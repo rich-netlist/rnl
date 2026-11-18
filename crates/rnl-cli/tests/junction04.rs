@@ -173,21 +173,6 @@ fn subcircuit_names_override_file_names_independently() {
     assert!(r.problems.iter().find(|p| p.name == "child").unwrap().junction.definition.is_none());
 }
 #[test]
-fn released_versions_keep_standard_name_writeback() {
-    for version in ["0.2", "0.3"] {
-        let r = files(&MemoryProvider::new().with(
-            "main.sp",
-            &source(version, "", r#"$JUNCTION = @DEFINE(roles=["p"]) {}; %p=(0,0); $JUNCTION @ATTACH %p"#),
-        ));
-        clean(&r);
-        assert!(r.model.levels[0].points.iter().find(|p| p.id == "%p").unwrap().junction);
-        let w = write(&r.problems[0]);
-        assert!(w.record.contains("$JUNCTION @ATTACH"));
-        assert!(w.warnings.is_empty());
-    }
-}
-
-#[test]
 fn quoted_dollar_aliases_resolve_as_they_do_in_target_records() {
     for alias in ["alias", "标记"] {
         let header = format!("@ALIAS(\"${alias}\",\"$DOT\"); @SOLVER-CONFIG(junction=\"$\"\"{alias}\"\"\")");

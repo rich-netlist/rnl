@@ -11,11 +11,6 @@ use rnl_runtime::diag::Severity;
 use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 
-fn read(net: &str) -> Interpretation {
-    let files = MemoryProvider::new().with("/w/t.sp", net);
-    interpret_file(Path::new("/w/t.sp"), None, &files, &Options::default()).unwrap()
-}
-
 fn read_as(path: &str, net: &str) -> Interpretation {
     let marker = if path.ends_with(".scs") { "//" } else { "*" };
     let header = format!(
@@ -179,8 +174,6 @@ fn a_transistor_whose_model_card_is_not_found_has_the_default_block_symbol() {
             "R1=$RESISTOR".to_string()
         ]
     );
-    // no instance is left undrawn
-    assert!(level.undrawn.is_empty(), "{:?}", level.undrawn.iter().map(|u| &u.id).collect::<Vec<_>>());
     let m2 = level.objects.iter().find(|o| o.id == "#M2").unwrap();
     assert_eq!(m2.pins.iter().map(|p| p.terminals.join(",")).collect::<Vec<_>>(), ["#M2:1", "#M2:2", "#M2:3", "#M2:4"]);
 }
@@ -191,16 +184,6 @@ fn a_transistor_without_a_card_is_drawn_with_the_symbol_the_file_gives_it() {
     let r = read_as("/w/t.sp", net);
     assert_eq!(symbol(&r, "M1"), "$PMOS_4TERM");
     assert_eq!(symbol(&r, "M2"), "%\"(default block symbol)\"");
-    let level = r.model.levels.iter().find(|l| l.title == "t.sp").unwrap();
-    assert!(level.undrawn.is_empty());
-}
-
-#[test]
-fn a_wire_to_a_device_that_is_not_drawn_fails_as_a_terminal_without_a_pin_does() {
-    let net = "* t\n.model nch nmos\nM1 d g s b nch\nM2 d g s b pch\n* @RNL { #M1 @PLACE(0, 0); &g {#M2:g #M1:g} @WIRE }\n.end\n";
-    let r = read(net);
-    let e = messages(&r, Severity::Error);
-    assert!(e.iter().any(|m| m.contains("M2") && m.contains("pin")), "{e:?}");
 }
 
 #[test]

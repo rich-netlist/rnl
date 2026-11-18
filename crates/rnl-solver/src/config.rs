@@ -12,8 +12,7 @@ use crate::objectives::Objective;
 use crate::{RunLimit, SolverOptions};
 use std::collections::BTreeMap;
 
-/// The layout engine used for a 0.4 level: the lines layout unless another is asked for. A level
-/// of an earlier version is laid out in rows whatever is asked.
+/// The layout engine used for a level: the lines layout unless another is asked for.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Layout {
     Rows,
@@ -112,8 +111,7 @@ pub struct Settings {
     /// a net joined into its first, its pins and wires, with its style. False by default, as the
     /// core gives each tree on its own (13.7), and two structures on one net are then joined by its
     /// name; true draws the net connected. A wire routed then refers to the first tree of its
-    /// net, whose own pins are not all the pins the wire may end at. A level before 0.4 does not
-    /// read it.
+    /// net, whose own pins are not all the pins the wire may end at.
     pub join_trees: bool,
     /// Whether the line layout's router routes each net of three parts or more again, a path at a
     /// time (`reroute_nets`): each path is taken out once and the parts it joined joined again, the
@@ -633,8 +631,7 @@ impl SolverOptions {
     /// `tool`, merged by key, each with whether it comes from an old `--solver-options` text.
     /// Without a problem, the tool's over the defaults. As in a solve, a value of the file that the
     /// solver does not take is an error for its key, which names the value that stays in effect
-    /// instead, and a bad value of the tool is an error too; a level before 0.4 reads no SOLVER-CONFIG, and of the tool only the
-    /// old `--solver-options`.
+    /// instead, and a bad value of the tool is an error too.
     pub fn check_settings(tool: &[(SolverSetting, bool)], problem: Option<&LevelProblem>) -> SettingsCheck {
         let defaults = rnl_runtime::solver_settings::parse_overrides(&Self::defaults_config()).unwrap_or_default();
         let mut values: BTreeMap<_, _> =
@@ -646,19 +643,10 @@ impl SolverOptions {
                 "--solver-options is deprecated; use --solver-config with RNL named parameters",
             ));
         }
-        let modern = problem.is_none_or(|p| p.version == "0.4");
-        let mut read = Vec::new();
-        for (s, old) in tool {
-            if modern || *old {
-                read.push(s.clone());
-            } else {
-                let message = format!("a level before 0.4 reads no --solver-config; {} is ignored", s.key);
-                warnings.push(SettingProblem::new(Some(&s.key), message));
-            }
-        }
+        let read: Vec<SolverSetting> = tool.iter().map(|(s, _)| s.clone()).collect();
         let mut o = Self::default();
         let mut refused = Vec::new();
-        if let Some(p) = problem.filter(|_| modern) {
+        if let Some(p) = problem {
             let file = file_settings(&mut o, &p.solver_config, &read);
             for key in file.run {
                 let message = format!("{key} is a tool-only run setting and is ignored in the file");
@@ -697,18 +685,7 @@ impl SolverOptions {
                 values.remove(unused);
             }
         }
-        if modern {
-            warnings.extend(unused_by_layout(&o));
-        }
-        if !modern {
-            // the layouts are those of 0.4: an earlier level is laid out in rows whatever is asked
-            if values.get("layout").is_some_and(|(_, from)| *from != SettingFrom::Default) {
-                let message = "a level before 0.4 is laid out in rows; layout is ignored";
-                warnings.push(SettingProblem::new(Some("layout"), message));
-            }
-            let rows = Lit::Str(rnl_runtime::interp::obj::WStr::new("rows", None));
-            values.insert("layout".into(), (rows, SettingFrom::Default));
-        }
+        warnings.extend(unused_by_layout(&o));
         // a value of the file that is not taken is an error for its key, as one of the tool's is
         refused.extend(errors);
         SettingsCheck { values, warnings, errors: refused }
@@ -721,17 +698,6 @@ impl SolverOptions {
     pub fn for_problem(&self, p: &LevelProblem) -> (Self, Vec<String>, Vec<String>) {
         let mut out = self.clone();
         let mut warnings = Vec::new();
-        if p.version != "0.4" {
-            // the layouts are those of 0.4: an earlier level is laid out in rows, as it always was,
-            // and the options its hash covers name no layout, as they never did
-            out.settings.layout = Layout::default();
-            // its trees are its nets' already, and it does not read the setting
-            out.settings.join_trees = false;
-            out.settings.reroute_nets = false;
-            // its default, which the options of its hash do not name: rows have no wires to move
-            out.settings.nudge_wires = true;
-            return (out, warnings, Vec::new());
-        }
         if self.settings.legacy_alias {
             warnings.push("--solver-options is deprecated; use --solver-config with RNL named parameters".into());
         }
@@ -822,10 +788,6 @@ mod tests {
         let err = SolverOptions::default().with_config("reroute_nets=1").unwrap_err();
         assert!(err.contains("reroute_nets must be a boolean"), "{err}");
         assert!(SolverOptions::defaults_config().contains("reroute_nets=false"));
-        // a level before 0.4 is laid out in rows and does not read it
-        p.version = "0.3".into();
-        let on = SolverOptions::default().with_config("reroute_nets=true").unwrap();
-        assert!(!on.for_problem(&p).0.settings.reroute_nets);
     }
 
     /// `nudge_wires`, on by default, a boolean a file or a tool may give.
@@ -844,10 +806,6 @@ mod tests {
         let err = SolverOptions::default().with_config("nudge_wires=0").unwrap_err();
         assert!(err.contains("nudge_wires must be a boolean"), "{err}");
         assert!(SolverOptions::defaults_config().contains("nudge_wires=true"));
-        // a level before 0.4 is laid out in rows, and its options keep their default
-        p.version = "0.3".into();
-        let off = SolverOptions::default().with_config("nudge_wires=false").unwrap();
-        assert!(off.for_problem(&p).0.settings.nudge_wires);
     }
 
     /// The weights of a crossing and of a bend: two integers from 0 to 1000, not both 0, which a

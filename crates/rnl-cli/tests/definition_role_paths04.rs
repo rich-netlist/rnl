@@ -75,15 +75,6 @@ fn undeclared_role_kinds_keep_errors_at_each_application() {
 }
 
 #[test]
-fn released_definitions_keep_application_time_path_checks() {
-    for version in ["0.2", "0.3"] {
-        assert!(errors(&read(version, "\"instance\"", "?r::net", "")).is_empty());
-        let r = read(version, "\"instance\"", "?r::net", "#R1 @AS $D; #R2 @AS $D");
-        assert_eq!(errors(&r), [codes::REF_NO_SUBOBJECT, codes::REF_NO_SUBOBJECT]);
-    }
-}
-
-#[test]
 fn role_paths_share_the_filler_identity_but_pin_names_keep_written_identity() {
     for forward in [false, true] {
         let application = "%u = #R1 @AS $D;";

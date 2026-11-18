@@ -43,11 +43,9 @@ fn check(body: &str, child: bool) {
 }
 
 #[test]
-fn default_reach_changes_only_for_statements_written_in_0_4() {
-    for version in ["0.2", "0.3", "0.4"] {
-        let r = read(version, "# @SELECT-INSTANCE(name=\"R*\") => @TEXT(\"mark\",key=\"mark\")");
-        assert_eq!(marked(&r)[1].len(), usize::from(version != "0.4"), "{version}");
-    }
+fn a_selection_statement_reaches_only_its_own_level_by_default() {
+    let r = read("0.4", "# @SELECT-INSTANCE(name=\"R*\") => @TEXT(\"mark\",key=\"mark\")");
+    assert_eq!(marked(&r)[1].len(), 0);
 }
 
 #[test]
@@ -220,21 +218,17 @@ fn the_reach_of_either_set_argument_can_enable_a_rule() {
 }
 
 #[test]
-fn scoped_rules_follow_the_source_file_version_in_mixed_includes() {
-    for (host_version, rule_version, grand) in [("0.3", "0.4", false), ("0.4", "0.3", true)] {
-        let source = format!(
-            r#"* scope
-* @RNL(type="header") {{ @VERSION("{rule_version}") }}
+fn a_scoped_rule_in_an_including_file_keeps_the_local_default_reach() {
+    let source = r#"* scope
+* @RNL(type="header") { @VERSION("0.4") }
 .include "cells.sp"
 R1 a b 1k
 X1 a b parent
-* @RNL(scope="parent") {{ $S = @DEFINE-SYMBOL {{ (0,0) @PIN(terminal=1) }}; # @SELECT-INSTANCE(recursive=true) => @SET-SYMBOL $S; # @SELECT-INSTANCE(name="R*") => @TEXT("mark",key="mark") }}
+* @RNL(scope="parent") { $S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1) }; # @SELECT-INSTANCE(recursive=true) => @SET-SYMBOL $S; # @SELECT-INSTANCE(name="R*") => @TEXT("mark",key="mark") }
 .end
-"#
-        );
-        let cells = format!(
-            r#"* cells
-* @RNL(type="header") {{ @VERSION("{host_version}") }}
+"#;
+    let cells = r#"* cells
+* @RNL(type="header") { @VERSION("0.4") }
 .subckt parent p q
 .subckt grand p q
 R3 p q 1k
@@ -242,31 +236,22 @@ R3 p q 1k
 R2 p q 1k
 X2 p q grand
 .ends parent
-"#
-        );
-        let files = MemoryProvider::new().with("t.sp", &source).with("cells.sp", &cells);
-        let r = interpret_file(Path::new("t.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
-        assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", r.diagnostics());
-        let counts: Vec<_> = r
-            .problems
-            .iter()
-            .map(|p| {
-                (
-                    p.name.as_str(),
-                    p.objects
-                        .iter()
-                        .filter(|o| o.text.as_ref().is_some_and(|t| t.key.as_deref() == Some("mark")))
-                        .count(),
-                )
-            })
-            .collect();
-        assert_eq!(counts.iter().find(|(name, _)| *name == "parent").unwrap().1, 1);
-        assert_eq!(
-            counts.iter().find(|(name, _)| name.ends_with("grand")).unwrap().1,
-            usize::from(grand),
-            "host={host_version}, rule={rule_version}, {counts:?}"
-        );
-    }
+"#;
+    let files = MemoryProvider::new().with("t.sp", source).with("cells.sp", cells);
+    let r = interpret_file(Path::new("t.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", r.diagnostics());
+    let counts: Vec<_> = r
+        .problems
+        .iter()
+        .map(|p| {
+            (
+                p.name.as_str(),
+                p.objects.iter().filter(|o| o.text.as_ref().is_some_and(|t| t.key.as_deref() == Some("mark"))).count(),
+            )
+        })
+        .collect();
+    assert_eq!(counts.iter().find(|(name, _)| *name == "parent").unwrap().1, 1);
+    assert_eq!(counts.iter().find(|(name, _)| name.ends_with("grand")).unwrap().1, 0, "{counts:?}");
 }
 
 #[test]

@@ -61,27 +61,22 @@ impl fmt::Display for Loc {
 }
 
 /// The kind of a diagnostic: its number in the toolkit's list, RNL and four digits, such as
-/// RNL3120, and its short name, such as `param-wrong-type`. A kind of the versions 0.2 and 0.3 alone
-/// has a name and no number. Numbers and names are kept from one version to the next and never given
-/// to another kind.
+/// RNL3120, and its short name, such as `param-wrong-type`. Numbers and names are kept from one
+/// version to the next and never given to another kind.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Code {
-    number: Option<u16>,
+    number: u16,
     name: &'static str,
 }
 
 impl Code {
     pub const fn new(number: u16, name: &'static str) -> Code {
-        Code { number: Some(number), name }
+        Code { number, name }
     }
 
-    pub const fn unnumbered(name: &'static str) -> Code {
-        Code { number: None, name }
-    }
-
-    /// The number, as "RNL3120"; None for a kind without one.
-    pub fn number(&self) -> Option<String> {
-        self.number.map(|n| format!("RNL{n:04}"))
+    /// The number, as "RNL3120".
+    pub fn number(&self) -> String {
+        format!("RNL{:04}", self.number)
     }
 
     /// The short name, such as "param-wrong-type".
@@ -91,12 +86,9 @@ impl Code {
 }
 
 impl fmt::Display for Code {
-    /// "RNL3120 param-wrong-type", or the name alone for a kind without a number.
+    /// "RNL3120 param-wrong-type".
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.number() {
-            Some(n) => write!(f, "{n} {}", self.name),
-            None => f.write_str(self.name),
-        }
+        write!(f, "{} {}", self.number(), self.name)
     }
 }
 
@@ -243,17 +235,15 @@ mod tests {
         let mut numbers = HashSet::new();
         let mut names = HashSet::new();
         for c in codes::ALL {
-            if let Some(n) = c.number() {
-                assert!(n.len() == 7 && n.starts_with("RNL"), "{n}");
-                assert!(numbers.insert(n.clone()), "{n} is given twice");
-            }
+            let n = c.number();
+            assert!(n.len() == 7 && n.starts_with("RNL"), "{n}");
+            assert!(numbers.insert(n.clone()), "{n} is given twice");
             assert!(names.insert(c.name()), "{} is given twice", c.name());
         }
+        // every kind has a number
+        assert_eq!(numbers.len(), codes::ALL.len());
         assert!(numbers.len() > 400);
         assert_eq!(codes::PARAM_WRONG_TYPE.to_string(), "RNL3120 param-wrong-type");
-        // a kind of 0.2 and 0.3 alone has a name and no number
-        assert_eq!(codes::UNSOLVED_NO_NUMBERS.number(), None);
-        assert_eq!(codes::UNSOLVED_NO_NUMBERS.to_string(), "unsolved-no-numbers");
     }
 
     #[test]

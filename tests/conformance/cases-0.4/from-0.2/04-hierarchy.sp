@@ -2,7 +2,7 @@
 * @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-PACKAGE(name="rnl-std-basic", version="0.4"); @USE-PACKAGE(name="rnl-std-semiconductors", version="0.4"); @VERSION("0.4")}
 *! Levels: one drawing per subcircuit; a block symbol (`# @SET-SYMBOL` in a subcircuit) as the look of the instances above it, with pins by port name; an .include'd file is a level of its own;
 *! scope= writes into a subcircuit from outside; the rules above apply to the levels below, recursive=false only to its own; USE-PACKAGE of an embedded package in a subcircuit changes how resistors are drawn;
-*! ports filled in ($PORT_FILL_SET) and taken first; a generated port can only be placed through a selection and cannot be wired (findings).
+*! ports filled in ($PORT_FILL_SET) and taken first; a port that the fill makes is named in the record of the solver, which places and wires it.
 .include 04-hierarchy-lib.inc
 .model nch nmos level=1
 .subckt amp in out vdd vss
@@ -36,7 +36,6 @@ R1 vdd out 10k
 *   &in @WIRE(mode="auto") {%pin:p #M1:2};
 *   %jo = (0, 3);
 *   &out @WIRE(mode="auto") {#R1:2 %jo #M1:1};
-*   &out @WIRE(mode="auto") {%jo (4, 3)};
 *   $JUNCTION @ATTACH %jo => @PLACE(0, 3)
 * }
 * 
@@ -45,7 +44,8 @@ R1 vdd out 10k
 *   #M1 @PLACE(0, 0);
 *   #R1 @PLACE(0, 7);
 *   %pin @PLACE(-5, 0);
-*   &out @SELECT-ANCESTOR-USAGE $IO_PORT => @PLACE(4, 3) => @ORIENT("MY");
+*   %io_port_out = $IO_PORT @ATTACH &out => @PLACE(4, 3) => @ORIENT("MY");
+*   &out @WIRE(mode="auto") {%jo %io_port_out:p};
 *   %gs_M1_3 = $GROUND @ATTACH #M1:3::net => @PLACE(0, -4); #M1:3::net @WIRE(mode="auto") {#M1:3 %gs_M1_3:p};
 *   %ss_R1_1 = $SUPPLY @ATTACH #R1:1::net => @PLACE(0, 12); #R1:1::net @WIRE(mode="auto") {#R1:1 %ss_R1_1:p};
 * }
@@ -83,5 +83,6 @@ Vin a 0 0.9
 *   %ss_X1_3 = $SUPPLY @ATTACH #X1:3::net => @PLACE(0, 5); #X1:3::net @WIRE(mode="auto") {#X1:3 %ss_X1_3:p};
 *   %ss_X2_3 = $SUPPLY @ATTACH #X2:3::net => @PLACE(14, 5); #X2:3::net @WIRE(mode="auto") {#X2:3 %ss_X2_3:p};
 *   %ss_Vdd_1 = $SUPPLY @ATTACH #Vdd:1::net => @PLACE(-14, 2); #Vdd:1::net @WIRE(mode="auto") {#Vdd:1 %ss_Vdd_1:p};
+*   %net_label_stub_X3_mid = $NET_LABEL_STUB @ATTACH #X3:mid => @PLACE(0, 0); %net_label_stub_X3_mid::l @PLACE(22, -1) => @ORIENT("R0");
 * }
 .end

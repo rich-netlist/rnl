@@ -69,15 +69,6 @@ fn a_level_without_a_record_that_fits_is_left_as_it_is() {
 }
 
 #[test]
-fn a_level_before_04_is_not_respaced() {
-    let old = SOURCE.replace("@VERSION(\"0.4\"); @SOLVER-CONFIG(layout=\"lines\")", "@VERSION(\"0.3\")");
-    let files = MemoryProvider::new().with("main.sp", &old);
-    let run = respace(Path::new("main.sp"), &files, &options("spacing_x=4"), &StoppedClock).unwrap();
-    assert!(run.levels.is_empty() && run.files.is_empty());
-    assert!(run.not_solved[0].reason.starts_with("unsupported: "), "{:?}", run.not_solved);
-}
-
-#[test]
 fn the_preview_says_respace_and_draws_the_level_spaced_again() {
     let before = solved();
     let files = MemoryProvider::new().with("main.sp", &before);

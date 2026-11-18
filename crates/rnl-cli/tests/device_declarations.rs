@@ -151,21 +151,6 @@ fn included_headers_act_only_on_their_own_host_lines() {
 }
 
 #[test]
-fn released_versions_keep_the_old_signature_and_name_validation() {
-    for version in ["0.2", "0.3"] {
-        let r = read("t.sp", &spice(version, r#"@DEVICE(name="X*", terminals=["d","D"])"#, "X1 a b cell", ""), None);
-        ok(&r);
-        assert_eq!(names(&r, "X1"), named(&["d", "D"]));
-        for header in
-            [r#"@DEVICE(model="cell", terminals=["a","b"])"#, r#"@DEVICE(name="X*", terminals=["a","b"], type="nmos")"#]
-        {
-            let r = read("t.sp", &spice(version, header, "X1 a b cell", ""), None);
-            assert!(r.diagnostics().iter().any(|d| d.severity == Severity::Error));
-        }
-    }
-}
-
-#[test]
 fn packages_precede_file_items_and_check_names_without_case() {
     let package = r#"@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="devices", version="1.0"); @DEVICE(model="cell", terminals=["package","return"], type="pmos"); @DEVICE(model="cell", terminals=["d","D"], type="bad") }"#;
     let main = spice(
@@ -195,22 +180,6 @@ fn both_written_patterns_must_match_and_short_lists_keep_numeric_positions() {
     assert_eq!(names(&r, "X1"), vec![Some("first".into()), None]);
     assert_eq!(names(&r, "X2"), vec![None, None]);
     assert_eq!(r.problems[0].usages[0].roles[0].members.len(), 2);
-}
-
-#[test]
-fn included_instances_follow_their_source_language_version() {
-    for (outer, inner) in [("0.3", "0.4"), ("0.4", "0.3")] {
-        let main = spice(outer, "", ".include child.sp", "");
-        let item = if inner == "0.4" {
-            r#"@DEVICE(model="cell", terminals=["a","b"])"#
-        } else {
-            r#"@DEVICE(name="X*", terminals=["d","D"])"#
-        };
-        let child = spice(inner, item, "X1 a b cell", "");
-        let r = read("t.sp", &main, Some(&child));
-        ok(&r);
-        assert_eq!(names(&r, "X1"), if inner == "0.4" { named(&["a", "b"]) } else { vec![None, None] });
-    }
 }
 
 #[test]

@@ -747,14 +747,6 @@
     },
     {
       "severity": "error",
-      "code": "RNL3221",
-      "name": "ref-not-found",
-      "file": "15-numbering-stale-and-errors.sp",
-      "line": 34,
-      "col": 7
-    },
-    {
-      "severity": "error",
       "code": "RNL2603",
       "name": "number-out-of-range",
       "file": "15-numbering-stale-and-errors.sp",

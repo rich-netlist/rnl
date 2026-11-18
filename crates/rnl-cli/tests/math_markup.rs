@@ -20,28 +20,22 @@ fn read(files: &MemoryProvider) -> Interpretation {
 }
 
 #[test]
-fn formulas_and_upright_overrides_are_versioned_in_model_and_rendering() {
-    for version in ["0.2", "0.3", "0.4"] {
-        let source = file(version, r#"(0,0) @TEXT("\(g_m=2\mathrm{V}\)", italic=true)"#);
-        let r = read(&MemoryProvider::new().with("t.sp", &source));
-        let text = &r.model.levels[0].texts[0];
-        assert_eq!(plain(&text.lines[0]), if version == "0.4" { "gm=2V" } else { r"\(g_m=2\mathrm{V}\)" });
-        let drawing = primitives(&r.model.levels[0], &RenderOptions::default());
-        let t = drawing
-            .iter()
-            .find_map(|p| match &p.kind {
-                Kind::Text(t) => Some(t),
-                _ => None,
-            })
-            .unwrap();
-        if version == "0.4" {
-            assert!(t.runs.iter().filter(|run| run.text.contains('g') || run.text == "m").all(|run| run.italic));
-            assert!(t.runs.iter().filter(|run| run.text.contains('2') || run.text == "V").all(|run| !run.italic));
-            assert!(!t.runs.iter().any(|run| run.text.contains('(')));
-        } else {
-            assert!(t.runs.iter().all(|run| run.italic));
-        }
-    }
+fn formulas_and_upright_overrides_are_in_model_and_rendering() {
+    let source = file("0.4", r#"(0,0) @TEXT("\(g_m=2\mathrm{V}\)", italic=true)"#);
+    let r = read(&MemoryProvider::new().with("t.sp", &source));
+    let text = &r.model.levels[0].texts[0];
+    assert_eq!(plain(&text.lines[0]), "gm=2V");
+    let drawing = primitives(&r.model.levels[0], &RenderOptions::default());
+    let t = drawing
+        .iter()
+        .find_map(|p| match &p.kind {
+            Kind::Text(t) => Some(t),
+            _ => None,
+        })
+        .unwrap();
+    assert!(t.runs.iter().filter(|run| run.text.contains('g') || run.text == "m").all(|run| run.italic));
+    assert!(t.runs.iter().filter(|run| run.text.contains('2') || run.text == "V").all(|run| !run.italic));
+    assert!(!t.runs.iter().any(|run| run.text.contains('(')));
 }
 
 #[test]
@@ -87,24 +81,22 @@ fn attribute_values_inside_formulas_are_literal_and_upright() {
 }
 
 #[test]
-fn formulas_in_pin_labels_and_symbol_text_use_the_defining_version() {
-    for version in ["0.3", "0.4"] {
-        let source = file(
-            version,
-            r#"$S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1, direction="left", label="\(V_1\)"); (2,0) @TEXT("\(I_2\)") }; #R1 @SET-SYMBOL $S => @PLACE(0,0)"#,
-        );
-        let r = read(&MemoryProvider::new().with("t.sp", &source));
-        let drawing = primitives(&r.model.levels[0], &RenderOptions::default());
-        let labels: Vec<_> = drawing
-            .iter()
-            .filter_map(|p| match &p.kind {
-                Kind::Text(t) => Some(t.runs.iter().map(|run| run.text.as_str()).collect::<String>()),
-                _ => None,
-            })
-            .collect();
-        for label in if version == "0.4" { ["V1", "I2"] } else { [r"\(V_1\)", r"\(I_2\)"] } {
-            assert!(labels.iter().any(|text| text == label), "{version}: {labels:?}");
-        }
+fn formulas_in_pin_labels_and_symbol_text_are_read() {
+    let source = file(
+        "0.4",
+        r#"$S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1, direction="left", label="\(V_1\)"); (2,0) @TEXT("\(I_2\)") }; #R1 @SET-SYMBOL $S => @PLACE(0,0)"#,
+    );
+    let r = read(&MemoryProvider::new().with("t.sp", &source));
+    let drawing = primitives(&r.model.levels[0], &RenderOptions::default());
+    let labels: Vec<_> = drawing
+        .iter()
+        .filter_map(|p| match &p.kind {
+            Kind::Text(t) => Some(t.runs.iter().map(|run| run.text.as_str()).collect::<String>()),
+            _ => None,
+        })
+        .collect();
+    for label in ["V1", "I2"] {
+        assert!(labels.iter().any(|text| text == label), "{labels:?}");
     }
 }
 
@@ -118,20 +110,18 @@ fn unsupported_commands_warn_without_failing_the_text() {
 }
 
 #[test]
-fn scoped_text_uses_the_writer_version_in_mixed_includes() {
-    for (main, child) in [("0.4", "0.3"), ("0.3", "0.4")] {
-        let source = file(main, "").replace("R1 a b 1k", "R1 a b 1k\n.include child.sp").replace(
-            ".end",
-            r#"* @RNL(scope="cell") { (4,0) @TEXT("\(M_1\)") }
+fn scoped_text_in_an_included_subcircuit_is_read() {
+    let source = file("0.4", "").replace("R1 a b 1k", "R1 a b 1k\n.include child.sp").replace(
+        ".end",
+        r#"* @RNL(scope="cell") { (4,0) @TEXT("\(M_1\)") }
 .end"#,
-        );
-        let included = format!("* child\n* @RNL(type=\"header\") {{ @VERSION(\"{child}\") }}\n.subckt cell a b\nR1 a b 1k\n* @RNL {{ (0,0) @TEXT(\"\\(C_2\\)\") }}\n.ends cell\n");
-        let r = read(&MemoryProvider::new().with("t.sp", &source).with("child.sp", &included));
-        let level = r.model.levels.iter().find(|level| level.title == "cell").unwrap();
-        let labels: Vec<_> = level.texts.iter().map(|text| plain(&text.lines[0])).collect();
-        assert!(labels.contains(&if main == "0.4" { "M1".into() } else { r"\(M_1\)".into() }));
-        assert!(labels.contains(&if child == "0.4" { "C2".into() } else { r"\(C_2\)".into() }));
-    }
+    );
+    let included = "* child\n.subckt cell a b\nR1 a b 1k\n* @RNL { (0,0) @TEXT(\"\\(C_2\\)\") }\n.ends cell\n";
+    let r = read(&MemoryProvider::new().with("t.sp", &source).with("child.sp", included));
+    let level = r.model.levels.iter().find(|level| level.title == "cell").unwrap();
+    let labels: Vec<_> = level.texts.iter().map(|text| plain(&text.lines[0])).collect();
+    assert!(labels.contains(&"M1".into()), "{labels:?}");
+    assert!(labels.contains(&"C2".into()), "{labels:?}");
 }
 
 #[test]

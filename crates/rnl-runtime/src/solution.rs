@@ -1,29 +1,23 @@
-//! A solver's result written back as RNL (standard 10.5, 13.3, 13.7, 14.8, 17; the draft 0.3,
-//! 5.9, 13.1, 14.8).
+//! A solver's result written back as RNL (standard 5.9, 10.5, 13.1, 13.3, 13.7, 14.8, 17).
 //!
 //! A solver gives its result for one level as a [`Solution`]: the position and orientation of the
 //! objects of its [`LevelProblem`], the routes it chose for the `"auto"` wires written in RNL, and
 //! the wires it routed for ROUTE. [`write_record`] turns it into the one record the solver writes
 //! at the end of the level's own text, `@RNL(type="generated", priority="high", author="…",
-//! hash="…") {…}`, in standard form. In a level of a file of the draft 0.3, [`finish_record`] then
+//! hash="…") {…}`, in standard form. [`finish_record`] then
 //! puts `numbering`, the check of its numbers, in its head when it uses a number (5.9).
 //! [`crate::writeback::replace_generated`] puts the record in place of the level's previous one.
 //!
-//! - **The interface is RNL** (the draft's 14.8): a [`Solution`] holds only what a record of the
+//! - **The interface is RNL** (14.8): a [`Solution`] holds only what a record of the
 //!   solver can hold, positions (PLACE), orientations (ORIENT), paths through the points of the
 //!   problem and coordinates (WIRE), branch points (named points) and junctions (`$JUNCTION`), so
 //!   any solution that a solver passes to another tool can be saved as one record.
-//! - **Every decision is written back** (the draft's 14.8): by name or key for the objects that
+//! - **Every decision is written back** (14.8): by name or key for the objects that
 //!   have one, by number for the others, with WIRE given the wire for the route of a wire, through
 //!   explicit statements for what rules make. What the record of the level cannot hold is listed
 //!   in [`Written::unsolved`] with the reason, never left out silently. Such a decision is not a
 //!   result: the object stays free, as if the level were not solved, and a viewer that does not
 //!   solve shows it so.
-//! - **Numbers and rewritten wires** are written only in a level of a file of the draft 0.3
-//!   ([`LevelProblem::version`]): a tool of 0.2 would read them as names it cannot find and as a
-//!   net slot given the wrong kind. In a level of 0.2, the decisions on objects without a name and
-//!   the routes of wires are unsolved ([`Unsolved::needs_0_3`]); `rnl solve` raises such a file to
-//!   0.3 when no name in it is spelled like a word that 0.3 adds (16.1).
 //! - Objects made by rules have no handle of their own (5.7, 10.5): their generating usage is
 //!   written out first as an explicit statement with a name [`generated_names`] gives, and the
 //!   objects are reached through it, as in `%gnd_stub_M1_s = $GND_STUB @ATTACH(…) #M1:s;
@@ -31,7 +25,7 @@
 //!   among the record's own objects ([`Reference::GeneratedNumber`]). The explicit usage then
 //!   takes the place of the generated one when the file is read again.
 //! - The route of a wire is WIRE given the wire, with `mode="straight"`, through the wire's own
-//!   points and the bends between them (the draft's 13.1). A wire routed for a ROUTE is a new WIRE
+//!   points and the bends between them (13.1). A wire routed for a ROUTE is a new WIRE
 //!   with `mode="straight"` and the style of its ROUTE; the points where wires branch are named
 //!   points, with `$JUNCTION` where the solver wants a dot (13.2, 13.7).
 //! - Coordinates are written by [`fmt_num`], which reads back as the same value (11.7).
@@ -42,8 +36,7 @@
 //!   (13.3). Where the solution has it elsewhere, as when the solver discarded the offset (8.5),
 //!   the record writes the PLACE on that axis, which replaces the offset there (13.3).
 //! - What the file fixes, where the solution has it, is no decision lost: a position or an
-//!   orientation that the record cannot hold, such as that of a point without a name in a file of
-//!   0.2, is not unsolved when it is what the facts of the file give the object (11.1, 11.2), since
+//!   orientation that the record cannot hold is not unsolved when it is what the facts of the file give the object (11.1, 11.2), since
 //!   a viewer that does not solve draws it there all the same. An object that the record reaches
 //!   has them written all the same, with the record's priority (14.8).
 
@@ -53,7 +46,6 @@ use std::fmt;
 use crate::diag::{codes, Code};
 use crate::geom::{fmt_num, Orient, Pt, TOL};
 use crate::host::{HostDocument, Record, Seg};
-use crate::interp::obj::Priority;
 use crate::interp::{interpret_numbering, AuthoredCounts};
 use crate::numbering::level_check;
 use crate::problem::*;
@@ -121,8 +113,8 @@ pub struct RoutedWire {
     pub points: Vec<WirePoint>,
 }
 
-/// The route the solver chose for an `"auto"` wire written in RNL (the draft 0.3, 13.1): written
-/// back as WIRE given the wire, which rewrites it. In 0.4, an authored wire on a net covered
+/// The route the solver chose for an `"auto"` wire written in RNL (13.1): written
+/// back as WIRE given the wire, which rewrites it. An authored wire on a net covered
 /// by a routing tree may also be split by inserting named branch points. A strict mode must
 /// retain its complete geometric path, including its computed bends (13.1).
 #[derive(Clone, Debug, PartialEq)]
@@ -136,19 +128,19 @@ pub struct WireRoute {
     pub points: Vec<WirePoint>,
 }
 
-/// A solver's result for one level. It holds only what a record of the solver can hold (the draft
-/// 0.3, 14.8), so that it can always be saved as one: what the record of a particular level cannot
-/// hold, such as an object without a name in a file of 0.2, the writer lists as unsolved.
+/// A solver's result for one level. It holds only what a record of the solver can hold (14.8), so
+/// that it can always be saved as one: what the record of a particular level cannot hold, the
+/// writer lists as unsolved.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Solution {
     pub placements: Vec<Placement>,
     pub branches: Vec<Branch>,
-    /// Additional dots on existing point references in 0.4 (13.2). These do not create
+    /// Additional dots on existing point references (13.2). These do not create
     /// branch points or connect wires. The configured junction definition supplies the dot.
     pub junctions: Vec<PointRef>,
     /// The wires routed for ROUTE (13.7).
     pub wires: Vec<RoutedWire>,
-    /// The routes of the `"auto"` wires written in RNL (the draft 0.3, 13.1).
+    /// The routes of the `"auto"` wires written in RNL (13.1).
     pub wire_routes: Vec<WireRoute>,
 }
 
@@ -170,7 +162,7 @@ pub enum Decision {
     Junction { index: usize },
 }
 
-/// A decision that the record of the level cannot hold. It is not a result (the draft 0.3, 14.8):
+/// A decision that the record of the level cannot hold. It is not a result (14.8):
 /// the object stays free, as if the level were not solved.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Unsolved {
@@ -184,13 +176,6 @@ pub struct Unsolved {
 }
 
 impl Unsolved {
-    /// Whether a record of a file of 0.3 holds it, where one of 0.2 cannot: the decision on an
-    /// object without a name, which 0.3 refers to by its number (5.9), or the route of a wire, which
-    /// 0.3 writes with WIRE given the wire (13.1). A tool raises such a file to 0.3 (16.1).
-    pub fn needs_0_3(&self) -> bool {
-        self.code == codes::UNSOLVED_NO_NUMBERS || self.code == codes::UNSOLVED_NO_REWRITE
-    }
-
     /// A dot that a tool leaves out of the record, as no place for it keeps the facts of the
     /// level as they are drawn: the rest of the record is written without it.
     pub fn junction_unplaced(junction: &JunctionWrite) -> Unsolved {
@@ -263,16 +248,8 @@ const AT_POINT: Why =
 const NO_ORIENTATION: Why = (codes::UNSOLVED_NO_ORIENTATION, "it has no orientation (11.2)");
 const ANONYMOUS: Why = (codes::UNSOLVED_ANONYMOUS, "it cannot be referred to (5.7)");
 const RULE_TEXT: Why = (codes::UNSOLVED_RULE_TEXT, "a text without a key that a rule makes cannot be referred to: the solver does not decide its position, the viewer places it (13.3, 14.8)");
-const NO_NUMBERS: Why = (
-    codes::UNSOLVED_NO_NUMBERS,
-    "it has no name, and a file of 0.2 cannot refer to it; the draft 0.3 refers to it by its number (5.9)",
-);
 const NOT_WRITTEN_OUT: Why =
     (codes::UNSOLVED_NOT_WRITTEN_OUT, "the usage made by a rule that it belongs to cannot be written out (10.5)");
-const NO_REWRITE: Why = (
-    codes::UNSOLVED_NO_REWRITE,
-    "a file of 0.2 cannot rewrite a wire; the draft 0.3 writes its route with WIRE given the wire (13.1)",
-);
 const OLD_RECORD: Why = (codes::UNSOLVED_OLD_RECORD, "it is an object of a record of the solver, which this record replaces: a solver reads the level without them (2.8)");
 const TWO_POINTS: Why = (codes::UNSOLVED_TWO_POINTS, "a wire has at least two points (13.1)");
 const NOT_A_NUMBER: Why =
@@ -405,8 +382,6 @@ struct Refs<'a> {
     p: &'a LevelProblem,
     /// The names of the usages made by rules, written out ([`generated_names`]).
     names: Vec<Option<String>>,
-    /// The level's file follows 0.3: numbers and rewrites can be written.
-    numbers: bool,
     /// For each usage written out: the number before those of the objects its statement makes.
     offsets: Vec<Option<usize>>,
 }
@@ -417,7 +392,6 @@ impl Refs<'_> {
     fn reach(&self, r: &Reference) -> Result<Option<usize>, Why> {
         match r {
             Reference::Name(_) => Ok(None),
-            Reference::Number { .. } | Reference::GeneratedNumber { .. } if !self.numbers => Err(NO_NUMBERS),
             // in a problem read with the records of the solver, their own objects come after the
             // authored ones: this record replaces them, and its numbers would name others (5.9)
             Reference::Number { number, .. } if *number > self.p.authored_numbers => Err(OLD_RECORD),
@@ -645,14 +619,12 @@ fn keeps_shape(p: &LevelProblem, s: &Solution, wire: &ProblemWire, points: &[Wir
 
 /// The statement that writes out a usage made by a rule (10.5): its definition, its roles in
 /// order, its parameters and its priority as it has it (14.8): the one its rule writes on it, or
-/// the `"disabled"` of the record its rule is written in. In a file of 0.3 a usage without one is
-/// written without: the record's `"high"` gives it none, so it keeps the priorities of the facts of
-/// its body, as the one the rule made did. In a file of 0.2 it would take the record's, so there
-/// it is written with `"normal"`.
-fn usage_statement(u: &UsageEntry, name: &str, follows_0_3: bool) -> String {
+/// the `"disabled"` of the record its rule is written in. A usage without one is written without:
+/// the record's `"high"` gives it none, so it keeps the priorities of the facts of its body, as the
+/// one the rule made did.
+fn usage_statement(u: &UsageEntry, name: &str) -> String {
     let mut params: Vec<String> = u.params.iter().map(|(k, v)| format!("{}={}", k, written_lit(v))).collect();
-    let priority = if follows_0_3 { u.priority } else { Some(u.priority.unwrap_or(Priority::Normal)) };
-    if let Some(priority) = priority {
+    if let Some(priority) = u.priority {
         params.push(format!("priority=\"{}\"", priority.as_str()));
     }
     let roles: Vec<&str> = u.roles.iter().filter_map(|r| r.written.as_deref()).collect();
@@ -686,19 +658,15 @@ fn junction_point_exists(p: &LevelProblem, point: &PointRef) -> bool {
 /// solver's options.
 ///
 /// Every decision of the solution is in the record, or in [`Written::unsolved`] with the reason
-/// the record cannot hold it, but what the file fixes (below):
-///
-/// - in a level of a file of 0.2: the position or orientation of an object without a name, and
-///   the route of a wire (the draft 0.3 writes them, by number and with WIRE given the wire);
-/// - in every version: the position of a text without a key that a rule makes, which nothing can
-///   refer to, so the solver does not decide it (13.3; the draft 0.3, 14.8); the point of a usage
-///   that only helps the solve ([`auxiliary_points`]), which the record does not write; an object reached
-///   only through a usage that a rule makes and that cannot be written out (10.5), or through
-///   nothing (5.7); in a problem read with the records of the solver, an object that one of them
-///   makes, which this record replaces; a position given to an object drawn at the point of its
-///   main object (12.1), an orientation given to a point or a text (11.2); a wire with fewer than
-///   two points (13.1), or through the centre of a set; a coordinate that is NaN or infinite
-///   (3.7); an index that is not in the problem or the solution.
+/// the record cannot hold it, but what the file fixes (below). The record cannot hold the position
+/// of a text without a key that a rule makes, which nothing can refer to, so the solver does not
+/// decide it (13.3, 14.8); the point of a usage that only helps the solve ([`auxiliary_points`]),
+/// which the record does not write; an object reached only through a usage that a rule makes and
+/// that cannot be written out (10.5), or through nothing (5.7); in a problem read with the records
+/// of the solver, an object that one of them makes, which this record replaces; a position given
+/// to an object drawn at the point of its main object (12.1), an orientation given to a point or a
+/// text (11.2); a wire with fewer than two points (13.1), or through the centre of a set; a
+/// coordinate that is NaN or infinite (3.7); an index that is not in the problem or the solution.
 ///
 /// A text keeps the axes on which the file places it by what it is attached to, where the solution
 /// has it there: by an offset (13.3), or by its owner's symbol on an axis that the scene does not
@@ -717,11 +685,10 @@ fn junction_point_exists(p: &LevelProblem, point: &PointRef) -> bool {
 /// rank first as written, as rnl-solver does, so that a viewer drops the later ones, in the order
 /// of 8.5.
 ///
-/// In a level of the draft 0.3 the record is not finished: when it uses a number,
-/// [`finish_record`] gives it the check of its numbers.
+/// The record is not finished: when it uses a number, [`finish_record`] gives it the check of its
+/// numbers.
 pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &str) -> Written {
-    let modern = crate::interp::unit::keeps_0_4(&p.version);
-    let mut refs = Refs { p, names: generated_names(p), numbers: p.follows_0_3(), offsets: vec![None; p.usages.len()] };
+    let mut refs = Refs { p, names: generated_names(p), offsets: vec![None; p.usages.len()] };
     let mut unsolved = Vec::new();
     let mut notes = Vec::new();
     let mut needed = vec![false; p.usages.len()];
@@ -846,7 +813,7 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
         }
     }
 
-    // the routes of the wires written in RNL: WIRE given the wire (the draft 0.3, 13.1)
+    // the routes of the wires written in RNL: WIRE given the wire (13.1)
     let mut rewrites: Vec<(Reference, Vec<Piece>)> = Vec::new();
     let mut sorted: Vec<&WireRoute> = solution.wire_routes.iter().collect();
     sorted.sort_by_key(|r| r.wire);
@@ -856,10 +823,6 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
             lost(decision, &format!("wire {}", wr.wire), NOT_IN_PROBLEM);
             continue;
         };
-        if !refs.numbers {
-            lost(decision, &wire.label, NO_REWRITE);
-            continue;
-        }
         let root = match refs.reach(&wire.reference) {
             Ok(root) => root,
             Err(why) => {
@@ -877,8 +840,7 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
         for u in root.into_iter().chain(roots) {
             needed[u] = true;
         }
-        let splitting = modern
-            && !wire.generated
+        let splitting = !wire.generated
             && wr.points.iter().any(|p| matches!(p, WirePoint::Branch(_)))
             && p.routes.iter().any(|route| wire.nets.contains(&route.net));
         let ordered = keeps_points(wire, &wr.points, splitting);
@@ -901,7 +863,7 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
 
     let mut extra_junctions = Vec::new();
     let mut accepted_junctions: Vec<&PointRef> = Vec::new();
-    if modern && p.junction.effective().definition.is_some() {
+    if p.junction.effective().definition.is_some() {
         for (index, point) in solution.junctions.iter().enumerate() {
             // Existing dots need no writable reference: nothing is emitted for them.
             if junction_point_exists(p, point)
@@ -946,7 +908,7 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
     let mut statements = Vec::new();
     for (k, u) in p.usages.iter().enumerate() {
         if let (true, Some(name)) = (needed[k], &refs.names[k]) {
-            statements.push(usage_statement(u, name, p.follows_0_3()));
+            statements.push(usage_statement(u, name));
         }
     }
     for (b, name) in solution.branches.iter().zip(&branch_names) {
@@ -976,8 +938,8 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
     for (r, pieces) in &rewrites {
         statements.push(format!("{} @WIRE(mode=\"straight\") {{{}}}", refs.text(r), list(pieces)));
     }
-    let junction = if modern { p.junction.effective().definition.as_deref() } else { Some("$JUNCTION") };
-    let warnings = if modern { p.junction.warning().into_iter().collect() } else { Vec::new() };
+    let junction = p.junction.effective().definition.as_deref();
+    let warnings = p.junction.warning().into_iter().collect();
     let mut junctions = Vec::new();
     for (index, (b, name)) in solution.branches.iter().zip(&branch_names).enumerate() {
         if let (true, Some(name), Some(definition)) = (b.junction, name, junction) {
@@ -1135,9 +1097,9 @@ fn fixed_at(o: &ProblemObject, axis: Axis, v: f64) -> bool {
 }
 
 /// The record of the solver of a level, finished: `record` is what [`write_record`] gives for the
-/// problem `p`. When it uses a number, in a level of a file of the draft 0.3, the record with
-/// `numbering` in its head, the check of its numbers (5.9); otherwise the record as it is: a
-/// record that uses no number needs no `numbering` (5.9), and a level of 0.2 has no numbers.
+/// problem `p`. When it uses a number, the record with `numbering` in its head, the check of its
+/// numbers (5.9); otherwise the record as it is: a record that uses no number needs no
+/// `numbering` (5.9).
 ///
 /// The check covers the objects of the authored records of the level and the record's own: the
 /// coordinates in its wires, the bodies of the usages it writes out, its junctions. So the document
@@ -1180,9 +1142,9 @@ impl<'a> LevelFinisher<'a> {
     /// The record finished, as [`finish_record`] gives it.
     pub fn finish(&self, files: &dyn Provider, record: &str) -> String {
         let p = self.p;
-        let ast = parse_record_features(record, true, crate::interp::unit::keeps_0_4(&p.version));
+        let ast = parse_record_features(record, true, true);
         let uses_numbers = ast.body.as_ref().is_some_and(|b| b.members.iter().any(|m| uses_number(m)));
-        if !p.follows_0_3() || !uses_numbers {
+        if !uses_numbers {
             return record.to_string();
         }
         let mut doc = self.doc.clone();

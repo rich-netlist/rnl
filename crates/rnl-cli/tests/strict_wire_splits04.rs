@@ -145,15 +145,6 @@ fn repeated_and_zero_length_segments_keep_their_authored_handles() {
 }
 
 #[test]
-fn released_strict_writeback_keeps_its_original_notes() {
-    let p = problem("0.3", "straight", "%a=(0,0); %b=(8,4)", "%a %b");
-    let w = write_record(&p, &solution(&p, (4., 2.), vec![WirePoint::Branch(0)]), "test", "hash");
-    assert_eq!(w.notes.len(), 2, "{:?}", w.notes);
-    assert!(w.notes[0].contains("not \"auto\""));
-    assert!(w.notes[1].contains("bends only between them"));
-}
-
-#[test]
 fn half_unit_bends_are_preserved_in_reverse_and_on_either_major_axis() {
     for (a, b, first, branch, last) in [
         ((0., 0.), (7., 4.), (1.5, 0.), (3.5, 2.), (5.5, 4.)),

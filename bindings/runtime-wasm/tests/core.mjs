@@ -27,7 +27,7 @@ const char = (...codes) => String.fromCharCode(...codes);
 const NETLIST = `* untitled
 R1 a 0 1k
 C1 a 0 1p
-* @RNL(type="header") { @VERSION("0.2")}
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4") }
 * @RNL {
 *   #R1 @PLACE(0, 0);
 *   #C1 @PLACE(4, 0)
@@ -91,8 +91,17 @@ test("a lone surrogate becomes U+FFFD, as TextEncoder makes it", () => {
   assert.equal(core.build({ entry: "a.sp", files: { "a.sp": kept } }).files[0].text, kept);
 });
 
+test("a file of 0.3 is not read, and the error says how to convert it", () => {
+  const text = '* t\nR1 a b 1k\n* @RNL(type="header") { @VERSION("0.3") }\n* @RNL { #R1 @PLACE(3x, 4) }\n.end\n';
+  const d = core.build({ entry: "t.sp", files: { "t.sp": text } });
+  const errors = d.diagnostics.filter((x) => x.severity === "error");
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].line, 3);
+  assert.match(errors[0].message, /^unsupported version 0\.3: .*`rnl upgrade` writes the file in 0\.4$/);
+});
+
 test("the same request gives the same Document every time", async () => {
-  const path = resolve(here, "../../../tests/conformance/cases/16-ties.sp");
+  const path = resolve(here, "../../../tests/conformance/cases-0.4/from-0.2/16-ties.sp");
   const request = { entry: "/w/16-ties.sp", files: { "/w/16-ties.sp": await readFile(path, "utf8") } };
   const first = core.build(request);
   for (let k = 0; k < 6; k++) assert.deepEqual(core.build(request), first);
@@ -192,7 +201,7 @@ test("a write gives the netlist written and its Document", () => {
   const { text, document } = core.write(rcWrite([placeR1]));
   assert.equal(
     text,
-    '\n* @RNL(type="header") { @VERSION("0.3")}\n.subckt rc VSS\nR1 in VSS 1k\n* @RNL(author="test") {\n*   #R1 @PLACE(2, 0)\n* }\n.ends rc\n',
+    '\n* @RNL(type="header") { @VERSION("0.4")}\n.subckt rc VSS\nR1 in VSS 1k\n* @RNL(author="test") {\n*   #R1 @PLACE(2, 0)\n* }\n.ends rc\n',
   );
   assert.equal(document.path, "/rnl-edit/netlist.sp");
   assert.equal(document.files[0].text, text);
@@ -266,14 +275,15 @@ test("real 0.4 write refusals keep diagnostic fields through the Worker", async 
   const worker = startCore();
   try {
     await assert.rejects(worker.write(request), diagnostic);
-    const legacy = { ...request, write: { ...request.write, language_version: undefined } };
-    await assert.rejects(worker.write(legacy), error => !Object.hasOwn(error, "code") && !Object.hasOwn(error, "diagnostics"));
+    // a write that names no version is written in 0.4, and refused the same way
+    const unversioned = { ...request, write: { ...request.write, language_version: undefined } };
+    await assert.rejects(worker.write(unversioned), diagnostic);
   } finally {
     worker.terminate();
   }
 });
 
-const TOP = '* top\n* @RNL(type="header") { @VERSION("0.3")}\n.include "amp.inc"\nX1 a b amp\n.end\n';
+const TOP = '* top\n* @RNL(type="header") { @VERSION("0.4")}\n.include "amp.inc"\nX1 a b amp\n.end\n';
 const AMP = ".subckt amp in out\r\nR1 in out 1k\r\n* @RNL { #R1 @PLACE(0, 0) }\r\n.ends amp\r\n";
 const replace = (level, records) => ({
   replace_records: { level, records },
@@ -319,7 +329,7 @@ test("parts ask for a snapshot, through the core and through the Worker", async 
   const instances = s.levels[0].model.objects.filter((o) => o.kind === "instance");
   assert.deepEqual(instances.map((o) => [o.id, o.at.value]), [["#R1", [0, 0]], ["#C1", [4, 0]]]);
   // the standard package's ground stubs for the unwired pins on 0, by where its rule is written
-  assert.ok(s.levels[0].model.objects.some((o) => o.definition === "$GND_STUB" && o.id.startsWith("@")));
+  assert.ok(s.levels[0].model.objects.some((o) => o.definition === "$GROUND_STUB" && o.id.startsWith("@")));
   assert.throws(() => core.build(request), /the request is not a build without parts/);
   assert.throws(() => core.snapshot(untitled), /the request is not a build with parts/);
   const worker = startCore();
@@ -377,10 +387,11 @@ test("the Worker writes, and gives every request the packages its build brings",
   const to = await mkdtemp(join(tmpdir(), "rnl-core-"));
   try {
     for (const name of ["core.js", "worker.js", "rnl_runtime_wasm.wasm", "package.json"]) await copyFile(new URL(name, dist), join(to, name));
-    const acme = '@RNL(type="header") { @VERSION("0.2"); @PACKAGE(name="acme", version="1.0")}';
+    // a body record, or a package of a header alone is an alias package
+    const acme = '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme", version="1.0")}\n@RNL {}\n';
     const files = JSON.stringify({ "/rnl-bundled/packages/acme.rnl": acme });
     await writeFile(join(to, "packages.js"), `export const files = ${files};\nexport const packageDirs = ["/rnl-bundled/packages"];\n`);
-    const header = '* t\n* @RNL(type="header") { @VERSION("0.2"); @USE-PACKAGE(name="acme", version="1.0")}\nR1 a 0 1k\n';
+    const header = '* t\n* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="acme", version="1.0")}\nR1 a 0 1k\n';
     const request = { entry: "/w/t.sp", files: { "/w/t.sp": header } };
     const errors = (d) => d.diagnostics.filter((x) => x.severity === "error").map((x) => x.message);
     assert.notDeepEqual(errors(core.build(request)), []);
@@ -401,28 +412,27 @@ test("a catalog request lists the packages, through the core and through the Wor
   const c = core.catalog({ catalog: {} });
   assert.deepEqual(Object.keys(c), ["packages", "symbols", "definitions", "sets"]);
   const resistor = c.symbols.find((s) => s.symbol === "$RESISTOR");
-  assert.deepEqual([resistor.package, resistor.version, resistor.file], ["rnl-std-basic", "0.3", "rnl-std-basic.rnl"]);
+  assert.deepEqual([resistor.package, resistor.version, resistor.file], ["rnl-std-basic", "0.4", "rnl-std-basic.rnl"]);
   assert.deepEqual(resistor.pins, [
-    { terminal: 1, at: [0, 2], direction: "up" },
-    { terminal: 2, at: [0, -2], direction: "down" },
+    { terminal: "p", at: [0, 2], direction: "up" },
+    { terminal: "n", at: [0, -2], direction: "down" },
   ]);
   assert.deepEqual(resistor.box, [-1, -2, 1, 2]);
   assert.deepEqual(resistor.labels.map((l) => l.key), ["name", "value"]);
-  assert.equal(c.symbols.find((s) => s.symbol === "$GROUND_SYMBOL").definition, "$GROUND");
-  assert.equal(c.definitions.find((d) => d.definition === "$GROUND").symbol, "$GROUND_SYMBOL");
-  // of each name the newest version, of those a file of the default version finds: rnl-std 0.3,
-  // not 0.2; a name only the draft 0.4 has, such as rnl-std-all, keeps 0.4
+  // in 0.4 a rule of the package draws $GROUND with $GROUND_SYMBOL; neither names the other
+  assert.equal(c.symbols.find((s) => s.symbol === "$GROUND_SYMBOL").package, "rnl-std-basic");
+  assert.deepEqual(c.definitions.find((d) => d.definition === "$GROUND").roles, [["p", "net"]]);
+  // only the standard series 0.4 is bundled
   const versions = (catalog, name) => catalog.packages.filter((p) => p.name === name).map((p) => p.version);
-  assert.deepEqual(versions(c, "rnl-std"), ["0.3"]);
+  assert.deepEqual(versions(c, "rnl-std"), []);
   assert.deepEqual(versions(c, "rnl-std-all"), ["0.4"]);
-  // every version: rnl-std of 0.2 and 0.3, and rnl-std-all of 0.4
+  // every version: still rnl-std-all of 0.4 alone
   const all = core.catalog({ catalog: { all_versions: true } });
   const series = [...new Set(all.packages.filter((p) => p.series).map((p) => p.version))].sort();
-  assert.deepEqual(series.slice(0, 3), ["0.2", "0.3", "0.4"]);
-  assert.deepEqual(versions(all, "rnl-std"), ["0.2", "0.3"]);
+  assert.deepEqual(series, ["0.4"]);
   assert.deepEqual(versions(all, "rnl-std-all"), ["0.4"]);
   // a request's own package, by name
-  const acme = '@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="acme", version="1.0")}\n@RNL { $ACME = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1, direction="up") } }\n';
+  const acme = '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme", version="1.0")}\n@RNL { $ACME = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1, direction="up") } }\n';
   const own = { catalog: { packages: ["acme"] }, files: { "/p/acme.rnl": acme }, package_dirs: ["/p"] };
   assert.deepEqual(core.catalog(own).symbols.map((s) => [s.symbol, s.package, s.box]), [["$ACME", "acme", [0, 0, 0, 0]]]);
   // a catalog request and a build each want their own answer
@@ -442,7 +452,7 @@ test("a catalog request lists the packages, through the core and through the Wor
 
 test("a formats request lists the formats and detects files, through the core and through the Worker", async () => {
   // a package file by its suffix, or by its first record, a header with PACKAGE at the start of a line
-  const pkg = '@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="p", version="1.0")}\n';
+  const pkg = '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="p", version="1.0")}\n';
   const detect = { "/w/a.inc": "* a\n", "/w/b.lib": "simulator lang=spectre\n", "/w/m.va": "module m;\nendmodule\n", "/w/p.rnl": "", "/w/p.pkg": pkg };
   const request = { formats: { detect } };
   const f = core.formats(request);
@@ -480,18 +490,18 @@ test("decodeText reads bytes as rnl reads a file", () => {
 const canvasPath = "/library/analog-canvas-extensions.rnl";
 const { publicPackageText, publicPackagesAvailable } = await import("../../../scripts/packages.mjs");
 const hasPublicPackages = publicPackagesAvailable(["analog-canvas-extensions"]);
-const canvasText = hasPublicPackages ? publicPackageText("analog-canvas-extensions") : "";
+const canvasText = hasPublicPackages ? publicPackageText("analog-canvas-extensions", "0.7") : "";
 const canvasNetlist = `* optional canvas
-* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="analog-canvas-extensions", version="0.1") }
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="analog-canvas-extensions", version="0.7") }
 R1 a 0 1k
-* @RNL { #R1 @SET-SYMBOL $CANVAS_VCVS_DIAMOND; #R1 @PLACE(0, 0) }
+* @RNL { #R1 @SET-SYMBOL $CANVAS_VCVS_CIRCLE; #R1 @PLACE(0, 0) }
 .end
 `;
 const canvasRequest = { entry: "/canvas.sp", files: { "/canvas.sp": canvasNetlist, [canvasPath]: canvasText } };
 test("the downloaded Canvas package is not built-in or searched merely because it is in files", { skip: !hasPublicPackages }, () => {
   const doc = core.build(canvasRequest);
-  assert.ok(doc.diagnostics.some(d => d.severity === "error" && d.message.includes("package analog-canvas-extensions 0.1 cannot be found")));
-  assert.ok(core.catalog({ catalog: {} }).packages.every(p => p.name.startsWith("rnl-std") || p.name === "rnl-zh" || p.name === "alias-zh"));
+  assert.ok(doc.diagnostics.some(d => d.severity === "error" && d.message.includes("package analog-canvas-extensions 0.7 cannot be found")));
+  assert.ok(core.catalog({ catalog: {} }).packages.every(p => p.name.startsWith("rnl-std") || p.name === "alias-zh"));
 });
 test("the downloaded Canvas package resolves when explicitly placed in the pool", { skip: !hasPublicPackages }, () => {
   const doc = core.build({ ...canvasRequest, pool: [canvasPath] });

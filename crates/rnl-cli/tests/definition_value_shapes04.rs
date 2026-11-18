@@ -55,12 +55,3 @@ fn unknown_scalar_values_and_valid_outer_lists_remain_deferred() {
     let r = read("0.4", "?r @ORIENT([?v,\"R0\"])", "#R1 @AS(v=\"R0\") $D; #R2 @AS(v=\"R90\") $D");
     assert!(errors(&r).is_empty(), "{:?}", r.diagnostics());
 }
-
-#[test]
-fn released_versions_keep_deferred_array_errors() {
-    for version in ["0.2", "0.3"] {
-        assert!(errors(&read(version, "?r @PLACE(x=[?v])", "")).is_empty());
-        let r = read(version, "?r @PLACE(x=[?v])", "#R1 @AS $D; #R2 @AS $D");
-        assert_eq!(errors(&r), [codes::PARAM_WRONG_TYPE, codes::PARAM_WRONG_TYPE]);
-    }
-}

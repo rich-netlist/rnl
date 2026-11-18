@@ -1,4 +1,4 @@
-//! A draft 0.4 solve that cannot write a level reports an error, without duplicating host errors.
+//! A solve that cannot write a level reports an error, without duplicating host errors.
 use rnl_cli::solve::{errors, lines, solve, SolveOptions, WallClock};
 use rnl_runtime::{
     diag::{codes, Severity},
@@ -44,17 +44,15 @@ fn encrypted_and_excluded_levels_are_errors_with_locations() {
 }
 
 #[test]
-fn the_owning_file_version_controls_a_refusal() {
-    for (top, lib, modern) in [("0.4", "0.3", false), ("0.3", "0.4", true)] {
-        let run = solve(Path::new("main.sp"), &providers(top, lib, ".prot", ".unprot"), &options()).unwrap();
-        let level = run.levels.iter().find(|l| l.problem.title == "cell").unwrap();
-        assert_eq!(level.write_errors.len(), usize::from(modern));
-        assert_eq!(
-            level.written.notes.iter().filter(|n| n.contains("the record is not written")).count(),
-            usize::from(!modern)
-        );
-        assert_eq!(errors(&run), usize::from(modern));
-    }
+fn an_included_file_without_a_header_refuses_as_the_including_file() {
+    let files = MemoryProvider::new()
+        .with("main.sp", &format!("{}.include lib.inc\nX1 a b cell\n", header("0.4")))
+        .with("lib.inc", "* source\n.prot\n.subckt cell a b\nR1 a b 1k\n.ends cell\n.unprot\n");
+    let run = solve(Path::new("main.sp"), &files, &options()).unwrap();
+    let level = run.levels.iter().find(|l| l.problem.title == "cell").unwrap();
+    assert_eq!(level.write_errors.len(), 1, "{:?}", lines(&run, true));
+    assert!(level.written.notes.iter().all(|n| !n.contains("the record is not written")));
+    assert_eq!(errors(&run), 1);
 }
 
 #[test]

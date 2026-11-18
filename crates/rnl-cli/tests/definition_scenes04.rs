@@ -66,15 +66,6 @@ fn local_points_private_definitions_and_selection_rules_remain_valid() {
 }
 
 #[test]
-fn released_versions_still_allow_same_level_scene_references() {
-    for version in ["0.2", "0.3"] {
-        let r = read(version, "%p=(1,2);", "%p @CIRCLE(radius=1)", "$D @ATTACH; $D @ATTACH");
-        assert!(errors(&r).is_empty(), "{:?}", r.diagnostics());
-        assert_eq!(r.model.levels[0].shapes.len(), 4);
-    }
-}
-
-#[test]
 fn private_package_points_are_not_visible_from_bodies() {
     let files = MemoryProvider::new()
         .with("p.rnl", "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"p\",version=\"1.0\") }\n@RNL { %q=%p; $D = @DEFINE(roles=[]) { %q @CIRCLE(radius=1) }; %p=(1,2) }\n")
@@ -117,16 +108,13 @@ fn nested_failed_members_do_not_discard_sibling_members() {
 }
 
 #[test]
-fn included_bodies_keep_their_own_language_version() {
-    for version in ["0.3", "0.4"] {
-        let files=MemoryProvider::new()
-            .with("main.sp","* includes\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include \"defs.sp\"\n")
-            .with("defs.sp",&format!("* definitions\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\n* @RNL {{ %p=(1,2); $D = @DEFINE(roles=[]) {{ %p @CIRCLE(radius=1) }} }}\n"));
-        let r =
-            rnl_cli::interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Default::default() })
-                .unwrap();
-        assert_eq!(errors(&r), if version == "0.4" { vec![SCENE] } else { vec![] }, "{version}: {:?}", r.diagnostics());
-    }
+fn included_bodies_check_their_scene_references() {
+    let files=MemoryProvider::new()
+        .with("main.sp","* includes\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include \"defs.sp\"\n")
+        .with("defs.sp","* definitions\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n* @RNL { %p=(1,2); $D = @DEFINE(roles=[]) { %p @CIRCLE(radius=1) } }\n");
+    let r = rnl_cli::interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Default::default() })
+        .unwrap();
+    assert_eq!(errors(&r), [SCENE], "{:?}", r.diagnostics());
 }
 
 #[test]
@@ -218,13 +206,9 @@ fn symbol_bodies_reject_external_points_and_collections() {
 }
 
 #[test]
-fn symbol_local_points_and_released_external_points_remain_allowed() {
+fn symbol_local_points_remain_allowed() {
     let r = read("0.4", "$S = @DEFINE-SYMBOL { %p=(1,2); %p; %p @CIRCLE(radius=1) };", "", "#R1 @SET-SYMBOL $S");
     assert!(errors(&r).is_empty(), "{:?}", r.diagnostics());
-    for version in ["0.2", "0.3"] {
-        let r = read(version, "%p=(1,2); $S = @DEFINE-SYMBOL { %p };", "", "#R1 @SET-SYMBOL $S");
-        assert!(errors(&r).is_empty(), "{version}: {:?}", r.diagnostics());
-    }
 }
 
 #[test]

@@ -12,9 +12,6 @@ impl Interp<'_> {
         settings: &[SolverSetting],
     ) -> (JunctionConfig, Option<ObjId>) {
         let (mut file, object) = self.junction_for(scene, settings);
-        if !self.follows_0_4(self.level_unit[self.scenes[scene].level]) {
-            return (file, object);
-        }
         let setting = self.tool_solver_config.iter().rev().find(|s| s.key == "junction").cloned();
         let Some(setting) = setting else { return (file, object) };
         let (mut tool, tool_object) = self.junction_for(scene, &[setting]);
@@ -35,9 +32,6 @@ impl Interp<'_> {
         settings: &[SolverSetting],
     ) -> (JunctionConfig, Option<ObjId>) {
         let unit = self.level_unit[self.scenes[scene].level];
-        if !self.follows_0_4(unit) {
-            return (JunctionConfig::default(), None);
-        }
         // the last value that names a definition here is in effect; a later one that does not is
         // kept for a warning, and an earlier one stands (14.10)
         let mut invalid = None;
@@ -77,24 +71,7 @@ impl Interp<'_> {
             let binding = self.lookup_unit(prefix, &name, unit, false, Some(scene))?;
             let home = self.home_scene(binding.owner);
             let target = if self.places.rules.contains(&binding.key()) { Some(scene) } else { home };
-            let object = if self.modern_binding(&binding) {
-                self.evaluated_binding(&binding, target)?
-            } else {
-                let value = self
-                    .eval_member_at(
-                        binding.owner,
-                        binding.rec,
-                        binding.index,
-                        binding.embedded,
-                        &binding.member,
-                        target,
-                        binding.header.clone(),
-                        None,
-                        "",
-                    )
-                    .ok()?;
-                self.bound_value(&binding.key(), target, binding.prefix, &binding.name, value)
-            };
+            let object = self.evaluated_binding(&binding, target)?;
             let ObjData::Definition(definition) = self.o(object) else { return None };
             let role = definition.roles.first()?;
             if role.kinds.as_ref().is_some_and(|k| !k.iter().any(|k| k == "point")) {

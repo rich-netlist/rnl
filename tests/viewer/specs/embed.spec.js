@@ -473,7 +473,7 @@ test("demo switches all four published examples in its existing iframe", async (
   await screenshot(page, "demo-before.png", browserName);
   for (const name of ["Two-stage buffer", "Line styles", "Five-transistor OTA"]) {
     await page.getByRole("button", { name, exact: true }).click();
-    const sample = name === "Two-stage buffer" ? "04-hierarchy.sp" : name === "Line styles" ? "17-line-styles.sp" : "ota5t.sp";
+    const sample = name === "Two-stage buffer" ? "04-hierarchy.sp" : name === "Line styles" ? "17-line-styles.sp" : "03-five-transistor-ota.sp";
     await expect(page.locator("#events")).toContainText(sample);
     await expect(frame.locator("#canvas > svg")).toBeVisible();
   }
@@ -514,7 +514,9 @@ test("public packages: failed catalogs preserve built-ins and altered package by
   await page.locator('#tab-files').click();
   await expect(page.locator('#public-package-status')).toContainText('Built-in standard packages remain available');
   await page.locator('[data-group="builtin"] .lib-toggle').click();
-  await expect(page.locator('[data-group="builtin"] .pool-row')).toHaveCount(25);
+  // the files of the one standard series, 0.4
+  const standard = fs.readdirSync(new URL('../../../libraries/standard/0.4/', import.meta.url)).filter(f => f.endsWith('.rnl'));
+  await expect(page.locator('[data-group="builtin"] .pool-row')).toHaveCount(standard.length);
   await page.unroute('**/public-packages/catalog.json');
   await page.route('**/public-packages/packages/analog-canvas-extensions/**/analog-canvas-extensions.rnl', route => route.fulfill({ body: 'altered package' }));
   const error = await page.evaluate(async () => {

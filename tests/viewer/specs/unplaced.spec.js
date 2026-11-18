@@ -70,7 +70,7 @@ test.describe("the objects not drawn", () => {
     await show(page);
     const nets = (name) =>
       rows(page).filter({ has: page.locator(".name", { hasText: new RegExp(`^${name}$`) }) }).locator(".thumb svg text").allTextContents();
-    expect((await nets("M1")).sort()).toEqual(["0", "d", "g", "s"]);
+    expect((await nets("M1")).sort()).toEqual(["d", "g", "s"]);
     expect((await nets("C1")).sort()).toEqual(["0", "a"]);
     const thumb = rows(page).first().locator(".thumb svg");
     await expect(thumb).toBeVisible();
@@ -225,7 +225,7 @@ test.describe("the drawings of the objects not drawn", () => {
     // each is drawn with its own symbol and nets
     const nets = (name) =>
       rows(page).filter({ has: page.locator(".name", { hasText: new RegExp(`^${name}$`) }) }).locator(".thumb svg text").allTextContents();
-    expect((await nets("M1")).sort()).toEqual(["0", "d", "g", "s"]);
+    expect((await nets("M1")).sort()).toEqual(["d", "g", "s"]);
     expect((await nets("C1")).sort()).toEqual(["0", "a"]);
   });
 
@@ -281,8 +281,8 @@ test.describe("the drawings of the objects not drawn", () => {
       window.fakeShell.releaseDrawings();
     });
     const m1 = rows(page).first().locator(".thumb svg text");
-    await expect(m1).toHaveCount(4);
-    expect((await m1.allTextContents()).sort()).toEqual(["0", "d", "g", "s"]);
+    await expect(m1).toHaveCount(3);
+    expect((await m1.allTextContents()).sort()).toEqual(["d", "g", "s"]);
     expect((await asked(viewer)).length).toBe(2);
     await page.locator("#unplaced-search").fill("rn5");
     await expect(rows(page).locator(".thumb svg")).toHaveCount(10);
@@ -296,25 +296,6 @@ test.describe("the drawings of the objects not drawn", () => {
     await expect(rows(page).locator(".thumb svg")).toHaveCount(PART);
     expect(await asked(viewer)).toEqual([]);
   });
-});
-
-test("a device whose model card is not found is listed with the reason, has no drawing, and none is asked for", async ({ page, viewer }) => {
-  await viewer.open("undrawn");
-  // M1 has its card and a symbol, but no position; M2, M3 and Q1 cannot be drawn at all
-  const listed = await page.evaluate(() => window.viewer.doc.levels[0].unplaced.map((u) => [u.name, u.reason ?? null]));
-  expect(listed.filter(([, reason]) => reason).map(([name]) => name)).toEqual(["M2", "M3", "Q1"]);
-  expect(listed.find(([name]) => name === "M1")[1]).toBeNull();
-  await expect(page.locator("#tab-unplaced")).toHaveAccessibleName(`Not drawn (${listed.length})`);
-  await show(page);
-  const row = (name) => rows(page).filter({ has: page.locator(".name", { hasText: new RegExp(`^${name}$`) }) });
-  await expect(row("M2").locator(".symbol")).toHaveText("instance · not drawn: model card not found");
-  await expect(row("M2")).toHaveClass(/undrawn/);
-  await expect(row("M2").locator(".thumb svg")).toHaveCount(0);
-  await expect(row("M1").locator(".thumb svg")).toHaveCount(1);
-  // only the objects that can be drawn are asked for
-  const items = (await asked(viewer)).flatMap(([, wanted]) => wanted);
-  const reasons = await page.evaluate((items) => items.map((i) => window.viewer.doc.levels[0].unplaced[i].reason ?? null), items);
-  expect(reasons.every((r) => r === null)).toBe(true);
 });
 
 test("a level with everything placed has no count and says so", async ({ page, viewer }) => {

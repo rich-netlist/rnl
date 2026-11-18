@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use crate::diag::{Diag, DiagId, Extra, Sink};
 use crate::host::format::Reading;
 use crate::host::{LevelId, LevelKind, Record};
-use crate::interp::unit::{declared_record_version, keeps_0_4, DEFAULT_VERSION};
+use crate::interp::unit::{declared_record_version, is_read_version};
 
 use super::{scan_run, scan_run_with, CarrierLine};
 
@@ -29,7 +29,8 @@ fn add_diagnostic(sink: &mut Sink, diagnostic: &Diag, cause: Option<DiagId>) -> 
 
 impl Reading<'_> {
     /// Read one carrier run. Adapters call this in source order instead of choosing a
-    /// language themselves. Released diagnostics are emitted at their original position.
+    /// language themselves. The diagnostics of the scan by the rules of the versions before 0.4,
+    /// which a file of a version not read keeps, are emitted at their original position.
     pub fn scan_records(&mut self, run: &[CarrierLine], file: &str, level: LevelId) {
         let mut old_sink = Sink::new();
         let records = scan_run(run, file, &mut old_sink);
@@ -48,12 +49,12 @@ impl Reading<'_> {
     }
 
     /// Choose the boundaries of the records of each file by its language version; and say, for
-    /// each level, whether its file is of version 0.4 or later.
+    /// each level, whether its file is of a version this implementation reads (16.1).
     pub(crate) fn finish_record_scans(&mut self) -> Vec<bool> {
         let runs = std::mem::take(&mut self.pending_records);
         if runs.is_empty() {
             // no carrier, so no header record: every file is of the default version
-            return vec![keeps_0_4(DEFAULT_VERSION); self.doc.levels.len()];
+            return vec![true; self.doc.levels.len()];
         }
         // Every range refers to the original level vector. Reverse order also puts
         // consecutive runs that originally yielded no records in their source order.
@@ -89,11 +90,11 @@ impl Reading<'_> {
                 let mut file = self.doc.file_level(level);
                 loop {
                     if let Some(version) = declarations.get(&file) {
-                        return keeps_0_4(version);
+                        return is_read_version(version);
                     }
                     match self.doc.levels[file].parent {
                         Some(parent) => file = self.doc.file_level(parent),
-                        None => return keeps_0_4(DEFAULT_VERSION),
+                        None => return true,
                     }
                 }
             })
@@ -108,7 +109,7 @@ impl Reading<'_> {
             }
         }
         // A diagnostic can be shared by two readings of the same physical file.
-        // Keep it if a released-language reading still needs it.
+        // Keep it if the reading of a file of a version not read still needs it.
         let kept: HashSet<_> = runs
             .iter()
             .filter(|run| !modern[run.level])

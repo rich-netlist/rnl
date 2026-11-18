@@ -104,29 +104,13 @@ fn styles_and_application_parameters_keep_their_open_context() {
 }
 
 #[test]
-fn released_versions_keep_application_time_parameter_errors() {
-    for version in ["0.2", "0.3"] {
-        for body in ["?r @PLACE(x=\"far\")", "?r @PLACE(no_such=1)"] {
-            assert!(errors(&read(version, body, "")).is_empty());
-            let r = read(version, body, CALLS);
-            assert_eq!(errors(&r).len(), 2, "{version}/{body}: {:?}", r.diagnostics());
-        }
-    }
-}
-
-#[test]
-fn included_definitions_follow_their_own_language() {
-    for (version, count) in [("0.3", 2), ("0.4", 1)] {
-        let lib=format!("* library\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\n.subckt cell a b\nR1 a b 1k\nR2 a b 2k\n* @RNL {{ {} }}\n.ends cell\n",record("?r @PLACE(x=\"far\")",CALLS));
-        let r = files(
-            MemoryProvider::new()
-                .with(
-                    "main.sp",
-                    "* main\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include lib.inc\nX1 a b cell\n",
-                )
-                .with("lib.inc", &lib),
-        );
-        assert_eq!(errors(&r).len(), count, "{version}: {:?}", r.diagnostics());
-        assert!(errors(&r).iter().all(|code| *code == codes::PARAM_WRONG_TYPE));
-    }
+fn included_definitions_check_their_parameters_once() {
+    let lib=format!("* library\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n.subckt cell a b\nR1 a b 1k\nR2 a b 2k\n* @RNL {{ {} }}\n.ends cell\n",record("?r @PLACE(x=\"far\")",CALLS));
+    let r = files(
+        MemoryProvider::new()
+            .with("main.sp", "* main\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include lib.inc\nX1 a b cell\n")
+            .with("lib.inc", &lib),
+    );
+    assert_eq!(errors(&r).len(), 1, "{:?}", r.diagnostics());
+    assert!(errors(&r).iter().all(|code| *code == codes::PARAM_WRONG_TYPE));
 }

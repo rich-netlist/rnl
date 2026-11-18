@@ -39,8 +39,6 @@ fn every_graphic_point_slot_checks_a_missing_terminal_pin_after_symbols() {
         let r = read("0.4", &format!("{graphic}; {ONE_PIN}"));
         assert!(errors(&r).iter().any(|e| e.contains("must be points or pins")), "{graphic}: {:?}", errors(&r));
         assert!(r.model.levels[0].shapes.is_empty(), "{graphic}");
-        let old = read("0.3", &format!("{graphic}; {ONE_PIN}"));
-        assert!(errors(&old).is_empty(), "{graphic}: {:?}", errors(&old));
     }
 }
 
@@ -91,24 +89,5 @@ fn unbound_and_usage_pins_do_not_convert_to_host_terminals() {
     ] {
         let r = read("0.4", body);
         assert!(errors(&r).iter().any(|e| e.contains("checks terminals")), "{:?}", errors(&r));
-    }
-}
-
-#[test]
-fn graphic_conversion_checks_follow_the_statement_file_in_mixed_includes() {
-    for (outer, inner) in [("0.3", "0.4"), ("0.4", "0.3")] {
-        let source=format!("* top\n* @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\n.include child.sp\n* @RNL(scope=\"child\") {{ {ONE_PIN}; #R1:2 @CIRCLE(radius=1) }}\n.end\n");
-        let child = format!(
-            "* child\n* @RNL(type=\"header\") {{ @VERSION(\"{inner}\") }}\n.subckt child a b\nR1 a b 1k\n.ends\n"
-        );
-        let files = MemoryProvider::new().with("top.sp", &source).with("child.sp", &child);
-        let r =
-            interpret_file(Path::new("top.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
-        assert_eq!(
-            errors(&r).iter().any(|e| e.contains("must be points or pins")),
-            outer == "0.4",
-            "{outer}/{inner}: {:?}",
-            errors(&r)
-        );
     }
 }

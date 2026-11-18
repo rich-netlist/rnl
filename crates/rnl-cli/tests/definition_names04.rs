@@ -34,14 +34,6 @@ fn missing_names_are_reported_once_even_without_an_application() {
 }
 
 #[test]
-fn unused_released_definitions_keep_their_name_lookup_timing() {
-    for version in ["0.2", "0.3"] {
-        let r = read(version, "", "$Missing @ATTACH", "");
-        assert!(errors(&r).is_empty(), "{:?}", r.diagnostics());
-    }
-}
-
-#[test]
 fn forward_local_and_global_bindings_stay_available() {
     for (setup, body) in [
         ("", "%p @CIRCLE(radius=1); %p=(2,0)"),
@@ -93,14 +85,6 @@ fn later_global_declarations_are_found_without_evaluating_them() {
 }
 
 #[test]
-fn released_nested_definition_role_checks_are_unchanged() {
-    for version in ["0.2", "0.3"] {
-        let r = read(version, "", "%inner = @DEFINE(roles=[\"t\"]) { ?t @PLACE(1,2) }", "");
-        assert_eq!(errors(&r), [codes::REF_HOLE_UNKNOWN], "{:?}", r.diagnostics());
-    }
-}
-
-#[test]
 fn unused_package_definitions_keep_their_own_name_environment_and_location() {
     let files = MemoryProvider::new()
         .with("p.rnl", "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"p\",version=\"1.0\") }\n@RNL { $D = @DEFINE(roles=[]) { $Caller @ATTACH } }\n")
@@ -117,21 +101,13 @@ fn unused_package_definitions_keep_their_own_name_environment_and_location() {
 }
 
 #[test]
-fn included_definitions_follow_the_version_of_their_source_file() {
-    for version in ["0.3", "0.4"] {
-        let files = MemoryProvider::new()
-            .with("main.sp", "* names\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include \"defs.sp\"\n")
-            .with("defs.sp", &format!("* definitions\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\n* @RNL {{ $D = @DEFINE(roles=[]) {{ $Missing @ATTACH }} }}\n"));
-        let r =
-            rnl_cli::interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Default::default() })
-                .unwrap();
-        assert_eq!(
-            errors(&r),
-            if version == "0.4" { vec![codes::REF_NOT_FOUND] } else { vec![] },
-            "{version}: {:?}",
-            r.diagnostics()
-        );
-    }
+fn included_definitions_check_their_names() {
+    let files = MemoryProvider::new()
+        .with("main.sp", "* names\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include \"defs.sp\"\n")
+        .with("defs.sp", "* definitions\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n* @RNL { $D = @DEFINE(roles=[]) { $Missing @ATTACH } }\n");
+    let r = rnl_cli::interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Default::default() })
+        .unwrap();
+    assert_eq!(errors(&r), [codes::REF_NOT_FOUND], "{:?}", r.diagnostics());
 }
 
 #[test]

@@ -1,4 +1,4 @@
-//! Written items and independent constraints in files of 0.4 (5.2, 14.1).
+//! Written items and independent constraints (5.2, 14.1).
 
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -291,7 +291,7 @@ impl Interp<'_> {
         let mapped = self.map_args(kw, args, seg, ctx, positions)?;
         let args: Vec<_> = positions.iter().map(|p| mapped[&p.name].obj).collect();
         for &a in &args {
-            if let Some(cause) = self.failed_input(a, ctx) {
+            if let Some(cause) = self.failed_input(a) {
                 let d = self.err_cause(
                     ctx,
                     codes::CONSTRAINT_MEMBER_FAILED,
@@ -364,14 +364,13 @@ impl Interp<'_> {
                 })
                 .collect();
         }
-        // a combination that takes one object twice is left out (14.1, 14.5); in a level of 0.4 a
-        // usage that may stand for its members (14.1) is not yet one object: it is kept until the
-        // symbols are known and each side has stood for its members (`split_usage_constraints`)
-        let deferred = self.follows_0_4(self.level_unit[self.scenes[s].level])
-            && matches!(
-                template.kind,
-                ConstraintKind::Align | ConstraintKind::Order | ConstraintKind::Distribute | ConstraintKind::Distance
-            );
+        // a combination that takes one object twice is left out (14.1, 14.5); a usage that may
+        // stand for its members (14.1) is not yet one object: it is kept until the symbols are
+        // known and each side has stood for its members (`split_usage_constraints`)
+        let deferred = matches!(
+            template.kind,
+            ConstraintKind::Align | ConstraintKind::Order | ConstraintKind::Distribute | ConstraintKind::Distance
+        );
         if template.kind != ConstraintKind::OrientRelation && !combinations.is_empty() {
             combinations.retain(|row| {
                 let mut seen = HashSet::new();
@@ -418,7 +417,7 @@ impl Interp<'_> {
         Ok(Expansion { atoms, collection })
     }
 
-    /// What an item of a constraint stands for in a level of 0.4 (14.1): a usage without a symbol,
+    /// What an item of a constraint stands for (14.1): a usage without a symbol,
     /// its members, the objects that fill its roles, a usage among them in turn for its own members,
     /// down to the objects that are not such usages, nets left out, as a GROUP takes them (11.5); any
     /// other object, itself, and so is a usage whose body the statement is of, which `?` names
@@ -484,7 +483,7 @@ impl Interp<'_> {
         out
     }
 
-    /// In a level of 0.4, once the symbols are known, a usage without a symbol among the items of
+    /// Once the symbols are known, a usage without a symbol among the items of
     /// an ALIGN, ORDER, DISTRIBUTE or DISTANCE stands for its members (14.1): each expanded
     /// constraint that has one becomes one for each combination of what its items stand for, each
     /// a unit of its own as the combinations of a set are and in their order, the first in its
@@ -492,9 +491,6 @@ impl Interp<'_> {
     /// out; a constraint with none left takes no part. The limit of expanded constraints holds for
     /// each constraint so split.
     pub(super) fn split_usage_constraints(&mut self, s: SceneId) {
-        if !self.follows_0_4(self.level_unit[self.scenes[s].level]) {
-            return;
-        }
         for c in self.scenes[s].constraints.clone() {
             if self.is_failed(c) {
                 continue;

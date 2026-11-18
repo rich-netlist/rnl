@@ -29,22 +29,20 @@ fn column(line: &str, needle: &str) -> usize {
 
 #[test]
 fn literal_text_positions_handle_names_comments_and_unicode() {
-    for version in ["0.3", "0.4"] {
-        for spectre in [false, true] {
-            for body in [
-                r#"/* 中文 */ (0,0) @TEXT("\zzzz")"#,
-                r#"(0,0) @TEXT(text = /* value */ "\zzzz",size=2)"#,
-                r#"(0,0) @TEXT(size=2,"text" /* name */ = "\zzzz")"#,
-            ] {
-                let (r, line) = read(version, "", body, spectre);
-                assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", r.diagnostics());
-                let warnings: Vec<_> =
-                    r.diagnostics().into_iter().filter(|d| d.code == codes::MARKUP_UNKNOWN_COMMAND).collect();
-                assert_eq!(warnings.len(), 1, "{:?}", r.diagnostics());
-                let loc = warnings[0].loc.as_ref().unwrap();
-                assert_eq!(loc.line, 4);
-                assert_eq!(loc.col as usize, column(&line, if version == "0.4" { "\\zzzz" } else { "@TEXT" }));
-            }
+    for spectre in [false, true] {
+        for body in [
+            r#"/* 中文 */ (0,0) @TEXT("\zzzz")"#,
+            r#"(0,0) @TEXT(text = /* value */ "\zzzz",size=2)"#,
+            r#"(0,0) @TEXT(size=2,"text" /* name */ = "\zzzz")"#,
+        ] {
+            let (r, line) = read("0.4", "", body, spectre);
+            assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", r.diagnostics());
+            let warnings: Vec<_> =
+                r.diagnostics().into_iter().filter(|d| d.code == codes::MARKUP_UNKNOWN_COMMAND).collect();
+            assert_eq!(warnings.len(), 1, "{:?}", r.diagnostics());
+            let loc = warnings[0].loc.as_ref().unwrap();
+            assert_eq!(loc.line, 4);
+            assert_eq!(loc.col as usize, column(&line, "\\zzzz"));
         }
     }
 }
@@ -52,20 +50,15 @@ fn literal_text_positions_handle_names_comments_and_unicode() {
 #[test]
 fn aliases_and_pin_labels_keep_their_parameter_location() {
     let cases = [
-        (r#"@ALIAS("caption","text")"#, r#"(0,0) @TEXT(size=2,caption="\zzzz")"#, "@TEXT"),
-        (r#"@ALIAS("caption","label")"#, r#"$S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1,caption="\zzzz") }"#, "@PIN"),
-        ("", r#"$S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=[1,2],label="\zzzz") }"#, "@PIN"),
+        (r#"@ALIAS("caption","text")"#, r#"(0,0) @TEXT(size=2,caption="\zzzz")"#),
+        (r#"@ALIAS("caption","label")"#, r#"$S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1,caption="\zzzz") }"#),
+        ("", r#"$S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=[1,2],label="\zzzz") }"#),
     ];
-    for version in ["0.3", "0.4"] {
-        for (aliases, body, keyword) in cases {
-            let (r, line) = read(version, aliases, body, false);
-            assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", r.diagnostics());
-            let warning = r.diagnostics().into_iter().find(|d| d.code == codes::MARKUP_UNKNOWN_COMMAND).unwrap();
-            assert_eq!(
-                warning.loc.as_ref().unwrap().col as usize,
-                column(&line, if version == "0.4" { "\\zzzz" } else { keyword })
-            );
-        }
+    for (aliases, body) in cases {
+        let (r, line) = read("0.4", aliases, body, false);
+        assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", r.diagnostics());
+        let warning = r.diagnostics().into_iter().find(|d| d.code == codes::MARKUP_UNKNOWN_COMMAND).unwrap();
+        assert_eq!(warning.loc.as_ref().unwrap().col as usize, column(&line, "\\zzzz"));
     }
 }
 

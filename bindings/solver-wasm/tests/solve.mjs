@@ -152,10 +152,9 @@ assert.match(twice.error, /^files: .* are one file$/);
   const stopped = then.find((e) => e.event === "level-done");
   assert.equal(stopped?.status, "time", JSON.stringify(then).slice(0, 600));
   assert.ok(stopped.work > 0 && stopped.seconds < 20, `the level took ${stopped.seconds} s and ${stopped.work} of work`);
-  // a file of 0.2 is raised and solved in two passes: its time in the report is the second's
-  const old = source.replace('@VERSION("0.4"); @SOLVER-CONFIG(layout="lines")', '@VERSION("0.2")');
-  const raised = timed.solve({ ...request, files: { "/w/main.sp": old }, solver_config: 'limit="work",work=3000000' });
-  assert.match(raised.report.text.join("\n"), /\n {2}time: (?!0\.000)\d+\.\d+ s/, JSON.stringify(raised).slice(0, 600));
+  // the report tells the time the level took
+  const worked = timed.solve({ ...request, solver_config: 'limit="work",work=3000000' });
+  assert.match(worked.report.text.join("\n"), /\n {2}time: (?!0\.000)\d+\.\d+ s/, JSON.stringify(worked).slice(0, 600));
 }
 console.log("cancelled, thrown through, renamed and timed through WebAssembly");
 

@@ -103,32 +103,33 @@ pub fn version_key(version: &str) -> (i64, i64) {
     super::unit::version_key(version)
 }
 
-/// A total order for package versions, retaining released parsing and supporting arbitrary
-/// unsigned decimal components for packages written in draft 0.4 (16.1, 16.2).
+/// A total order for package versions: two unsigned decimal integers of any length (16.1, 16.2);
+/// any other text by [`version_key`].
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PackageVersionKey {
     major: (i128, String),
     minor: (i128, String),
 }
 
-pub fn package_version_key(version: &str, language: &str) -> PackageVersionKey {
+/// The order of a package version ([`PackageVersionKey`]).
+pub fn package_version_key(version: &str) -> PackageVersionKey {
     fn digits(s: &str) -> (i128, String) {
         let s = s.trim_start_matches('0');
         (s.len() as i128, s.to_string())
     }
-    fn released(n: i64) -> (i128, String) {
+    fn number(n: i64) -> (i128, String) {
         if n < 0 {
             (i128::from(n), String::new())
         } else {
             digits(&n.to_string())
         }
     }
-    if super::unit::keeps_0_4(language) && super::unit::valid_package_version(version) {
+    if super::unit::valid_package_version(version) {
         let (a, b) = version.split_once('.').unwrap();
         PackageVersionKey { major: digits(a), minor: digits(b) }
     } else {
         let (a, b) = version_key(version);
-        PackageVersionKey { major: released(a), minor: released(b) }
+        PackageVersionKey { major: number(a), minor: number(b) }
     }
 }
 

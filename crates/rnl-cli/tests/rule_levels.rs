@@ -22,7 +22,7 @@ const WARNING: &str = "this rule uses objects of the level it is written in, so 
 fn interpret(statements: &[&str]) -> Interpretation {
     let record: Vec<String> = statements.iter().map(|s| format!("*   {s}\n")).collect();
     let net = format!(
-        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\")}}\n.subckt cell a b\nR1 a b 1k\n.ends cell\n\
+        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n.subckt cell a b\nR1 a b 1k\n.ends cell\n\
          V1 n1 0 1\nV2 n2 0 1\nR3 n1 n2 1k\nX1 n1 n2 cell\n* @RNL {{\n{}* }}\n.end\n",
         record.concat()
     );
@@ -44,7 +44,7 @@ fn distances(r: &Interpretation, title: &str, line: u32) -> usize {
 
 #[test]
 fn a_rule_that_is_no_generation_rule_does_not_warn_for_the_host_objects_it_names() {
-    for recursive in ["", "(recursive=false)"] {
+    for recursive in ["(recursive=true)", "(recursive=false)"] {
         let select = format!("$rest = # @SELECT-INSTANCE{recursive};");
         let r = interpret(&[
             &select,
@@ -52,15 +52,15 @@ fn a_rule_that_is_no_generation_rule_does_not_warn_for_the_host_objects_it_names
             "{#V1 #V2} $rest @DISTANCE(\"bottom-to-top\", min=3)",
         ]);
         assert!(loud(&r).is_empty(), "{recursive}: {:?}", loud(&r));
-        // the top level has its DISTANCE, between the sources and the rest; the subcircuit none
-        assert_eq!((distances(&r, "t.sp", 13), distances(&r, "cell", 13)), (1, 0), "{recursive}");
+        // the top level has its DISTANCE, between each source and each of the rest, R3 and X1
+        // (14.5); the subcircuit none
+        assert_eq!((distances(&r, "t.sp", 13), distances(&r, "cell", 13)), (4, 0), "{recursive}");
     }
 }
 
 #[test]
 fn a_rule_of_its_own_level_only_gives_the_levels_below_no_fact() {
-    // both sides selections, as the test set writes it to have no warning: below, both were empty,
-    // and the subcircuit had a DISTANCE between nothing and nothing
+    // both sides selections, as the test set writes it to have no warning: below, both are empty
     let r = interpret(&[
         "%clk = # @SELECT-INSTANCE(name=\"V*\", recursive=false);",
         "%rest = # @SELECT-INSTANCE(recursive=false);",
@@ -68,22 +68,23 @@ fn a_rule_of_its_own_level_only_gives_the_levels_below_no_fact() {
         "%clk %rest @DISTANCE(\"bottom-to-top\", min=3)",
     ]);
     assert!(loud(&r).is_empty(), "{:?}", loud(&r));
-    assert_eq!((distances(&r, "t.sp", 14), distances(&r, "cell", 14)), (1, 0));
-    // with recursive selections, the rule is evaluated in the subcircuit as well
+    assert_eq!((distances(&r, "t.sp", 14), distances(&r, "cell", 14)), (4, 0));
+    // with recursive selections, the rule is evaluated in the subcircuit as well, where it has no
+    // source: with one side empty there is no pair, and no fact (14.5)
     let r = interpret(&[
-        "%clk = # @SELECT-INSTANCE(name=\"V*\");",
-        "%rest = # @SELECT-INSTANCE;",
+        "%clk = # @SELECT-INSTANCE(name=\"V*\", recursive=true);",
+        "%rest = # @SELECT-INSTANCE(recursive=true);",
         "%clk @REMOVE-FROM %rest;",
         "%clk %rest @DISTANCE(\"bottom-to-top\", min=3)",
     ]);
-    assert_eq!((distances(&r, "t.sp", 14), distances(&r, "cell", 14)), (1, 1));
+    assert_eq!((distances(&r, "t.sp", 14), distances(&r, "cell", 14)), (4, 0));
 }
 
 #[test]
 fn a_generation_rule_whose_other_role_is_a_host_object_still_warns() {
     let r = interpret(&[
         "$PAIR = @DEFINE(roles=[[\"p\", \"net\"], [\"n\", \"net\"]]) { ?p @TEXT(\"p\") };",
-        "# @SELECT-NET(name=\"n2\") => $PAIR @ATTACH &n1",
+        "# @SELECT-NET(name=\"n2\", recursive=true) => $PAIR @ATTACH &n1",
     ]);
     assert_eq!(loud(&r), [WARNING]);
 }

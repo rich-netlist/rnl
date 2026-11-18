@@ -126,20 +126,6 @@ fn the_pins_of_the_default_block_symbol_are_pin_objects() {
 }
 
 #[test]
-fn earlier_versions_keep_only_their_placed_pin_view() {
-    for version in ["0.2", "0.3"] {
-        let s = read(version, "$S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1) }; #R1 @SET-SYMBOL $S => @PLACE(0,0)");
-        let value = serde_json::to_value(s).unwrap();
-        let pin = &value["levels"][0]["model"]["objects"][0]["pins"][0];
-        assert_eq!(pin["at"], serde_json::json!([0.0, 0.0]));
-        for field in ["kind", "id", "index", "names", "bus", "reference", "local_at"] {
-            assert!(pin.get(field).is_none(), "{version}: {field}");
-        }
-        assert!(value["drawing"]["objects"].as_array().unwrap().iter().all(|o| o.get("pin").is_none()));
-    }
-}
-
-#[test]
 fn pin_alias_roles_keep_written_members_and_share_an_editable_object() {
     let s = read(
         "0.4",
@@ -186,29 +172,34 @@ fn selected_pins_use_physical_ids_without_inventing_source_references() {
 }
 
 #[test]
-fn pin_interfaces_follow_symbol_and_assignment_versions_in_mixed_includes() {
-    for (outer, inner) in [("0.4", "0.3"), ("0.3", "0.4")] {
-        let files = MemoryProvider::new()
-            .with("top.sp", &format!(r#"* mixed
-* @RNL(type="header") {{ @VERSION("{outer}") }}
+fn pin_interfaces_reach_a_subcircuit_of_an_included_file() {
+    // a symbol assigned from the main file to an instance of a subcircuit an included file defines
+    let files = MemoryProvider::new()
+        .with(
+            "top.sp",
+            r#"* included
+* @RNL(type="header") { @VERSION("0.4") }
 .include child.sp
-* @RNL(scope="child") {{
-* $S = @DEFINE-SYMBOL {{ (0,0) @PIN(terminal=1) }};
+* @RNL(scope="child") {
+* $S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1) };
 * #R1 @SET-SYMBOL $S
-* }}
+* }
 .end
-"#))
-            .with("child.sp", &format!("* child\n* @RNL(type=\"header\") {{ @VERSION(\"{inner}\") }}\n.subckt child a b\nR1 a b 1k\n.ends\n"));
-        let options =
-            BuildOptions { runtime: rnl_runtime::Options { std: false, ..Default::default() }, ..Default::default() };
-        let s = crate::snapshot("top.sp", &files, &options, Parts { drawing: true, host: false, model: true }).unwrap();
-        assert!(!s.diagnostics.iter().any(|d| d.severity == "error"), "{:?}", s.diagnostics);
-        let doc = s.drawing.as_ref().unwrap();
-        let pin = doc.objects.iter().find_map(|o| o.pin.as_ref()).unwrap();
-        assert_eq!(pin.at, None);
-        assert_eq!(doc.objects[pin.owner].name, "R1");
-        assert_eq!(pin.reference.as_deref(), Some("#R1:1"));
-    }
+"#,
+        )
+        .with(
+            "child.sp",
+            "* child\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child a b\nR1 a b 1k\n.ends\n",
+        );
+    let options =
+        BuildOptions { runtime: rnl_runtime::Options { std: false, ..Default::default() }, ..Default::default() };
+    let s = crate::snapshot("top.sp", &files, &options, Parts { drawing: true, host: false, model: true }).unwrap();
+    assert!(!s.diagnostics.iter().any(|d| d.severity == "error"), "{:?}", s.diagnostics);
+    let doc = s.drawing.as_ref().unwrap();
+    let pin = doc.objects.iter().find_map(|o| o.pin.as_ref()).unwrap();
+    assert_eq!(pin.at, None);
+    assert_eq!(doc.objects[pin.owner].name, "R1");
+    assert_eq!(pin.reference.as_deref(), Some("#R1:1"));
 }
 
 #[test]

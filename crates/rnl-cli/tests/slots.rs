@@ -1,9 +1,8 @@
-//! Loose objects match the slots of a keyword one to one (5.2.1 item 3, in every version, as the
-//! draft 0.3 keeps it): a keyword with several slots, where a definition takes a slot too, fails
-//! when the number of objects is not the number of slots. So `#M1 #M2 @SET-SYMBOL $NMOS` fails;
-//! to give M1 and M2 the symbol, write `{#M1 #M2} @SET-SYMBOL $NMOS`. Before, a keyword with a
-//! definition and one other slot put the loose objects together into one set, while one with two
-//! other slots failed. Roles marked and a lone set split one level (items 1 and 2) are unchanged.
+//! Loose objects match the slots of a keyword one to one (5.2.1 item 3): a keyword with several
+//! slots, where a definition takes a slot too, fails when the number of objects is not the number
+//! of slots. So `#M1 #M2 @SET-SYMBOL $NMOS` fails; to give M1 and M2 the symbol, write
+//! `{#M1 #M2} @SET-SYMBOL $NMOS`. Roles marked and a lone set split one level (items 1 and 2) are
+//! as they are.
 
 use std::path::Path;
 
@@ -15,7 +14,7 @@ use rnl_runtime::{Interpretation, Options};
 /// R1 to R3, two definitions, a style, a set, and `statements` in the same record, from line 11.
 fn read(statements: &[&str]) -> Interpretation {
     let mut text = String::from("* slots\nR1 a b 1k\nR2 b c 1k\nR3 c 0 1k\n");
-    text += "* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n* @RNL {\n";
+    text += "* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n* @RNL {\n";
     let mut all = vec![
         "$ONE = @DEFINE(roles=[\"a\"]) { ?a @PLACE(x=0) }",
         "$TALL = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1); (0, 10) @PIN(terminal=2) }",
@@ -56,7 +55,7 @@ fn a_definition_takes_a_slot() {
 #[test]
 fn a_usage_takes_one_object_for_each_role() {
     // AS and ATTACH: the roles of the definition and the definition are the slots (9.4)
-    let one = "the ordinary definition $ONE has 1 roles, 2 objects are written (9.4)".to_string();
+    let one = "the ordinary definition $ONE has 1 role, 2 objects are written (9.4)".to_string();
     assert_eq!(errors(&["#R1 #R2 @AS $ONE", "$ONE @ATTACH #R1 #R2"]), [(11, one.clone()), (12, one)]);
     let braced = errors(&["{#R1 #R2} @AS $ONE", "$ONE @ATTACH {#R1 #R2}"]);
     assert!(braced.is_empty(), "{braced:?}");

@@ -75,7 +75,7 @@ export type InspectedSymbol = {
 
 export type InspectedPin = {
   /**
-   * The 0.4 pin's local names, independently of its display label (`name`).
+   * The pin's local names, independently of its display label (`name`).
    */
   names?: Array<string>,
   bus?: boolean,
@@ -192,8 +192,7 @@ export type Level = {
   /**
    * The objects of the level that are not drawn on it: those that have no position, each with
    * its symbol drawn alone, in the order of the netlist (their number is the one `status`
-   * gives), then those that are not drawn at all, since no symbol can be chosen for them, each
-   * with its `reason` and no symbol.
+   * gives).
    */
   unplaced: Array<Unplaced>,
 };
@@ -205,12 +204,12 @@ export type Usage = {
   frame: UsageFrame | null,
   object: number,
   /**
-   * For a 0.4 usage attached to pins of one owner: that owner's Document object index.
+   * For a usage attached to pins of one owner: that owner's Document object index.
    * Absent without a unique host; independent of the usage's symbol, coordinates and constraints.
    */
   pin_of?: number,
   /**
-   * The enclosing 0.4 usage's Document object index. Follow this chain for inherited pin attachment.
+   * The enclosing usage's Document object index. Follow this chain for inherited pin attachment.
    */
   parent?: number,
   /**
@@ -219,7 +218,7 @@ export type Usage = {
    */
   kind: string,
   /**
-   * For a group of a 0.4 level in the tree of groups: the group above it, by its Document
+   * For a group in the tree of groups: the group above it, by its Document
    * object index, as `pin_of`; absent at the top. The tree is that of the solver's rules on the
    * members with a place of their own (`rnl_runtime::group_tree`); the solver's own may leave
    * out a group of fewer than two of the objects it lays out.
@@ -236,7 +235,7 @@ export type Usage = {
   crosses?: number,
   id: string,
   /**
-   * Its definition, such as `$GROUND`, or in a 0.4 level, `%dot` for one a level defines, whose `%` a level before 0.4 leaves out; empty for a group.
+   * Its definition, such as `$GROUND`, or `%dot` for one a level defines; empty for a group.
    */
   definition: string,
   /**
@@ -254,7 +253,7 @@ export type Usage = {
   /**
    * "in-effect"; "overridden", a fact its statement writes lost a conflict to one of higher
    * priority (8.5); "disabled", its priority, or that of the usage it is made in, is
-   * "disabled" (14.8). A group is "in-effect" or "disabled" (11.5), and in a 0.4 level also
+   * "disabled" (14.8). A group is "in-effect" or "disabled" (11.5), or
    * "same", its members are those of another group (`same_as`), or "left-out", it crosses a
    * group in the tree (`crosses`) or has no member with a place of its own. As `MemberOf::state`; an application that failed makes no
    * usage and has no row.
@@ -319,7 +318,7 @@ export type CurrentArrow = {
  */
 export type Hit = {
   /**
-   * For a 0.4 pin hit, its independent object index in Document.objects.
+   * For a pin hit, its independent object index in Document.objects.
    */
   pin?: number,
   /**
@@ -586,7 +585,7 @@ export type ConstraintObject = {
 
 /**
  * How the level's own text refers to something: what it writes, a usage made by a rule and the
- * path through it, a number in a file of the draft 0.3 (5.9), or nothing.
+ * path through it, a number (5.9), or nothing.
  */
 export type ConstraintReference =
   | string
@@ -749,15 +748,9 @@ export type Unplaced = {
    */
   name: string,
   /**
-   * The name of the symbol it is drawn with; empty for an object that has none (see `reason`).
+   * The name of the symbol it is drawn with.
    */
   symbol: string,
-  /**
-   * Why it is not drawn at all, whatever its position, such as `model card not found` for a
-   * transistor whose model the netlist does not define; absent for an object that only lacks a
-   * position, which a solver can place. Such an object has no symbol and no drawing.
-   */
-  reason?: string,
   /**
    * The instances it stands for, indexes into `Document::objects`: one for an instance, its
    * members for a bundle, none for a usage. A viewer shows the first one's statement.
@@ -860,11 +853,11 @@ export type FormatInfo = {
 
 export type Object = {
   /**
-   * The data of an independent 0.4 pin. Absent for other object kinds.
+   * The data of an independent pin. Absent for other object kinds.
    */
   pin?: PinObject,
   /**
-   * "instance", "net", "usage", "group" (a set marked with GROUP), or "bundle" for a 0.4 pin host, or "pin".
+   * "instance", "net", "usage", "group" (a set marked with GROUP), or "bundle" for a pin host, or "pin".
    */
   kind: string,
   /**
@@ -947,15 +940,14 @@ export type MemberOf = {
    */
   id: string,
   /**
-   * Its definition, such as `$DIFFERENTIAL_PAIR`, or in a 0.4 level, `%dot` for one a level defines, whose `%` a level before 0.4 leaves out;
-   * empty for a group, and when a failed statement names none.
+   * Its definition, such as `$DIFFERENTIAL_PAIR`, or `%dot` for one a level defines; empty for a
+   * group, and when a failed statement names none.
    */
   definition: string,
   /**
    * The roles the object fills in it, in the order of the definition. For a group, `members`, a
-   * set role; none when the object is a group within this one: a reference to a set is spread
-   * in a set (5.2), so a group is within another when all its members are among the other's,
-   * and it is listed with the smallest such groups only.
+   * set role; none when the object is a group within this one, the group above it in the tree
+   * of groups (11.5).
    */
   roles: Array<RoleOf>,
   /**
@@ -984,8 +976,8 @@ export type MemberOf = {
    * "in-effect"; "failed", the application failed and made no usage (7.2); "overridden", a fact
    * its statement writes lost a conflict to one of higher priority (8.5); "disabled", its
    * priority, or that of the usage it is made in, is "disabled" (14.8), and its facts are left
-   * out. A group is "in-effect" or "disabled" (11.5), and in a 0.4 level also "same" or
-   * "left-out", as `Usage::state` says.
+   * out. A group is "in-effect", "disabled", "same" or "left-out" (11.5), as `Usage::state`
+   * says.
    */
   state: string,
   /**
@@ -1044,10 +1036,9 @@ export type Diagnostic = {
    */
   severity: string,
   /**
-   * Its kind's number in the toolkit's list of diagnostics, such as "RNL3120"; none for a kind of
-   * the versions 0.2 and 0.3 alone.
+   * Its kind's number in the toolkit's list of diagnostics, such as "RNL3120".
    */
-  code: string | null,
+  code: string,
   /**
    * Its kind's short name, such as "param-wrong-type".
    */

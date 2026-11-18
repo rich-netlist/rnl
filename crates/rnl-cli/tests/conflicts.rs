@@ -1,12 +1,11 @@
-//! The hints of a conflict of geometric facts (the draft 0.3, 8.5), in a file that declares 0.3.
+//! The hints of a conflict of geometric facts (8.5).
 //! A fact discarded in a conflict gives a hint that names every set of facts taken in that has no
 //! solution together with it, each fact by the statement that wrote it, and each statement in
 //! these sets gets a hint that names the facts discarded because of it.
 //! The toolkit does not solve: of the facts of one object on one axis, or of its orientation, it
 //! keeps the one first in the order of 8.5 and takes in those that agree with it, so the sets of a
 //! discarded fact are the kept facts that contradict it, one fact each. A constraint discarded
-//! against fixed coordinates names the smallest sets of them that leave it no solution. A file of
-//! 0.2 gives the hints it always gave.
+//! against fixed coordinates names the smallest sets of them that leave it no solution.
 
 use std::path::Path;
 
@@ -84,7 +83,7 @@ fn drawn(r: &Interpretation, id: &str) -> ((f64, f64), Orient) {
 
 #[test]
 fn two_place_facts_on_one_axis() {
-    let r = read(&netlist("0.3", &["#R1 @PLACE(0, 0)", "#R1 @PLACE(x=10)"]), &options());
+    let r = read(&netlist("0.4", &["#R1 @PLACE(0, 0)", "#R1 @PLACE(x=10)"]), &options());
     let x0 = at("the x of #R1 = 0", 0, 5);
     let x10 = at("the x of #R1 = 10", 1, 5);
     assert_eq!(hints(&r), [(line(0), 5, discarded("the x of #R1 = 0", &[&[&x10]])), (line(1), 5, note(&[&x0]))]);
@@ -94,7 +93,7 @@ fn two_place_facts_on_one_axis() {
 #[test]
 fn three_place_facts_on_one_axis() {
     // two facts discarded, each conflicting with the one kept, which is told of both
-    let r = read(&netlist("0.3", &["#R1 @PLACE(0, 0)", "#R1 @PLACE(x=5)", "#R1 @PLACE(x=10)"]), &options());
+    let r = read(&netlist("0.4", &["#R1 @PLACE(0, 0)", "#R1 @PLACE(x=5)", "#R1 @PLACE(x=10)"]), &options());
     let x10 = at("the x of #R1 = 10", 2, 5);
     assert_eq!(
         hints(&r),
@@ -108,7 +107,7 @@ fn three_place_facts_on_one_axis() {
 
     // two facts kept that agree: the one discarded names both, the later first, and both
     // statements are told
-    let r = read(&netlist("0.3", &["#R1 @PLACE(0, 0)", "#R1 @PLACE(x=10)", "#R1 @PLACE(x=10)"]), &options());
+    let r = read(&netlist("0.4", &["#R1 @PLACE(0, 0)", "#R1 @PLACE(x=10)", "#R1 @PLACE(x=10)"]), &options());
     let x0 = at("the x of #R1 = 0", 0, 5);
     assert_eq!(
         hints(&r),
@@ -125,7 +124,7 @@ fn three_place_facts_on_one_axis() {
 
     // a fact that agrees with the one kept is taken in with it, though a fact between them does
     // not: only that one is discarded, and it conflicts with both
-    let r = read(&netlist("0.3", &["#R1 @PLACE(0, 0)", "#R1 @PLACE(y=5)", "#R1 @PLACE(y=0)"]), &options());
+    let r = read(&netlist("0.4", &["#R1 @PLACE(0, 0)", "#R1 @PLACE(y=5)", "#R1 @PLACE(y=0)"]), &options());
     let y5 = at("the y of #R1 = 5", 1, 5);
     assert_eq!(
         hints(&r),
@@ -145,7 +144,7 @@ fn three_place_facts_on_one_axis() {
 #[test]
 fn an_orient_conflict() {
     // the ORIENT of a later segment of the pipe, at column 25
-    let r = read(&netlist("0.3", &["#R1 @PLACE(0, 0) => @ORIENT(\"R90\")", "#R1 @ORIENT(\"MY\")"]), &options());
+    let r = read(&netlist("0.4", &["#R1 @PLACE(0, 0) => @ORIENT(\"R90\")", "#R1 @ORIENT(\"MY\")"]), &options());
     assert_eq!(
         hints(&r),
         [
@@ -162,7 +161,7 @@ fn priorities_decide_and_a_low_fact_gives_no_hint() {
     // not named to the statement kept
     let r = read(
         &netlist(
-            "0.3",
+            "0.4",
             &["#R1 @PLACE(0, 0, priority=\"high\")", "#R1 @PLACE(5, 5)", "#R1 @PLACE(x=7, priority=\"low\")"],
         ),
         &options(),
@@ -181,17 +180,29 @@ fn priorities_decide_and_a_low_fact_gives_no_hint() {
 
 #[test]
 fn a_fact_of_an_expansion_is_named_with_its_origin() {
-    // the PLACE of the body, at column 34, takes the place of the AS in the order of 8.5 (9.4)
+    // the ALIGN of the body, at column 39, takes the place of the AS in the order of 8.5 (9.4), so
+    // the PLACEs written after it come first. A PLACE in a body would be relative to the usage
+    // (9.4), with no conflict of its own
     let r = read(
-        &netlist("0.3", &["$AT = @DEFINE(roles=[\"a\"]) { ?a @PLACE(x=0) }", "#R1 @AS $AT", "#R1 @PLACE(10, 0)"]),
+        &netlist(
+            "0.4",
+            &[
+                "$AT = @DEFINE(roles=[\"a\", \"b\"]) { {?a ?b} @ALIGN(\"y\") }",
+                "#R1 #R2 @AS $AT",
+                "#R1 @PLACE(0, 0)",
+                "#R2 @PLACE(10, 5)",
+            ],
+        ),
         &options(),
     );
     let applying = format!("applying $AT (t.sp:{}:5)", line(1));
+    let align = format!("{} [{applying}]", at("ALIGN", 0, 39));
     assert_eq!(
         hints(&r),
         [
-            (line(0), 34, discarded("the x of #R1 = 0", &[&[&at("the x of #R1 = 10", 2, 5)]])),
-            (line(2), 5, note(&[&format!("{} [{applying}]", at("the x of #R1 = 0", 0, 34))])),
+            (line(0), 39, discarded("ALIGN", &[&[&at("the y of #R1 = 0", 2, 5), &at("the y of #R2 = 5", 3, 5)]])),
+            (line(2), 5, note(&[&align])),
+            (line(3), 5, note(&[&align])),
         ]
     );
     assert_eq!(r.diagnostics()[0].origin, applying);
@@ -203,7 +214,7 @@ fn a_constraint_names_the_smallest_sets_it_conflicts_with() {
     // solution with R3 and either of them
     let r = read(
         &netlist(
-            "0.3",
+            "0.4",
             &["{#R1 #R2 #R3} @ALIGN(\"y\")", "#R1 @PLACE(0, 0)", "#R2 @PLACE(10, 0)", "#R3 @PLACE(20, 10)"],
         ),
         &options(),
@@ -222,7 +233,7 @@ fn a_constraint_names_the_smallest_sets_it_conflicts_with() {
     assert_eq!(r.model.levels[0].constraints[0].status, "dropped");
 }
 
-/// The conflicts of the tests above in one file of 0.2, the ALIGN first.
+/// The conflicts of the tests above in one file, the ALIGN first.
 const CONFLICTS: &[&str] = &[
     "{#R1 #R2 #R3} @ALIGN(\"y\")",
     "#R1 @PLACE(0, 20)",
@@ -241,22 +252,8 @@ const CONFLICTS: &[&str] = &[
 ];
 
 #[test]
-fn a_file_of_0_2_gives_the_hints_it_always_gave() {
-    let dropped = |what: &str, by: &str| format!("{what} conflicts with {by} and is dropped in the order of 8.5 (8.5)");
-    let expected = [
-        (line(1), 5, dropped("the x of #R1 = 0", "the x of #R1 = 10")),
-        (line(3), 5, dropped("the x of #R2 = 0", "the x of #R2 = 5")),
-        (line(4), 5, dropped("the x of #R2 = 5", "the x of #R2 = 10")),
-        (line(6), 5, dropped("the x of #R3 = 0", "the x of #R3 = 10")),
-        (line(11), 5, dropped("the y of #R5 = 0", "the y of #R5 = 5")),
-        (line(12), 5, dropped("the y of #R5 = 5", "the y of #R5 = 0")),
-        (line(9), 26, dropped("the orientation R90 of #R4", "the orientation MY of #R4")),
-        (line(0), 5, "ALIGN conflicts with fixed coordinates and is dropped in the order of 8.5 (8.5)".to_string()),
-    ];
-    assert_eq!(hints(&read(&netlist("0.2", CONFLICTS), &options())), expected);
-    // the same file of 0.3 gives the hints of 0.3, one for each fact discarded and one for each
-    // statement told
-    let r = read(&netlist("0.3", CONFLICTS), &options());
+fn the_conflicts_in_one_file_give_a_hint_for_each_fact_discarded_and_each_statement_told() {
+    let r = read(&netlist("0.4", CONFLICTS), &options());
     let found = hints(&r);
     assert_eq!(found.iter().filter(|h| h.2.contains(" is discarded in the order of 8.5: ")).count(), 7);
     assert_eq!(found.iter().filter(|h| h.2.starts_with("facts discarded in the order of 8.5 ")).count(), 10);

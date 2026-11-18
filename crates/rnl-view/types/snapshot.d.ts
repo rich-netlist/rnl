@@ -190,8 +190,8 @@ export type UsageOf = {
    */
   id: string,
   /**
-   * Its definition, such as `$DIFFERENTIAL_PAIR`, or in a 0.4 level, `%dot` for one a level defines, whose `%` a level before 0.4 leaves out;
-   * empty for a group, and when a failed statement names none.
+   * Its definition, such as `$DIFFERENTIAL_PAIR`, or `%dot` for one a level defines; empty for a
+   * group, and when a failed statement names none.
    */
   definition: string,
   /**
@@ -344,8 +344,8 @@ export type LevelModel = {
    */
   groups?: Array<GroupView>,
   /**
-   * For a 0.4 level, the definition of its junction dots, which SOLVER-CONFIG `junction` selects
-   * (14.10), readable before any solve; absent before 0.4, and when none is selected.
+   * The definition of the level's junction dots, which SOLVER-CONFIG `junction` selects (13.2,
+   * 14.10), readable before any solve; absent when none is selected.
    */
   junction?: JunctionView,
 };
@@ -400,7 +400,7 @@ export type SymbolDefinition = {
 
 export type SymbolPin = {
   /**
-   * Local names of a 0.4 pin, in binding order; empty for an unnamed pin.
+   * Local names of a pin, in binding order; empty for an unnamed pin.
    */
   names?: Array<string>,
   /**
@@ -453,11 +453,11 @@ export type Slot<T> = { value: T | null, source: string | null };
 
 export type ObjectView = {
   /**
-   * The owner id of a 0.4 usage's pin attachment; absent without a unique structural host.
+   * The owner id of a usage's pin attachment; absent without a unique structural host.
    */
   pin_of?: string,
   /**
-   * The enclosing 0.4 usage's id. Follow this chain for inherited pin attachment.
+   * The enclosing usage's id. Follow this chain for inherited pin attachment.
    */
   parent?: string,
   /**
@@ -474,7 +474,7 @@ export type ObjectView = {
    */
   host: Array<string>,
   /**
-   * A usage's definition, such as `$GROUND`, or in a 0.4 level, `%dot` for one a level defines, whose `%` a level before 0.4 leaves out.
+   * A usage's definition, such as `$GROUND`, or `%dot` for one a level defines.
    */
   definition: string | null,
   /**
@@ -508,7 +508,7 @@ export type ObjectView = {
    */
   orient: Slot<string>,
   /**
-   * The assigned symbol's pins. In 0.4 these include unplaced pins with a null scene position.
+   * The assigned symbol's pins, unplaced pins included, with a null scene position.
    */
   pins: Array<PinView>,
   /**
@@ -520,7 +520,7 @@ export type ObjectView = {
 
 export type PinView = {
   /**
-   * The independent pin object kind, present in 0.4.
+   * The independent pin object kind, present when the pin is an object of its own.
    */
   kind?: "pin",
   /**
@@ -717,7 +717,7 @@ export type AnnotationGraphic = {
 };
 
 /**
- * The junction dots of a 0.4 level ([`LevelModel::junction`]).
+ * The junction dots of a level ([`LevelModel::junction`]).
  */
 export type JunctionView = {
   /**

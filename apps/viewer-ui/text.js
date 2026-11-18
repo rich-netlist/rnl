@@ -257,7 +257,7 @@ export function markUnplaced(i) {
       if (!lines) continue;
       const [f, from, to] = lines;
       if (plainFiles[f]) continue;
-      for (let n = from; n <= to; n++) notDrawn[f]?.set(n, u.reason ? m`Not drawn: ${u.reason}` : m("Not drawn: it has no position yet"));
+      for (let n = from; n <= to; n++) notDrawn[f]?.set(n, m("Not drawn: it has no position yet"));
     }
   }
   for (const [f, view] of fileViews.entries()) view.setInactive(notDrawn[f]);

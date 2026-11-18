@@ -154,36 +154,6 @@ fn pin_labels_and_case_distinct_keys_are_not_pin_names() {
 }
 
 #[test]
-fn old_files_keep_pin_local_names_as_points_and_keep_their_texts() {
-    for version in ["0.2", "0.3"] {
-        let r = read(version, "", "$S = @DEFINE-SYMBOL { %position = (-2,0) @PIN(terminal=1); %p = (2,0) @PIN(terminal=2); ? @TEXT(\"old\",key=\"p\") }; #R1 @SET-SYMBOL $S; #R1 @TEXT(\"still valid\",key=\"p\")");
-        no_errors(&r);
-        assert_eq!(r.model.levels[0].texts.len(), 1);
-        assert_eq!(pins(&r, "#R1"), [(-2.0, 0.0), (2.0, 0.0)]);
-    }
-}
-
-#[test]
-fn mixed_version_text_layers_keep_the_old_layer_in_either_source_order() {
-    for (outer, inner) in [("0.4", "0.3"), ("0.3", "0.4")] {
-        let symbol = "$S = @DEFINE-SYMBOL { %p = (3,0) @PIN(terminal=1) }; #R1 @SET-SYMBOL $S;";
-        let (outer_body, inner_body) = if outer == "0.4" {
-            (format!("{symbol} #R1 @TEXT(\"bad\",key=\"p\")"), "#R1 @TEXT(\"old\",key=\"p\")".to_string())
-        } else {
-            ("#R1 @TEXT(\"old\",key=\"p\")".to_string(), format!("{symbol} #R1 @TEXT(\"bad\",key=\"p\")"))
-        };
-        let files = MemoryProvider::new()
-            .with("names.sp", &format!("* outer\n* @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\n.include \"inner.sp\"\n* @RNL(scope=\"child\") {{ {outer_body}; #R1 @PLACE(0,0) }}\n.end\n"))
-            .with("inner.sp", &format!("* inner\n* @RNL(type=\"header\") {{ @VERSION(\"{inner}\") }}\n.subckt child a b\nR1 a b 1k\n* @RNL {{ {inner_body} }}\n.ends\n"));
-        let r = read_files(&files);
-        assert_eq!(count(&r, codes::PIN_NAME_IS_TEXT_KEY_SCENE), 1, "{:?}", r.diagnostics());
-        let texts: Vec<_> = r.model.levels.iter().flat_map(|level| &level.texts).collect();
-        assert_eq!(texts.len(), 1, "{texts:?}");
-        assert_eq!(texts[0].markup, "old");
-    }
-}
-
-#[test]
 fn block_symbol_name_failure_keeps_the_earlier_block_assignment() {
     let files = MemoryProvider::new().with("names.sp", "* blocks\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child p n\n* @RNL { $GOOD = @DEFINE-SYMBOL { (-2,0) @PIN(terminal=1) }; $BAD = @DEFINE-SYMBOL { %position = (3,0) @PIN(terminal=1) }; # @SET-SYMBOL $GOOD; # @SET-SYMBOL $BAD }\n.ends\nX1 a b child\n* @RNL { #X1 @PLACE(0,0) }\n.end\n");
     let r = read_files(&files);

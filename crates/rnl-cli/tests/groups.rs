@@ -1,10 +1,9 @@
 //! PRIORITY on a set with GROUP (standard 5.2.1, 11.5, 14.8): it acts on the group itself, which
 //! has no priority, only on and off. A disabled group is withheld from the solver; the constraints
-//! written on the grouped set are not affected. Any other set is taken member by member. Before,
-//! every set was split into its members, so a group could not be turned off at all. Several
+//! written on the grouped set are not affected. Any other set is taken member by member. Several
 //! objects given to one PRIORITY make one set whose referenced sets are spread (5.2.1), a set
 //! with GROUP among them too, so PRIORITY fails on the members, and its error says to write one
-//! PRIORITY for each group; so too in a file of the draft 0.3, whose 7.2 is withdrawn.
+//! PRIORITY for each group.
 
 use std::path::Path;
 
@@ -36,7 +35,7 @@ impl Outcome {
 
 /// R1 to R6 in a row, with `statements`, one per line, in a record of the main file.
 fn solve(statements: &str) -> Outcome {
-    solve_in("0.2", statements)
+    solve_in("0.4", statements)
 }
 
 /// The same in a file that declares `version`.
@@ -64,14 +63,15 @@ fn a_disabled_group_is_withheld_and_its_constraints_stay() {
         r#"
         %stage1_set = {#R1 #R2 #R5} @GROUP;
         %stage2_set = {#R3 #R4} @GROUP;
-        %c1 = %stage1_set %stage2_set @DISTANCE("x", min=1);
+        %c1 = %stage1_set %stage2_set @DISTANCE("left-to-right", min=1);
         %stage1_set @PRIORITY("disabled")
         "#,
     );
     assert!(r.errors.is_empty(), "{:?}", r.errors);
     assert_eq!(r.groups(), [["#R3", "#R4"]]);
-    // GROUP is not a constraint: the DISTANCE between the two stages still holds
-    assert_eq!(r.constraints(), [("%c1", Priority::Normal)]);
+    // GROUP is not a constraint: the DISTANCE between the two stages still holds, one for each
+    // pair of their members (14.5)
+    assert_eq!(r.constraints(), [("%c1", Priority::Normal); 6]);
 }
 
 #[test]
@@ -81,7 +81,7 @@ fn a_priority_on_a_group_only_turns_it_on_or_off() {
         r#"
         %stage1_set = {#R1 #R2} @GROUP;
         %stage2_set = {#R3 #R4} @GROUP;
-        %c1 = %stage1_set %stage2_set @DISTANCE("x", min=1);
+        %c1 = %stage1_set %stage2_set @DISTANCE("left-to-right", min=1);
         %stage1_set @PRIORITY("disabled");
         %stage1_set @PRIORITY("low");
         %stage2_set @PRIORITY("high")
@@ -89,7 +89,7 @@ fn a_priority_on_a_group_only_turns_it_on_or_off() {
     );
     assert!(r.errors.is_empty(), "{:?}", r.errors);
     assert_eq!(r.groups(), [["#R1", "#R2"], ["#R3", "#R4"]]);
-    assert_eq!(r.constraints(), [("%c1", Priority::Normal)]);
+    assert_eq!(r.constraints(), [("%c1", Priority::Normal); 4]);
 }
 
 #[test]
@@ -121,10 +121,9 @@ fn a_set_without_group_is_taken_member_by_member() {
     );
     assert!(r.errors.is_empty(), "{:?}", r.errors);
     assert_eq!(r.constraints(), [("%c3", Priority::Normal)]);
-    // a set of instances without GROUP: PRIORITY reaches the first instance and fails there
+    // a set of instances without GROUP: PRIORITY reaches each instance and fails at each
     let r = solve("%s = {#R1 #R2}; %s @PRIORITY(\"disabled\")");
-    assert_eq!(r.errors.len(), 1, "{:?}", r.errors);
-    assert!(r.errors[0].contains("PRIORITY takes constraints, usages and grouped sets only, not #R1 (14.8)"));
+    refused(&r, &["#R1", "#R2"]);
     // the same set of constraints with GROUP: the group is off, and the constraints stay
     let r = solve(
         r#"
@@ -196,57 +195,58 @@ const TWO_GROUPS: &str = r#"
     %a_set %b_set @PRIORITY("disabled")
 "#;
 
+/// The errors of PRIORITY on the members `labels`, one for each, which each fails on its own.
+fn refused(r: &Outcome, labels: &[&str]) {
+    assert_eq!(r.errors.len(), labels.len(), "{:?}", r.errors);
+    for (error, label) in r.errors.iter().zip(labels) {
+        let said = format!("PRIORITY takes constraints, usages and grouped sets only, not {label} (14.8)");
+        assert!(error.contains(&said), "{:?}", r.errors);
+    }
+}
+
 /// What the error on a member adds when a set with GROUP is among several objects.
 const ONE_FOR_EACH: &str =
     "several objects are spread into their members, so write one PRIORITY for each group (5.2.1)";
 
-/// A file of 0.2, and a file of the draft 0.3, which reads PRIORITY as 0.2 does: its 7.2, which took
-/// each of several objects as it is, is withdrawn.
-const VERSIONS: [&str; 2] = ["0.2", "0.3"];
-
 #[test]
 fn several_objects_are_spread_into_their_members_a_group_too() {
-    for version in VERSIONS {
-        // the loose objects are put together as in {…} (5.2.1): PRIORITY receives the members and
-        // fails at the first; every group stays on
-        let r = solve_in(version, TWO_GROUPS);
-        assert_eq!(r.errors.len(), 1, "{version}: {:?}", r.errors);
-        assert!(r.errors[0].contains("PRIORITY takes constraints, usages and grouped sets only, not #R1 (14.8)"));
-        assert!(r.errors[0].contains(ONE_FOR_EACH), "{version}: {:?}", r.errors);
-        assert_eq!(r.groups(), [["#R1", "#R2"], ["#R3", "#R4"], ["#R5", "#R6"]]);
+    // the loose objects are put together as in {…} (5.2.1): PRIORITY receives the members and
+    // fails at each; every group stays on
+    let r = solve(TWO_GROUPS);
+    refused(&r, &["#R1", "#R2", "#R3", "#R4"]);
+    assert!(r.errors.iter().all(|e| e.contains(ONE_FOR_EACH)), "{:?}", r.errors);
+    assert_eq!(r.groups(), [["#R1", "#R2"], ["#R3", "#R4"], ["#R5", "#R6"]]);
 
-        // a group and a set of constraints: the constraints after the group are not reached
-        let r = solve_in(
-            version,
-            r#"
-            %a_set = {#R1 #R2} @GROUP;
-            %c1 = {#R3 #R4} @ALIGN("y");
-            %c2 = {#R5 #R6} @ALIGN("y");
-            %b_set = {%c1 %c2};
-            %a_set %b_set @PRIORITY("disabled")
-            "#,
-        );
-        assert_eq!(r.errors.len(), 1, "{version}: {:?}", r.errors);
-        assert!(r.errors[0].contains(ONE_FOR_EACH), "{version}: {:?}", r.errors);
-        assert_eq!(r.groups(), [["#R1", "#R2"]]);
-        assert_eq!(r.constraints(), [("%c2", Priority::Normal), ("%c1", Priority::Normal)]);
+    // a group and a set of constraints: the members of the group fail, and the constraints after
+    // them are turned off all the same
+    let r = solve(
+        r#"
+        %a_set = {#R1 #R2} @GROUP;
+        %c1 = {#R3 #R4} @ALIGN("y");
+        %c2 = {#R5 #R6} @ALIGN("y");
+        %b_set = {%c1 %c2};
+        %a_set %b_set @PRIORITY("disabled")
+        "#,
+    );
+    refused(&r, &["#R1", "#R2"]);
+    assert!(r.errors.iter().all(|e| e.contains(ONE_FOR_EACH)), "{:?}", r.errors);
+    assert_eq!(r.groups(), [["#R1", "#R2"]]);
+    assert!(r.constraints().is_empty(), "{:?}", r.constraints());
 
-        // with a selection among them, at the geometry phase: the usage is disabled, and each
-        // member of the group fails
-        let r = solve_in(
-            version,
-            r#"
-            $PAIR = @DEFINE(roles=["a", "b"]) { %row = {?a ?b} @ALIGN("y") };
-            %u = #R3(a) #R4(b) @AS $PAIR;
-            %a_set = {#R1 #R2} @GROUP;
-            # @SELECT-USAGE $PAIR => %a_set @PRIORITY("disabled")
-            "#,
-        );
-        assert_eq!(r.errors.len(), 2, "{version}: {:?}", r.errors);
-        assert!(r.errors.iter().all(|e| e.contains(ONE_FOR_EACH)), "{version}: {:?}", r.errors);
-        assert_eq!(r.groups(), [["#R1", "#R2"]]);
-        assert!(r.constraints().is_empty());
-    }
+    // with a selection among them, at the geometry phase: the usage is disabled, and each
+    // member of the group fails
+    let r = solve(
+        r#"
+        $PAIR = @DEFINE(roles=["a", "b"]) { %row = {?a ?b} @ALIGN("y") };
+        %u = #R3(a) #R4(b) @AS $PAIR;
+        %a_set = {#R1 #R2} @GROUP;
+        # @SELECT-USAGE $PAIR => %a_set @PRIORITY("disabled")
+        "#,
+    );
+    assert_eq!(r.errors.len(), 2, "{:?}", r.errors);
+    assert!(r.errors.iter().all(|e| e.contains(ONE_FOR_EACH)), "{:?}", r.errors);
+    assert_eq!(r.groups(), [["#R1", "#R2"]]);
+    assert!(r.constraints().is_empty());
 }
 
 #[test]
@@ -258,19 +258,16 @@ fn one_priority_for_each_group_turns_both_off() {
         %a_set @PRIORITY("disabled");
         %b_set @PRIORITY("disabled")
     "#;
-    for version in VERSIONS {
-        let r = solve_in(version, statements);
-        assert!(r.errors.is_empty(), "{version}: {:?}", r.errors);
-        assert_eq!(r.groups(), [["#R5", "#R6"]]);
-    }
+    let r = solve(statements);
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(r.groups(), [["#R5", "#R6"]]);
 }
 
 #[test]
 fn without_a_group_among_the_objects_the_error_says_nothing_of_groups() {
     let r = solve("%s = {#R1 #R2} @GROUP; %t = {#R3 #R4}; %u = {#R5 #R6}; %t %u @PRIORITY(\"disabled\")");
-    assert_eq!(r.errors.len(), 1, "{:?}", r.errors);
-    assert!(r.errors[0].contains("PRIORITY takes constraints, usages and grouped sets only, not #R3 (14.8)"));
-    assert!(!r.errors[0].contains("for each group"), "{:?}", r.errors);
+    refused(&r, &["#R3", "#R4", "#R5", "#R6"]);
+    assert!(r.errors.iter().all(|e| !e.contains("for each group")), "{:?}", r.errors);
     assert_eq!(r.groups(), [["#R1", "#R2"]]);
 }
 

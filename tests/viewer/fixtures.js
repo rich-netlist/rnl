@@ -30,7 +30,7 @@ export const FILES = {
   "ota-nested-usages": "tests/viewer/inputs/ota-nested-usages.sp",
   "duplicate-usages-04": "tests/viewer/inputs/duplicate-usages-04.sp",
   "usage-deep": "tests/viewer/inputs/usage-deep.sp",
-  "usage-ota5t": "site/examples/ota5t.sp",
+  "usage-ota5t": "tests/viewer/inputs/usage-ota5t.sp",
   "package-pkg": "tests/viewer/inputs/acme.pkg",
   "wire-labels": "tests/viewer/inputs/wire-labels.sp",
   "flylines": "tests/viewer/inputs/flylines.sp",
@@ -66,13 +66,13 @@ export const PREVIEWS = ["T4-miller-conflicts", "04-hierarchy"];
 const PREVIEW_LIMITS = { "T4-miller-conflicts": ["--solver-config", 'limit="work",work=100000000'] };
 
 /**
- * The fixtures of netlists that only a solver draws, and the files of tests/integration/solver they
- * are built from: `rnl solve` solves each file into the fixtures' directory, and the fixture is
- * `rnl view` of the file solved, with the records of the solver it wrote.
+ * The fixtures of netlists that only a solver draws: the reviewed cases of 0.4 as `rnl solve` wrote
+ * them, within a fixed work, into tests/integration/solver-0.4/solved, the same on every machine. The
+ * fixture is `rnl view` of the file solved, with the records of the solver it holds.
  */
 export const SOLVED = {
-  "T2-common-source-solved": "tests/integration/solver/T2-common-source.sp",
-  "T3-ota5t-solved": "tests/integration/solver/T3-ota5t.sp",
+  "cs-amplifier-solved": "tests/integration/solver-0.4/solved/cs-amplifier.sp",
+  "ota5t-solved": "tests/integration/solver-0.4/solved/ota5t.scs",
 };
 
 /** The subcircuits of the "subcircuits" fixture: two under M, one under each other initial, and one under #. */
@@ -130,28 +130,15 @@ export const EDITED = {
  */
 export const UNPLACED = [
   "* objects without a position",
+  // of 0.4 with the standard series, without the labels its fill puts on unwired pins or ports on the rails
+  '* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4") }',
+  '* @RNL { # @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; $SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_SET; $GROUND_NET_SET @REMOVE-FROM $PORT_FILL_SET }',
   ".subckt cell p q", "R1 p q 1k", ".ends",
   "R1 in a 1k", "C1 a 0 1p", "M1 d g s 0 nmos", "X1 a b cell",
   ...Array.from({ length: 60 }, (_, k) => `Rn${String(k + 1).padStart(2, "0")} n${k + 1} 0 2k`),
   "* @RNL {", "*   #R1 @PLACE(0, 0)", "* }",
   '* @RNL(scope="cell") {', "*   #R1 @PLACE(0, 0)", "* }",
   ".model nmos nmos",
-  ".end",
-];
-
-/**
- * Transistors whose model card is not found, which are not drawn at all: `nch` has its card, so M1
- * has a symbol, and R1 is placed; M2 and M3 name the missing card `pch`, and Q1 the missing `qm`.
- */
-export const UNDRAWN = [
-  "* devices that cannot be drawn",
-  ".model nch nmos",
-  "R1 a b 1k",
-  "M1 d g s b nch",
-  "M2 d g s b pch",
-  "M3 d g s b pch",
-  "Q1 c b e qm",
-  "* @RNL { #R1 @PLACE(0, 0) }",
   ".end",
 ];
 
@@ -352,9 +339,9 @@ function view(rnl, file, cwd) {
  * the netlist of NESTED, and "nested-changed", the same file after XB2 was named XB3;
  * "continued" and "continued-spectre", the netlists of CONTINUED; "edit", "edit-changed", the
  * same file after the edit, and "edit-crlf", the same with CRLF line ends, from EDITED; "unicode",
- * the netlist of UNICODE; the netlists of UNCALLED; "unplaced", the netlist of UNPLACED; "undrawn", the netlist of UNDRAWN; "pick", the netlist of PICK; "long", a title, LONG lines of a bare
- * `*`, R1, a record that places it and `.end`; and those of SOLVED, from the files that `rnl solve`
- * writes under `solved` in `dir`; and those of PREVIEWS.
+ * the netlist of UNICODE; the netlists of UNCALLED; "unplaced", the netlist of UNPLACED; "pick", the netlist of PICK; "long", a title, LONG lines of a bare
+ * `*`, R1, a record that places it and `.end`; and those of SOLVED, from the files `rnl solve` wrote;
+ * and those of PREVIEWS.
  */
 export function writeFixtures(rnl, dir) {
   const semantic = ['* large semantic file', 'R1 a 0 1k', '* @RNL { #R1 is here @PLACE(0, 0) }',
@@ -447,8 +434,6 @@ export function writeFixtures(rnl, dir) {
 
   fs.writeFileSync(path.join(dir, "unplaced.sp"), UNPLACED.concat("").join("\n"));
   fs.writeFileSync(path.join(dir, "unplaced.json"), view(rnl, "unplaced.sp", dir));
-  fs.writeFileSync(path.join(dir, "undrawn.sp"), UNDRAWN.concat("").join("\n"));
-  fs.writeFileSync(path.join(dir, "undrawn.json"), view(rnl, "undrawn.sp", dir));
   fs.writeFileSync(path.join(dir, "pick.sp"), PICK.concat("").join("\n"));
   fs.writeFileSync(path.join(dir, "pick.json"), view(rnl, "pick.sp", dir));
 
@@ -470,10 +455,7 @@ export function writeFixtures(rnl, dir) {
     fs.writeFileSync(path.join(dir, `${name}-constraints.json`), constrained);
   }
 
-  const solved = path.join(dir, "solved");
   for (const [name, file] of Object.entries(SOLVED)) {
-    // what the solver prints of each level is not needed; it fails, and the setup with it, on an error
-    execFileSync(rnl, ["solve", file, "-o", solved], { cwd: root, encoding: "utf8", maxBuffer: 1 << 26 });
-    fs.writeFileSync(path.join(dir, `${name}.json`), view(rnl, path.basename(file), solved));
+    fs.writeFileSync(path.join(dir, `${name}.json`), view(rnl, path.basename(file), path.join(root, path.dirname(file))));
   }
 }

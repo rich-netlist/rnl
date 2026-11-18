@@ -127,15 +127,6 @@ fn deferred_priority_checks_continue_after_a_bad_member() {
 }
 
 #[test]
-fn released_versions_keep_first_segment_failure_behavior() {
-    for version in ["0.2", "0.3"] {
-        let r = read(version, "%saved = #R1 @PLACE(\"bad\",0); %saved @TEXT(\"absent\",key=\"ok\")");
-        assert!(r.diagnostics().iter().any(|d| d.code == codes::REF_FAILED));
-        assert!(!r.model.levels[0].texts.iter().any(|t| t.markup == "absent"));
-    }
-}
-
-#[test]
 fn a_symbol_body_keeps_a_local_text_after_failed_placement() {
     let r = read("0.4", "$S = @DEFINE-SYMBOL { %label = ? @TEXT(\"local\",key=\"ok\"); %saved = %label @PLACE(\"bad\",0); %saved @PLACE(0,4) }; #R1 @SET-SYMBOL $S");
     assert_eq!(errors(&r), 1, "{:?}", r.diagnostics());
@@ -159,16 +150,13 @@ fn ambiguous_slot_shapes_are_not_guessed_during_recovery() {
 }
 
 #[test]
-fn the_statement_source_version_controls_recovery_in_mixed_includes() {
-    for (outer, inner) in [("0.4", "0.3"), ("0.3", "0.4")] {
-        let files = MemoryProvider::new()
-            .with("outer.sp", &format!("* outer\n* @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\n.include \"inner.sp\"\n* @RNL(scope=\"child\") {{ #R1 @PLACE(0,0); %saved = #R1 @PLACE(\"bad\",0); %saved @TEXT(\"scoped\",key=\"ok\") }}\n.end\n"))
-            .with("inner.sp", &format!("* inner\n* @RNL(type=\"header\") {{ @VERSION(\"{inner}\") }}\n.subckt child a b\nR1 a b 1k\n.ends\n"));
-        let r =
-            interpret_file(Path::new("outer.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
-        assert_eq!(errors(&r), if outer == "0.4" { 1 } else { 2 }, "{:?}", r.diagnostics());
-        assert_eq!(r.model.levels.iter().flat_map(|level| &level.texts).any(|t| t.markup == "scoped"), outer == "0.4");
-    }
+fn a_scoped_statement_keeps_its_handle_after_a_failed_fact() {
+    let files = MemoryProvider::new()
+        .with("outer.sp", "* outer\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include \"inner.sp\"\n* @RNL(scope=\"child\") { #R1 @PLACE(0,0); %saved = #R1 @PLACE(\"bad\",0); %saved @TEXT(\"scoped\",key=\"ok\") }\n.end\n")
+        .with("inner.sp", "* inner\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child a b\nR1 a b 1k\n.ends\n");
+    let r = interpret_file(Path::new("outer.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    assert_eq!(errors(&r), 1, "{:?}", r.diagnostics());
+    assert!(r.model.levels.iter().flat_map(|level| &level.texts).any(|t| t.markup == "scoped"));
 }
 
 #[test]
@@ -217,16 +205,6 @@ fn a_missing_loose_input_does_not_stop_valid_members() {
     let texts: Vec<_> = r.model.levels[0].texts.iter().filter(|t| t.markup == "kept").collect();
     assert_eq!(texts.len(), 1);
     assert_eq!(texts[0].attach.as_deref(), Some("#R1"));
-}
-
-#[test]
-fn released_versions_still_stop_at_a_missing_loose_input() {
-    for version in ["0.2", "0.3"] {
-        let r = read(version, "%saved = %missing #R1 @PLACE(5,0); %saved @TEXT(\"absent\",key=\"ok\")");
-        assert!(r.diagnostics().iter().any(|d| d.code == codes::REF_FAILED));
-        assert_eq!(r.model.levels[0].items.iter().find(|i| i.id == "#R1").unwrap().at, (0.0, 0.0));
-        assert!(!r.model.levels[0].texts.iter().any(|t| t.markup == "absent"));
-    }
 }
 
 #[test]

@@ -15,7 +15,7 @@ fn open(path: &Path) -> Result<Document, String> {
 /// The corpus files, named relative to the crate, where the tests run.
 fn corpus() -> Vec<PathBuf> {
     let mut out = Vec::new();
-    for dir in ["cases", "equivalence"] {
+    for dir in ["cases-0.4/from-0.2", "cases-0.4/from-0.3", "equivalence-0.4"] {
         let dir = Path::new("../../tests/conformance").join(dir);
         let mut files: Vec<PathBuf> = std::fs::read_dir(dir)
             .unwrap()

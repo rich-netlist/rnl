@@ -120,11 +120,6 @@ fn current_rules_do_not_read_changes_of_other_rules_in_the_same_phase() {
     let r = read("0.4", body);
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     assert_eq!(direction(&r, "#R1:1"), "out");
-    for version in ["0.2", "0.3"] {
-        let r = read(version, body);
-        assert!(errors(&r).is_empty(), "{:?}", errors(&r));
-        assert_eq!(direction(&r, "#R1:1"), "in");
-    }
 }
 
 #[test]
@@ -250,17 +245,13 @@ fn final_current_checks_include_pin_facts_and_ignore_disabled_ones() {
 }
 
 #[test]
-fn current_rule_phases_follow_the_statement_version_in_mixed_files() {
-    for (outer, inner, expected) in [("0.4", "0.3", "out"), ("0.3", "0.4", "in")] {
-        let top = format!("* top\n* @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\n.include child.sp\n* @RNL(scope=\"child\") {{ #R1:1 @CURRENT(\"in\"); # @SELECT-TERMINAL(current=\"in\") => @CURRENT(\"out\"); # @SELECT-TERMINAL(current=\"out\") => @CURRENT(\"in\") }}\n.end\n");
-        let child = format!(
-            "* child\n* @RNL(type=\"header\") {{ @VERSION(\"{inner}\") }}\n.subckt child a b\nR1 a b 1k\n.ends\n"
-        );
-        let files = MemoryProvider::new().with("current.sp", &top).with("child.sp", &child);
-        let r = interpret_file(Path::new("current.sp"), None, &files, &Options { std: false, ..Options::solver() })
-            .unwrap();
-        assert!(errors(&r).is_empty(), "{outer}/{inner}: {:?}", errors(&r));
-        let level = r.model.levels.iter().find(|level| level.name == "child").unwrap();
-        assert_eq!(level.currents.iter().find(|fact| fact.terminal == "#R1:1").unwrap().direction, expected);
-    }
+fn current_rule_phases_hold_in_a_scoped_record_on_an_included_level() {
+    let top = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include child.sp\n* @RNL(scope=\"child\") { #R1:1 @CURRENT(\"in\"); # @SELECT-TERMINAL(current=\"in\") => @CURRENT(\"out\"); # @SELECT-TERMINAL(current=\"out\") => @CURRENT(\"in\") }\n.end\n";
+    let child = "* child\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child a b\nR1 a b 1k\n.ends\n";
+    let files = MemoryProvider::new().with("current.sp", top).with("child.sp", child);
+    let r =
+        interpret_file(Path::new("current.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let level = r.model.levels.iter().find(|level| level.name == "child").unwrap();
+    assert_eq!(level.currents.iter().find(|fact| fact.terminal == "#R1:1").unwrap().direction, "out");
 }

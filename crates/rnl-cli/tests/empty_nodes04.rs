@@ -8,10 +8,10 @@ use rnl_runtime::{
     Interpretation, Options,
 };
 
-fn read_version(version: &str, body: &str) -> Interpretation {
+fn read(body: &str) -> Interpretation {
     let body = body.replace('\n', "\n* ");
     let source = format!(
-        "* empty nodes\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\nR1 a b 1k\n* @RNL {{ {body} }}\n.end\n"
+        "* empty nodes\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\nR1 a b 1k\n* @RNL {{ {body} }}\n.end\n"
     );
     interpret_file(
         Path::new("empty.sp"),
@@ -20,9 +20,6 @@ fn read_version(version: &str, body: &str) -> Interpretation {
         &Options { std: false, problems: true, ..Default::default() },
     )
     .unwrap()
-}
-fn read(body: &str) -> Interpretation {
-    read_version("0.4", body)
 }
 fn no_errors(result: &Interpretation) {
     assert!(!result.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", result.diagnostics());
@@ -140,14 +137,6 @@ fn named_missing_nets_remain_missing_and_unbound_pins_are_distinct() {
 }
 
 #[test]
-fn released_versions_keep_rejecting_the_bare_ampersand() {
-    for version in ["0.2", "0.3"] {
-        let r = read_version(version, "& @WIRE {(0,0) (1,0)}");
-        assert!(r.diagnostics().iter().any(|d| d.code == codes::SYNTAX_NAME_MISSING_AFTER_PREFIX));
-    }
-}
-
-#[test]
 fn sets_drop_empty_nodes_before_counting_positions_or_building_buses() {
     let r = read(
         r#"
@@ -231,32 +220,26 @@ fn indirect_pin_net_roles_resolve_without_order_dependence() {
 }
 
 #[test]
-fn editing_a_wire_on_no_net_writes_bare_ampersand_only_in_04() {
-    for version in ["0.3", "0.4"] {
-        let request = serde_json::json!({
-            "dialect":"spice", "language_version":version, "author":"test",
-            "netlist":"* empty nodes\nR1 a b 1k\n.end\n",
-            "ops":[{"op":"add-wire", "level":"file", "nets":[],
-                     "via":[{"at":[0,0]},{"at":[1,0]}]}]
-        });
-        let request = serde_json::from_value(request).unwrap();
-        if version == "0.3" {
-            assert!(rnl_edit::write(&request).unwrap_err().contains("`nets` is empty"));
-            continue;
-        }
-        let written = rnl_edit::write(&request).unwrap();
-        assert!(written.contains("& @WIRE"), "{written}");
-        let result = interpret_file(
-            Path::new("edited.sp"),
-            None,
-            &MemoryProvider::new().with("edited.sp", &written),
-            &Options { std: false, problems: true, ..Default::default() },
-        )
-        .unwrap();
-        no_errors(&result);
-        assert_eq!(result.problems[0].wires.len(), 1);
-        assert!(result.problems[0].wires[0].nets.is_empty());
-    }
+fn editing_a_wire_on_no_net_writes_a_bare_ampersand() {
+    let request = serde_json::json!({
+        "dialect":"spice", "language_version":"0.4", "author":"test",
+        "netlist":"* empty nodes\nR1 a b 1k\n.end\n",
+        "ops":[{"op":"add-wire", "level":"file", "nets":[],
+                 "via":[{"at":[0,0]},{"at":[1,0]}]}]
+    });
+    let request = serde_json::from_value(request).unwrap();
+    let written = rnl_edit::write(&request).unwrap();
+    assert!(written.contains("& @WIRE"), "{written}");
+    let result = interpret_file(
+        Path::new("edited.sp"),
+        None,
+        &MemoryProvider::new().with("edited.sp", &written),
+        &Options { std: false, problems: true, ..Default::default() },
+    )
+    .unwrap();
+    no_errors(&result);
+    assert_eq!(result.problems[0].wires.len(), 1);
+    assert!(result.problems[0].wires[0].nets.is_empty());
 }
 
 #[test]

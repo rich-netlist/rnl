@@ -468,7 +468,7 @@ impl Interp<'_> {
                     return self.fail(
                         ctx,
                         codes::USAGE_TOO_MANY_OBJECTS,
-                        self.usage_role_count_message(label, data.roles.len(), args.len(), ctx),
+                        self.usage_role_count_message(label, data.roles.len(), args.len()),
                         segment.start,
                     );
                 }

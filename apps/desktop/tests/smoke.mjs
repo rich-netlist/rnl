@@ -1007,7 +1007,7 @@ async function filePoolSmoke(page) {
   await preloadSmoke(page, work);
   check(await page.evaluate(`Array.from(document.querySelectorAll('[data-group="builtin"] .pool-row')).every(r => !r.textContent.includes('Exclude'))`), "a built-in can be excluded");
   await page.evaluate(`document.querySelector('[data-group="builtin"] .lib-toggle').click()`);
-  await page.evaluate(`document.querySelector('[aria-label="Open 0.3/rnl-std.rnl"]').click()`);
+  await page.evaluate(`document.querySelector('[aria-label="Open 0.4/rnl-std-basic.rnl"]').click()`);
   await until("a built-in package opened", () => page.evaluate(`window.viewer.doc.path.includes('<bundled>') && !document.body.classList.contains('busy')`));
   check(await page.evaluate(`(async () => (await import('./open.js')).currentSource().readonly)()`), "built-in package is not read-only");
   await page.send("Page.reload");
@@ -1028,10 +1028,10 @@ async function filePoolSmoke(page) {
   await until("the native missing-package hint", () => page.evaluate(`
     document.querySelector('.package-hint .msg')?.textContent === 'Look for it in Help › Public Packages.'
       && window.viewer.doc.diagnostics.some(d => d.message.includes('package analog-canvas-extensions 9.9 cannot be found'))`));
-  same(await page.evaluate(`document.querySelectorAll('[data-group="builtin"] .pool-open').length`), 25,
-    "the native built-in library contains both standard series");
-  check(await page.evaluate(`Array.from(document.querySelectorAll('[data-group="builtin"] .pool-open')).every(b => /^0\\.[23]\\/rnl-(std|zh)/.test(b.textContent))`),
-    "a nonstandard package remains built in");
+  // the built-in library is the one standard series, 0.4: its files, and nothing else
+  const standard = fs.readdirSync(path.join(root, "libraries", "standard", "0.4")).filter((f) => f.endsWith(".rnl")).map((f) => `0.4/${f}`).sort();
+  same(await page.evaluate(`Array.from(document.querySelectorAll('[data-group="builtin"] .pool-open')).map(b => b.textContent).sort()`), standard,
+    "the native built-in library");
   if (process.env.SMOKE_OUTPUT_DIR) {
     fs.mkdirSync(process.env.SMOKE_OUTPUT_DIR, { recursive: true });
     const image = await page.send("Page.captureScreenshot", { format: "png" });

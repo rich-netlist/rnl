@@ -40,8 +40,6 @@ fn a_net_wire_or_multi_point_graphic_has_no_position_subobject() {
     ] {
         let r = read("0.4", body);
         assert!(errors(&r).iter().any(|e| e.contains("has no position sub-object")), "{body}: {:?}", errors(&r));
-        let old = read("0.3", body);
-        assert!(errors(&old).is_empty(), "{body}: {:?}", errors(&old));
     }
 }
 
@@ -74,12 +72,6 @@ fn a_terminal_without_a_pin_cannot_get_a_position_through_a_reference() {
     ] {
         let r = read("0.4", &format!("{consumer}; {PIN}"));
         assert!(errors(&r).iter().any(|e| e.contains("position")), "{consumer}: {:?}", errors(&r));
-        let old = read("0.3", &format!("{consumer}; {PIN}"));
-        if consumer.starts_with("$D") {
-            assert!(errors(&old).iter().any(|error| error.contains("takes point")), "{:?}", errors(&old));
-        } else {
-            assert!(errors(&old).is_empty(), "{consumer}: {:?}", errors(&old));
-        }
     }
 }
 
@@ -152,22 +144,12 @@ fn a_renderer_standin_terminal_still_has_a_position() {
 }
 
 #[test]
-fn position_reference_checks_follow_the_statement_version() {
-    for (outer, inner) in [("0.3", "0.4"), ("0.4", "0.3")] {
-        let top = format!("* top\n* @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\n.include child.sp\n* @RNL(scope=\"child\") {{ &a::position @CIRCLE(radius=1) }}\n.end\n");
-        let child = format!(
-            "* child\n* @RNL(type=\"header\") {{ @VERSION(\"{inner}\") }}\n.subckt child a b\nR1 a b 1k\n.ends\n"
-        );
-        let files = MemoryProvider::new().with("top.sp", &top).with("child.sp", &child);
-        let r =
-            interpret_file(Path::new("top.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
-        assert_eq!(
-            errors(&r).iter().any(|e| e.contains("has no position sub-object")),
-            outer == "0.4",
-            "{outer}/{inner}: {:?}",
-            errors(&r)
-        );
-    }
+fn position_reference_checks_apply_to_scoped_statements() {
+    let top = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include child.sp\n* @RNL(scope=\"child\") { &a::position @CIRCLE(radius=1) }\n.end\n";
+    let child = "* child\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child a b\nR1 a b 1k\n.ends\n";
+    let files = MemoryProvider::new().with("top.sp", top).with("child.sp", child);
+    let r = interpret_file(Path::new("top.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    assert!(errors(&r).iter().any(|e| e.contains("has no position sub-object")), "{:?}", errors(&r));
 }
 
 #[test]

@@ -22,21 +22,21 @@ fn text(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).replace("\r\n", "\n")
 }
 
-const MAIN: &str = "* top netlist\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n.include \"amp.inc\"\n\
+const MAIN: &str = "* top netlist\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.include \"amp.inc\"\n\
                     X1 a b amp\nX2 a b amp2\n* @RNL {\n*   #X1 @PLACE(0, 0);\n*   #X2 @PLACE(10, 0)\n* }\n.end\n";
 
 /// An included file of two subcircuits, in CRLF line endings: the first has its authored record and
 /// the solver's, the second has both too.
-const AMP: &str = "* amp library\r\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\r\n.subckt amp in out\r\n\
+const AMP: &str = "* amp library\r\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\r\n.subckt amp in out\r\n\
     R1 in mid 1k\r\nR2 mid out 2k\r\n* @RNL {\r\n*   #R1 @PLACE(0, 0);\r\n*   #R2 @PLACE(4, 0)\r\n* }\r\n\
     * @RNL(type=\"generated\", author=\"rnl-solver 0.1\") {\r\n*   #R1 @PLACE(0, 0)\r\n* }\r\n.ends amp\r\n\
     .subckt amp2 in out\r\nR3 in out 1k\r\n* @RNL(type=\"generated\") { #R3 @PLACE(2, 2) }\r\n\
     * @RNL { #R3 @PLACE(2, 2) }\r\n.ends amp2\r\n";
 
-/// A netlist that includes a file of the draft 0.4.
+/// A netlist without a header record that includes a file of 0.4.
 const MAIN04: &str = "* top netlist of 0.4\n.include \"v04.inc\"\nX1 a b amp04\n.end\n";
 
-/// A file of the draft 0.4, with a subcircuit of its own.
+/// A file of 0.4, with a subcircuit of its own.
 const V04: &str = "* a file of 0.4\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.subckt amp04 in out\n\
                    R4 in out 1k\n* @RNL { #R4 @PLACE(0, 0) }\n.ends amp04\n";
 
@@ -173,9 +173,9 @@ fn a_file_of_the_draft_0_4_is_replaced_in_as_well() {
 fn a_subcircuit_in_a_region_written_to_be_encrypted_is_refused_and_nothing_is_written() {
     let dir = scratch("encrypted");
     let secret =
-        "* secret library\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n.prot\n.subckt hidden a b\nR1 a b 1k\n\
+        "* secret library\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.prot\n.subckt hidden a b\nR1 a b 1k\n\
                   * @RNL { #R1 @PLACE(0, 0) }\n.ends hidden\n.unprot\n";
-    let main = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n.include \"secret.inc\"\nX1 a b hidden\n.end\n";
+    let main = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.include \"secret.inc\"\nX1 a b hidden\n.end\n";
     let entry = netlist(&dir, &[("main.sp", main), ("secret.inc", secret)]);
     let given = dir.join("new.rnl");
     std::fs::write(&given, "@RNL { #R1 @PLACE(3, 3) }\n").unwrap();
@@ -294,7 +294,7 @@ fn a_file_of_a_version_that_is_not_read_is_kept() {
 fn a_spectre_netlist_is_carried_by_slashes_and_a_latin_1_file_stays_latin_1() {
     let dir = scratch("spectre");
     let scs =
-        "// top \u{e9}\n// @RNL(type=\"header\") { @VERSION(\"0.3\")}\nsimulator lang=spectre\nsubckt amp (in out)\n\
+        "// top \u{e9}\n// @RNL(type=\"header\") { @VERSION(\"0.4\")}\nsimulator lang=spectre\nsubckt amp (in out)\n\
                r1 (in out) resistor r=1k\n// @RNL {\n//   #r1 @PLACE(0, 0)\n// }\nends amp\n";
     // Latin-1: the e acute is one byte
     let latin1: Vec<u8> = scs.chars().map(|c| u8::try_from(u32::from(c)).unwrap()).collect();

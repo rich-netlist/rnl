@@ -22,10 +22,10 @@ fn point(r: &PointRef) -> Value {
         PointRef::Origin(k) => json!({"origin": k}),
         PointRef::Pin { object, pin, terminal } => json!({"object": object, "pin": pin, "terminal": terminal}),
         PointRef::SymbolPin { object, pin, reference: r } => {
-            json!({"object": object, "pin": pin, "reference": reference(r, true)})
+            json!({"object": object, "pin": pin, "reference": reference(r)})
         }
         PointRef::PinPosition { object, pin, reference: r } => {
-            json!({"object": object, "pin_position": pin, "reference": reference(r, true)})
+            json!({"object": object, "pin_position": pin, "reference": reference(r)})
         }
         PointRef::Centre(points) => json!({"centre": points.iter().map(point).collect::<Vec<_>>()}),
     }
@@ -42,17 +42,17 @@ fn slot(s: &Slot) -> Value {
     }
 }
 
-/// A reference; a number only in a level of a file of the draft 0.3, where the record of the
-/// solver writes it (5.9), and otherwise none, as for an object without a reference.
-fn reference(r: &Reference, numbers: bool) -> Value {
+/// A reference: a name, or a number, as the record of the solver writes it (5.9); none for an
+/// object without a reference.
+fn reference(r: &Reference) -> Value {
     match r {
         Reference::Name(n) => json!(n),
         Reference::Generated { usage, path } => json!({"generated_by": usage, "path": path.concat()}),
-        Reference::Number { number, path } if numbers => json!({"number": number, "path": path.concat()}),
-        Reference::GeneratedNumber { usage, index, path } if numbers => {
+        Reference::Number { number, path } => json!({"number": number, "path": path.concat()}),
+        Reference::GeneratedNumber { usage, index, path } => {
             json!({"generated_by": usage, "number": index, "path": path.concat()})
         }
-        Reference::Number { .. } | Reference::GeneratedNumber { .. } | Reference::Anonymous => Value::Null,
+        Reference::Anonymous => Value::Null,
     }
 }
 
@@ -91,11 +91,9 @@ fn fact(p: &LevelProblem, k: usize) -> Value {
 }
 
 /// One level's problem, with its `sig2` hash for the solver options given. The references are
-/// numbers, `{"number": 3, "path": "::mid"}` and `{"generated_by": 2, "number": 1, "path": ""}`,
-/// only in a level of a file of the draft 0.3, which alone has `authored_numbers` and the
-/// `written_numbers` of each usage as well.
+/// names or numbers, `{"number": 3, "path": "::mid"}` and `{"generated_by": 2, "number": 1,
+/// "path": ""}`, with `authored_numbers` and the `written_numbers` of each usage (5.9).
 pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
-    let numbers = p.follows_0_3();
     let mut v = json!({
         "level": p.level,
         "title": p.title,
@@ -112,7 +110,7 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
                 "id": k,
                 "kind": o.kind.as_str(),
                 "label": o.label,
-                "reference": reference(&o.reference, numbers),
+                "reference": reference(&o.reference),
                 "generated": o.generated,
                 "symbol": o.symbol,
                 "position": position(&o.position),
@@ -166,12 +164,12 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
         })).collect::<Vec<_>>(),
         "facts": (0..p.facts.len()).map(|k| fact(p, k)).collect::<Vec<_>>(),
         "nets": p.nets.iter().map(|n| json!({
-            "name": n.name, "reference": reference(&n.reference, numbers), "pins": points(&n.pins),
+            "name": n.name, "reference": reference(&n.reference), "pins": points(&n.pins),
             "wires": n.wires, "routes": n.routes, "port": n.port,
         })).collect::<Vec<_>>(),
         "wires": p.wires.iter().map(|w| {
             let mut wire = json!({
-                "label": w.label, "reference": reference(&w.reference, numbers), "nets": w.nets, "bus": w.bus,
+                "label": w.label, "reference": reference(&w.reference), "nets": w.nets, "bus": w.bus,
                 "anchors": points(&w.anchors), "mode": w.mode, "generated": w.generated,
             });
             if w.default_auto { wire["default_auto"] = json!(true); }
@@ -203,7 +201,7 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
             let mut entry = json!({
                 "definition": u.definition,
                 "label": u.label,
-                "reference": reference(&u.reference, numbers),
+                "reference": reference(&u.reference),
                 "generated": u.generated,
                 "rule_made": u.rule_made,
                 "roles": u.roles.iter().map(|r| json!({
@@ -215,9 +213,7 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
                 "object": u.object,
                 "source": u.source.as_ref().map(|l| json!({"file": l.file, "line": l.line, "col": l.col})),
             });
-            if numbers {
-                entry.as_object_mut().unwrap().insert("written_numbers".into(), json!(u.written_numbers));
-            }
+            entry.as_object_mut().unwrap().insert("written_numbers".into(), json!(u.written_numbers));
             entry
         }).collect::<Vec<_>>(),
     });
@@ -249,9 +245,7 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
     if !p.solver_config.is_empty() {
         v["solver_config"] = serde_json::to_value(rnl_view::solver_settings(p)).unwrap();
     }
-    if numbers {
-        v.as_object_mut().unwrap().insert("authored_numbers".into(), json!(p.authored_numbers));
-    }
+    v.as_object_mut().unwrap().insert("authored_numbers".into(), json!(p.authored_numbers));
     v
 }
 

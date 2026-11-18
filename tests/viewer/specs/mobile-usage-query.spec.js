@@ -77,7 +77,7 @@ test.describe("on a phone", () => {
         q.selectNodeContents(last);
         return [d.textContent.replace("）", ")"), Math.round(r.getBoundingClientRect().top) === Math.round(q.getBoundingClientRect().top) ? 1 : 2];
       }));
-      expect(names).toEqual([["%dp1", 1], ["$DIFFERENTIAL_PAIR)", 1], ["%sym12", 1], ["$MIRRORED)", 1]]);
+      expect(names).toEqual([["%dp1", 1], ["$MATCHED)", 1], ["%sym12", 1], ["$MIRRORED_LAYOUT)", 1]]);
     }
   });
 

@@ -38,21 +38,9 @@ impl Interp<'_> {
         }
     }
 
-    pub(super) fn modern_binding(&self, binding: &Binding) -> bool {
-        self.follows_0_4(binding.rec.map_or(binding.owner, |rec| self.rec_unit[rec]))
-    }
-
-    pub(super) fn remember_binding_creation(
-        &mut self,
-        key: &MemberKey,
-        scene: Option<SceneId>,
-        bound: &Bound,
-        ctx: &Ctx,
-    ) {
-        if self.follows_0_4(self.source_unit(ctx)) {
-            let valid = bound.iter().map(|(_, value, _)| !self.is_failed(*value)).collect();
-            self.bindings.valid.insert((key.clone(), scene), valid);
-        }
+    pub(super) fn remember_binding_creation(&mut self, key: &MemberKey, scene: Option<SceneId>, bound: &Bound) {
+        let valid = bound.iter().map(|(_, value, _)| !self.is_failed(*value)).collect();
+        self.bindings.valid.insert((key.clone(), scene), valid);
     }
 
     /// Bindings compete in written order; a leading name still names the whole pipe.
@@ -139,11 +127,6 @@ impl Interp<'_> {
     /// Read an already evaluated name for exports and consumers. A later symbol failure
     /// does not make another declaration take over the name.
     pub(super) fn evaluated_binding(&self, binding: &Binding, scene: Option<SceneId>) -> Option<ObjId> {
-        if !self.modern_binding(binding) {
-            let key = binding.key();
-            let Memo::Val(value) = self.memo.get(&(key.clone(), scene))? else { return None };
-            return Some(self.bound_value(&key, scene, binding.prefix, &binding.name, *value));
-        }
         let mut failed = None;
         for candidate in self.binding_candidates(binding) {
             let target =
@@ -161,9 +144,6 @@ impl Interp<'_> {
     /// Static body checks must use the declaration that survives creation. Wait for the
     /// normal reading to resolve competing declarations, rather than creating them early.
     pub(super) fn static_binding(&mut self, binding: Binding, scene: Option<SceneId>) -> Option<Binding> {
-        if !self.modern_binding(&binding) {
-            return Some(binding);
-        }
         let candidates = self.binding_candidates(&binding);
         if candidates.len() == 1 {
             return Some(binding);
@@ -204,13 +184,10 @@ impl Interp<'_> {
         changed
     }
 
-    pub(super) fn check_modern_binding_duplicates(&mut self, unit: UnitId, scene: Option<SceneId>) {
+    pub(super) fn check_binding_duplicates(&mut self, unit: UnitId, scene: Option<SceneId>) {
         let package = if scene.is_none() { self.units[unit].pkg().to_string() } else { String::new() };
         for key in self.units[unit].name_order.clone() {
             let binding = self.units[unit].names[&key].clone();
-            if !self.modern_binding(&binding) {
-                continue;
-            }
             let mut first = None;
             for candidate in self.binding_candidates(&binding) {
                 let Some(Memo::Val(default)) = self.memo.get(&(candidate.key(), scene)) else { continue };

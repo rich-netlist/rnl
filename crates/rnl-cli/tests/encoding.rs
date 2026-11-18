@@ -25,7 +25,6 @@ fn run(files: Vec<SolvedFile>) -> SolveRun {
         levels: Vec::new(),
         not_solved: Vec::new(),
         errors: 0,
-        raised: Vec::new(),
     }
 }
 
@@ -93,7 +92,7 @@ fn strip_generated_preserves_source_encoding_bom_and_line_endings() {
         for ending in ["\n", "\r\n"] {
             for final_newline in [true, false] {
                 let title = decode(original).trim_end().to_owned();
-                let retained = format!("{title}{ending}* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}{ending}");
+                let retained = format!("{title}{ending}* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}{ending}");
                 let tail = format!(".end{}", if final_newline { ending } else { "" });
                 let text = format!("{retained}* @RNL(type=\"generated\", author=\"test\") {{ }}{ending}{tail}");
                 let expected = format!("{retained}{tail}");
@@ -135,7 +134,7 @@ fn strip_generated_preserves_source_encoding_bom_and_line_endings() {
 fn solve_cli_accepts_explicit_utf8_and_preserves_latin1_by_default() {
     let dir = scratch("solve-cli");
     let input = dir.join("top.sp");
-    std::fs::write(&input, b"* caf\xe9\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n.end\n").unwrap();
+    std::fs::write(&input, b"* caf\xe9\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nR1 a 0 1k\n.end\n").unwrap();
     for (name, args) in
         [("preserve", vec![]), ("utf8", vec!["--encoding", "utf8"]), ("equals", vec!["--encoding=utf8"])]
     {
@@ -186,7 +185,7 @@ fn strip_generated_uses_actual_disk_or_bundled_origin_not_the_display_name() {
 
     let dir = scratch("strip-bundled");
     let output = dir.join("stripped.rnl");
-    let entry = "<bundled>/0.3/rnl-std.rnl";
+    let entry = "<bundled>/0.4/rnl-std-all.rnl";
     let expected = rnl_cli::bundled().read(entry).unwrap();
     let result = Command::new(env!("CARGO_BIN_EXE_rnl"))
         .current_dir(&dir)
@@ -201,8 +200,8 @@ fn strip_generated_uses_actual_disk_or_bundled_origin_not_the_display_name() {
     // user sets it: a .rnl file is a package file by default, which has no generated records.
     // strip-generated uses host carriers. The ordinary comment prefix must survive removal.
     // Exercise this on every platform, not only Unix.
-    let physical = dir.join("rnl-std.rnl");
-    let disk = b"* caf\xe9\r\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\r\n* retained note\r\n";
+    let physical = dir.join("rnl-std-all.rnl");
+    let disk = b"* caf\xe9\r\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\r\n* retained note\r\n";
     let with_generated = [disk.strip_suffix(b"\r\n").unwrap(), b" @RNL(type=\"generated\") { }\r\n"].concat();
     std::fs::write(&physical, &with_generated).unwrap();
     let result = Command::new(env!("CARGO_BIN_EXE_rnl"))

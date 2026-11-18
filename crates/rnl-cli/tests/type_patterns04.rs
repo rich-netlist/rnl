@@ -171,43 +171,23 @@ fn bundle_type_patterns_use_the_first_member_once() {
 }
 
 #[test]
-fn earlier_versions_keep_exact_type_matching() {
-    for version in ["0.2", "0.3"] {
-        for keyword in ["SELECT-INSTANCE", "SELECT-TERMINAL"] {
-            for (pattern, instances) in [("*mos", 0), ("*", 0), ("nmos", 1)] {
-                let r =
-                    read("t.sp", &spice(version, &format!(r#"# @{keyword}(type="{pattern}") => @AS $PROBE"#)), None);
-                ok(&r);
-                assert_eq!(count(&r, "$PROBE"), instances, "{version} {keyword} {pattern}");
-            }
-        }
-    }
-}
-
-#[test]
-fn mixed_includes_use_the_selection_writers_version() {
-    for (outer, inner) in [("0.3", "0.4"), ("0.4", "0.3")] {
-        let main = format!(
-            r#"* main
-* @RNL(type="header") {{ @VERSION("{outer}") }}
+fn scoped_and_included_selections_both_take_patterns() {
+    let main = r#"* main
+* @RNL(type="header") { @VERSION("0.4") }
 .include child.sp
-* @RNL(scope="cell") {{ $PROBE = @DEFINE(roles=["x"]) {{}}; # @SELECT-INSTANCE(type="*mos") => @AS $PROBE }}
+* @RNL(scope="cell") { $PROBE = @DEFINE(roles=["x"]) {}; # @SELECT-INSTANCE(type="*mos") => @AS $PROBE }
 .end
-"#
-        );
-        let child = format!(
-            r#"* child
-* @RNL(type="header") {{ @VERSION("{inner}") }}
+"#;
+    let child = r#"* child
+* @RNL(type="header") { @VERSION("0.4") }
 .subckt cell a b
 .model nch nmos
 M1 a a b b nch
-* @RNL {{ $CHILD = @DEFINE(roles=["x"]) {{}}; # @SELECT-INSTANCE(type="*mos") => @AS $CHILD }}
+* @RNL { $CHILD = @DEFINE(roles=["x"]) {}; # @SELECT-INSTANCE(type="*mos") => @AS $CHILD }
 .ends
-"#
-        );
-        let r = read("t.sp", &main, Some(&child));
-        ok(&r);
-        assert_eq!(count(&r, "$PROBE"), usize::from(outer == "0.4"));
-        assert_eq!(count(&r, "$CHILD"), usize::from(inner == "0.4"));
-    }
+"#;
+    let r = read("t.sp", main, Some(child));
+    ok(&r);
+    assert_eq!(count(&r, "$PROBE"), 1);
+    assert_eq!(count(&r, "$CHILD"), 1);
 }

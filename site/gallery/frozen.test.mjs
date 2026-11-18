@@ -20,16 +20,17 @@ const empty = (series, packages = []) => ({
 });
 
 /** Runs build.mjs over a tree with the package rnl-std-style in standard/0.3 (when `with03`) and a package outside the
- *  standard, with the given frozen groups; gives the files it wrote. */
+ *  standard, with the given frozen groups; gives the files it wrote. Both packages are the package file of the series
+ *  0.4, in the language 0.4 that the core reads, the one in standard/0.3 with the version 0.3. */
 function built(frozen, { with03 }) {
   const dir = mkdtempSync(join(tmpdir(), "rnl-gallery-frozen-"));
   try {
-    const style = readFileSync(join(root, "libraries", "standard", "0.3", "rnl-std-style.rnl"), "utf8");
+    const style = readFileSync(join(root, "libraries", "standard", "0.4", "rnl-std-style.rnl"), "utf8");
     mkdirSync(join(dir, "libraries", "extension"), { recursive: true });
-    writeFileSync(join(dir, "libraries", "extension", "rnl-x.rnl"), style.replaceAll("0.3", "0.4").replaceAll("rnl-std-style", "rnl-x"));
+    writeFileSync(join(dir, "libraries", "extension", "rnl-x.rnl"), style.replaceAll("rnl-std-style", "rnl-x"));
     if (with03) {
       mkdirSync(join(dir, "libraries", "standard", "0.3"), { recursive: true });
-      writeFileSync(join(dir, "libraries", "standard", "0.3", "rnl-std-style.rnl"), style);
+      writeFileSync(join(dir, "libraries", "standard", "0.3", "rnl-std-style.rnl"), style.replace('version="0.4"', 'version="0.3"'));
     }
     mkdirSync(join(dir, "spec", "0.3"), { recursive: true });
     writeFileSync(join(dir, "spec", "0.3", "RELEASED"), "released\n");

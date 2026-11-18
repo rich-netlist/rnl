@@ -101,17 +101,6 @@ fn invalid_size_fails_even_when_selection_is_empty() {
 }
 
 #[test]
-fn released_versions_still_reject_graphic_selection_inputs() {
-    for version in ["0.2", "0.3"] {
-        for call in ["CIRCLE(radius=1)", "LINE"] {
-            let r = read(version, &format!("# @SELECT-TERMINAL => @{call}"));
-            assert!(r.diagnostics().iter().any(|d| d.code == codes::KEYWORD_GRAPHIC_POINTS_SELECTION));
-            assert!(r.model.levels[0].shapes.is_empty());
-        }
-    }
-}
-
-#[test]
 fn a_bad_member_does_not_discard_other_centred_graphics() {
     let r = read("0.4", "%pins = #R1 @SELECT-PIN; {%pins #R2} @CIRCLE(radius=1)");
     assert_eq!(r.diagnostics().iter().filter(|d| d.code == codes::KEYWORD_GRAPHIC_NOT_POINTS).count(), 1);

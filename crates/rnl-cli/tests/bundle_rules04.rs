@@ -1,7 +1,6 @@
 //! Rules and bundles (10.1, 11.8, 8.2): in a file of 0.4 the bundles of step 3 are known when the
 //! symbol queue evaluates the selections of its rules, so a rule's selection reaches the bundle by
-//! the conditions of its first member, and never a member: members are not drawn on their own. A
-//! file of 0.3 resolves bundles after the queue's rules, as it did.
+//! the conditions of its first member, and never a member: members are not drawn on their own.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -58,17 +57,6 @@ fn a_rule_gives_the_bundle_its_symbol_in_0_4() {
         assert_eq!(errors(&path, false), Vec::<String>::new(), "{name}");
         assert_eq!(symbol_of(&path, false, "%b"), "$BS", "{name}");
     }
-}
-
-#[test]
-fn a_file_of_0_3_resolves_bundles_after_the_rules_as_it_did() {
-    let body = format!(
-        "{SYMBOL}\n*   %b = #XI0<1:0> @BUNDLE;\n*   # @SELECT-INSTANCE(name=\"XI0*\") => @SET-SYMBOL $BS;\n*   %b @PLACE(0, 0)"
-    );
-    let path = file("v03.sp", &netlist("0.3", "", &body));
-    let e = errors(&path, false);
-    assert_eq!(e.len(), 2, "{e:?}");
-    assert!(e.iter().all(|l| l.contains("RNL4601 bundle-member-drawn-alone")), "{e:?}");
 }
 
 #[test]

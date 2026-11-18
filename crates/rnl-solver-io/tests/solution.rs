@@ -8,50 +8,45 @@ use rnl_runtime::{
 use rnl_solver_io::{decode_solution, encode_solution};
 use serde_json::json;
 
-fn problem(version: &str) -> LevelProblem {
-    let text = format!(
-        r#"* protocol round trip
-* @RNL(type="header") {{ @VERSION("{version}") }}
+fn problem() -> LevelProblem {
+    let text = r#"* protocol round trip
+* @RNL(type="header") { @VERSION("0.4") }
 R1 a n 1k
 R2 n b 1k
-* @RNL {{
-* $S = @DEFINE-SYMBOL {{ (-1,-1) (1,1) @RECTANGLE; (-2,0) @PIN(terminal=1); (2,0) @PIN(terminal=2) }};
-* {{#R1 #R2}} @SET-SYMBOL $S;
-* &n @ROUTE;
-* &a @WIRE(mode="straight") {{#R1:1 (-6,0)}}
-* }}
+* @RNL {
+* $S = @DEFINE-SYMBOL { (-1,-1) (1,1) @RECTANGLE; (-2,0) @PIN(terminal=1); (2,0) @PIN(terminal=2) };
+* {#R1 #R2} @SET-SYMBOL $S;
+* &n @ROUTE-NET;
+* &a @WIRE(mode="straight") {#R1:1 (-6,0)}
+* }
 .end
-"#
-    );
-    let text = if version == "0.4" { text.replace("@ROUTE;", "@ROUTE-NET;") } else { text };
-    let files = MemoryProvider::new().with("test.sp", &text);
+"#;
+    let files = MemoryProvider::new().with("test.sp", text);
     let read = rnl_view::interpret("test.sp", None, &files, &Options { std: false, ..Options::solver() }).unwrap();
     assert!(read.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", read.diagnostics());
     read.problems[0].clone()
 }
 
 #[test]
-fn actual_native_results_and_written_records_round_trip_for_each_language_version() {
-    for version in ["0.2", "0.3", "0.4"] {
-        let p = problem(version);
-        let solved = rnl_solver::solve(&p, &rnl_solver::SolverOptions::without_time_limit());
-        assert!(!solved.solution.placements.is_empty());
-        assert!(!solved.solution.wires.is_empty());
-        let json = encode_solution(&solved.solution).unwrap();
-        let bytes = serde_json::to_vec(&json).unwrap();
-        let decoded = decode_solution(&serde_json::from_slice(&bytes).unwrap(), &p).unwrap();
-        assert_eq!(decoded, solved.solution);
-        assert_eq!(
-            write_record(&p, &decoded, "test", "input").record,
-            write_record(&p, &solved.solution, "test", "input").record
-        );
-    }
+fn actual_native_results_and_written_records_round_trip() {
+    let p = problem();
+    let solved = rnl_solver::solve(&p, &rnl_solver::SolverOptions::without_time_limit());
+    assert!(!solved.solution.placements.is_empty());
+    assert!(!solved.solution.wires.is_empty());
+    let json = encode_solution(&solved.solution).unwrap();
+    let bytes = serde_json::to_vec(&json).unwrap();
+    let decoded = decode_solution(&serde_json::from_slice(&bytes).unwrap(), &p).unwrap();
+    assert_eq!(decoded, solved.solution);
+    assert_eq!(
+        write_record(&p, &decoded, "test", "input").record,
+        write_record(&p, &solved.solution, "test", "input").record
+    );
 }
 
 #[test]
 fn line_reports_round_trip_and_reject_invalid_dimensions_axes_and_routes() {
     use rnl_solver_io::{LevelResult, ResultDocument, SolverIdentity};
-    let p = problem("0.4");
+    let p = problem();
     let options = rnl_solver::SolverOptions::default().with_config("layout=\"lines\",limit=\"seed\"").unwrap();
     let solved = rnl_solver::solve(&p, &options);
     let skeleton = solved.report.skeleton.as_ref().unwrap();
@@ -87,7 +82,7 @@ fn line_reports_round_trip_and_reject_invalid_dimensions_axes_and_routes() {
 
 #[test]
 fn pin_coordinates_and_electrical_pins_are_not_collapsed_by_the_protocol() {
-    let p = problem("0.4");
+    let p = problem();
     let PointRef::Pin { object, pin, terminal } = &p.wires[0].anchors[0] else {
         panic!("expected an authored terminal");
     };
@@ -107,7 +102,7 @@ fn pin_coordinates_and_electrical_pins_are_not_collapsed_by_the_protocol() {
 
 #[test]
 fn a_valid_pin_index_does_not_authorize_another_endpoint_or_arbitrary_reference_text() {
-    let p = problem("0.4");
+    let p = problem();
     for reference in ["#R2:2", "#R1:1", "#R1:1::position; (99,99) @PLACE(0,0)"] {
         let s = Solution {
             junctions: vec![PointRef::PinPosition { object: 0, pin: 0, reference: Reference::Name(reference.into()) }],
@@ -239,7 +234,7 @@ R2 a 0 2k
 
 #[test]
 fn malformed_result_indices_and_duplicate_placements_are_rejected_with_paths() {
-    let p = problem("0.4");
+    let p = problem();
     let solved = rnl_solver::solve(&p, &rnl_solver::SolverOptions::without_time_limit());
     let original = encode_solution(&solved.solution).unwrap();
     let mut bad = original.clone();
@@ -262,7 +257,7 @@ fn malformed_result_indices_and_duplicate_placements_are_rejected_with_paths() {
 
 #[test]
 fn nonfinite_native_coordinates_cannot_turn_into_absent_decisions() {
-    let p = problem("0.4");
+    let p = problem();
     let mut solved = rnl_solver::solve(&p, &rnl_solver::SolverOptions::without_time_limit());
     for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         solved.solution.placements[0].x = Some(value);
@@ -288,17 +283,15 @@ fn result(p: &LevelProblem) -> rnl_solver_io::ResultDocument {
 
 #[test]
 fn complete_native_reports_round_trip_without_losing_replay_settings() {
-    for version in ["0.2", "0.3", "0.4"] {
-        let p = problem(version);
-        let result = result(&p);
-        let value = rnl_solver_io::encode_result(&result).unwrap();
-        assert_eq!(rnl_solver_io::decode_result(&value, &[p]).unwrap(), result);
-    }
+    let p = problem();
+    let result = result(&p);
+    let value = rnl_solver_io::encode_result(&result).unwrap();
+    assert_eq!(rnl_solver_io::decode_result(&value, &[p]).unwrap(), result);
 }
 
 #[test]
 fn result_envelope_rejects_stale_missing_extra_and_duplicate_levels() {
-    let p = problem("0.4");
+    let p = problem();
     let result = result(&p);
     let original = rnl_solver_io::encode_result(&result).unwrap();
     for mutation in 0..7 {
@@ -323,7 +316,7 @@ fn result_envelope_rejects_stale_missing_extra_and_duplicate_levels() {
 
 #[test]
 fn request_ordinals_disambiguate_identical_inputs_and_responses_can_be_reordered() {
-    let p = problem("0.4");
+    let p = problem();
     let mut result = result(&p);
     let mut second = result.levels[0].clone();
     second.request = 1;
@@ -335,7 +328,7 @@ fn request_ordinals_disambiguate_identical_inputs_and_responses_can_be_reordered
 
 #[test]
 fn third_party_result_without_a_fact_report_stays_unreported() {
-    let p = problem("0.4");
+    let p = problem();
     let mut result = result(&p);
     result.levels[0].report = None;
     let json = rnl_solver_io::encode_result(&result).unwrap();
@@ -348,7 +341,7 @@ fn nonempty_solution_and_report_fields_survive_bytes_including_large_work_counts
     use rnl_solver::{
         BudgetReport, Discarded, RunLimit, SolveReport, Statement, StatementHint, StopReason, Unrouted, Work,
     };
-    let source = "* report\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\",version=\"0.2\") }\nV1 a 0 1\nR1 a 0 1k\n* @RNL { (9,9) @TEXT(\"note\"); &a @ROUTE }\n.end\n";
+    let source = "* report\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\nV1 a 0 1\nR1 a 0 1k\n* @RNL { (9,9) @TEXT(\"note\"); &a @ROUTE-NET }\n.end\n";
     let files = MemoryProvider::new().with("report.sp", source);
     let read = rnl_view::interpret("report.sp", None, &files, &Options::solver()).unwrap();
     assert!(read.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", read.diagnostics());

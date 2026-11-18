@@ -5,18 +5,19 @@
 //! the writing brief are derived from it, so adding or changing a keyword means editing the file
 //! and adding a handler, not editing tables in code.
 //!
-//! One list serves every version read (16.1): a keyword or a parameter that a version adds carries
-//! `since`, one that a version removes carries `until`, the last version that has it, and the list
-//! `removed` names each removed word with the section that replaces it. A word is in a version from
-//! its `since` (0.2 when not written) through its `until`.
+//! It is the list of the language 0.4, the only version read (16.1). A keyword or a parameter that a
+//! version after 0.2 added carries `since`; the list `removed` names each word of an earlier version
+//! that 0.4 does not have, with the section that replaces it. The parser still takes `until`, the
+//! last version that has a word, and a word is in a version from its `since` (0.2 when not written)
+//! through its `until`.
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::OnceLock;
 
 use serde_json::Value;
 
-/// The word list of language 0.2, embedded.
-pub const WORDS_0_2: &str = include_str!("../data/words-0.2.json");
+/// The word list of the language 0.4, embedded.
+pub const WORDS: &str = include_str!("../data/words.json");
 
 /// A literal in a list of allowed values: strings, or numbers such as TEXT's `rotate`.
 #[derive(Clone, Debug, PartialEq)]
@@ -675,32 +676,10 @@ fn keyword(name: &str, spec: &Value) -> Result<KeywordSig, String> {
     })
 }
 
-/// The fields of the record head that the draft 0.3 adds (2.8), read only in a file that declares
-/// it: `numbering`, the check of the numbers of the record of the solver, which affects the
-/// interpretation (5.9). In a file of 0.2 it is an unknown field.
-pub fn draft_header_fields() -> &'static [HeaderField] {
-    static F: OnceLock<Vec<HeaderField>> = OnceLock::new();
-    F.get_or_init(|| vec![HeaderField { name: "numbering".into(), values: None, affects: true }])
-}
-
-/// Record fields added by the drafts through 0.4 (2.8).
-pub fn draft_0_4_header_fields() -> &'static [HeaderField] {
-    static F: OnceLock<Vec<HeaderField>> = OnceLock::new();
-    F.get_or_init(|| {
-        let mut fields = draft_header_fields().to_vec();
-        fields.push(HeaderField {
-            name: "language".into(),
-            values: Some(vec!["spice".into(), "spectre".into()]),
-            affects: true,
-        });
-        fields
-    })
-}
-
 /// The word list of the language version this runtime supports.
 pub fn words() -> &'static Words {
     static W: OnceLock<Words> = OnceLock::new();
-    W.get_or_init(|| Words::parse(WORDS_0_2).expect("the embedded word list is valid"))
+    W.get_or_init(|| Words::parse(WORDS).expect("the embedded word list is valid"))
 }
 
 #[cfg(test)]
@@ -708,35 +687,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn embedded_list_has_46_keywords_of_0_2_and_0_3() {
+    fn the_embedded_list_is_that_of_0_4() {
         let w = words();
+        // the version that a word without `since` has been in since
         assert_eq!(w.language_version, "0.2");
-        assert_eq!(w.keywords_in("0.2").count(), 46);
-        assert_eq!(w.keywords_in("0.3").count(), 46);
-        // Annotations, pin selection, routing, settings, tables and assertions added by 0.4.
-        let added: Vec<_> = w.keywords.iter().filter(|k| !k.in_version("0.3")).map(|k| k.name.as_str()).collect();
-        assert_eq!(
-            added,
-            [
-                "ANNOTATION",
-                "SELECT-PIN",
-                "ROUTE-NET",
-                "ROUTE-OBJECT",
-                "UNROUTE-NET",
-                "UNROUTE-OBJECT",
-                "SOLVER-CONFIG",
-                "TABLE",
-                "ASSERT-INSTANCE",
-                "ASSERT-TERMINAL",
-                "ASSERT-NET",
-                "ASSERT-TOPOLOGY",
-                "ASSERT-USAGE",
-                "ASSERT-IN"
-            ]
-        );
-        assert!(w.keyword_in("ROUTE", "0.3").is_some());
-        assert!(w.keyword_in("ROUTE", "0.4").is_none());
-        assert!(!w.all_words_in("0.3").contains("different") && w.all_words_in("0.4").contains("different"));
+        assert_eq!(w.keywords.len(), 59);
+        assert!(w.keywords.iter().all(|k| k.in_version("0.4")));
+        // ROUTE of 0.3 is gone, and named among the removed words with the section that replaces it
+        assert!(w.keyword("ROUTE").is_none() && w.keyword("ROUTE-NET").is_some());
+        assert_eq!(w.removed_in("ROUTE", "0.4").map(|r| r.see.as_str()).collect::<Vec<_>>(), ["13.7"]);
+        assert!(w.all_words().contains("different") && w.all_words().contains("textvisible"));
+        // the fields of the record head that 0.3 and 0.4 added are fields of the list
+        let fields: Vec<&str> = w.header_fields.iter().map(|f| f.name.as_str()).collect();
+        assert!(fields.contains(&"numbering") && fields.contains(&"language"), "{fields:?}");
         let place = w.keyword("PLACE").unwrap();
         assert_eq!(place.positional, vec!["x", "y"]);
         assert!(matches!(w.keyword("AS").unwrap().positions, Positions::Definition));
@@ -748,20 +711,11 @@ mod tests {
     }
 
     #[test]
-    fn style_words_follow_the_source_language_version() {
-        let w = words();
-        for version in ["0.2", "0.3"] {
-            assert!(!w.all_words_in(version).contains("textvisible"));
-            assert!(w.all_words_in(version).contains("textcolor"));
-        }
-        assert!(w.all_words_in("0.4").contains("textvisible"));
-        assert!(w.all_words().contains("textvisible"));
-    }
-
-    #[test]
     fn a_word_is_in_the_versions_from_since_through_until() {
-        let mut v: Value = serde_json::from_str(WORDS_0_2).unwrap();
+        let mut v: Value = serde_json::from_str(WORDS).unwrap();
         let kws = v["keywords"].as_object_mut().unwrap();
+        kws.insert("ROUTE".into(), kws["ROUTE-NET"].clone());
+        kws["ROUTE"].as_object_mut().unwrap().remove("since");
         let mut table = kws["GROUP"].clone();
         table["since"] = "0.4".into();
         table["at_least_one"] = serde_json::json!([["a", "b"], ["c"]]);

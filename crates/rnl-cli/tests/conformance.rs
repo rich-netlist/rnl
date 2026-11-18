@@ -1,24 +1,17 @@
 //! The conformance corpus in `tests/conformance`.
 //!
-//! - `cases/NAME.sp` (or `.scs`) with `NAME.expected.json`: the effective model and the places of
-//!   the diagnostics must match; and with `NAME.snapshot.json`, the editor interface's snapshot.
-//!   Run with `RNL_BLESS=1` to write the expected files after a change that is meant. These are
-//!   the corpus of 0.2: each case declares its version, so it keeps the standard series 0.2 (16.1,
-//!   16.3).
-//! - `equivalence/NAME.sp` and `NAME.scs`: the same circuit in SPICE and Spectre with the same RNL
-//!   gives the same effective model (architecture 4.1, 10.2). They declare 0.2 too.
-//! - `cases-0.3/NAME.sp` (or `.scs`): the cases of 0.3, read as every file is, with expected files
-//!   of their own as in `cases`. `RNL_BLESS_0_3=1` writes them, and `RNL_BLESS=1` does not: the
-//!   expected files of each corpus are written only when it is asked for.
-
-//! - `cases-0.4/from-0.2` and `cases-0.4/from-0.3`: reviewed modern counterparts,
-//!   with references isolated by `RNL_BLESS_0_4`; `equivalence-0.4` contains the modern dialect pairs.
+//! - `cases-0.4/from-0.2` and `cases-0.4/from-0.3`, `NAME.sp` (or `.scs`) with
+//!   `NAME.expected.json`: the effective model and the places of the diagnostics must match; and
+//!   with `NAME.snapshot.json`, the editor interface's snapshot. The two directories are the cases
+//!   written for 0.2 and for 0.3, in 0.4. Run with `RNL_BLESS_0_4=1` to write the expected files
+//!   after a change that is meant.
+//! - `equivalence-0.4/NAME.sp` and `NAME.scs`: the same circuit in SPICE and Spectre with the same
+//!   RNL gives the same effective model (architecture 4.1, 10.2).
 
 use std::path::{Path, PathBuf};
 
 use rnl_cli::{dump, interpret_file, FsProvider};
-use rnl_runtime::interp::catalog::version_key;
-use rnl_runtime::interp::unit::{scan_language_decl, DEFAULT_VERSION};
+use rnl_runtime::interp::unit::scan_language_decl;
 use rnl_runtime::Options;
 use serde_json::Value;
 
@@ -61,11 +54,6 @@ fn snapshot(path: &Path) -> Value {
     v
 }
 
-/// Each case's `output` against `NAME.{kind}.json`, or with `RNL_BLESS=1` written there.
-fn check_cases(kind: &str, what: &str, output: fn(&Path) -> Value) {
-    check_cases_in("cases", "RNL_BLESS", kind, what, output)
-}
-
 /// The cases of a directory of the corpus against their expected files, or with `variable` set in
 /// the environment written there.
 fn check_cases_in(dir: &str, variable: &str, kind: &str, what: &str, output: fn(&Path) -> Value) {
@@ -93,27 +81,8 @@ fn check_cases_in(dir: &str, variable: &str, kind: &str, what: &str, output: fn(
     assert!(failed.is_empty(), "the {what} differs from the expected one: {failed:?}");
 }
 
-#[test]
-fn cases_match_their_expected_models() {
-    check_cases("expected", "effective model", run);
-}
-
-#[test]
-fn cases_match_their_expected_snapshots() {
-    check_cases("snapshot", "snapshot", snapshot);
-}
-
-#[test]
-fn cases_of_0_3_match_their_expected_models() {
-    check_cases_in("cases-0.3", "RNL_BLESS_0_3", "expected", "effective model of 0.3", run);
-}
-
-#[test]
-fn cases_of_0_3_match_their_expected_snapshots() {
-    check_cases_in("cases-0.3", "RNL_BLESS_0_3", "snapshot", "snapshot of 0.3", snapshot);
-}
-
-/// The migrated examples retain their source families, including deliberate negative cases.
+/// The cases, in two families by the version they were first written for, with cases of the
+/// versions that are not read among them.
 const MODERN_CASES: [&str; 2] = ["cases-0.4/from-0.2", "cases-0.4/from-0.3"];
 
 #[test]
@@ -137,20 +106,6 @@ fn migrated_cases_declare_the_modern_language_except_the_unsupported_version_tes
             let source = std::fs::read_to_string(&file).unwrap();
             let expected = if file.file_name().unwrap() == "13-unsupported-version.sp" { "9.0" } else { "0.4" };
             assert_eq!(scan_language_decl(&source).as_deref(), Some(expected), "{}", file.display());
-        }
-    }
-}
-
-#[test]
-fn the_corpus_of_0_2_declares_its_version() {
-    // a main file without a header record is read in the tool's default version, 0.3 (16.1): each
-    // case of the corpus of 0.2 declares its version, as reading it finds it, so that it stays a
-    // corpus of 0.2
-    let provider = FsProvider::new(&[]);
-    for dir in ["cases", "equivalence"] {
-        for f in files(&corpus().join(dir), &["sp", "scs"]) {
-            let declared = interpret_file(&f, None, &provider, &Options::default()).unwrap().model.language;
-            assert!(!declared.is_empty() && declared != "0.3", "{}: {declared:?}", f.display());
         }
     }
 }
@@ -192,50 +147,25 @@ fn check_equivalence(directory: &str) {
 }
 
 #[test]
-fn spice_and_spectre_give_the_same_model() {
-    check_equivalence("equivalence");
-}
-
-#[test]
 fn modern_spice_and_spectre_give_the_same_model() {
     check_equivalence("equivalence-0.4");
 }
 
-/// The package files of the standard series, every version in a directory of its own, each written
-/// in the language of its version: those of the versions up to the tool's default, and those of the
-/// drafts after it.
-fn standard_packages() -> (Vec<PathBuf>, Vec<PathBuf>) {
+/// The package files of the standard series, a version in a directory of its own: the series 0.4.
+fn standard_packages() -> Vec<PathBuf> {
     let lib = corpus().join("../../libraries/standard");
-    let mut out = (Vec::new(), Vec::new());
+    let mut out = Vec::new();
     for dir in std::fs::read_dir(lib).unwrap().map(|e| e.unwrap().path()).filter(|p| p.is_dir()) {
-        for f in files(&dir, &["rnl"]) {
-            let language = scan_language_decl(&std::fs::read_to_string(&f).unwrap()).unwrap();
-            if version_key(&language) <= version_key(DEFAULT_VERSION) {
-                out.0.push(f);
-            } else {
-                out.1.push(f);
-            }
-        }
+        out.extend(files(&dir, &["rnl"]));
     }
     out
 }
 
-#[test]
-fn standard_packages_check_clean() {
-    let packages = standard_packages().0;
-    for f in &packages {
-        let r = interpret_file(f, None, &FsProvider::new(&[]), &Options::default()).unwrap();
-        // not even a hint, such as one for a pin off the integer points (9.2.4)
-        let d: Vec<String> = r.diagnostics().iter().map(|d| r.sink.render(d)).collect();
-        assert!(d.is_empty(), "{}: {d:?}", f.display());
-    }
-    assert!(packages.len() >= 25, "only {} package files", packages.len());
-}
-
-/// The formal 0.4 series is fully understood, including its aliases and header rules.
+/// The series 0.4 is fully understood, including its aliases and header rules: not even a hint,
+/// such as one for a pin off the integer points (9.2.4).
 #[test]
 fn the_formal_standard_series_checks_clean() {
-    let packages = standard_packages().1;
+    let packages = standard_packages();
     assert_eq!(packages.len(), 16, "expected 16 package files, got {}", packages.len());
     for file in packages {
         let read = interpret_file(&file, None, &FsProvider::new(&[]), &Options::default()).unwrap();

@@ -1,4 +1,4 @@
-//! The numbers of the objects without a name (the draft 0.3, 5.9).
+//! The numbers of the objects without a name (5.9).
 //!
 //! The record of the solver refers by number to the objects that no name reaches, so that it can
 //! write back every decision: the points, the wires, the texts without a key, the bundles, the
@@ -9,7 +9,7 @@
 //! 1. those of the authored records, the level's own text first and then the records written into
 //!    it with `scope=` (2.6), with the bodies of the usages that they make. They are counted as the
 //!    level reads without its records of the solver, as a solver reads it, and keep their numbers
-//!    when it is read with them: a reading with a record of the solver of a file of the draft first
+//!    when it is read with them: a reading with a record of the solver first
 //!    reads the document without those records ([`NumberRun::authored`]), and its objects take the
 //!    numbers of the objects made there in the same way ([`Interp::identity`]);
 //! 2. those of one record of the solver (`type="generated"`, in the level's own text), with the
@@ -27,8 +27,7 @@
 //! only there, 6.7), and what rules make (10.5). What `::` reaches from another object, such as a
 //! local object or a text with a key, is never noted. Numbers start at 1.
 //!
-//! The numbers are computed for every version, for the solver's view of a level; they are read,
-//! as `%#3`, only in a file of the draft. The check of a record of the solver is made of one line
+//! The numbers are computed for the solver's view of a level and read as `%#3`. The check of a record of the solver is made of one line
 //! for each number ([`Interp::number_lines`]).
 
 use std::collections::{HashMap, HashSet};
@@ -214,16 +213,13 @@ impl Interp<'_> {
     }
 
     /// Does this reading count the objects of the authored records as a reading without the
-    /// records of the solver does (5.9)? When it reads a record of the solver of a file of 0.3;
-    /// then that reading comes first. A file of 0.2 never needs it.
+    /// records of the solver does (5.9)? When it reads a record of the solver; then that reading
+    /// comes first.
     pub(crate) fn needs_count(&self) -> bool {
         self.read_generated
             && self.rec_header.iter().any(|(&rec, h)| {
                 let u = self.rec_unit[rec];
-                h.type_ == "generated"
-                    && h.scope.is_none()
-                    && self.units[u].kind == UnitKind::Level
-                    && self.follows_0_3(u)
+                h.type_ == "generated" && h.scope.is_none() && self.units[u].kind == UnitKind::Level
             })
     }
 
@@ -411,7 +407,7 @@ impl Interp<'_> {
     }
 
     /// `%#n` in a statement (5.9). Only the record of the solver, with `type="generated"` in the
-    /// level's own text, of a file of the draft, writes numbers; its `numbering` decides afterwards
+    /// level's own text, writes numbers; its `numbering` decides afterwards
     /// whether they take effect (`NumberRun`). The numbers of the authored records are those of the
     /// reading without the records of the solver; the record's own follow, counted on the record
     /// in the order of its members, so that a number may be used before the member that makes its
@@ -654,8 +650,8 @@ impl Interp<'_> {
         LevelNumbering { level: self.scenes[s].level, check: check(&lines), authored: lines, records }
     }
 
-    /// The records of the solver that a second run reads differently (5.9): in a file of the draft,
-    /// one that uses numbers without `numbering`, and one that uses numbers and whose `numbering`
+    /// The records of the solver that a second run reads differently (5.9): one that uses numbers
+    /// without `numbering`, and one that uses numbers and whose `numbering`
     /// is not its check. A record that uses no number need not have `numbering`, and one that does
     /// not match changes nothing. The check is compared as hexadecimal digits, in either case.
     pub(crate) fn number_recheck(&mut self, numbering: &[LevelNumbering]) -> NumberRun {
@@ -664,7 +660,7 @@ impl Interp<'_> {
             let Some(s) = self.level_scene[lvn.level] else { continue };
             let solver = self.level_records(s).solver;
             for (g, r) in solver.into_iter().zip(&lvn.records) {
-                if !self.follows_0_3(self.rec_unit[g]) || !r.uses_numbers {
+                if !r.uses_numbers {
                     continue;
                 }
                 match &r.written {
@@ -700,10 +696,7 @@ impl Interp<'_> {
         };
         if let Some(st) = b.stmt {
             let text = texts.entry(st).or_insert_with(|| match st.rec {
-                Some(rec) => {
-                    let places = self.follows_0_4(self.rec_unit[rec]);
-                    statement_tokens_features(&self.record_chars(rec), st.start, st.end, places).join(" ")
-                }
+                Some(rec) => statement_tokens_features(&self.record_chars(rec), st.start, st.end, true).join(" "),
                 None => String::new(),
             });
             line.push_str(text);

@@ -89,7 +89,7 @@ impl Interp<'_> {
         let members = mapped["members"].obj;
         // a failed object among the members, written in a set too, nested or named, fails the
         // assertion as a whole, as for those of 15.3 (7.3)
-        if let Some(d) = self.failed_input(members, ctx) {
+        if let Some(d) = self.failed_input(members) {
             let id = self.err_cause(
                 ctx,
                 codes::ASSERT_MEMBER_FAILED,

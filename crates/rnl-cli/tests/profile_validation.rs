@@ -1,4 +1,4 @@
-//! Parameter failures found by checking the published 0.3 vocabulary (5.3, 6.4, 6.12, 9.2.4).
+//! Parameter failures found by checking the vocabulary (5.3, 6.4, 6.12, 9.2.4).
 
 use std::path::Path;
 
@@ -18,7 +18,7 @@ fn errors(r: &Interpretation) -> Vec<String> {
 
 fn pin_file(terminal: &str) -> String {
     format!(
-        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\nR1 a b 1k\n\
+        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\nR1 a b 1k\n\
          * @RNL {{ $S = @DEFINE-SYMBOL(box=[-1,-1,1,1]) {{ (0,0) @PIN(terminal={terminal}); (0,1) @PIN(terminal=2) }}; #R1 @SET-SYMBOL $S; #R1 @PLACE(0,0) }}\n.end\n"
     )
 }
@@ -49,7 +49,7 @@ fn numeric_named_and_mixed_bus_pin_terminals_remain_valid() {
 fn malformed_device_names_do_not_shift_or_rename_terminals() {
     for terminals in ["[\"first\",true,\"last\"]", "[7,\"last\"]", "[[\"first\"],\"last\"]"] {
         let text = format!(
-            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); @DEVICE(name=\"R*\", terminals={terminals}) }}\nR1 a b 1k\n.end\n"
+            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @DEVICE(name=\"R*\", terminals={terminals}) }}\nR1 a b 1k\n.end\n"
         );
         let r = read("t.sp", &text);
         assert_eq!(errors(&r), ["the terminals of @DEVICE must be an array of names (strings) (6.12)"], "{terminals}");
@@ -60,25 +60,25 @@ fn malformed_device_names_do_not_shift_or_rename_terminals() {
 #[test]
 fn header_parameters_reject_wrong_types_before_using_their_defaults() {
     let cases = [
-        ("@DEVICE(name=\"R*\", model=7, terminals=[\"first\",\"last\"])", "model", "DEVICE"),
-        ("@DEVICE(name=\"R*\", terminals=\"first\")", "terminals", "DEVICE"),
-        ("@USE-PACKAGE(name=\"rnl-std\", version=7)", "version", "USE-PACKAGE"),
-        ("@USE-PACKAGE(name=\"rnl-std\", path=false)", "path", "USE-PACKAGE"),
-        ("@USE-ALIASES(name=\"rnl-zh\", version=7)", "version", "USE-ALIASES"),
-        ("@USE-ALIASES(name=\"rnl-zh\", path=false)", "path", "USE-ALIASES"),
+        ("@DEVICE(name=\"R*\", model=7, terminals=[\"first\",\"last\"])", "model", "DEVICE", "a string"),
+        ("@DEVICE(name=\"R*\", terminals=\"first\")", "terminals", "DEVICE", "an array"),
+        ("@USE-PACKAGE(name=\"rnl-std-all\", version=7)", "version", "USE-PACKAGE", "a string"),
+        ("@USE-PACKAGE(name=\"rnl-std-all\", path=false)", "path", "USE-PACKAGE", "a string"),
+        ("@USE-ALIASES(name=\"alias-zh\", version=7)", "version", "USE-ALIASES", "a string"),
+        ("@USE-ALIASES(name=\"alias-zh\", path=false)", "path", "USE-ALIASES", "a string"),
     ];
-    for (declaration, parameter, keyword) in cases {
-        let text = format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); {declaration} }}\nR1 a b 1k\n.end\n");
+    for (declaration, parameter, keyword, expected) in cases {
+        let text = format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); {declaration} }}\nR1 a b 1k\n.end\n");
         let r = read("t.sp", &text);
-        assert_eq!(errors(&r), [format!("the {parameter} of @{keyword} has the wrong type (5.3)")], "{declaration}");
+        assert_eq!(errors(&r), [format!("the {parameter} of @{keyword} must be {expected} (5.3)")], "{declaration}");
         assert_eq!(r.model.levels[0].terminal_names[0], [Some("p".into()), Some("n".into())]);
     }
     for (declaration, parameter) in
         [("@PACKAGE(name=7, version=\"1.0\")", "name"), ("@PACKAGE(name=\"test\", version=true)", "version")]
     {
-        let r = read("t.rnl", &format!("@RNL(type=\"header\") {{ @VERSION(\"0.3\"); {declaration} }}\n"));
+        let r = read("t.rnl", &format!("@RNL(type=\"header\") {{ @VERSION(\"0.4\"); {declaration} }}\n"));
         assert!(
-            errors(&r).contains(&format!("the {parameter} of @PACKAGE has the wrong type (5.3)")),
+            errors(&r).contains(&format!("the {parameter} of @PACKAGE must be a string (5.3)")),
             "{declaration}: {:?}",
             errors(&r)
         );
@@ -97,7 +97,7 @@ fn parameterless_keywords_reject_parameters_before_changing_objects() {
         ("UNION", "%members @UNION(bogus=true)"),
     ] {
         let text = format!(
-            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\nR1 a b 1k\n\
+            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\nR1 a b 1k\n\
              * @RNL {{ $S = @DEFINE-SYMBOL {{ (0,0) @PIN(terminal=1) }}; $style = @DEFINE-STYLE {{}}; %members = {{#R1}}; {statement}; #R1 @PLACE(0,0) }}\n.end\n"
         );
         let r = read("t.sp", &text);
@@ -112,13 +112,16 @@ fn parameterless_keywords_reject_parameters_before_changing_objects() {
 fn terminal_selection_rejects_arrays_and_nonpositive_or_fractional_ordinals() {
     for terminal in ["true", "[]", "[1]", "1.5", "0", "-1", "4294967296"] {
         let text = format!(
-            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\nR1 a b 1k\n\
+            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\nR1 a b 1k\n\
              * @RNL {{ #R1 @PLACE(0,0); #R1 @SELECT-TERMINAL(terminal={terminal}) => @TEXT(\"invalid\", key=\"bad\"); #R1 @TEXT(\"valid\", key=\"good\") }}\n.end\n"
         );
         let r = read("t.sp", &text);
         assert_eq!(
             errors(&r),
-            ["the terminal of @SELECT-TERMINAL has the wrong type (5.3)", "the object the TEXT is attached to failed"],
+            [
+                "the terminal of @SELECT-TERMINAL must be a positive terminal number or a terminal name (5.3)",
+                "the object the TEXT is attached to failed"
+            ],
             "{terminal}"
         );
         let texts = &r.model.levels[0].texts;

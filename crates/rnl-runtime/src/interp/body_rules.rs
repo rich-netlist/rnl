@@ -125,7 +125,7 @@ impl Interp<'_> {
         let Some(scene) = ctx.scene else {
             return false;
         };
-        if !self.follows_0_4(self.source_unit(ctx)) || ctx.body_scene.is_none() || ctx.body_scene == ctx.scene {
+        if ctx.body_scene.is_none() || ctx.body_scene == ctx.scene {
             return false;
         }
         if let Some(input) = self.role_inputs.get(&object) {
@@ -141,7 +141,7 @@ impl Interp<'_> {
     }
 
     pub(super) fn note_rule(&mut self, ctx: &Ctx) {
-        if self.follows_0_4(self.source_unit(ctx)) && ctx.frame_kind() == Some(FrameKind::Definition) {
+        if ctx.frame_kind() == Some(FrameKind::Definition) {
             if let (Some(usage), Some(statement)) = (ctx.frame.as_ref().and_then(|f| f.borrow().usage), ctx.stmt) {
                 self.body_rules.marked.insert((usage, statement.start));
             }

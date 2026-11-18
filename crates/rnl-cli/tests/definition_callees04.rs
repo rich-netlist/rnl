@@ -7,13 +7,7 @@ use rnl_runtime::{
 use std::path::Path;
 
 fn read(version: &str, header: &str, setup: &str, body: &str, after: &str, used: bool) -> Interpretation {
-    let calls = if !used {
-        ""
-    } else if version == "0.4" {
-        "$D @ATTACH(x=2) => @PLACE(0,0); $D @ATTACH(x=3) => @PLACE(10,0)"
-    } else {
-        "$D @ATTACH(x=2); $D @ATTACH(x=3)"
-    };
+    let calls = if used { "$D @ATTACH(x=2) => @PLACE(0,0); $D @ATTACH(x=3) => @PLACE(10,0)" } else { "" };
     let source = format!("* callees\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\"); {header} }}\n* @RNL {{ {setup} $D = @DEFINE(roles=[],parameters=[\"x\"]) {{ {body}; (5,0) @CIRCLE(radius=1) }}; {after} {calls} }}\n");
     rnl_cli::interpret_file(
         Path::new("callees.sp"),
@@ -146,16 +140,6 @@ fn declarations_are_not_expanded_to_check_their_signatures() {
 }
 
 #[test]
-fn released_definitions_keep_application_time_checks() {
-    for version in ["0.2", "0.3"] {
-        let unused = read(version, "", PARAM, "$C @ATTACH(unknown=1)", "", false);
-        assert!(errors(&unused).is_empty(), "{:?}", unused.diagnostics());
-        let used = read(version, "", PARAM, "$C @ATTACH(unknown=1)", "", true);
-        assert_eq!(errors(&used), [codes::PARAM_UNKNOWN, codes::PARAM_UNKNOWN], "{:?}", used.diagnostics());
-    }
-}
-
-#[test]
 fn scoped_aliases_and_quoted_names_use_the_callees_namespace() {
     let header = "@ALIAS(\"alias_param\",\"known\",definition=\"$C\"); @ALIAS(\"alias_role\",\"p\",definition=\"$C\")";
     let setup = "$C = @DEFINE(roles=[\"p\"],parameters=[\"known\"]) {};";
@@ -272,24 +256,6 @@ fn outer_aliases_are_resolved_in_their_own_set_scope() {
     for used in [false, true] {
         let r = read("0.4", "", "", body, "", used);
         assert!(errors(&r).is_empty(), "{:?}", r.diagnostics());
-    }
-}
-
-#[test]
-fn scoped_declarations_use_their_source_files_language_version() {
-    for (source, target) in [("0.3", "0.4"), ("0.4", "0.3")] {
-        let main=format!("* scoped declaration\n* @RNL(type=\"header\") {{ @VERSION(\"{source}\") }}\n.include \"child.sp\"\nX1 a b cell\n* @RNL(scope=\"cell\") {{ $C = @DEFINE(roles=[[\"p\",\"pin\"]]) {{}} }}\n");
-        let child=format!("* scoped target\n* @RNL(type=\"header\") {{ @VERSION(\"{target}\") }}\n.subckt cell a b\nR1 a b 1k\n* @RNL {{ $D = @DEFINE(roles=[]) {{ $C @ATTACH(unknown=1) }} }}\n.ends cell\n");
-        let files = MemoryProvider::new().with("main.sp", &main).with("child.sp", &child);
-        let r =
-            rnl_cli::interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Default::default() })
-                .unwrap();
-        assert_eq!(
-            errors(&r),
-            if source == "0.3" { vec![codes::REF_FAILED, codes::DEFINE_ROLE_UNKNOWN_KIND] } else { vec![] },
-            "{source}/{target}: {:?}",
-            r.diagnostics()
-        );
     }
 }
 

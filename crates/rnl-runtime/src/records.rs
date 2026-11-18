@@ -28,14 +28,15 @@ pub fn scan_run(run: &[CarrierLine], file: &str, sink: &mut Sink) -> Vec<Record>
     scan_run_with(run, file, sink, false)
 }
 
-/// Scan a package with the language declared by its first header record (16.1).
-/// A missing declaration keeps the released default version.
+/// Scan a package by the language version declared by its first header record (16.1): by the
+/// rules of the versions this implementation reads when it declares one of them or none, as a
+/// package without VERSION is read in the default version, else by those of the earlier versions.
 pub fn scan_package_run(run: &[CarrierLine], file: &str, sink: &mut Sink) -> Vec<Record> {
     let candidate = scan_run_with(run, file, &mut Sink::new(), true);
     let modern = candidate
         .first()
         .and_then(|record| crate::interp::unit::declared_record_version(&record.text))
-        .is_some_and(|(version, _)| crate::interp::unit::keeps_0_4(&version));
+        .is_none_or(|(version, _)| crate::interp::unit::is_read_version(&version));
     scan_run_with(run, file, sink, modern)
 }
 

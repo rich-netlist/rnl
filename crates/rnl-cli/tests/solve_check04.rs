@@ -218,24 +218,6 @@ fn a_solver_config_that_the_reading_fails_is_an_error_of_its_level() {
 }
 
 #[test]
-fn a_level_before_0_4_reads_only_the_old_options() {
-    let main = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n.end\n";
-    let tool = [ToolSettings::Config("beam=5".into()), ToolSettings::Options("grid=2".into())];
-    let c = check(main, &tool);
-    let l = &c.levels[0];
-    assert_eq!(setting(l, "beam"), "beam=4 (default)");
-    assert_eq!(setting(l, "grid"), "grid=2 (command-line)");
-    assert!(keyed(&l.warnings).contains(&"beam: a level before 0.4 reads no --solver-config; beam is ignored".into()));
-    // it is laid out in rows, not by the default of 0.4, and whatever the old options ask
-    assert_eq!(setting(l, "layout"), "layout=\"rows\" (default)");
-    assert!(!keyed(&l.warnings).iter().any(|w| w.starts_with("layout:")), "{:?}", l.warnings);
-    let c = check(main, &[ToolSettings::Options("layout=lines".into())]);
-    let l = &c.levels[0];
-    assert_eq!(setting(l, "layout"), "layout=\"rows\" (default)");
-    assert!(keyed(&l.warnings).contains(&"layout: a level before 0.4 is laid out in rows; layout is ignored".into()));
-}
-
-#[test]
 fn a_spacing_is_warned_of_only_where_the_layout_does_not_space_by_it() {
     let main = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nR1 a 0 1k\n.end\n";
     let unused = |c: &Checked| {
@@ -282,9 +264,6 @@ fn each_level_says_its_layout_and_the_settings_it_does_not_use() {
     );
     let work = check(MAIN, &[ToolSettings::Config("limit=\"work\",work=100".into())]);
     assert!(!level(&work, "main.sp").unused.contains(&"safety_seconds".to_string()));
-    // a level before 0.4 lays out in rows
-    let old = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n.end\n";
-    assert_eq!(check(old, &[]).levels[0].layout, "rows");
 }
 
 #[test]

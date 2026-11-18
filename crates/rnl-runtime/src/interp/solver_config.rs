@@ -293,32 +293,26 @@ impl Interp<'_> {
         // by key, a stable sort keeping each key's values in their order
         settings.sort_by(|a, b| a.key.cmp(&b.key));
         let unit = self.level_unit[level];
-        if self.follows_0_4(unit) {
-            let mut taken = Vec::with_capacity(settings.len());
-            for s in settings {
-                if s.key == "junction"
-                    && s.value.str() != Some("")
-                    && self.junction_definition(scene, unit, &s).is_none()
-                {
-                    let message = format!(
-                        "junction={} must name a definition whose first role accepts a point in the level {}, or be \
-                         empty (13.2); the value is left out, and the one before it stays in effect (14.10)",
-                        s.value.show(),
-                        self.doc.levels[level].title()
-                    );
-                    self.diag_in(
-                        Severity::Error,
-                        codes::SOLVER_CONFIG_JUNCTION_NOT_TAKEN,
-                        message,
-                        s.source.clone(),
-                        &s.package,
-                    );
-                    continue;
-                }
-                taken.push(s);
+        let mut taken = Vec::with_capacity(settings.len());
+        for s in settings {
+            if s.key == "junction" && s.value.str() != Some("") && self.junction_definition(scene, unit, &s).is_none() {
+                let message = format!(
+                    "junction={} must name a definition whose first role accepts a point in the level {}, or be \
+                     empty (13.2); the value is left out, and the one before it stays in effect (14.10)",
+                    s.value.show(),
+                    self.doc.levels[level].title()
+                );
+                self.diag_in(
+                    Severity::Error,
+                    codes::SOLVER_CONFIG_JUNCTION_NOT_TAKEN,
+                    message,
+                    s.source.clone(),
+                    &s.package,
+                );
+                continue;
             }
-            settings = taken;
+            taken.push(s);
         }
-        settings
+        taken
     }
 }

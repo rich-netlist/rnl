@@ -1,8 +1,6 @@
-//! The draft language 0.4 and the standard series 0.4 (libraries/standard/0.4), bundled beside
-//! the series 0.2 and 0.3. A file of 0.4 is read (16.1) and explicitly uses the series 0.4
-//! (16.3). 0.4 is newer than the tool's default version, 0.3, so a
-//! USE-PACKAGE that names no version finds a package written in 0.4 only in a file of 0.4 (16.2):
-//! the files of 0.2 and 0.3 find what they found before the series 0.4 was bundled.
+//! The language 0.4 and the standard series 0.4 (libraries/standard/0.4), the series bundled. A
+//! file of 0.4 is read (16.1) and explicitly uses the series 0.4 (16.3); a USE-PACKAGE that names
+//! no version finds the package of the series 0.4 (16.2).
 
 use std::path::Path;
 
@@ -50,13 +48,6 @@ fn a_file_of_0_4_uses_the_series_0_4_when_requested() {
     let at_root = root(level(&r));
     assert!(at_root.contains(&("rnl-std-all", "0.4")), "{at_root:?}");
     assert!(at_root.iter().all(|(_, v)| *v == "0.4"), "{at_root:?}");
-    // the files of 0.2 and 0.3 keep their series
-    for version in ["0.2", "0.3"] {
-        let r = read(&MemoryProvider::new().with("t.sp", &netlist(version, "")), &Options::default());
-        let at_root = root(level(&r));
-        assert!(at_root.contains(&("rnl-std", version)), "{version}: {at_root:?}");
-        assert!(at_root.iter().all(|(_, v)| *v == version), "{version}: {at_root:?}");
-    }
 }
 
 #[test]
@@ -69,30 +60,17 @@ fn a_package_that_names_no_version_is_found_in_the_series_the_file_can_use() {
         root(level(&r)).iter().map(|(n, v)| format!("{n} {v}")).collect::<Vec<_>>()
     };
     let unnamed = "@USE-PACKAGE(name=\"rnl-std-rf\")";
-    // The published 0.2/0.3 lookup stays; 0.4 uses its own series.
-    for (version, want) in [("0.2", "0.3"), ("0.3", "0.3"), ("0.4", "0.4")] {
-        assert_eq!(rf(version, unnamed), [format!("rnl-std-rf {want}")], "{version}");
-    }
-    // An explicit package version cannot cross the language boundary either.
-    let named = "@USE-PACKAGE(name=\"rnl-std-rf\", version=\"0.4\")";
-    for (version, header) in [("0.2", named), ("0.3", named)] {
-        let r = read(&MemoryProvider::new().with("t.sp", &netlist(version, header)), &options);
-        assert!(errors(&r).iter().any(|e| e.contains("RNL2308")), "{:?}", errors(&r));
-        assert!(root(level(&r)).is_empty());
-    }
+    assert_eq!(rf("0.4", unnamed), ["rnl-std-rf 0.4"]);
 }
 
 #[test]
 fn the_rules_that_0_3_changes_hold_in_0_4() {
-    // `numbering`, a word that 0.3 adds (2.8), is a standard word in a file of 0.4 too, which no
+    // `numbering`, a word that 0.3 added (2.8), is a standard word in a file of 0.4, which no
     // alias may be spelled as (16.5)
     let options = Options { std: false, ..Options::default() };
-    for (version, error) in [("0.2", false), ("0.3", true), ("0.4", true)] {
-        let r =
-            read(&MemoryProvider::new().with("t.sp", &netlist(version, "@ALIAS(\"numbering\", \"axis\")")), &options);
-        let said = errors(&r).iter().any(|e| e.contains("the alias numbering is the name of a standard word (16.5)"));
-        assert_eq!(said, error, "{version}: {:?}", errors(&r));
-    }
+    let r = read(&MemoryProvider::new().with("t.sp", &netlist("0.4", "@ALIAS(\"numbering\", \"axis\")")), &options);
+    let said = errors(&r).iter().any(|e| e.contains("the alias numbering is the name of a standard word (16.5)"));
+    assert!(said, "{:?}", errors(&r));
     // T has terminal names by default (6.12)
     let t = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\nT1 a b c d z0=50 td=1n\n\
              * @RNL { #T1:p1 @TEXT(\"first port\") }\n.end\n";

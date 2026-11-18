@@ -98,7 +98,7 @@ impl rnl_solver::Clock for Ticks {
 
 /// Two resistors placed apart on x, and a high ALIGN on x that the solver keeps first; of the two
 /// PLACEs, the later is kept (8.5), and the x of R1 is discarded, with the ALIGN in its conflict.
-const NET: &str = "* preview\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a b 1k\nR2 b 0 1k\n\
+const NET: &str = "* preview\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\nR1 a b 1k\nR2 b 0 1k\n\
                    * @RNL { #R1 @PLACE(0, 0) }\n\
                    * @RNL { {#R1 #R2} @ALIGN(\"x\", priority=\"high\") }\n\
                    * @RNL { #R2 @PLACE(4, 5) }\n.end\n";
@@ -173,7 +173,7 @@ fn a_copy_of_files_that_include_others_is_a_folder_and_never_the_files_read() {
     let dir = scratch("folder");
     let src = dir.join("src");
     std::fs::create_dir_all(src.join("lib")).unwrap();
-    let top = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n.include lib/div.inc\n.include lib/plain.inc\n\
+    let top = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n.include lib/div.inc\n.include lib/plain.inc\n\
                X1 a 0 div\nR1 a 0 1k\n.end\n";
     let div = "* div\n.subckt div p n\nR1 p m 1k\nR2 m n 1k\n.ends div\n";
     let plain = "* nothing to draw\n.param r=1k\n";
@@ -205,7 +205,7 @@ fn a_copy_of_files_that_include_others_is_a_folder_and_never_the_files_read() {
 fn a_solve_stops_when_its_watcher_says_so() {
     let dir = scratch("stop");
     let file = dir.join("t.sp");
-    let text = "* stop\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n.subckt a p n\nR1 p n 1k\n.ends\n\
+    let text = "* stop\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n.subckt a p n\nR1 p n 1k\n.ends\n\
                 .subckt b p n\nR1 p n 1k\n.ends\nX1 1 0 a\nX2 1 0 b\n.end\n";
     std::fs::write(&file, text).unwrap();
     // at once, and after the first level: nothing comes back but the word that it stopped

@@ -3,7 +3,7 @@
 use crate::diag::{codes, Severity};
 use crate::host::{glob, LevelKind};
 
-use super::obj::{ObjData, ObjId, SceneId, UnitId};
+use super::obj::{ObjData, ObjId, SceneId};
 use super::Interp;
 
 #[derive(Clone, Debug)]
@@ -20,7 +20,8 @@ impl Interp<'_> {
         for object in self.scenes[s].insts.clone() {
             let inst = self.inst_of(object).clone();
             let file = self.doc.file_level_of(&inst).unwrap_or(level);
-            if !self.follows_0_4(self.level_unit[file]) {
+            // an instance of a file none of whose RNL is read takes no DEVICE declaration (16.1)
+            if !self.file_ok(file) {
                 continue;
             }
             let effective = self.effective_packages(level);
@@ -47,7 +48,7 @@ impl Interp<'_> {
                 None
             };
             let mut info = DeviceInfo {
-                terminals: ports.clone().or_else(|| self.default_terminals(s, &inst)).unwrap_or_default(),
+                terminals: ports.clone().or_else(|| self.default_terminals(&inst)).unwrap_or_default(),
                 mtype: inst.mtype.clone(),
             };
             for decl in declarations {
@@ -98,15 +99,9 @@ impl Interp<'_> {
     }
 
     /// Type conditions share one matcher in circuit selections, pin selections and assertions.
-    /// Read the statement's version: an included file need not use its objects' version.
-    pub(super) fn instance_type_matches(&self, object: ObjId, pattern: &str, writer: UnitId) -> bool {
-        let kind = self.instance_type(object);
+    pub(super) fn instance_type_matches(&self, object: ObjId, pattern: &str) -> bool {
         let pattern = pattern.to_lowercase();
-        if self.follows_0_4(writer) {
-            kind.is_some_and(|kind| glob(&pattern, kind, true))
-        } else {
-            kind.unwrap_or("") == pattern
-        }
+        self.instance_type(object).is_some_and(|kind| glob(&pattern, kind, true))
     }
 
     pub(super) fn instance_type(&self, object: ObjId) -> Option<&str> {

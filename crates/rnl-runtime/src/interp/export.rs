@@ -79,8 +79,7 @@ impl Interp<'_> {
             }
         }
 
-        // what each object is referred to by: a name, else a number (5.7, 10.5, 13.3; the draft
-        // 0.3, 5.9); through `::` the local objects of a usage that has either
+        // what each object is referred to by: a name, else a number (5.7, 5.9, 10.5, 13.3); through `::` the local objects of a usage that has either
         let names = self.level_names(s);
         for (name, o) in &names {
             ix.refs.entry(*o).or_insert_with(|| Reference::Name(format!("%{}", written_name(name))));
@@ -233,13 +232,6 @@ impl Interp<'_> {
                 }
                 ObjectKind::Usage => {
                     usage = ix.usages.get(o).copied();
-                    if self.at_point(*o) {
-                        if let Some(m) = self.main_of(*o) {
-                            if let Some(r) = self.point_ref(s, &ix, m) {
-                                position = Position::At(r);
-                            }
-                        }
-                    }
                 }
                 ObjectKind::Text => {
                     let att = self.text_attach(*o);
@@ -289,8 +281,7 @@ impl Interp<'_> {
                         rotate: items.rotate.unwrap_or(0.0),
                         fix_rotate: items.fix_rotate.unwrap_or(false),
                         upright: items.upright.unwrap_or(true),
-                        baseline_mirrors: items.modern_text
-                            || items.text.as_ref().and_then(|t| t.unit).is_some_and(|u| self.follows_0_4(u)),
+                        baseline_mirrors: items.modern_text || items.text.as_ref().and_then(|t| t.unit).is_some(),
                         column_position: self.text_column_position(s, *o),
                         style,
                     });
@@ -311,13 +302,13 @@ impl Interp<'_> {
             });
         }
 
-        // wires (13.1), a rewritten one as its rewrite gives it (the draft 0.3): read without the
+        // wires (13.1), a rewritten one as its rewrite gives it: read without the
         // records of the solver, as by a solver, the rewrites of the authored records
         let mut problem_wires = Vec::new();
         for &w in &wires {
             let ObjData::Wire { nets, bus, generated, .. } = self.o(w).clone() else { continue };
-            let Some(WireShape { points, mode, site, .. }) = self.wire_shape(s, w) else { continue };
-            let default_auto = mode == "auto" && self.modern_wire_source(s, site.as_ref());
+            let Some(WireShape { points, mode, .. }) = self.wire_shape(s, w) else { continue };
+            let default_auto = mode == "auto";
             let anchors: Vec<PointRef> = points.iter().filter_map(|q| self.point_ref(s, &ix, *q)).collect();
             problem_wires.push(ProblemWire {
                 label: self.label(w),
@@ -390,25 +381,23 @@ impl Interp<'_> {
         // CURRENT is resolved after symbol-dependent conversions (8.2, 15.2). Read only
         // effective declarations and use the final direction of each host terminal.
         let mut currents = Vec::new();
-        if self.follows_0_4(self.level_unit[lv]) {
-            let marked: Vec<ObjId> = self.scenes[s]
-                .currents
-                .iter()
-                .filter(|fact| self.current_fact_active(s, fact, usize::MAX))
-                .filter_map(|fact| fact.terminal)
-                .collect();
-            let mut seen = HashSet::new();
-            for terminal in marked {
-                if !seen.insert(terminal) || !self.has_pin(s, terminal) {
-                    continue;
-                }
-                let direction = self.current_of(s, terminal);
-                if direction == "unspecified" {
-                    continue;
-                }
-                if let Some(pin) = self.point_ref(s, &ix, terminal) {
-                    currents.push(TerminalCurrent { pin, direction });
-                }
+        let marked: Vec<ObjId> = self.scenes[s]
+            .currents
+            .iter()
+            .filter(|fact| self.current_fact_active(s, fact, usize::MAX))
+            .filter_map(|fact| fact.terminal)
+            .collect();
+        let mut seen = HashSet::new();
+        for terminal in marked {
+            if !seen.insert(terminal) || !self.has_pin(s, terminal) {
+                continue;
+            }
+            let direction = self.current_of(s, terminal);
+            if direction == "unspecified" {
+                continue;
+            }
+            if let Some(pin) = self.point_ref(s, &ix, terminal) {
+                currents.push(TerminalCurrent { pin, direction });
             }
         }
 
@@ -587,39 +576,32 @@ impl Interp<'_> {
         let solver_config = self.solver_config_for(s);
         let (junction, definition) = self.junction_with_tools_for(s, &solver_config);
         let mut existing_junctions = Vec::new();
-        if self.follows_0_4(self.level_unit[lv]) {
-            let replaced_records = self.solver_records(s);
-            for &a in &usages {
-                let mut root = a;
-                let mut chain = Vec::new();
-                while let Some(parent) = self.usage(root).parent {
-                    chain.push(parent);
-                    root = parent;
-                }
-                chain.reverse();
-                if self
-                    .usage(root)
-                    .site
-                    .as_ref()
-                    .and_then(|ctx| ctx.rec)
-                    .is_some_and(|rec| replaced_records.contains(&rec))
-                {
-                    continue;
-                }
-                let u = self.usage(a);
-                if Some(u.definition) != definition
-                    || self.eff_priority(s, u.priority, &chain, Some(a)) == Priority::Disabled
-                {
-                    continue;
-                }
-                let role = u.roles.first().map(|(_, r)| *r);
-                if let Some(role) = role {
-                    for obj in self.flatten(s, role, 7, None) {
-                        if let Some(point) = self.point_ref(s, &ix, obj) {
-                            if let Some(key) = junction_point_identity(&point) {
-                                if !existing_junctions.iter().any(|p| junction_point_identity(p) == Some(key)) {
-                                    existing_junctions.push(point);
-                                }
+        let replaced_records = self.solver_records(s);
+        for &a in &usages {
+            let mut root = a;
+            let mut chain = Vec::new();
+            while let Some(parent) = self.usage(root).parent {
+                chain.push(parent);
+                root = parent;
+            }
+            chain.reverse();
+            if self.usage(root).site.as_ref().and_then(|ctx| ctx.rec).is_some_and(|rec| replaced_records.contains(&rec))
+            {
+                continue;
+            }
+            let u = self.usage(a);
+            if Some(u.definition) != definition
+                || self.eff_priority(s, u.priority, &chain, Some(a)) == Priority::Disabled
+            {
+                continue;
+            }
+            let role = u.roles.first().map(|(_, r)| *r);
+            if let Some(role) = role {
+                for obj in self.flatten(s, role, 7, None) {
+                    if let Some(point) = self.point_ref(s, &ix, obj) {
+                        if let Some(key) = junction_point_identity(&point) {
+                            if !existing_junctions.iter().any(|p| junction_point_identity(p) == Some(key)) {
+                                existing_junctions.push(point);
                             }
                         }
                     }
@@ -659,7 +641,7 @@ impl Interp<'_> {
 
     /// What the last record of the solver of scene `s` gives, read with it: the coordinates and
     /// orientations of its PLACE and ORIENT statements, the routes of the wires it rewrites and the
-    /// wires it writes itself, with their points as drawn (the draft 0.3, 13.1, 14.8). The objects
+    /// wires it writes itself, with their points as drawn (13.1, 14.8). The objects
     /// and wires are given by the keys that a problem built without the record finds them by:
     /// their names, the numbers of the authored records, and the places of the objects without a
     /// name in the bodies of the usages that the record writes out (5.9, 10.5). `objects` are the
@@ -740,8 +722,7 @@ impl Interp<'_> {
             let ObjData::Wire { nets, points, mode, generated, site, .. } = self.o(w).clone() else { continue };
             if !generated && of_record(site.as_ref()) {
                 let nets = nets.iter().map(|n| self.net_display(*n)).collect();
-                let modern = self.modern_wire_source(s, site.as_ref());
-                if let Some(path) = self.routed_wire_run(s, &points, &mode, modern, (true, true)) {
+                if let Some(path) = self.routed_wire_run(s, &points, &mode, (true, true)) {
                     written.push((nets, path));
                 }
                 continue;
@@ -750,11 +731,10 @@ impl Interp<'_> {
                 rs.iter()
                     .filter(|r| r.fault.is_none() && !r.generated && of_record(Some(&r.site)))
                     .max_by(|a, b| (&a.pos, a.seq).cmp(&(&b.pos, b.seq)))
-                    .map(|r| (r.points.clone(), r.mode.clone(), r.site.clone()))
+                    .map(|r| (r.points.clone(), r.mode.clone()))
             });
-            let (Some((points, mode, site)), Some(k)) = (rewrite, ix.refs.get(&w).and_then(key)) else { continue };
-            let modern = self.modern_wire_source(s, Some(&site));
-            if let Some(path) = self.routed_wire_run(s, &points, &mode, modern, (true, true)) {
+            let (Some((points, mode)), Some(k)) = (rewrite, ix.refs.get(&w).and_then(key)) else { continue };
+            if let Some(path) = self.routed_wire_run(s, &points, &mode, (true, true)) {
                 routes.push((k, path));
             }
         }
@@ -892,15 +872,13 @@ impl Interp<'_> {
                 }
             }
             ObjData::Pos { parent } => self.reference_of(s, ix, parent).then("::position"),
-            ObjData::ScenePin { owner, index } if self.follows_0_4(self.level_unit[self.scenes[s].level]) => {
-                match self.symbol_pin_ref(s, ix, owner, index) {
-                    Some(PointRef::SymbolPin { reference, .. }) => reference,
-                    Some(PointRef::Pin { terminal, .. }) => {
-                        self.reference_of(s, ix, owner).then(&format!(":{}", written_name(&terminal)))
-                    }
-                    _ => Reference::Anonymous,
+            ObjData::ScenePin { owner, index } => match self.symbol_pin_ref(s, ix, owner, index) {
+                Some(PointRef::SymbolPin { reference, .. }) => reference,
+                Some(PointRef::Pin { terminal, .. }) => {
+                    self.reference_of(s, ix, owner).then(&format!(":{}", written_name(&terminal)))
                 }
-            }
+                _ => Reference::Anonymous,
+            },
             ObjData::NamedSubobject { parent, name, .. } => {
                 self.reference_of(s, ix, parent).then(&format!("::{}", written_name(&name)))
             }
@@ -929,11 +907,7 @@ impl Interp<'_> {
         }
         match self.reference_of(s, ix, o) {
             Reference::Name(n) => Some((n, 0)),
-            Reference::Number { number, path }
-                if self.follows_0_4(self.level_unit[self.scenes[s].level])
-                    && number > 0
-                    && number <= self.level_numbers(s).authored.len() =>
-            {
+            Reference::Number { number, path } if number > 0 && number <= self.level_numbers(s).authored.len() => {
                 // Authored numbers survive replacement of the solver record. Its
                 // own numbers do not, and must never become role references here.
                 Some((format!("%#{number}{}", path.concat()), 0))
@@ -1132,7 +1106,7 @@ impl Interp<'_> {
         objs: &[(ObjId, ObjectKind)],
     ) -> (Vec<ProblemFact>, Vec<(usize, Vec<Orient>)>) {
         let mut ranked: Vec<Ranked> = Vec::new();
-        // the lists of codes of 0.4 (11.2, 14.9), by the number each fact is collected with
+        // the lists of codes (11.2, 14.9), by the number each fact is collected with
         let mut lists: HashMap<usize, Vec<Orient>> = HashMap::new();
         let rank = |p: Priority| p as u8;
         // the texts whose offset on an axis replaces their PLACE on that axis, or the reverse; either

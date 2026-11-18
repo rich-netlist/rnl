@@ -82,7 +82,7 @@ for (const lang of ["en", "zh"]) {
   });
 }
 
-/** The definitions of the usages of M1 of the OTA, `$DIFFERENTIAL_PAIR` and `$MIRRORED`, each on one line: a name that fits a line is moved whole to the next, not broken. */
+/** The definitions of the usages of M1 of the OTA, `$MATCHED` and `$MIRRORED_LAYOUT`, each on one line: a name that fits a line is moved whole to the next, not broken. */
 const unbroken = (page) => page.evaluate(() => [...document.querySelectorAll("#usage-detail .membership-definition")].map((d) => {
   // the lines it is on: the top of its first character and of its last
   const tops = [d.firstChild, d.lastChild.lastChild ?? d.lastChild].map((n, i) => {
@@ -100,7 +100,7 @@ for (const lang of ["en", "zh"]) {
     await selectObject(page, "instance", "M1");
     if (lang === "zh") await page.evaluate(() => window.viewer.command("language-zh"));
     await expect(rows(page)).toHaveCount(2);
-    expect(await unbroken(page)).toEqual([["$DIFFERENTIAL_PAIR)", 1], ["$MIRRORED)", 1]]);
+    expect(await unbroken(page)).toEqual([["$MATCHED)", 1], ["$MIRRORED_LAYOUT)", 1]]);
   });
 }
 

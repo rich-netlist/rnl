@@ -140,8 +140,7 @@ pub struct Level {
     pub constraints: Option<crate::LevelConstraints>,
     /// The objects of the level that are not drawn on it: those that have no position, each with
     /// its symbol drawn alone, in the order of the netlist (their number is the one `status`
-    /// gives), then those that are not drawn at all, since no symbol can be chosen for them, each
-    /// with its `reason` and no symbol.
+    /// gives).
     pub unplaced: Vec<Unplaced>,
 }
 
@@ -187,14 +186,8 @@ pub struct Unplaced {
     /// An instance's name; for a bundle or a usage, the label the diagnostics give it, such as
     /// "a usage of $GND".
     pub name: String,
-    /// The name of the symbol it is drawn with; empty for an object that has none (see `reason`).
+    /// The name of the symbol it is drawn with.
     pub symbol: String,
-    /// Why it is not drawn at all, whatever its position, such as `model card not found` for a
-    /// transistor whose model the netlist does not define; absent for an object that only lacks a
-    /// position, which a solver can place. Such an object has no symbol and no drawing.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(test, ts(optional))]
-    pub reason: Option<String>,
     /// The instances it stands for, indexes into `Document::objects`: one for an instance, its
     /// members for a bundle, none for a usage. A viewer shows the first one's statement.
     pub objects: Vec<usize>,
@@ -361,7 +354,7 @@ pub struct AutoIncludeCandidate {
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Hit {
-    /// For a 0.4 pin hit, its independent object index in Document.objects.
+    /// For a pin hit, its independent object index in Document.objects.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub pin: Option<usize>,
@@ -430,11 +423,11 @@ pub struct SourceFile {
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Object {
-    /// The data of an independent 0.4 pin. Absent for other object kinds.
+    /// The data of an independent pin. Absent for other object kinds.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub pin: Option<PinObject>,
-    /// "instance", "net", "usage", "group" (a set marked with GROUP), or "bundle" for a 0.4 pin host, or "pin".
+    /// "instance", "net", "usage", "group" (a set marked with GROUP), or "bundle" for a pin host, or "pin".
     pub kind: &'static str,
     /// An instance or net's name, or a usage's or group's editor identity (`%gnd1` when named).
     pub name: String,
@@ -492,9 +485,8 @@ pub struct Span {
 pub struct Diagnostic {
     /// "error", "violation", "warning" or "hint", in that rank (7.6).
     pub severity: &'static str,
-    /// Its kind's number in the toolkit's list of diagnostics, such as "RNL3120"; none for a kind of
-    /// the versions 0.2 and 0.3 alone.
-    pub code: Option<String>,
+    /// Its kind's number in the toolkit's list of diagnostics, such as "RNL3120".
+    pub code: String,
     /// Its kind's short name, such as "param-wrong-type".
     pub name: &'static str,
     /// The file as shown: relative to the opened file's directory when it is inside it.
@@ -573,7 +565,7 @@ pub(crate) fn document(
                     let (file, line) = h.loc.map(|l| (l.file, l.line)).unwrap_or_default();
                     LevelHint {
                         kind: h.kind.as_str(),
-                        code: h.kind.code().number().unwrap_or_default(),
+                        code: h.kind.code().number(),
                         severity: h.severity.as_str(),
                         message: h.message,
                         file: shown_file(&file),
@@ -584,8 +576,7 @@ pub(crate) fn document(
                 .collect();
         }
     }
-    let main_language = r.model.levels.iter().find(|lv| lv.level == 0).map_or("", |lv| lv.language.as_str());
-    let (params, notes) = Params::new(&r.doc, options.bind.as_ref(), main_language);
+    let (params, notes) = Params::new(&r.doc, options.bind.as_ref());
     let drawn: HashMap<usize, usize> = r.model.levels.iter().enumerate().map(|(k, lv)| (lv.level, k)).collect();
     for (k, lv) in r.model.levels.iter().enumerate() {
         let host = &r.doc.levels[lv.level];
@@ -1223,26 +1214,9 @@ impl<'a> Index<'a> {
                 kind: it.kind,
                 name: name.unwrap_or_else(|| it.id.clone()),
                 symbol: sym.name.clone(),
-                reason: None,
                 objects: it.host.iter().filter_map(|i| self.insts.get(&(lv.level, *i)).copied()).collect(),
                 svg: drawn.as_ref().and_then(|d| d.svg.clone()),
                 primitives: drawn.and_then(|d| d.primitives),
-            });
-        }
-        // the devices that are not drawn at all: listed after, with the reason and no drawing
-        for u in &lv.undrawn {
-            let name = match u.host.as_slice() {
-                [i] => self.doc.levels[lv.level].instances.get(*i).map(|inst| inst.name.clone()),
-                _ => None,
-            };
-            out.push(Unplaced {
-                kind: if u.host.len() == 1 { "instance" } else { "bundle" },
-                name: name.unwrap_or_else(|| u.id.clone()),
-                symbol: String::new(),
-                reason: Some(u.reason.clone()),
-                objects: u.host.iter().filter_map(|i| self.insts.get(&(lv.level, *i)).copied()).collect(),
-                svg: None,
-                primitives: None,
             });
         }
         out
@@ -1440,11 +1414,11 @@ mod tests {
     }
 
     fn case(name: &str) -> String {
-        corpus(&format!("cases/{name}"))
+        corpus(&format!("cases-0.4/from-0.2/{name}"))
     }
 
     fn equivalence(name: &str) -> String {
-        corpus(&format!("equivalence/{name}"))
+        corpus(&format!("equivalence-0.4/{name}"))
     }
 
     /// The text of a span.
@@ -1566,7 +1540,7 @@ M1 d g s 0 nmos
         let text = "* labels
 R1 a b 1k
 C1 b 0 1p
-* @RNL(type=\"header\") { @VERSION(\"0.2\")}
+* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\")}
 * @RNL {
 *   #R1 @PLACE(0, 0);
 *   #C1 @PLACE(6, 0);
@@ -1607,7 +1581,7 @@ C1 b 0 1p
         // label, so nothing on the drawing stands for it; the first's label stands for its pin's net
         let text = "* a terminal without a pin
 R1 a b 1k
-* @RNL(type=\"header\") { @VERSION(\"0.2\")}
+* @RNL(type=\"header\") { @VERSION(\"0.4\")}
 * @RNL {
 *   $ONE = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1); @LINE {(0, 0) (0, 2)} };
 *   #R1 @SET-SYMBOL $ONE;
@@ -1632,7 +1606,7 @@ R1 a b 1k
 
     #[test]
     fn labels_with_repeated_runtime_ids_get_independent_display_groups() {
-        // the supply symbols of the corpus: four unnamed usages, whose labels are all `%s::name`
+        // the supply symbols of the corpus: four usages, whose labels all stand for the net vdd
         let d = load(&case("03-five-transistor-ota.sp")).unwrap();
         let level = &d.levels[0];
         let is_vdd = |h: &Hit| h.objects.iter().any(|o| d.objects[*o].kind == "net" && d.objects[*o].name == "vdd");
@@ -1651,7 +1625,8 @@ R1 a b 1k
         }
         // Each still stands for the net, as well as its own independently selectable usage.
         assert_eq!(vdd.len(), on_vdd("box").len());
-        // the supply symbols have no name of their own, the ports of the netlist have
+        // the supply and ground symbols have the names the file gives them, as the ports of the
+        // netlist have
         let named: Vec<(&str, Vec<&str>)> = level
             .hits
             .iter()
@@ -1668,10 +1643,21 @@ R1 a b 1k
                 })
             })
             .collect();
-        assert!(on_vdd("box").iter().all(|h| h.name.is_none()));
+        let mut supplies: Vec<&str> = on_vdd("box").iter().filter_map(|h| h.name.as_deref()).collect();
+        supplies.sort_unstable();
+        assert_eq!(supplies, ["ss_Ib_1", "ss_M3_3", "ss_M4_3", "ss_Vdd_1"]);
+        let named: Vec<(&str, Vec<&str>)> = named.into_iter().filter(|(n, _)| !n.starts_with("ss_")).collect();
         assert_eq!(
             named,
-            [("pi", vec!["inp"]), ("pn", vec!["inn"]), ("po", vec!["out"])],
+            [
+                ("pi", vec!["inp"]),
+                ("pn", vec!["inn"]),
+                ("po", vec!["out"]),
+                ("gs_M5_3", vec!["0"]),
+                ("gs_M6_3", vec!["0"]),
+                ("gs_CL_2", vec!["0"]),
+                ("gs_Vdd_2", vec!["0"])
+            ],
             "the ports of the netlist have their names"
         );
         assert!(named.iter().all(|(_, nets)| nets.len() == 1), "{named:?}");
@@ -1679,8 +1665,20 @@ R1 a b 1k
 
     #[test]
     fn unkeyed_wire_labels_get_separate_groups_for_each_net() {
-        let files = rnl_runtime::source::MemoryProvider::new()
-            .with("wire-labels.sp", include_str!("../../../tests/viewer/inputs/wire-labels.sp"));
+        let text = r#"* Unkeyed labels attached to different wires need independent display groups.
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-spice", version="0.4") }
+R1 in mid 1k
+R2 mid out 2k
+* @RNL {
+*   #R1 @PLACE(0, 0); #R2 @PLACE(8, 0);
+*   %input = &in @WIRE {(-8, 2) #R1:1};
+*   %output = &out @WIRE {#R2:2 (14, -2)};
+*   %input @TEXT("IN") => @PLACE(-5, 3);
+*   %output @TEXT("OUT") => @PLACE(11, -1)
+* }
+.end
+"#;
+        let files = rnl_runtime::source::MemoryProvider::new().with("wire-labels.sp", text);
         let d = crate::build("wire-labels.sp", &files, &BuildOptions::default()).unwrap();
         let level = &d.levels[0];
         let labels: Vec<_> = level
@@ -1737,7 +1735,8 @@ R1 a b 1k
 
     #[test]
     fn a_level_with_everything_placed_lists_nothing() {
-        let d = load(&case("04-hierarchy.sp")).unwrap();
+        // the case of 0.4 places every object of its level, the usages of the standard series too
+        let d = load(&case("03-five-transistor-ota.sp")).unwrap();
         assert!(d.levels.iter().all(|l| l.unplaced.is_empty()));
     }
 
@@ -1849,15 +1848,15 @@ R1 a b 1k
     fn usages_have_independent_objects_and_preserve_net_hits() {
         let text = r#"* virtual objects
 R1 rail out 1k
-* @RNL(type="header") { @VERSION("0.3") }
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-basic", version="0.4") }
 * @RNL {
 *   #R1 @PLACE(0, 0);
 *   %g = $GROUND @ATTACH &rail; %g @PLACE(-8, -4);
 *   %g2 = $GROUND @ATTACH &rail; %g2 @PLACE(-2, -4);
 *   %s = $SUPPLY @ATTACH &rail; %s @PLACE(8, 6);
-*   %p = $IO_PORT @ATTACH &rail; %p @PLACE(12, 6);
-*   %j = $JUNCTION @ATTACH (4, -5);
-*   &rail @WIRE {%g:1 (-8, 3) #R1:1 (8, 3) %s:1}
+*   %p = $NET_LABEL @ATTACH &rail; %p @PLACE(12, 6);
+*   %j = $JUNCTION @ATTACH (4, -5); %j @PLACE(4, -5);
+*   &rail @WIRE {%g:p (-8, 3) #R1:1 (8, 3) %s:p}
 * }
 .end
 "#;
@@ -1893,56 +1892,48 @@ R1 rail out 1k
 
     #[test]
     fn a_usage_attached_to_a_point_or_a_terminal_stands_for_its_net() {
-        for version in ["0.3", "0.4"] {
-            let text = format!(
-                r#"* a junction
+        // a dot is put on its point or terminal by a solve, which writes where it is
+        let text = r#"* a junction
 R1 a b 1k
 R2 b 0 1k
 R3 b c 1k
-* @RNL(type="header") {{ @VERSION("{version}"); @USE-PACKAGE(name="rnl-std-basic", version="{version}") }}
-* @RNL {{
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-basic", version="0.4") }
+* @RNL {
 *   #R1 @PLACE(0, 0); #R2 @PLACE(12, 0); #R3 @PLACE(6, 10);
 *   %o = (6, 3); %free = (20, 20);
-*   &b @WIRE(mode="straight") {{#R1:2 %o #R2:1}};
-*   &b @WIRE(mode="straight") {{#R3:1 %o}};
+*   &b @WIRE(mode="straight") {#R1:2 %o #R2:1};
+*   &b @WIRE(mode="straight") {#R3:1 %o};
 *   %dot = $JUNCTION @ATTACH %o;
 *   %lone = $JUNCTION @ATTACH %free;
-*   %on_pin = $JUNCTION @ATTACH #R3:2{place}
-* }}
+*   %on_pin = $JUNCTION @ATTACH #R3:2;
+*   %dot @PLACE(6, 3); %lone @PLACE(20, 20); %on_pin @PLACE(7, 10)
+* }
 .end
-"#,
-                // a dot of 0.4 is put on its point or terminal by a solve, which writes where it is
-                place = if version == "0.4" {
-                    ";\n*   %dot @PLACE(6, 3); %lone @PLACE(20, 20); %on_pin @PLACE(7, 10)"
-                } else {
-                    ""
-                }
-            );
-            let files = rnl_runtime::source::MemoryProvider::new().with("dot.sp", &text);
-            let d = crate::build("dot.sp", &files, &BuildOptions::default()).unwrap();
-            assert!(d.failed.is_none(), "{version}");
-            assert!(!d.diagnostics.iter().any(|x| x.severity == "error"), "{version}: {:?}", d.diagnostics);
-            let hits = &d.levels[0].hits;
-            let net = d.objects.iter().position(|o| o.kind == "net" && o.name == "b").unwrap();
-            let box_of = |name: &str| {
-                let hit = hits.iter().find(|h| h.kind == "box" && h.name.as_deref() == Some(name));
-                hit.unwrap_or_else(|| panic!("{version}: no box %{name}"))
-            };
-            // the dot is on the point the two wires of b pass through: it stands for b, as a ground
-            // stands for its net
-            let dot = box_of("dot");
-            assert_eq!(d.objects[dot.objects[0]].name, "%dot", "{version}");
-            assert_eq!(&dot.objects[1..], [net], "{version}");
-            // a point no wire passes through is on no net
-            let lone = box_of("lone");
-            assert_eq!(d.objects[lone.objects[0]].name, "%lone", "{version}");
-            assert_eq!(lone.objects.len(), 1, "{version}");
-            // a dot on a terminal stands for the terminal's net
-            let c = d.objects.iter().position(|o| o.kind == "net" && o.name == "c").unwrap();
-            let on_pin = box_of("on_pin");
-            assert_eq!(d.objects[on_pin.objects[0]].name, "%on_pin", "{version}");
-            assert_eq!(&on_pin.objects[1..], [c], "{version}");
-        }
+"#;
+        let files = rnl_runtime::source::MemoryProvider::new().with("dot.sp", text);
+        let d = crate::build("dot.sp", &files, &BuildOptions::default()).unwrap();
+        assert!(d.failed.is_none());
+        assert!(!d.diagnostics.iter().any(|x| x.severity == "error"), "{:?}", d.diagnostics);
+        let hits = &d.levels[0].hits;
+        let net = d.objects.iter().position(|o| o.kind == "net" && o.name == "b").unwrap();
+        let box_of = |name: &str| {
+            let hit = hits.iter().find(|h| h.kind == "box" && h.name.as_deref() == Some(name));
+            hit.unwrap_or_else(|| panic!("no box %{name}"))
+        };
+        // the dot is on the point the two wires of b pass through: it stands for b, as a ground
+        // stands for its net
+        let dot = box_of("dot");
+        assert_eq!(d.objects[dot.objects[0]].name, "%dot");
+        assert_eq!(&dot.objects[1..], [net]);
+        // a point no wire passes through is on no net
+        let lone = box_of("lone");
+        assert_eq!(d.objects[lone.objects[0]].name, "%lone");
+        assert_eq!(lone.objects.len(), 1);
+        // a dot on a terminal stands for the terminal's net
+        let c = d.objects.iter().position(|o| o.kind == "net" && o.name == "c").unwrap();
+        let on_pin = box_of("on_pin");
+        assert_eq!(d.objects[on_pin.objects[0]].name, "%on_pin");
+        assert_eq!(&on_pin.objects[1..], [c]);
     }
 
     #[test]
@@ -2023,39 +2014,5 @@ R3 b c 1k
         let (last, tokens) = statement(&lines, 0).unwrap();
         assert_eq!(last, 1);
         assert_eq!(tokens.iter().map(|t| t.text.as_str()).collect::<Vec<_>>(), ["m1", "d", "g", "s", "b", "nch"]);
-    }
-
-    #[test]
-    fn a_device_that_cannot_be_drawn_is_listed_after_the_unplaced_with_its_reason() {
-        let text = "* a transistor without its model card is not drawn
-.model nch nmos
-R1 a b 1k
-M1 d g s b nch
-M2 d g s b pch
-* @RNL { #R1 @PLACE(0, 0) }
-.end
-";
-        let files = rnl_runtime::source::MemoryProvider::new().with("a.sp", text);
-        let d = crate::build("a.sp", &files, &BuildOptions::default()).unwrap();
-        let level = &d.levels[0];
-        let listed: Vec<(&str, &str, Option<&str>)> =
-            level.unplaced.iter().map(|u| (u.name.as_str(), u.symbol.as_str(), u.reason.as_deref())).collect();
-        let names: Vec<&str> = listed.iter().map(|l| l.0).collect();
-        assert_eq!(names.last(), Some(&"M2"), "{listed:?}");
-        assert_eq!(listed.last().unwrap(), &("M2", "", Some("model card not found")));
-        // the others, which a solver can place, have a symbol and no reason
-        assert!(listed[..listed.len() - 1].iter().all(|(_, symbol, reason)| !symbol.is_empty() && reason.is_none()));
-        // it has no drawing, and stands for its instance in the objects
-        let m2 = level.unplaced.last().unwrap();
-        assert!(m2.svg.is_none() && m2.primitives.is_none());
-        assert_eq!((m2.kind, m2.objects.len()), ("instance", 1));
-        assert_eq!(d.objects[m2.objects[0]].name, "M2");
-        // the status counts the objects without a position, not the ones that cannot be drawn
-        assert!(level.status.as_deref().unwrap().starts_with("1 without a position"), "{:?}", level.status);
-        // in the JSON the reason is there for it alone
-        let json = serde_json::to_value(&d).unwrap();
-        let rows = json["levels"][0]["unplaced"].as_array().unwrap();
-        assert_eq!(rows.iter().filter(|u| u.get("reason").is_some()).count(), 1);
-        assert_eq!(rows.last().unwrap()["reason"], "model card not found");
     }
 }

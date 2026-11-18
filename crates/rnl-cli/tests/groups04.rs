@@ -41,11 +41,6 @@ fn solver_groups_export_provenance_and_set_identity_independently_of_labels() {
     let mut changed = p.clone();
     changed.groups[0].direct = !changed.groups[0].direct;
     assert_ne!(rnl_runtime::problem::input_digest(p), rnl_runtime::problem::input_digest(&changed));
-    let mut old = p.clone();
-    old.version = "0.3".into();
-    changed.version = "0.3".into();
-    changed.groups[0].identity += 100;
-    assert_eq!(rnl_runtime::problem::input_digest(&old), rnl_runtime::problem::input_digest(&changed));
 }
 fn problem(r: &Interpretation, name: &str) -> Vec<String> {
     let p = r.problems.iter().find(|p| p.groups.iter().any(|g| g.label == name)).unwrap();
@@ -80,12 +75,6 @@ fn semantic_usages_expand_but_symbolized_usages_remain_members() {
     let r = read("0.4", &format!("{body}; %u @SET-SYMBOL $U"));
     clean(&r);
     members(&r, "%g", &["%u", "#R3"]);
-    for version in ["0.2", "0.3"] {
-        let r = read(version, body);
-        clean(&r);
-        assert_eq!(problem(&r, "%g"), ["#R3"]);
-        assert_eq!(model(&r, "%g"), ["%u", "#R3"]);
-    }
 }
 
 #[test]
@@ -142,23 +131,15 @@ fn singleton_groups_keep_the_set_handle() {
 }
 
 #[test]
-fn mixed_version_scoped_groups_follow_the_writing_file() {
-    for (version, other) in [("0.3", "0.4"), ("0.4", "0.3")] {
-        let main=format!("* mixed\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\n.include extra.sp\n* @RNL(scope=\"child\") {{ %own = {{%u #R3}} @GROUP }}\n");
-        let extra =
-            source(other, "$D = @DEFINE(roles=[\"a\",\"b\"]) {}; %u = #R1 #R2 @AS $D; %other = {%u #R3} @GROUP")
-                .replace("R1 a", ".subckt child a b c\nR1 a")
-                + ".ends\n";
-        let r = read_files(&MemoryProvider::new().with("main.sp", &main).with("extra.sp", &extra));
-        clean(&r);
-        members(&r, "%own", if version == "0.4" { &["#R1", "#R2", "#R3"] } else { &["%u", "#R3"] });
-        if other == "0.4" {
-            members(&r, "%other", &["#R1", "#R2", "#R3"]);
-        } else {
-            assert_eq!(problem(&r, "%other"), ["#R3"]);
-            assert_eq!(model(&r, "%other"), ["%u", "#R3"]);
-        }
-    }
+fn scoped_groups_expand_the_usages_of_an_included_level() {
+    let main = "* scoped\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include extra.sp\n* @RNL(scope=\"child\") { %own = {%u #R3} @GROUP }\n";
+    let extra = source("0.4", "$D = @DEFINE(roles=[\"a\",\"b\"]) {}; %u = #R1 #R2 @AS $D; %other = {%u #R3} @GROUP")
+        .replace("R1 a", ".subckt child a b c\nR1 a")
+        + ".ends\n";
+    let r = read_files(&MemoryProvider::new().with("main.sp", main).with("extra.sp", &extra));
+    clean(&r);
+    members(&r, "%own", &["#R1", "#R2", "#R3"]);
+    members(&r, "%other", &["#R1", "#R2", "#R3"]);
 }
 
 #[test]

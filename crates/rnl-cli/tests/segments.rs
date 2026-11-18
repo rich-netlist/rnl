@@ -1,12 +1,10 @@
-//! A later segment of a pipe is written later, wherever the place of writing matters (5.5, as the
-//! draft 0.3 makes it clear, in every version): in the appearance queues (8.3), in override by key
-//! (8.4), in the order of resolution (8.5, in `solver.rs`), in the drawing order (11.6), and for
-//! PRIORITY (14.8) and CURRENT (15.2), between the PLACE of a text and its offset (13.3), and for the
-//! statement that closes a cycle of sets (5.2.2); the rewrites of a wire are in `rewrite.rs`. The later
-//! segment comes after all that the earlier one holds, such as the statements nested in it: in
-//! `{#R2 @LAYER("top")} => @LAYER("bottom")`, the outer LAYER is the later. Before, the segments
-//! of one statement shared its position, so the earlier of two could win, and a statement nested
-//! in an earlier segment won over a later segment.
+//! A later segment of a pipe is written later, wherever the place of writing matters (5.5): in the
+//! appearance queues (8.3), in override by key (8.4), in the order of resolution (8.5, in
+//! `solver.rs`), in the drawing order (11.6), and for PRIORITY (14.8) and CURRENT (15.2), between
+//! the PLACE of a text and its offset (13.3), and for the statement that closes a cycle of sets
+//! (5.2.2); the rewrites of a wire are in `rewrite.rs`. The later segment comes after all that the
+//! earlier one holds, such as the statements nested in it: in `{#R2 @LAYER("top")} =>
+//! @LAYER("bottom")`, the outer LAYER is the later.
 
 use std::path::Path;
 
@@ -30,7 +28,7 @@ fn read(statements: &[&str]) -> Interpretation {
 /// The same netlist read with `options`, whatever it reports.
 fn read_with(statements: &[&str], options: &Options) -> Interpretation {
     let mut text = String::from("* segments\nR1 a b 1k\nR2 c d 1k\nR3 e f 1k\nR4 g h 1k\n");
-    text += "* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n* @RNL {\n";
+    text += "* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n* @RNL {\n";
     let mut all = vec![
         "$TALL = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1); (0, 10) @PIN(terminal=2) }",
         "$WIDE = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1); (10, 0) @PIN(terminal=2) }",
@@ -122,8 +120,9 @@ fn the_later_current_holds() {
 
 #[test]
 fn in_a_symbol_body_the_later_pin_and_place_win() {
-    // a symbol body is read in order, so its later segments win too: the later pin of a terminal
-    // (9.2.4) and the later PLACE of a text on `?` (9.2.2)
+    // a symbol body is read in order, so its later segments win too: the later pin of a terminal,
+    // which the terminal stands for where it is written (9.2.4), and the later PLACE of a text on
+    // `?` (9.2.2)
     let r = read(&[
         "$PINS = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1, label=\"a\") => @PIN(terminal=1, label=\"b\"); \
          (0, 10) @PIN(terminal=2); ? @TEXT(\"${name}\", key=\"name\") => @PLACE(2, 1) => @PLACE(2, 5) }",
@@ -131,7 +130,7 @@ fn in_a_symbol_body_the_later_pin_and_place_win() {
     ]);
     let lv = &r.model.levels[0];
     let pins = &lv.symbols[item(&r, "#R4").symbol].pins;
-    assert_eq!(pins.iter().find(|p| p.terminals == ["1"]).unwrap().label.as_deref(), Some("b"));
+    assert_eq!(pins.iter().rfind(|p| p.terminals == ["1"]).unwrap().label.as_deref(), Some("b"));
     let name =
         lv.texts.iter().find(|t| t.key.as_deref() == Some("name") && t.attach.as_deref() == Some("#R4")).unwrap();
     assert_eq!(name.anchor, (22.0, 5.0));

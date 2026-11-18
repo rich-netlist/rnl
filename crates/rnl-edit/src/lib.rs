@@ -32,7 +32,6 @@ pub use error::{Refusal, Written};
 pub mod form;
 pub mod ops;
 pub mod replace;
-pub mod upgrade;
 
 use std::collections::BTreeMap;
 
@@ -46,8 +45,8 @@ use serde_json::Value;
 
 pub use ops::{LevelOp, Op, RuleAction};
 
-/// The language version the header record declares: the toolkit's default (16.1).
-pub const VERSION: &str = "0.3";
+/// The language version the header record declares, the only one this writer writes (16.1).
+pub const VERSION: &str = "0.4";
 
 /// The longest line written, comment marker included (4.3).
 pub const LINE: usize = 132;
@@ -55,7 +54,7 @@ pub const LINE: usize = 132;
 /// What to write: a netlist, its dialect, and the ops of one author.
 #[derive(Deserialize, Debug, Clone)]
 pub struct WriteRequest {
-    /// Explicit language opt-in. None retains the released writer default.
+    /// The language version to write, which can only be 0.4, [`VERSION`]; None writes it too.
     #[serde(default)]
     pub language_version: Option<String>,
     /// "spice" or "spectre".
@@ -112,10 +111,13 @@ pub fn write_diagnosed(request: &WriteRequest) -> Result<Written, Refusal> {
 
 fn write_in(request: &WriteRequest, files: Option<&dyn rnl_runtime::source::Provider>) -> Result<Written, Refusal> {
     let version = request.language_version.as_deref().unwrap_or(VERSION);
-    if !["0.3", "0.4"].contains(&version) {
+    if version != VERSION {
         return Err(Refusal::new(
             codes::EDIT_FIELD_INVALID,
-            format!("unsupported output language version `{version}`"),
+            format!(
+                "unsupported output language version `{version}`: this writer writes only {VERSION}; core 0.5.7 \
+                 writes 0.3"
+            ),
         ));
     }
     let dialect = request.dialect.as_str();
@@ -143,32 +145,22 @@ fn write_in(request: &WriteRequest, files: Option<&dyn rnl_runtime::source::Prov
             format!("dialect \"{dialect}\" is not {}", names.join(" or ")),
         ));
     }
-    let ops: Vec<LevelOp> = request
-        .ops
-        .iter()
-        .enumerate()
-        .map(|(k, v)| ops::parse_for_language(k, v, request.language_version.as_deref() == Some("0.4")))
-        .collect::<Result<_, _>>()?;
+    let ops: Vec<LevelOp> =
+        request.ops.iter().enumerate().map(|(k, v)| ops::parse_diagnosed(k, v)).collect::<Result<_, _>>()?;
 
     for op in &ops {
         match &op.op {
-            Op::AddText { text, rotate, style, .. } => {
-                form::check_math_content(text, version).map_err(|e| Refusal::new(codes::EDIT_FIELD_INVALID, e))?;
-                if version != "0.4" && rotate.is_some_and(|r| ![0.0, 90.0, 180.0, 270.0].contains(&r)) {
-                    return Err(Refusal::new(
-                        codes::EDIT_FIELD_INVALID,
-                        "arbitrary TEXT rotation requires language_version 0.4",
-                    ));
-                }
+            Op::AddText { text, style, .. } => {
+                form::check_math_content(text).map_err(|e| Refusal::new(codes::EDIT_FIELD_INVALID, e))?;
                 for (name, value) in style {
-                    if name == "textvisible" && (version != "0.4" || !matches!(value, ops::Literal::Bool(_))) {
+                    if name == "textvisible" && !matches!(value, ops::Literal::Bool(_)) {
                         return Err(Refusal::new(codes::EDIT_FIELD_INVALID, "textvisible requires a 0.4 boolean"));
                     }
                 }
             }
             Op::AddRule { action: ops::RuleAction::Text(action), .. } => {
                 if let Op::AddText { text, style, .. } = &**action {
-                    form::check_math_content(text, version).map_err(|e| Refusal::new(codes::EDIT_FIELD_INVALID, e))?;
+                    form::check_math_content(text).map_err(|e| Refusal::new(codes::EDIT_FIELD_INVALID, e))?;
                     for (name, value) in style {
                         if name == "textvisible" && !matches!(value, ops::Literal::Bool(_)) {
                             return Err(Refusal::new(codes::EDIT_FIELD_INVALID, "textvisible requires a 0.4 boolean"));
@@ -179,32 +171,11 @@ fn write_in(request: &WriteRequest, files: Option<&dyn rnl_runtime::source::Prov
             Op::DefineSymbol { pins, .. } => {
                 for pin in pins {
                     if let Some(label) = &pin.label {
-                        form::check_math_content(label, version)
-                            .map_err(|e| Refusal::new(codes::EDIT_PIN_INVALID, e))?;
+                        form::check_math_content(label).map_err(|e| Refusal::new(codes::EDIT_PIN_INVALID, e))?;
                     }
                 }
             }
             _ => {}
-        }
-    }
-
-    if version != "0.4" {
-        for op in &ops {
-            if matches!(&op.op, Op::AddText { fix_rotate: Some(_), .. }) {
-                return Err(Refusal::new(codes::EDIT_FIELD_INVALID, "fix_rotate requires language_version 0.4"));
-            }
-            if matches!(&op.op, Op::AddText { upright: Some(_), .. }) {
-                return Err(Refusal::new(codes::EDIT_FIELD_INVALID, "upright requires language_version 0.4"));
-            }
-            if let Op::DefineSymbol { pins, .. } = &op.op {
-                if pins.iter().any(|p| p.terminals.is_empty() || !p.names.is_empty() || p.bus && p.terminals.len() == 1)
-                {
-                    return Err(Refusal::new(
-                        codes::EDIT_PIN_INVALID,
-                        "independent pin names, unbound pins and one-terminal bus pins require language_version 0.4",
-                    ));
-                }
-            }
         }
     }
 
@@ -213,19 +184,15 @@ fn write_in(request: &WriteRequest, files: Option<&dyn rnl_runtime::source::Prov
     let mut read = |text: &str| {
         let memory = MemoryProvider::new().with(&path, text);
         let mut layers: Vec<&dyn rnl_runtime::source::Provider> = vec![&memory];
-        // Modern writes read includes from the caller's workspace too.
-        if version == "0.4" {
-            layers.extend(files);
-        }
+        // the includes are read from the caller's workspace too
+        layers.extend(files);
         let source = rnl_runtime::source::Layered { layers };
-        // Each modern read reports the source it just checked, without stale locations
-        // from the input before the header or the requested records were inserted.
-        if version == "0.4" {
-            sink = Sink::new();
-        }
+        // each read reports the source it just checked, without stale locations from the input
+        // before the header or the requested records were inserted
+        sink = Sink::new();
         let doc = rnl_view::read_host(&path, Some(dialect), &source, &mut sink);
         let doc = match doc {
-            Ok(doc) if version == "0.4" => {
+            Ok(doc) => {
                 let (doc, checked) =
                     rnl_runtime::interp::resolve_host_diagnostics(doc, version, std::mem::take(&mut sink));
                 sink = checked;
@@ -233,9 +200,7 @@ fn write_in(request: &WriteRequest, files: Option<&dyn rnl_runtime::source::Prov
             }
             other => other,
         };
-        if version == "0.4" {
-            refuse_host_errors(&sink)?;
-        }
+        refuse_host_errors(&sink)?;
         doc.map_err(|message| Refusal {
             code: codes::VIEW_CANNOT_READ,
             message,
@@ -313,11 +278,7 @@ fn write_in(request: &WriteRequest, files: Option<&dyn rnl_runtime::source::Prov
             }
             _ => None,
         };
-        let mut written = if version == "0.4" {
-            form::statements_for_language(&lop.op, style.as_deref(), None, true)
-        } else {
-            form::statements(&lop.op, style.as_deref())
-        };
+        let mut written = form::statements_with_junction(&lop.op, style.as_deref(), None);
         if matches!(lop.op, Op::AddRule { .. }) {
             let seen = rules.entry(level).or_default();
             written.retain(|statement| seen.insert(statement.clone()));
@@ -390,7 +351,7 @@ pub fn write_with_options_diagnosed(
 ) -> Result<Written, Refusal> {
     let mut written = write_in(request, Some(files))?;
     let text = &written.text;
-    if !options.include_std || request.language_version.as_deref() != Some("0.4") {
+    if !options.include_std {
         return finish_write(request, written, files, options);
     }
     let entry = entry_of(request);
@@ -430,9 +391,6 @@ fn finish_write(
 ) -> Result<Written, Refusal> {
     let host_count = written.diagnostics.len();
     let mut written = add_junctions(request, written, files, options)?;
-    if request.language_version.as_deref() != Some("0.4") {
-        return Ok(written);
-    }
     let extra = written.diagnostics.split_off(host_count);
     let path = entry_of(request);
     let memory = MemoryProvider::new().with(&path, &written.text);
@@ -443,7 +401,7 @@ fn finish_write(
         message,
         diagnostics: error::diagnostics(&sink),
     })?;
-    let (_, sink) = rnl_runtime::interp::resolve_host_diagnostics(doc, "0.4", sink);
+    let (_, sink) = rnl_runtime::interp::resolve_host_diagnostics(doc, VERSION, sink);
     refuse_host_errors(&sink)?;
     written.diagnostics = error::diagnostics(&sink);
     written.diagnostics.extend(extra);
@@ -458,15 +416,8 @@ fn add_junctions(
     files: &dyn rnl_runtime::source::Provider,
     options: &rnl_runtime::Options,
 ) -> Result<Written, Refusal> {
-    if request.language_version.as_deref() != Some("0.4") {
-        return Ok(written);
-    }
-    let ops: Vec<_> = request
-        .ops
-        .iter()
-        .enumerate()
-        .map(|(k, v)| ops::parse_for_language(k, v, request.language_version.as_deref() == Some("0.4")))
-        .collect::<Result<_, _>>()?;
+    let ops: Vec<_> =
+        request.ops.iter().enumerate().map(|(k, v)| ops::parse_diagnosed(k, v)).collect::<Result<_, _>>()?;
     if !ops.iter().any(|op| matches!(op.op, Op::AddPoint { junction: true, .. })) {
         return Ok(written);
     }
