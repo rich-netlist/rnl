@@ -80,7 +80,10 @@ The configurable drawing objectives include `overlaps`, `crowding`, `misleading`
 and `wire_over_symbol`. For 0.4, only configured objectives rank candidates, after
 one fixed key: false joins, the wires that run along another net's pin or through a
 symbol and so read as connected where they are not, count first, whether or not
-those objectives are configured. In the lines layout they rank right after the
+those objectives are configured. This ranks the drawings the search compares; it does not rule
+out a false join. Where the router's search for a net runs out, by `astar_expansions` or the
+level's budget, the net is still joined, by straight runs whatever they pass, and the drawing
+taken can then have a false join where a larger budget would have routed around it. In the lines layout they rank right after the
 facts that must hold, above broken low-priority facts. There the
 group tree ranks its arrangements by the line layout's own order (`lines_order` of the
 [settings table](solver-settings-table.md)): the configured objectives, then the pins
