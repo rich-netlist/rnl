@@ -884,6 +884,22 @@ C1 a 0 1p
     }
 
     #[test]
+    fn a_file_of_0_2_or_0_3_is_not_read() {
+        for version in ["0.2", "0.3"] {
+            let text = format!(
+                "* t\nR1 a b 1k\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\n* @RNL {{ #R1 @PLACE(3x, 4) }}\n.end\n"
+            );
+            let v = answer(json!({ "entry": "t.sp", "files": { "t.sp": text } }));
+            let d = v["document"]["diagnostics"].as_array().unwrap();
+            // one error, at the declaration; the record after it is not read
+            assert_eq!(d.iter().filter(|d| d["severity"] == "error").count(), 1, "{v}");
+            let error = d.iter().find(|d| d["severity"] == "error").unwrap();
+            assert_eq!(error["line"], 3, "{v}");
+            assert!(error["message"].as_str().unwrap().contains("`rnl upgrade`"), "{v}");
+        }
+    }
+
+    #[test]
     fn a_request_can_ask_for_a_version_of_the_standard_package() {
         // a file of 0.3 that writes $GND of the series 0.2: an error, unless the request asks for it
         let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\n* @RNL { $GND @ATTACH &a }\n.end\n";

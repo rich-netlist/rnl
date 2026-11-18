@@ -91,6 +91,15 @@ test("a lone surrogate becomes U+FFFD, as TextEncoder makes it", () => {
   assert.equal(core.build({ entry: "a.sp", files: { "a.sp": kept } }).files[0].text, kept);
 });
 
+test("a file of 0.3 is not read, and the error says how to convert it", () => {
+  const text = '* t\nR1 a b 1k\n* @RNL(type="header") { @VERSION("0.3") }\n* @RNL { #R1 @PLACE(3x, 4) }\n.end\n';
+  const d = core.build({ entry: "t.sp", files: { "t.sp": text } });
+  const errors = d.diagnostics.filter((x) => x.severity === "error");
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].line, 3);
+  assert.match(errors[0].message, /^unsupported version 0\.3: .*`rnl upgrade` writes the file in 0\.4$/);
+});
+
 test("the same request gives the same Document every time", async () => {
   const path = resolve(here, "../../../tests/conformance/cases/16-ties.sp");
   const request = { entry: "/w/16-ties.sp", files: { "/w/16-ties.sp": await readFile(path, "utf8") } };

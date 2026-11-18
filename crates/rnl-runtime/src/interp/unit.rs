@@ -42,13 +42,31 @@ pub(crate) fn declared_record_version(text: &str) -> Option<(String, usize)> {
     }
 }
 
-/// The versions of the language this implementation reads (16.1): 0.2, 0.3, and 0.4, whose text
-/// is still a draft. Every rule that 0.3 changes applies to the files of 0.3 and of the
-/// versions after it ([`keeps_0_3`]), so a file of 0.2 reads as it did before 0.3 was read.
-pub const READ_VERSIONS: [&str; 3] = ["0.2", "0.3", "0.4"];
+/// The versions of the language this implementation reads (16.1): 0.4 only. A file of 0.2 or 0.3
+/// is a file of a version it does not read, none of whose RNL is interpreted; the cores of 0.5.x
+/// read those versions, and their `rnl upgrade` writes such a file in 0.4 ([`unsupported_version`]).
+pub const READ_VERSIONS: [&str; 1] = ["0.4"];
 /// The version a main file, or a package file, without a header record is read in: the tool's
 /// default (16.1). An included file without one follows the file that includes it.
-pub const DEFAULT_VERSION: &str = "0.3";
+pub const DEFAULT_VERSION: &str = "0.4";
+
+/// The versions that the cores of 0.5.x read and this one does not: a file of one of them is
+/// written in 0.4 by `rnl upgrade` of core 0.5.6 (`core-v0.5.6`), the last core that reads them.
+pub const EARLIER_VERSIONS: [&str; 2] = ["0.2", "0.3"];
+
+/// The error of a file whose version this implementation does not read (16.1): none of its RNL is
+/// interpreted. A file of 0.2 or 0.3 is told how to convert it.
+pub fn unsupported_version(version: &str) -> String {
+    let reads = read_versions();
+    let mut message =
+        format!("unsupported version {version}: no RNL of this file is interpreted (16.1; this implementation reads {reads})");
+    if EARLIER_VERSIONS.contains(&version) {
+        message.push_str(&format!(
+            "; core 0.5.6 reads {version}, and its `rnl upgrade` writes the file in {DEFAULT_VERSION}"
+        ));
+    }
+    message
+}
 
 /// Does a file of the language version `version` keep the rules that 0.3 changes? 0.3 and every
 /// version after it that this implementation reads do, by the order of versions (16.1); 0.2 does
@@ -741,11 +759,7 @@ impl Interp<'_> {
                         self.doc.levels[lv].section_lines.map_or(1, |(start, _)| start + 1),
                     )
                 });
-                let reads = read_versions();
-                self.sink.error(codes::VERSION_UNSUPPORTED,
-                    format!("unsupported version {version}: no RNL of this file is interpreted (16.1; this implementation reads {reads})"),
-                    Some(loc),
-                );
+                self.sink.error(codes::VERSION_UNSUPPORTED, unsupported_version(&version), Some(loc));
             }
         }
     }
@@ -1441,13 +1455,7 @@ impl Interp<'_> {
                     };
                     self.units[u].version = v.clone();
                     if version_key(v).0 < 0 || !READ_VERSIONS.contains(&v.as_str()) {
-                        let reads = read_versions();
-                        self.diag_in(
-                            Severity::Error,
-                            codes::VERSION_UNSUPPORTED, format!("unsupported version {v}: no RNL of this file is interpreted (16.1; this implementation reads {reads})"),
-                            Some(loc),
-                            &pkg,
-                        );
+                        self.diag_in(Severity::Error, codes::VERSION_UNSUPPORTED, unsupported_version(v), Some(loc), &pkg);
                         self.units[u].ok = false;
                     }
                 }

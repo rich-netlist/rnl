@@ -127,9 +127,45 @@ fn a_version_that_is_not_read_is_unsupported() {
     // no RNL of the file is read (16.1)
     let (code, out) = rnl(&["check", &f]);
     assert_eq!(code, 1, "{out}");
-    let message =
-        "unsupported version 9.9: no RNL of this file is interpreted (16.1; this implementation reads 0.2, 0.3 and 0.4)";
+    let message = "unsupported version 9.9: no RNL of this file is interpreted (16.1; this implementation reads 0.4)";
     assert!(out.contains(message), "{out}");
+    // a version that no core read is not told to upgrade
+    assert!(!out.contains("rnl upgrade"), "{out}");
+}
+
+#[test]
+fn a_file_of_0_2_or_0_3_is_not_read_and_is_told_how_to_upgrade() {
+    for version in ["0.2", "0.3"] {
+        let f = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("version-{version}.sp"));
+        // the record on line 4 would be an error if it were read: a number with a suffix
+        let text = format!(
+            "* a file of {version}\nR1 a b 1k\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\")}}\n* @RNL {{ #R1 @PLACE(3x, 4)}}\n.end\n"
+        );
+        std::fs::write(&f, text).unwrap();
+        let f = f.to_string_lossy();
+        let (code, out) = rnl(&["check", &f]);
+        assert_eq!(code, 1, "{out}");
+        // the error is at the declaration, on line 3, and names the core that converts the file
+        let message = format!(
+            "unsupported version {version}: no RNL of this file is interpreted (16.1; this implementation reads 0.4); \
+             core 0.5.6 reads {version}, and its `rnl upgrade` writes the file in 0.4"
+        );
+        assert!(out.contains(&message), "{out}");
+        assert!(out.contains(":3:"), "{out}");
+        // it is not read as 0.4 either: the number with a suffix is no error
+        assert!(!out.contains("RNL1"), "{out}");
+    }
+}
+
+#[test]
+fn a_main_file_without_a_header_record_reads_in_0_4() {
+    let f = Path::new(env!("CARGO_TARGET_TMPDIR")).join("no-header-0.4.sp");
+    // TEXT(rotate=...) with an arbitrary angle is a rule of 0.4
+    let text = "* no header\nR1 a b 1k\n* @RNL { (0,0) @TEXT(\"t\", rotate=30) }\n.end\n";
+    std::fs::write(&f, text).unwrap();
+    let (code, out) = rnl(&["check", &f.to_string_lossy()]);
+    assert_eq!(code, 0, "{out}");
+    assert!(out.contains("it is read in the tool's default version 0.4"), "{out}");
 }
 
 #[test]
