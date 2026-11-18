@@ -76,6 +76,9 @@ XEA y x vg opamp
 *   /* the first two branches and the op-amp form the core */
 *   %core_group = {%x_branch #XEA %y_branch} @GROUP;
 *
+*   /* the output of the op-amp points up, to the gates of the mirror */
+*   %xea_output_up = #XEA:out @ORIENT("up");
+*
 *   /* the supply source is turned */
 *   %supply_orient = {#VDD} @ORIENT("R0");
 * }
