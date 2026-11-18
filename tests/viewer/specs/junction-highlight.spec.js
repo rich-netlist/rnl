@@ -1,10 +1,10 @@
 // A junction dot the solver writes stands for the net of the wires it joins (#634): its box hit carries
 // [usage, net], so that selecting the net lights its dots up with its wires, and selecting a dot lights
-// the dot alone. The T3 OTA's own level has four of them: one on out, two on x and one on tail.
+// the dot alone. The five-transistor OTA's own level has six of them: one on out, two on nb, one on tail and two on x.
 
 import { expect, test } from "../viewer.js";
 
-const NETS = { out: 1, x: 2, tail: 1 };
+const NETS = { out: 1, nb: 2, tail: 1, x: 2 };
 
 /** The junction dots of the level shown: [the group id of the dot, its usage's name, its net's name] each, by position in the file. */
 function dots(page) {
@@ -13,13 +13,13 @@ function dots(page) {
     return doc.levels[window.viewer.level].hits
       .filter((h) => h.kind === "box" && h.id && h.objects.length === 2 && doc.objects[h.objects[0]].kind === "usage" && doc.objects[h.objects[1]].kind === "net")
       .map((h) => [h.id, doc.objects[h.objects[0]].name, doc.objects[h.objects[1]].name])
-      .filter(([, usage]) => /^@T3-ota5t\.sp:\d+:\d+$/.test(usage));
+      .filter(([, usage]) => /^@ota5t\.scs:\d+:\d+$/.test(usage));
   });
 }
 
 for (const platform of ["web", "desktop"]) {
   test(`${platform}: selecting a net lights the junction dots on it, and selecting a dot lights it alone`, async ({ page, viewer }) => {
-    await viewer.open("T3-ota5t-solved", { platform });
+    await viewer.open("ota5t-solved", { platform });
     await page.locator("#tab-hierarchy").click();
     await page.locator("#index .index-row:not(.top)", { hasText: "ota5t" }).click();
     await page.locator("#tab-netlist").click();

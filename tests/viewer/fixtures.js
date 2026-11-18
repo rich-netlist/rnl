@@ -66,13 +66,13 @@ export const PREVIEWS = ["T4-miller-conflicts", "04-hierarchy"];
 const PREVIEW_LIMITS = { "T4-miller-conflicts": ["--solver-config", 'limit="work",work=100000000'] };
 
 /**
- * The fixtures of netlists that only a solver draws, and the files of tests/integration/solver they
- * are built from: `rnl solve` solves each file into the fixtures' directory, and the fixture is
- * `rnl view` of the file solved, with the records of the solver it wrote.
+ * The fixtures of netlists that only a solver draws: the reviewed cases of 0.4 as `rnl solve` wrote
+ * them, within a fixed work, into tests/integration/solver-0.4/solved, the same on every machine. The
+ * fixture is `rnl view` of the file solved, with the records of the solver it holds.
  */
 export const SOLVED = {
-  "T2-common-source-solved": "tests/integration/solver/T2-common-source.sp",
-  "T3-ota5t-solved": "tests/integration/solver/T3-ota5t.sp",
+  "cs-amplifier-solved": "tests/integration/solver-0.4/solved/cs-amplifier.sp",
+  "ota5t-solved": "tests/integration/solver-0.4/solved/ota5t.scs",
 };
 
 /** The subcircuits of the "subcircuits" fixture: two under M, one under each other initial, and one under #. */
@@ -337,8 +337,8 @@ function view(rnl, file, cwd) {
  * "continued" and "continued-spectre", the netlists of CONTINUED; "edit", "edit-changed", the
  * same file after the edit, and "edit-crlf", the same with CRLF line ends, from EDITED; "unicode",
  * the netlist of UNICODE; the netlists of UNCALLED; "unplaced", the netlist of UNPLACED; "pick", the netlist of PICK; "long", a title, LONG lines of a bare
- * `*`, R1, a record that places it and `.end`; and those of SOLVED, from the files that `rnl solve`
- * writes under `solved` in `dir`; and those of PREVIEWS.
+ * `*`, R1, a record that places it and `.end`; and those of SOLVED, from the files `rnl solve` wrote;
+ * and those of PREVIEWS.
  */
 export function writeFixtures(rnl, dir) {
   const semantic = ['* large semantic file', 'R1 a 0 1k', '* @RNL { #R1 is here @PLACE(0, 0) }',
@@ -452,10 +452,7 @@ export function writeFixtures(rnl, dir) {
     fs.writeFileSync(path.join(dir, `${name}-constraints.json`), constrained);
   }
 
-  const solved = path.join(dir, "solved");
   for (const [name, file] of Object.entries(SOLVED)) {
-    // what the solver prints of each level is not needed; it fails, and the setup with it, on an error
-    execFileSync(rnl, ["solve", file, "-o", solved], { cwd: root, encoding: "utf8", maxBuffer: 1 << 26 });
-    fs.writeFileSync(path.join(dir, `${name}.json`), view(rnl, path.basename(file), solved));
+    fs.writeFileSync(path.join(dir, `${name}.json`), view(rnl, path.basename(file), path.join(root, path.dirname(file))));
   }
 }
