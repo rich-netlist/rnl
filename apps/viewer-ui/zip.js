@@ -50,11 +50,15 @@ export function archiveNames(paths) {
   });
 }
 
-/** Entries have { path, read }, whose reader returns a string, Blob or Uint8Array. */
-export async function libraryZip(files) {
+/**
+ * Entries have { path, read }, whose reader returns a string, Blob or Uint8Array. Their paths are made names in the
+ * archive (`archiveNames`); with `named`, they are such names already, made once (a project's, which its manifest
+ * names too), and are written as they are: a name with `%` in it is not encoded again.
+ */
+export async function libraryZip(files, { named = false } = {}) {
   if (files.length >= 65535) throw new Error("The library has too many files for a ZIP archive (maximum 65534).");
   const bodies = [], directory = [];
-  const names = archiveNames(files.map(file => file.path));
+  const names = named ? files.map(file => file.path) : archiveNames(files.map(file => file.path));
   let offset = 0, directorySize = 0;
   for (const [index, file] of files.entries()) {
     const name = names[index];

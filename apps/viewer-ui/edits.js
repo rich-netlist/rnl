@@ -2,9 +2,13 @@
 // read, the last saved snapshot, what the editor holds now, and what the Document was built from. The editor
 // (editor.js) changes the text; a change is not applied to the Document until the user says so, and
 // not saved to the file until the user says that. Text is kept with its line ends as `\n`, as a text
-// box gives it, and written with the line ends the file had.
+// box gives it, and written with the line ends the file had: each line the edit leaves as it was with its own, a
+// line written in the place of one with that one's, and a line added with the one the file has most of.
 
-/** @type {Map<string, { name: string, original: string, base: string, text: string, applied: string, eol: string }>} */
+/**
+ * @type {Map<string, { name: string, original: string, base: string, text: string, applied: string, eol: string,
+ *   ends: string[] }>}
+ */
 const buffers = new Map(); // by the file's path in the Document
 
 /** A text with its line ends as `\n`. */
@@ -17,14 +21,38 @@ function eolOf(text) {
   return crlf > bare ? "\r\n" : "\n";
 }
 
+/** The line ends of a text, in their order: `\r\n`, `\n` or `\r`, one for each line but the last. */
+const endsOf = (text) => text.match(/\r\n|\r|\n/g) ?? [];
+
 /** A buffer for a file of a Document, whose text is as it was read. */
 function add(file) {
   const text = lf(file.text);
-  buffers.set(file.path, { name: file.name, original: text, base: text, text, applied: text, eol: eolOf(file.text) });
+  buffers.set(file.path, { name: file.name, original: text, base: text, text, applied: text, eol: eolOf(file.text), ends: endsOf(file.text) });
 }
 
-/** The text of a buffer as a file has it: with the line ends the file had. */
-const written = (b, text) => (b.eol === "\n" ? text : text.replace(/\n/g, b.eol));
+/**
+ * The text of a buffer as a file has it: with the line ends the file had (`ends`, those of `original`). The lines
+ * before the first one changed and after the last keep their own; each line between has the end of the line between it
+ * replaces, the first the first's and so on, and those past them the end the file has most of (`eol`).
+ */
+function written(b, text) {
+  if (b.ends.every((end) => end === b.eol)) return b.eol === "\n" ? text : text.replace(/\n/g, b.eol);
+  const lines = text.split("\n");
+  const was = b.original.split("\n");
+  let head = 0;
+  while (head < lines.length - 1 && head < was.length - 1 && lines[head] === was[head]) head++;
+  let tail = 0;
+  while (tail < lines.length - 1 - head && tail < was.length - 1 - head && lines[lines.length - 1 - tail] === was[was.length - 1 - tail]) tail++;
+  let out = "";
+  for (let k = 0; k < lines.length; k++) {
+    out += lines[k];
+    if (k === lines.length - 1) break;
+    // (a line between: the k-th of them has the end of the k-th line it replaces, while there is one)
+    const from = lines.length - 1 - k <= tail ? k - lines.length + was.length : k < was.length - tail ? k : -1;
+    out += b.ends[from] ?? b.eol;
+  }
+  return out;
+}
 
 /** A Document built from the files as they are on disk: nothing is edited. */
 export function resetBuffers(doc) {
@@ -119,7 +147,9 @@ export function markSaved(files, writtenToSource) {
   for (const file of files) {
     const b = buffers.get(file.path);
     if (b) {
+      // (the text as the file has it now: its line ends are those of the file)
       b.original = lf(file.text);
+      b.ends = endsOf(file.text);
       if (writtenToSource) b.base = b.original;
     }
   }

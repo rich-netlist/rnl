@@ -34,6 +34,19 @@ async function bytesOf(value) {
   return value instanceof Uint8Array ? value : new Uint8Array(value);
 }
 
+/**
+ * The reader of a Library file whose text, an edit's, is written in the encoding of the file on the desktop's disk
+ * (`shell.encodeLike`: Latin-1, UTF-8 with or without its byte order mark, as Save keeps it); a file's own bytes are
+ * kept as they are. Text that has no file on disk, or that its encoding cannot hold, is written in UTF-8.
+ */
+function inOwnEncoding(file) {
+  return async () => {
+    const value = await file.read();
+    if (typeof value !== "string" || file.path.startsWith("<")) return value;
+    try { return await shell.encodeLike(file.path, value); } catch { return value; }
+  };
+}
+
 /** The level shown, as a manifest names it: a subcircuit's name, or "(top)". */
 function levelName() {
   const level = doc?.levels[current];
@@ -82,7 +95,8 @@ function projectContents() {
   const items = snapshot.items.filter((item) => !item.builtin);
   const edited = (path) => (hasBuffer(path) ? fileText(path) : null);
   const files = libraryFiles({ items, temporary: snapshot.temporary }, source, doc, edited, changes(false), shell.readFile)
-    .filter((file) => !file.path.startsWith("<bundled>"));
+    .filter((file) => !file.path.startsWith("<bundled>"))
+    .map((file) => (shell.encodeLike ? { ...file, read: inOwnEncoding(file) } : file));
   const external = source.external;
   if (external) {
     for (const [path, text] of Object.entries(external.files)) {
@@ -138,7 +152,8 @@ async function projectZip(contents) {
   const manifest = await writeManifest({ archive: true, entry: contents.entry, files, pool: contents.pool, formats: contents.formats,
     level: contents.level, paths: contents.paths, settings: contents.settings, display: contents.display });
   const json = `${JSON.stringify(manifest, null, 2)}\n`;
-  return libraryZip([{ path: PROJECT_MANIFEST, read: () => json }, ...files.map((f) => ({ path: f.path, read: () => f.bytes }))]);
+  // (the names are those of the manifest, made once by archiveNames: the archive writes them as they are)
+  return libraryZip([{ path: PROJECT_MANIFEST, read: () => json }, ...files.map((f) => ({ path: f.path, read: () => f.bytes }))], { named: true });
 }
 
 /**

@@ -30,7 +30,10 @@ test("desktop: Save Project keeps paths relative to the files' directory, PATH c
   const dir = entry.slice(0, entry.lastIndexOf("/"));
   const extra = `${dir}/lib/extra.inc`;
   await page.evaluate(async ({ extra }) => {
-    window.fakeShell.disk = { [extra]: "* extra\n", "Z:/pdk/a.rnl": "* a\n", "Z:/pdk/1.0/b.rnl": "* b\n" };
+    // the netlist's own files are on the disk too: an unedited file is archived as its bytes there
+    const { sourcePath } = await import("./source-path.js");
+    const own = Object.fromEntries(window.viewer.doc.files.map((f) => [sourcePath(window.viewer.doc, f), f.text]));
+    window.fakeShell.disk = { ...own, [extra]: "* extra\n", "Z:/pdk/a.rnl": "* a\n", "Z:/pdk/1.0/b.rnl": "* b\n" };
     const { restorePool } = await import("./pool.js");
     await restorePool([{ path: extra, name: extra, source: { path: extra, name: extra } }]);
     await (await import("./formats.js")).chooseFormat(extra, "spectre");
