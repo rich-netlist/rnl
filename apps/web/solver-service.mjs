@@ -6,7 +6,9 @@
 //   GET  /rnl-solver/table  what `rnl solver-defaults --json` prints: the table of the solver's settings
 //                           (docs/solver-settings-table.md), which the page's settings dialog is drawn from
 //   POST /rnl-solver/check  {"config"}  ->  what `rnl solve --check --json` prints of those settings, with no file
-//   POST /rnl-solver/solve  {"entry", "files", "pool", "config", "timeall", "level", "respace"}  ->  {"document", "report"}
+//   POST /rnl-solver/solve  {"entry", "files", "pool", "formats", "config", "timeall", "level", "respace"}  ->  {"document", "report"}
+//     "formats": the format set for each file by its path, such as "spectre", as the page opened the netlist with: each
+//     is given to `rnl preview` as `--format PATH=NAME`, so the solve reads the files as the page did.
 //     "timeall": the seconds that all levels of a time limit share, `rnl preview --timeall`; none for each level's own.
 //     "respace": each level as the record of the solver in the file last drew it, spaced again as the settings say,
 //     nothing searched (`rnl preview --respace`, docs/solver-respace.md); the report says its mode. Not with "timeall".
@@ -21,7 +23,9 @@
 // there, as the desktop viewer solves (decision 0010), and gives what it prints: the Document of the
 // netlist as solved, with its constraints, and the report of what became of each fact. The directory is
 // removed afterwards.
-// Nothing is written but there, and the `rnl` that runs is the one named when the server started.
+// Nothing is written but there, and the `rnl` that runs is the one named when the server started. It reads nothing but
+// there either (`--confine`): a file the netlist names outside the files the page sent, such as an include by an
+// absolute path, is not found, as it is not in the browser.
 //
 // The service answers only the page of this server: the Host must be this computer's address and port,
 // the Origin, when there is one, the server's own, and the body JSON, which another site cannot send
@@ -30,7 +34,7 @@
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, posix, resolve } from "node:path";
+import { dirname, join, posix, relative, resolve } from "node:path";
 
 /** The most the page may send in one solve. */
 const MAX_BODY = 512 * 1024 * 1024;
@@ -109,7 +113,7 @@ function isEvent(line) {
  * `--solver-config` takes them, the server's first; `level` is the title of the one level to solve. `onEvent` is given the events of the solve, as lines of JSON, as they come.
  */
 export async function solve({ rnl, prefix = [], work, request, defaults, signal, onEvent }) {
-  const { entry, files, pool = [], config = "", timeall = null, level = null, respace = false } = request;
+  const { entry, files, pool = [], formats = {}, config = "", timeall = null, level = null, respace = false } = request;
   if (timeall !== null && !(typeof timeall === "number" && Number.isFinite(timeall) && timeall > 0)) throw new Error("timeall must be a positive number of seconds");
   const entryPath = insidePath(entry);
   if (!entryPath || !files || typeof files !== "object" || typeof files[entry] !== "string") throw new Error("the request has no entry file");
@@ -132,7 +136,14 @@ export async function solve({ rnl, prefix = [], work, request, defaults, signal,
       }
     }
     const solverConfig = joinConfig(defaults, config);
-    const common = [posix.basename(entryPath)];
+    const cwd = resolve(dir, dirname(entryPath));
+    const common = [posix.basename(entryPath), "--confine", dir];
+    // the formats of the files sent, each by its path from the entry's directory, where rnl runs
+    for (const [path, name] of Object.entries(formats && typeof formats === "object" ? formats : {})) {
+      const inside = insidePath(path);
+      if (inside === null || typeof files[path] !== "string" || typeof name !== "string" || !/^[A-Za-z0-9_.-]+$/.test(name)) continue;
+      common.push("--format", `${relative(cwd, resolve(dir, inside)).replaceAll("\\", "/")}=${name}`);
+    }
     for (const d of packageDirs) common.push("--package-dir", d);
     for (const d of searchDirs) common.push("--path", d);
     if (solverConfig) common.push("--solver-config", solverConfig);
@@ -140,7 +151,6 @@ export async function solve({ rnl, prefix = [], work, request, defaults, signal,
     if (timeall !== null) common.push("--timeall", String(timeall));
     if (respace === true) common.push("--respace");
     if (onEvent) common.push("--progress=json");
-    const cwd = resolve(dir, dirname(entryPath));
     return await run(rnl, prefix, ["preview", ...common], cwd, signal, onEvent);
   } finally {
     await rm(dir, { recursive: true, force: true });

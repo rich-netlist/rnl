@@ -4,9 +4,10 @@
 //!   GET  /rnl-solver/table  the table of the solver's settings (docs/solver-settings-table.md), which the page's settings
 //!                           dialog is drawn from: what `rnl solver-defaults --json` prints
 //!   POST /rnl-solver/check  {"config"}  ->  what `rnl solve --check --json` prints of those settings, with no file
-//!   POST /rnl-solver/solve  {"entry", "files", "pool", "config", "timeall", "level", "respace", "stream"}  ->  {"document", "report"}
+//!   POST /rnl-solver/solve  {"entry", "files", "pool", "formats", "config", "timeall", "level", "respace", "stream"}  ->  {"document", "report"}
 //!
 //! `config` is the settings that differ from the defaults, as RNL named parameters, as `--solver-config` takes them.
+//! `formats` is the format set for each file, by its path, as the page read the netlist with (`rnl --format`).
 //!
 //! `level` is the title of the one level to solve (`rnl solve --level`), none for every level. With `"stream": true` the
 //! answer is lines of JSON (`application/x-ndjson`): the events of the solve as they happen (docs/solver-progress.md), then
@@ -39,6 +40,10 @@ pub struct Request {
     /// The paths of the files of the Library among them: the packages by name, the includes by path.
     #[serde(default)]
     pub pool: Vec<String>,
+    /// The format set for each file by its path, such as `spectre`, as the page opened it with: the solve reads the files
+    /// as the page did (`rnl --format`).
+    #[serde(default)]
+    pub formats: BTreeMap<String, String>,
     /// The solver's settings, written as RNL named parameters as `rnl solve --solver-config` takes them.
     #[serde(default)]
     pub config: String,
@@ -130,7 +135,19 @@ pub fn prepare(request: &Request) -> Result<Prepared, String> {
     if request.timeall.is_some_and(|s| !s.is_finite() || s <= 0.0) {
         return Err("timeall must be a positive number of seconds".into());
     }
-    let options = SolveOptions { solver, level, total_seconds: request.timeall, ..SolveOptions::default() };
+    // (the formats of the files the request has; a name the core does not know is its error, as the page's build was)
+    let formats = request
+        .formats
+        .iter()
+        .filter(|(path, _)| request.files.contains_key(*path))
+        .map(|(p, f)| (p.clone(), f.clone()));
+    let options = SolveOptions {
+        solver,
+        level,
+        total_seconds: request.timeall,
+        formats: formats.collect(),
+        ..SolveOptions::default()
+    };
     Ok(Prepared { entry: request.entry.clone(), files, options, respace: request.respace })
 }
 
@@ -241,7 +258,33 @@ mod tests {
             level: None,
             respace: false,
             stream: false,
+            formats: BTreeMap::new(),
         }
+    }
+
+    #[test]
+    fn a_file_is_read_in_the_format_the_page_set_for_it() {
+        let (_client, server) = pair();
+        // Spectre written in a .sp file: read as SPICE, its nets would be `(a` and `0)`
+        let text = "r1 (a 0) resistor r=1k\n";
+        let nets = |r: &Request| {
+            let json: serde_json::Value = serde_json::from_str(&solve(r, &server).unwrap()).unwrap();
+            let mut nets: Vec<String> = json["document"]["objects"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|o| o["kind"] == "net")
+                .map(|o| o["name"].as_str().unwrap().to_string())
+                .collect();
+            nets.sort();
+            (nets, json["document"]["files"][0]["format"].as_str().map(str::to_string))
+        };
+        let mut r = request("/top.sp", text);
+        r.formats.insert("/top.sp".into(), "spectre".into());
+        assert_eq!(nets(&r).1.as_deref(), Some("spectre"));
+        assert!(!nets(&r).0.iter().any(|n| n.contains('(') || n.contains(')')), "{:?}", nets(&r).0);
+        r.formats.clear();
+        assert_eq!(nets(&r).1.as_deref(), Some("spice"));
     }
 
     #[test]

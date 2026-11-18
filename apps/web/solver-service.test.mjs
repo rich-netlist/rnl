@@ -140,6 +140,22 @@ test("a respace asks preview for --respace; a solve does not", async () => {
   } finally { await s.close(); }
 });
 
+test("the formats the page set reach preview as --format, by the paths from the entry's folder; preview reads only the solve's directory", async () => {
+  const s = await serve();
+  try {
+    const files = { "/work/top.sp": "* x", "/work/sub/a.inc": "* a", "/lib/m.inc": "* m" };
+    const formats = { "/work/top.sp": "spectre", "/lib/m.inc": "spice", "/work/sub/a.inc": "bad name;", "/missing.inc": "spectre" };
+    const args = (await call(s.port, "POST", SOLVE, { entry: "/work/top.sp", files, formats })).json.document.seen.args;
+    const given = args.flatMap((a, i) => (a === "--format" ? [args[i + 1]] : []));
+    // a name that is not a format's and a file not sent are left out
+    assert.deepEqual(given.sort(), ["../lib/m.inc=spice", "top.sp=spectre"]);
+    // the directory the files are written in, and nothing outside it
+    const confine = args[args.indexOf("--confine") + 1];
+    assert.ok(confine && /solve-[^\\/]*$/.test(confine), confine);
+    assert.ok(!(await call(s.port, "POST", SOLVE, { entry: "/work/top.sp", files })).json.document.seen.args.includes("--format"));
+  } finally { await s.close(); }
+});
+
 test("a solve of one level asks preview for it by its title; none asks for every level", async () => {
   const s = await serve();
   try {

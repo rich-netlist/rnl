@@ -1109,7 +1109,8 @@ export default {
         const response = await fetch(new URL("rnl-solver/solve", location.href), { method: "POST", signal: own.signal,
           // (X-RNL: the local program, which serves the page to one browser, asks for it of every request that does anything)
           headers: { "Content-Type": "application/json", "X-RNL": "1" },
-          body: JSON.stringify({ entry: request.entry, files, pool: request.pool, config: settings?.config || "", timeall: settings?.timeall ?? null, respace: settings?.respace === true, level: settings?.level ?? null, stream: true }) });
+          // (formats: those set for files when the netlist was opened, as the build read them)
+          body: JSON.stringify({ entry: request.entry, files, pool: request.pool, formats: request.formats ?? {}, config: settings?.config || "", timeall: settings?.timeall ?? null, respace: settings?.respace === true, level: settings?.level ?? null, stream: true }) });
         if (!/^application\/x-ndjson/.test(response.headers.get("Content-Type") || "")) {
           const answer = await response.json().catch(() => ({ error: `the solver service answered ${response.status}` }));
           if (!response.ok) throw answer.error || `the solver service answered ${response.status}`;
