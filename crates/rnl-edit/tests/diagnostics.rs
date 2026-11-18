@@ -29,7 +29,7 @@ fn operation_failures_have_stable_kinds_and_keep_the_op_index() {
     ];
     for (value, code) in cases {
         let error = parse_diagnosed(7, &value).unwrap_err();
-        assert_eq!(error.code.number().as_deref(), Some(code), "{value}: {error}");
+        assert_eq!(error.code.number(), code, "{value}: {error}");
         assert!(error.message.starts_with("op 7"), "{error}");
         assert_eq!(rnl_edit::ops::parse(7, &value).unwrap_err(), error.message);
     }
@@ -41,13 +41,13 @@ fn writer_failures_use_the_catalog_without_changing_legacy_messages() {
         let mut req = request(json!([]));
         req.dialect = dialect.into();
         let error = write_diagnosed(&req).unwrap_err();
-        assert_eq!(error.code.number().as_deref(), Some(code));
+        assert_eq!(error.code.number(), code);
         assert_eq!(write(&req).unwrap_err(), error.message);
     }
     for (level, code) in [("unknown", "RNL8605"), ("subckt:missing", "RNL8606")] {
         let req = request(json!([{"op":"set","level":level,"object":"#R1","at":[0,0]}]));
         let error = write_diagnosed(&req).unwrap_err();
-        assert_eq!(error.code.number().as_deref(), Some(code));
+        assert_eq!(error.code.number(), code);
         assert!(error.message.starts_with("op 0 (set):"));
     }
 }

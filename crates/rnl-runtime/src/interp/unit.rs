@@ -69,20 +69,7 @@ pub fn unsupported_version(version: &str) -> String {
     message
 }
 
-/// Does a file of the language version `version` keep the rules that 0.3 changes? 0.3 and every
-/// version after it that this implementation reads do, by the order of versions (16.1); 0.2 does
-/// not, nor a version it does not read, none of whose RNL is interpreted.
-pub fn keeps_0_3(version: &str) -> bool {
-    READ_VERSIONS.contains(&version) && version_key(version) >= (0, 3)
-}
-
-/// Does a file of the language version `version` follow the rules that 0.4 changes? 0.4 and every
-/// version after it that this implementation reads do, by the order of versions (16.1).
-pub fn keeps_0_4(version: &str) -> bool {
-    READ_VERSIONS.contains(&version) && version_key(version) >= (0, 4)
-}
-
-/// The versions this implementation reads, as a message lists them: "0.2, 0.3 and 0.4".
+/// The versions this implementation reads, as a message lists them, such as "0.4".
 fn read_versions() -> String {
     match READ_VERSIONS.split_last() {
         Some((last, [])) => last.to_string(),
@@ -91,17 +78,12 @@ fn read_versions() -> String {
     }
 }
 
-/// The draft 0.4 and earlier languages have no package compatibility. Keep the published
-/// 0.2/0.3 compatibility within the older languages (16.1).
-pub(super) fn package_languages_match(language: &str, reader: &str) -> bool {
-    (language == "0.4") == (reader == "0.4")
+/// Is `version` a language version this implementation reads (16.1)? A package file written in
+/// another one is not read: reading it reports its version ([`unsupported_version`]).
+pub fn is_read_version(version: &str) -> bool {
+    READ_VERSIONS.contains(&version)
 }
 
-/// Prefer packages on the reader's side of the 0.4 language boundary (16.1).
-fn finds_unnamed(language: &str, reader: &str) -> bool {
-    package_languages_match(language, reader)
-        && (version_key(language) <= version_key(DEFAULT_VERSION) || version_key(language) <= version_key(reader))
-}
 const HEADER_KW: [&str; 5] = ["VERSION", "PACKAGE", "ALIAS", "DEVICE", "USE-ALIASES"];
 /// A second VERSION in a header record (16.1).
 pub const SECOND_VERSION: &str =
@@ -113,8 +95,8 @@ pub struct Header {
     pub type_: String,
     pub priority: Option<Priority>,
     pub scope: Option<String>,
-    /// The check of the numbers that the record of the solver uses, as written: a field of the
-    /// draft 0.3, only with `type="generated"` (5.9).
+    /// The check of the numbers that the record of the solver uses, as written: a field only with
+    /// `type="generated"` (5.9).
     pub numbering: Option<String>,
     /// Host sections on which this record acts (2.8); ALL when no field is written.
     pub languages: Languages,
@@ -336,8 +318,8 @@ pub enum Place {
 pub struct EffPackage {
     /// Reached by an effective use path with no host-language restriction (14.10).
     pub solver_config: bool,
-    /// The USE-PACKAGE written in a file that brings it in; none for the standard package used
-    /// implicitly (16.3) and for a package checked on its own (2.7).
+    /// The USE-PACKAGE written in a file that brings it in; none for the standard package that the
+    /// tool setting adds (16.3) and for a package checked on its own (2.7).
     pub decl: Option<UseDecl>,
     pub unit: UnitId,
     pub place: Place,
@@ -427,54 +409,36 @@ fn decimal_version(v: &str) -> Option<DecimalVersion<'_>> {
     Some((part(a), part(b)))
 }
 
-/// The same numeric draft version denotes one package reading, whatever its leading zeroes.
-pub(super) fn package_cache_key(name: String, version: String, modern: bool) -> (String, String, bool) {
-    let version = if modern {
-        decimal_version(&version).map_or_else(
-            || version.clone(),
-            |(a, b)| format!("{}.{}", if a.1.is_empty() { "0" } else { a.1 }, if b.1.is_empty() { "0" } else { b.1 }),
-        )
-    } else {
-        version
-    };
-    (name, version, modern)
+/// The same numeric version denotes one package reading, whatever its leading zeroes (16.2).
+pub(super) fn package_cache_key(name: String, version: String) -> (String, String) {
+    let version = decimal_version(&version).map_or_else(
+        || version.clone(),
+        |(a, b)| format!("{}.{}", if a.1.is_empty() { "0" } else { a.1 }, if b.1.is_empty() { "0" } else { b.1 }),
+    );
+    (name, version)
 }
 
 pub(super) fn valid_package_version(v: &str) -> bool {
     decimal_version(v).is_some()
 }
 
-pub(super) fn package_version_cmp(a: &str, b: &str, modern: bool) -> std::cmp::Ordering {
-    if modern {
-        decimal_version(a).cmp(&decimal_version(b))
+pub(super) fn package_version_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    decimal_version(a).cmp(&decimal_version(b))
+}
+
+pub(super) fn same_package_major(a: &str, b: &str) -> bool {
+    let (Some(ka), Some(kb)) = (decimal_version(a), decimal_version(b)) else { return false };
+    if ka.0 .0 == 0 || kb.0 .0 == 0 {
+        ka == kb
     } else {
-        version_key(a).cmp(&version_key(b))
+        ka.0 == kb.0
     }
 }
 
-pub(super) fn same_package_major(a: &str, b: &str, modern: bool) -> bool {
-    if modern {
-        let (Some(ka), Some(kb)) = (decimal_version(a), decimal_version(b)) else { return false };
-        if ka.0 .0 == 0 || kb.0 .0 == 0 {
-            ka == kb
-        } else {
-            ka.0 == kb.0
-        }
-    } else {
-        let (ka, kb) = (version_key(a), version_key(b));
-        if ka.0 == 0 || kb.0 == 0 {
-            ka == kb
-        } else {
-            ka.0 == kb.0
-        }
-    }
-}
-
-pub(super) fn version_ok(want: Option<&str>, have: &str, modern: bool) -> bool {
+pub(super) fn version_ok(want: Option<&str>, have: &str) -> bool {
     match want {
-        None => !modern || valid_package_version(have),
-        Some(w) if modern => same_package_major(w, have, true) && !package_version_cmp(have, w, true).is_lt(),
-        Some(w) => w == have || (same_package_major(w, have, false) && version_key(have) > version_key(w)),
+        None => valid_package_version(have),
+        Some(w) => same_package_major(w, have) && !package_version_cmp(have, w).is_lt(),
     }
 }
 
@@ -482,8 +446,8 @@ pub(super) fn version_ok(want: Option<&str>, have: &str, modern: bool) -> bool {
 /// its VERSION, the language version it is written in (16.1). The header record is the file's
 /// first record, and its statements count as reading the file counts them (`Interp::read_header`):
 /// a PACKAGE or a VERSION written in a comment or a string, such as an example in the file's header
-/// comment, declares nothing; the first VERSION stands. In draft 0.4 the first PACKAGE
-/// stands too; released versions keep their last declaration.
+/// comment, declares nothing; the first VERSION stands, and the first PACKAGE, when its version is
+/// well formed (16.2).
 fn header_decls(text: &str) -> (Option<(String, String)>, Option<String>) {
     let recs = scan_package_run(&package_lines(text), "", &mut crate::diag::Sink::new());
     let Some(first) = recs.first() else { return (None, None) };
@@ -497,7 +461,7 @@ fn header_decls(text: &str) -> (Option<(String, String)>, Option<String>) {
         Some(Value::Str(s)) => Some(s.clone()),
         _ => None,
     };
-    let (mut package, mut version, mut versions) = (None, None, 0);
+    let (mut version, mut versions) = (None, 0);
     let (mut first_package, mut packages) = (None, 0);
     for m in &body.members {
         if m.error.is_some() || m.segments.len() != 1 || m.bind().is_some() {
@@ -520,17 +484,11 @@ fn header_decls(text: &str) -> (Option<(String, String)>, Option<String>) {
         }
         if kw == "VERSION" {
             version = text_of(p.get("version"));
-        } else {
-            package = text_of(p.get("name")).zip(text_of(p.get("version")));
-            if packages == 1 {
-                first_package = package.clone();
-            }
+        } else if packages == 1 {
+            first_package = text_of(p.get("name")).zip(text_of(p.get("version")));
         }
     }
-    if version.as_deref().is_some_and(keeps_0_4) {
-        package = first_package.filter(|(_, v)| valid_package_version(v));
-    }
-    (package, version)
+    (first_package.filter(|(_, v)| valid_package_version(v)), version)
 }
 
 /// "@PACKAGE(name="…", version="…")" in a package file's header record (2.7).
@@ -589,14 +547,13 @@ fn params_by_name_mode(
     let params = spec.params_in(version);
     let names: Vec<&str> = params.iter().map(|q| q.name.as_str()).collect();
     let order = &spec.positional;
-    let modern = keeps_0_4(version);
     let site =
         crate::parameter_errors::Site::Header { standard: std_form, first: names.first().copied().unwrap_or("name") };
     let mut out = HashMap::new();
     if let Some(p) = p {
         if !p.positional.is_empty() {
             if order.is_empty() {
-                return Err(crate::parameter_errors::positional(kw, site, modern));
+                return Err(crate::parameter_errors::positional(kw, site, true));
             }
             if p.positional.len() > order.len() {
                 return Err(crate::parameter_errors::too_many(kw, order, p.positional.len()));
@@ -608,7 +565,7 @@ fn params_by_name_mode(
         for n in &p.named {
             let std = if std_form || n.quoted { n.name.clone() } else { word(&n.name) };
             if !names.contains(&std.as_str()) {
-                return Err(crate::parameter_errors::unknown(kw, n, &std, &names, site, modern));
+                return Err(crate::parameter_errors::unknown(kw, n, &std, &names, site, true));
             }
             if out.contains_key(&std) {
                 return Err(crate::parameter_errors::twice(kw, &std));
@@ -630,7 +587,7 @@ fn params_by_name_mode(
                 _ => true,
             };
             if !valid {
-                return Err((codes::PARAM_WRONG_TYPE, parameter_type_message(kw, &q.name, &q.ty, keeps_0_4(version))));
+                return Err((codes::PARAM_WRONG_TYPE, parameter_type_message(kw, &q.name, &q.ty)));
             }
         }
     }
@@ -638,10 +595,7 @@ fn params_by_name_mode(
 }
 
 /// Share the expected-type description between headers and evaluated statements (5.3).
-pub(super) fn parameter_type_message(kw: &str, name: &str, ty: &ParamType, modern: bool) -> String {
-    if !modern {
-        return format!("the {name} of @{kw} has the wrong type (5.3)");
-    }
+pub(super) fn parameter_type_message(kw: &str, name: &str, ty: &ParamType) -> String {
     let expected = match ty {
         ParamType::Number => "a number",
         ParamType::String => "a string",
@@ -691,16 +645,13 @@ impl Interp<'_> {
         self.sink.add(sev, code, msg, loc, Extra { in_package: pkg.to_string(), ..Extra::default() })
     }
 
-    /// Parse a record once. In a file of the draft 0.3, `%#3` is a number (5.9); in 0.2 it stays a
-    /// lexical error.
+    /// Parse a record once: `%#3` is a number (5.9).
     pub(crate) fn parse(&mut self, rec: RecId) -> Rc<RecordAst> {
         if let Some(a) = &self.asts[rec] {
             return a.clone();
         }
-        let numbers = self.follows_0_3(self.rec_unit[rec]);
-        let places = self.follows_0_4(self.rec_unit[rec]);
-        self.places.enabled |= places;
-        let a = Rc::new(syntax::parse_record_language(&self.recs[rec].text, numbers, places));
+        self.places.enabled = true;
+        let a = Rc::new(syntax::parse_record_language(&self.recs[rec].text, true, true));
         self.asts[rec] = Some(a.clone());
         a
     }
@@ -780,29 +731,23 @@ impl Interp<'_> {
             .level
             .filter(|&lv| self.units[u].kind == UnitKind::Level && self.doc.is_veriloga(&self.doc.levels[lv].file))
             .and(level_kind);
-        for (index, rec) in self.unit_records(u).into_iter().enumerate() {
+        for rec in self.unit_records(u) {
             let ast = self.parse(rec);
             if !self.read_generated && self.units[u].kind == UnitKind::Level && is_generated_record(&ast) {
                 // a solver does not read the solver's records, nor what they would report (2.8, 14.8)
                 continue;
             }
-            let early_header = if self.follows_0_4(u) {
-                let header = Rc::new(self.read_header_fields(&ast, rec, u));
-                self.rec_header.insert(rec, header.clone());
-                if header.languages == Languages::NONE {
-                    self.units[u].other_records += 1;
-                    continue;
-                }
-                Some(header)
-            } else {
-                None
-            };
-            let deferred =
-                self.units[u].kind == UnitKind::Package && self.checking_path.is_none() && early_header.is_some();
+            let header = Rc::new(self.read_header_fields(&ast, rec, u));
+            self.rec_header.insert(rec, header.clone());
+            if header.languages == Languages::NONE {
+                self.units[u].other_records += 1;
+                continue;
+            }
+            let deferred = self.units[u].kind == UnitKind::Package && self.checking_path.is_none();
             if deferred {
                 self.pending_language_records.push(rec);
             }
-            let dormant = deferred || early_header.as_ref().is_some_and(|header| !self.record_has_language(u, header));
+            let dormant = deferred || !self.record_has_language(u, &header);
             for note in ast.notes.iter().filter(|_| !dormant) {
                 if let Some(kw) = &note.kw {
                     let k = self.kw(kw, u);
@@ -825,8 +770,6 @@ impl Interp<'_> {
                 self.units[u].other_records += 1;
                 continue;
             }
-            let header = early_header.unwrap_or_else(|| Rc::new(self.read_header_fields(&ast, rec, u)));
-            self.rec_header.insert(rec, header.clone());
             // the record of the solver whose numbering does not match the level: its statements
             // that use a number are left out, as if they were not written, with one hint (5.9)
             let stale = self.numbers.stale.contains(&rec);
@@ -846,35 +789,23 @@ impl Interp<'_> {
                 );
             }
             if header.type_ == "header" {
-                let modern = self.follows_0_4(u);
                 let same_header =
                     self.units[u].header_records.iter().any(|r| self.rec_header[r].languages == header.languages);
                 let wrong = if !is_file_level {
                     Some((codes::HEADER_RECORD_IN_SUBCIRCUIT,
                         "a header record is written at the file level, not inside a subcircuit (2.8); this one is ignored"))
-                } else if (!modern && self.units[u].header_record.is_some()) || (modern && same_header) {
+                } else if same_header {
                     Some((
                         codes::HEADER_RECORD_SECOND,
-                        if modern {
-                            "a file has at most one header record without language and one per language (2.8); this one is ignored"
-                        } else {
-                            "a file has at most one header record (2.8); this one is ignored"
-                        },
+                        "a file has at most one header record without language and one per language (2.8); this one is ignored",
                     ))
-                } else if (if modern {
-                    self.units[u].other_records != 0
-                        || (header.languages == Languages::ALL && !self.units[u].header_records.is_empty())
-                } else {
-                    index != 0
-                }) || self.after_a_record_of_its_file(u, rec)
+                } else if self.units[u].other_records != 0
+                    || (header.languages == Languages::ALL && !self.units[u].header_records.is_empty())
+                    || self.after_a_record_of_its_file(u, rec)
                 {
                     Some((
                         codes::HEADER_RECORD_NOT_FIRST,
-                        if modern {
-                            "header records precede all other records, with the one without language first (2.8); this one is ignored"
-                        } else {
-                            "a header record is the first record of a file, and a record comes before this one (2.8); this one is ignored"
-                        },
+                        "header records precede all other records, with the one without language first (2.8); this one is ignored",
                     ))
                 } else {
                     None
@@ -1042,11 +973,10 @@ impl Interp<'_> {
                 && lv.records.iter().any(|o| {
                     let p = o.loc(0);
                     (p.line, p.col) < (at.line, at.col)
-                        && !(self.follows_0_4(u)
-                            && self.units[u].header_records.iter().any(|r| {
-                                let accepted = self.recs[*r].loc(0);
-                                accepted.file == p.file && accepted.line == p.line && accepted.col == p.col
-                            }))
+                        && !self.units[u].header_records.iter().any(|r| {
+                            let accepted = self.recs[*r].loc(0);
+                            accepted.file == p.file && accepted.line == p.line && accepted.col == p.col
+                        })
                 })
         })
     }
@@ -1394,7 +1324,7 @@ impl Interp<'_> {
             let call = seg.call.clone().unwrap();
             let kw = call.kw.clone();
             let loc = self.recs[rec].loc(call.start);
-            if kw == "SOLVER-CONFIG" && self.follows_0_4(u) {
+            if kw == "SOLVER-CONFIG" {
                 self.header_solver_config(u, rec, &seg);
                 continue;
             }
@@ -1464,7 +1394,7 @@ impl Interp<'_> {
                         self.sink.error(codes::PACKAGE_DECL_OUTSIDE_PACKAGE_FILE, message, Some(loc));
                         continue;
                     }
-                    if self.follows_0_4(u) && self.units[u].header_kws.iter().filter(|k| *k == "PACKAGE").count() > 1 {
+                    if self.units[u].header_kws.iter().filter(|k| *k == "PACKAGE").count() > 1 {
                         self.diag_in(
                             Severity::Error,
                             codes::PACKAGE_DECLARED_TWICE,
@@ -1476,7 +1406,7 @@ impl Interp<'_> {
                     }
                     let name = str_val(p.get("name")).unwrap_or_default();
                     let version = str_val(p.get("version")).unwrap_or_default();
-                    if self.follows_0_4(u) && !valid_package_version(&version) {
+                    if !valid_package_version(&version) {
                         self.diag_in(Severity::Error, codes::PACKAGE_VERSION_MALFORMED,
                             format!("@PACKAGE version={version:?} must be two unsigned decimal integers separated by a dot; this file is not a package (16.1, 16.2)"), Some(loc), &pkg);
                         self.units[u].ok = false;
@@ -1488,8 +1418,7 @@ impl Interp<'_> {
                     // standard package's, find by its name and version; one that a USE-PACKAGE
                     // or a reference found is there already (16.2)
                     if !name.is_empty() {
-                        let language = self.version_of(Some(u));
-                        self.packages.entry(package_cache_key(name, version, language == "0.4")).or_insert(u);
+                        self.packages.entry(package_cache_key(name, version)).or_insert(u);
                     }
                 }
                 "USE-ALIASES" => self.use_aliases(u, &p, &loc),
@@ -1525,7 +1454,6 @@ impl Interp<'_> {
                     }
                 }
                 "DEVICE" => {
-                    let modern = self.follows_0_4(u);
                     let name = str_val(p.get("name"));
                     let model = str_val(p.get("model"));
                     let mtype = str_val(p.get("type")).map(|s| s.to_lowercase());
@@ -1533,14 +1461,8 @@ impl Interp<'_> {
                         Some(Value::Arr(items)) => Some(items.clone()),
                         _ => None,
                     };
-                    if (modern && ((name.is_none() && model.is_none()) || (terms.is_none() && mtype.is_none())))
-                        || (!modern && (name.is_none() || terms.is_none()))
-                    {
-                        let message = if modern {
-                            "@DEVICE needs name or model, and terminals or type (6.12)"
-                        } else {
-                            "@DEVICE takes name and terminals (6.12)"
-                        };
+                    if (name.is_none() && model.is_none()) || (terms.is_none() && mtype.is_none()) {
+                        let message = "@DEVICE needs name or model, and terminals or type (6.12)";
                         self.diag_in(Severity::Error, codes::DEVICE_MISSING_PARAMS, message, Some(loc), &pkg);
                         continue;
                     }
@@ -1554,21 +1476,19 @@ impl Interp<'_> {
                         );
                         continue;
                     }
-                    if modern {
-                        let cs = self.units[u].kind != UnitKind::Package && self.doc.rules(&loc.file).case_sensitive;
-                        let mut seen = HashSet::new();
-                        let invalid = terms.as_ref().is_some_and(|a| {
-                            a.iter().any(|v| {
-                                let Value::Str(n) = v else { return false };
-                                let key = if cs { n.clone() } else { n.to_lowercase() };
-                                (!n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())) || !seen.insert(key)
-                            })
-                        });
-                        if invalid {
-                            self.diag_in(Severity::Error, codes::DEVICE_TERMINAL_NAMES_INVALID,
-                                "the terminal names of @DEVICE must be distinct by the host's case rules and cannot be made only of digits (6.12)", Some(loc), &pkg);
-                            continue;
-                        }
+                    let cs = self.units[u].kind != UnitKind::Package && self.doc.rules(&loc.file).case_sensitive;
+                    let mut seen = HashSet::new();
+                    let invalid = terms.as_ref().is_some_and(|a| {
+                        a.iter().any(|v| {
+                            let Value::Str(n) = v else { return false };
+                            let key = if cs { n.clone() } else { n.to_lowercase() };
+                            (!n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())) || !seen.insert(key)
+                        })
+                    });
+                    if invalid {
+                        self.diag_in(Severity::Error, codes::DEVICE_TERMINAL_NAMES_INVALID,
+                            "the terminal names of @DEVICE must be distinct by the host's case rules and cannot be made only of digits (6.12)", Some(loc), &pkg);
+                        continue;
                     }
                     let terminals = terms.map(|a| {
                         a.iter()
@@ -1736,7 +1656,7 @@ impl Interp<'_> {
                     "@USE-ALIASES cannot have an alias: the aliases are not known before it is read (16.5)".into(),
                 );
             }
-            if check_original && !standard_original_in(orig, version) {
+            if check_original && !standard_original(orig) {
                 return bad(
                     self,
                     codes::ALIAS_ORIGINAL_NOT_STANDARD,
@@ -1744,10 +1664,7 @@ impl Interp<'_> {
                 );
             }
             let a = &alias[1..];
-            if (words().is_keyword(a) && (a != "TABLE" || keeps_0_4(version)))
-                || a.is_empty()
-                || !a.chars().all(syntax::is_word_char)
-            {
+            if words().is_keyword(a) || a.is_empty() || !a.chars().all(syntax::is_word_char) {
                 return bad(
                     self,
                     codes::ALIAS_MALFORMED_OR_KEYWORD,
@@ -1755,16 +1672,15 @@ impl Interp<'_> {
                 );
             }
         } else {
-            if check_original && !standard_original_in(orig, version) {
+            if check_original && !standard_original(orig) {
                 return bad(
                     self,
                     codes::ALIAS_ORIGINAL_NOT_STANDARD,
                     format!("the original {orig} is not a standard word (16.5)"),
                 );
             }
-            // a word that 0.3 adds, `numbering`, is a standard word in a file of 0.3 (16.1): a file
-            // of 0.2 raised to 0.3 with such an alias, with a warning, has it in error here
-            if words().all_words_in(version).contains(alias) || added_word(alias, version) {
+            // a field of the record head, `numbering`, is a standard word too (2.8, 16.5)
+            if words().all_words_in(version).contains(alias) || HEAD_WORDS.contains(&alias) {
                 return bad(
                     self,
                     codes::ALIAS_IS_STANDARD_WORD,
@@ -1779,7 +1695,7 @@ impl Interp<'_> {
     /// its scope (16.5). `source` names the alias package it comes from.
     fn add_alias(&mut self, u: UnitId, decl: (String, String, Option<String>), loc: &Loc, source: &str) {
         let (alias, orig, definition) = decl;
-        let package = if self.follows_0_4(u) { self.units[u].pkg().to_string() } else { String::new() };
+        let package = self.units[u].pkg().to_string();
         let wher = if source.is_empty() { String::new() } else { format!("in alias package {source}, ") };
         if let Some(def) = definition {
             self.units[u].scoped_raw.push((def.clone(), alias.clone(), orig.clone(), loc.clone(), source.to_string()));
@@ -1831,7 +1747,7 @@ impl Interp<'_> {
 
     /// Definition-scoped aliases by the definition's `$` name, read through the `$` aliases (16.5, D17).
     fn finish_aliases(&mut self, u: UnitId) {
-        let package = if self.follows_0_4(u) { self.units[u].pkg().to_string() } else { String::new() };
+        let package = self.units[u].pkg().to_string();
         self.units[u].scoped.clear();
         let mut prio: Vec<String> = vec!["priority".into()];
         prio.extend(self.units[u].aliases.iter().filter(|(_, o)| *o == "priority").map(|(a, _)| a.clone()));
@@ -1885,7 +1801,7 @@ impl Interp<'_> {
         let mut out = Vec::new();
         for (alias, (orig, loc)) in table {
             if taken.contains(&alias) {
-                let package = if self.follows_0_4(fu) { self.units[fu].pkg().to_string() } else { String::new() };
+                let package = self.units[fu].pkg().to_string();
                 self.diag_in(
                     Severity::Error,
                     codes::ALIAS_SCOPED_LIKE_OWN_NAME,
@@ -1905,7 +1821,7 @@ impl Interp<'_> {
     /// original is not looked up eagerly, and this check never creates usages.
     pub(crate) fn check_unused_scoped_aliases(&mut self) {
         for u in 0..self.units.len() {
-            if !self.units[u].ok || !self.follows_0_4(u) {
+            if !self.units[u].ok {
                 continue;
             }
             let Some(fu) = self.file_unit(u) else { continue };
@@ -1970,7 +1886,7 @@ impl Interp<'_> {
         let decls = self.units[pk].alias_decls.clone();
         let level = self.units[u].level;
         for d in decls {
-            if d.definition.is_none() && !d.original.starts_with('$') && !standard_original_in(&d.original, &version) {
+            if d.definition.is_none() && !d.original.starts_with('$') && !standard_original(&d.original) {
                 let what = if d.original.starts_with('@') { "standard keyword" } else { "standard word" };
                 self.diag_in(
                     Severity::Error,
@@ -1982,22 +1898,6 @@ impl Interp<'_> {
                     &pkg,
                 );
                 self.units[u].alias_rejected.entry(d.alias.clone()).or_insert(name.clone());
-                continue;
-            }
-            // the package is read in its own version, and the alias is checked in it; but a word
-            // that the version of this file adds is a standard word here, which no alias may be, as
-            // for an alias declared in this file (16.1, 16.5): a file of 0.2 raised to 0.3 has it
-            // in error, as the raise warned
-            if d.definition.is_none() && added_word(&d.alias, &version) {
-                self.diag_in(
-                    Severity::Error,
-                    codes::USE_ALIASES_ALIAS_IS_ADDED_WORD, format!(
-                        "in alias package {name}, the alias {} is the name of a standard word in this file's language version {version}; the alias is not used (16.5)",
-                        d.alias
-                    ),
-                    Some(loc.clone()),
-                    &pkg,
-                );
                 continue;
             }
             if let Some(level) = level {
@@ -2018,7 +1918,7 @@ impl Interp<'_> {
 
     /// The standard keyword for a written keyword, through the file's aliases (16.5).
     pub(crate) fn kw(&self, written: &str, u: UnitId) -> String {
-        if words().is_keyword(written) && (written != "TABLE" || self.follows_0_4(u)) {
+        if words().is_keyword(written) {
             return written.to_string();
         }
         if let Some(orig) = self.alias(u, &format!("@{written}")) {
@@ -2083,27 +1983,6 @@ impl Interp<'_> {
             fu = above.and_then(|p| self.file_unit(self.level_unit[p]));
         }
         DEFAULT_VERSION.to_string()
-    }
-
-    /// Does a unit follow 0.3? When the file the unit's text is in is read in 0.3 or a later version
-    /// ([`Self::version_of`], [`keeps_0_3`]): every rule that 0.3 changes applies only there, so a
-    /// file of 0.2 reads as it did before 0.3 was read.
-    pub fn follows_0_3(&self, u: UnitId) -> bool {
-        keeps_0_3(&self.version_of(Some(u)))
-    }
-
-    /// Does a unit follow 0.4? When the file the unit's text is in is read in 0.4 or a later version
-    /// ([`keeps_0_4`]): every rule that 0.4 changes applies only there, so a file of 0.2 or 0.3 reads
-    /// as it did before 0.4 was read.
-    pub fn follows_0_4(&self, u: UnitId) -> bool {
-        keeps_0_4(&self.version_of(Some(u)))
-    }
-
-    /// Does the text a statement is written in follow the draft 0.3? That is the file of its
-    /// record: for a record written into a subcircuit with scope=, the file that writes it (2.6);
-    /// for a statement of a definition body, the file of the definition (6.9).
-    pub fn statement_follows_0_3(&self, ctx: &super::ctx::Ctx) -> bool {
-        self.follows_0_3(ctx.rec.map_or(ctx.unit, |r| self.rec_unit[r]))
     }
 
     /// A USE-PACKAGE written in a level or in a file's header record (16.2, 16.3), or, in the
@@ -2171,9 +2050,7 @@ impl Interp<'_> {
             offset: call.start,
             pkg: None,
         };
-        if self.follows_0_4(self.use_writer(&decl))
-            && decl.version.as_deref().is_some_and(|v| !valid_package_version(v))
-        {
+        if decl.version.as_deref().is_some_and(|v| !valid_package_version(v)) {
             decl.pkg =
                 self.resolve_package(&decl, loc.clone(), None, if reference { "reference" } else { "USE-PACKAGE" });
             if reference {
@@ -2183,7 +2060,7 @@ impl Interp<'_> {
             }
             return;
         }
-        if self.follows_0_4(u) && in_header {
+        if in_header {
             let previous = if reference { &self.units[u].refs } else { &self.units[u].uses };
             let previous = previous.iter().position(|old| old.in_header && old.name == name && old.rec != rec);
             if let Some(index) = previous {
@@ -2218,7 +2095,7 @@ impl Interp<'_> {
                 if (old_version
                     .as_ref()
                     .zip(new_version.as_ref())
-                    .is_some_and(|(a, b)| !package_version_cmp(a, b, true).is_eq()))
+                    .is_some_and(|(a, b)| !package_version_cmp(a, b).is_eq()))
                     || !same_body
                 {
                     self.diag_in(Severity::Error, codes::HEADER_PACKAGE_LANGUAGE_CONFLICT,
@@ -2238,9 +2115,7 @@ impl Interp<'_> {
             decl.pkg = self.resolve_package(&decl, loc.clone(), None, what);
         }
         if let (Some(pk), None) = (decl.pkg, &body) {
-            if is_alias_package(&self.units[pk])
-                && (self.follows_0_4(self.use_writer(&decl)) || self.units[pk].header_kws.iter().any(|k| k == "ALIAS"))
-            {
+            if is_alias_package(&self.units[pk]) {
                 self.diag_in(
                     Severity::Error,
                     codes::USE_PACKAGE_ALIAS_PACKAGE, format!("package {name} is an alias package; load it with @USE-ALIASES(name=\"{name}\") in the header record. This {what} fails (16.5)"),
@@ -2299,8 +2174,7 @@ impl Interp<'_> {
         let kind = if what == "USE-ALIASES" { "alias package" } else { "package" };
         // a reference in the header record of a package file is reported in that package (7.6)
         let pkg = if what == "reference" { self.units[decl.unit].pkg_name.clone() } else { String::new() };
-        let modern = self.follows_0_4(self.use_writer(decl));
-        if modern && decl.version.as_deref().is_some_and(|v| !valid_package_version(v)) {
+        if decl.version.as_deref().is_some_and(|v| !valid_package_version(v)) {
             let version = decl.version.as_deref().unwrap();
             self.diag_in(Severity::Error, codes::PACKAGE_VERSION_MALFORMED,
                 format!("@{what} version={version:?} must be two unsigned decimal integers separated by a dot; this reference fails without lookup (16.1, 16.2)"), Some(loc), &pkg);
@@ -2318,9 +2192,6 @@ impl Interp<'_> {
             self.read_embedded(id, body.clone(), decl.rec);
             return Some(id);
         }
-        if !modern {
-            self.scan_packages(&decl.name);
-        }
         let mut cand: Option<(String, String, String)> = None;
         if let Some(path) = &decl.path {
             let target = join(&base.unwrap_or_else(|| self.file_dir(decl.unit)), path);
@@ -2332,7 +2203,7 @@ impl Interp<'_> {
                         "path={path:?} declares {kind} {n} {v}, but this reference requests {}{requested}",
                         decl.name
                     );
-                    if n == decl.name && version_ok(decl.version.as_deref(), &v, modern) {
+                    if n == decl.name && version_ok(decl.version.as_deref(), &v) {
                         if let Some(want) = &decl.version {
                             if *want != v {
                                 self.diag_in(
@@ -2345,7 +2216,7 @@ impl Interp<'_> {
                         }
                         cand = Some((n, v, target));
                     }
-                } else if modern {
+                } else {
                     self.diag_in(Severity::Error, codes::PACKAGE_PATH_NOT_PACKAGE,
                         format!("{path} has no valid PACKAGE declaration; this {what} fails without looking up another file (2.7, 16.2)"), Some(loc), &pkg);
                     return None;
@@ -2355,40 +2226,30 @@ impl Interp<'_> {
                 self.diag_in(
                     Severity::Warning,
                     codes::PACKAGE_PATH_NOT_FOUND,
-                    if modern {
-                        format!("{reason}; looking up {kind} {} by name ({sec})", decl.name)
-                    } else {
-                        format!("the file named by path= does not exist or its @PACKAGE does not match; looking the package up by name ({sec})")
-                    },
+                    format!("{reason}; looking up {kind} {} by name ({sec})", decl.name),
                     Some(loc.clone()),
                     &pkg,
                 );
             }
         }
         if cand.is_none() {
-            if modern {
-                self.scan_packages(&decl.name);
-            }
+            self.scan_packages(&decl.name);
             let same: Vec<(String, String, String)> =
                 self.pkg_files[&decl.name].iter().filter(|c| c.0 == decl.name).cloned().collect();
-            let reader = self.version_of(Some(self.use_writer(decl)));
-            let found = |c: &&(String, String, String)| {
-                finds_unnamed(self.pkg_languages.get(&c.2).map_or(DEFAULT_VERSION, String::as_str), &reader)
+            // one of a version this implementation reads first; else one of another version,
+            // which reports its version when it is read (16.1)
+            let read = |c: &(String, String, String)| {
+                is_read_version(self.pkg_languages.get(&c.2).map_or(DEFAULT_VERSION, String::as_str))
             };
             if let Some(want) = &decl.version {
-                if let Some(c) =
-                    same.iter()
-                        .find(|c| if modern { package_version_cmp(&c.1, want, true).is_eq() } else { c.1 == *want })
-                {
+                if let Some(c) = same.iter().find(|c| package_version_cmp(&c.1, want).is_eq()) {
                     cand = Some(c.clone());
                 } else {
                     let mut newer: Vec<&(String, String, String)> = same
                         .iter()
-                        .filter(|c| {
-                            same_package_major(&c.1, want, modern) && package_version_cmp(&c.1, want, modern).is_gt()
-                        })
+                        .filter(|c| same_package_major(&c.1, want) && package_version_cmp(&c.1, want).is_gt())
                         .collect();
-                    newer.sort_by(|a, b| package_version_cmp(&a.1, &b.1, modern));
+                    newer.sort_by(|a, b| package_version_cmp(&a.1, &b.1));
                     if let Some(c) = newer.first() {
                         self.diag_in(
                             Severity::Warning,
@@ -2399,17 +2260,11 @@ impl Interp<'_> {
                         cand = Some((*c).clone());
                     }
                 }
-            } else if let Some(c) =
-                same.iter().filter(found).min_by(|a, b| package_version_cmp(&b.1, &a.1, modern)).or_else(|| {
-                    same.iter()
-                        .filter(|c| {
-                            !package_languages_match(
-                                self.pkg_languages.get(&c.2).map_or(DEFAULT_VERSION, String::as_str),
-                                &reader,
-                            )
-                        })
-                        .min_by(|a, b| package_version_cmp(&b.1, &a.1, modern))
-                })
+            } else if let Some(c) = same
+                .iter()
+                .filter(|c| read(c))
+                .min_by(|a, b| package_version_cmp(&b.1, &a.1))
+                .or_else(|| same.iter().filter(|c| !read(c)).min_by(|a, b| package_version_cmp(&b.1, &a.1)))
             {
                 // the newest found, and of its copies the one of the first package directory, as
                 // for a version named (16.2)
@@ -2440,16 +2295,7 @@ impl Interp<'_> {
             );
             return None;
         };
-        let language = self
-            .provider
-            .read(&path)
-            .and_then(|t| scan_language_decl(&t))
-            .unwrap_or_else(|| DEFAULT_VERSION.to_string());
-        let reader = self.version_of(Some(self.use_writer(decl)));
-        if self.reject_package_language(&n, &reader, &language, Some(loc), &pkg, what) {
-            return None;
-        }
-        if let Some(&u) = self.packages.get(&package_cache_key(n.clone(), v.clone(), language == "0.4")) {
+        if let Some(&u) = self.packages.get(&package_cache_key(n.clone(), v.clone())) {
             return Some(u);
         }
         Some(self.load_package_file(&path, Some((n, v))))
@@ -2457,26 +2303,6 @@ impl Interp<'_> {
 
     pub(super) fn use_writer(&self, decl: &UseDecl) -> UnitId {
         decl.rec.map_or(decl.unit, |r| self.rec_unit[r])
-    }
-
-    /// Keep 0.4 package references separate from the published 0.2/0.3 behavior (16.1).
-    pub(super) fn reject_package_language(
-        &mut self,
-        name: &str,
-        reader: &str,
-        language: &str,
-        loc: Option<Loc>,
-        pkg: &str,
-        what: &str,
-    ) -> bool {
-        // Unsupported versions keep their own diagnostic when the package is read.
-        if package_languages_match(language, reader) || !READ_VERSIONS.contains(&language) {
-            return false;
-        }
-        self.diag_in(Severity::Error, codes::PACKAGE_LANGUAGE_MISMATCH,
-            format!("package {name} is written in language {language}, but this file uses {reader}: language 0.4 cannot use packages of earlier languages or be used by them; this {what} fails (16.1, 16.2, 16.3)"),
-            loc, pkg);
-        true
     }
 
     /// Read a package file into a unit (2.7). `key`, the name and version it is found by, holds it
@@ -2496,16 +2322,13 @@ impl Interp<'_> {
             self.pkg_sources.push((fname.clone(), text));
         }
         let mut u = Unit::new(UnitKind::Package, &fname);
-        // Mark the 0.4 boundary before reading references written ahead of VERSION in the
-        // header. Leave the published 0.2/0.3 header handling as it was.
-        if language == "0.4" {
-            u.version = language.clone();
-        }
+        // its version is known before references written ahead of VERSION in the header are read
+        u.version = language;
         u.pkg_level = Some(pl);
         let id = self.units.len();
         self.units.push(u);
         if let Some((name, version)) = key {
-            self.packages.insert(package_cache_key(name, version, language == "0.4"), id);
+            self.packages.insert(package_cache_key(name, version), id);
         }
         let rec_ids: Vec<RecId> = recs.into_iter().map(|r| self.add_record(r, id)).collect();
         self.unit_recs.push(rec_ids);
@@ -2529,7 +2352,7 @@ impl Interp<'_> {
         let pending = std::mem::take(&mut self.units[u].alias_pending);
         let pkg = self.units[u].pkg_name.clone();
         for (alias, orig, loc) in pending {
-            if standard_original_in(&orig, &self.version_of(Some(u))) {
+            if standard_original(&orig) {
                 continue;
             }
             let what = if orig.starts_with('@') { "standard keyword" } else { "standard word" };
@@ -2594,10 +2417,10 @@ impl Interp<'_> {
     // ------------------------------------------------------------------ names (6.6)
 
     /// The records written above a subcircuit with scope= commit their statements to it, and the
-    /// names they bind are published there, in one name space with its own (2.6, 6.7, as the
-    /// draft 0.3 makes clear in its 7.4). They come after its own text, the nearest level's
-    /// first, as they take effect; a name bound again is the 6.6 error of the subcircuit's level,
-    /// and the earlier binding is kept. Called once every level is read.
+    /// names they bind are published there, in one name space with its own (2.6, 6.7). They come
+    /// after its own text, the nearest level's first, as they take effect; a name bound again is
+    /// the 6.6 error of the subcircuit's level, and the earlier binding is kept. Called once every
+    /// level is read.
     pub(crate) fn publish_scope_names(&mut self) {
         for lv in 0..self.doc.levels.len() {
             let level = &self.doc.levels[lv];
@@ -2680,15 +2503,9 @@ impl Interp<'_> {
     }
 }
 
-/// The field of the record head that 0.3 added, `numbering` (2.8, 5.9): a standard word, which no
-/// alias may be spelled as (16.5), although the other fields of the record head are not.
-const ADDED_WORDS: [&str; 1] = ["numbering"];
-
-/// Is a word one that the language version `version` adds, `numbering` in 0.3 (16.1)? It is a
-/// standard word in a file of that version or a later one, which no alias may be spelled as (16.5).
-pub fn added_word(word: &str, version: &str) -> bool {
-    keeps_0_3(version) && ADDED_WORDS.contains(&word)
-}
+/// The field of the record head `numbering` (2.8, 5.9): a standard word, which no alias may be
+/// spelled as (16.5), although the other fields of the record head are not.
+const HEAD_WORDS: [&str; 1] = ["numbering"];
 
 /// Is an alias original a standard keyword (written with `@`) or a standard word (16.1, 16.5)?
 pub fn standard_original(orig: &str) -> bool {
@@ -2696,16 +2513,6 @@ pub fn standard_original(orig: &str) -> bool {
         Some(k) => words().is_keyword(k),
         None => words().all_words().contains(orig),
     }
-}
-
-/// Keep the released alias vocabulary unchanged when introducing solver settings.
-fn standard_original_in(orig: &str, version: &str) -> bool {
-    if !keeps_0_4(version)
-        && matches!(orig, "@TABLE" | "transpose" | "spacing_x" | "spacing_y" | "@SOLVER-CONFIG" | "junction")
-    {
-        return false;
-    }
-    standard_original(orig)
 }
 
 /// Read `$` aliases as their originals, whole token, wherever a `$` name is written (16.5).
@@ -2774,9 +2581,9 @@ mod tests {
         assert_eq!(closest("priorty", ["type", "scope", "priority", "author"]).as_deref(), Some("priority"));
         assert_eq!(
             scan_package_decl(
-                "@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"rnl-std\", version=\"0.2\")}"
+                "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"rnl-std-all\", version=\"0.4\")}"
             ),
-            Some(("rnl-std".into(), "0.2".into()))
+            Some(("rnl-std-all".into(), "0.4".into()))
         );
     }
 }

@@ -98,8 +98,8 @@ fn equal_member_networks_return_one_network() {
 fn a_scoped_record_on_an_included_level_follows_terminal_names() {
     let body = r#"$D = @DEFINE(roles=[["n","net"]]) {}; %bundle = {#R1 #R2} @BUNDLE; %u = %bundle:p::net @AS $D"#;
     let main = format!("* mixed\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n.include child.sp\n* @RNL(scope=\"child\") {{ {body} }}\n.end\n");
-    let child = format!("* child\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @DEVICE(name=\"R1\", terminals=[\"p\",\"n\"]); @DEVICE(name=\"R2\", terminals=[\"n\",\"p\"]) }}\n.subckt child a b c d\nR1 a b 1k\nR2 c d 1k\n.ends child\n");
-    let provider = MemoryProvider::new().with("t.sp", &main).with("child.sp", &child);
+    let child = "* child\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @DEVICE(name=\"R1\", terminals=[\"p\",\"n\"]); @DEVICE(name=\"R2\", terminals=[\"n\",\"p\"]) }\n.subckt child a b c d\nR1 a b 1k\nR2 c d 1k\n.ends child\n";
+    let provider = MemoryProvider::new().with("t.sp", &main).with("child.sp", child);
     let result =
         interpret_file(Path::new("t.sp"), None, &provider, &Options { std: false, ..Options::solver() }).unwrap();
     assert!(result.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", result.diagnostics());

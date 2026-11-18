@@ -140,8 +140,7 @@ pub struct Level {
     pub constraints: Option<crate::LevelConstraints>,
     /// The objects of the level that are not drawn on it: those that have no position, each with
     /// its symbol drawn alone, in the order of the netlist (their number is the one `status`
-    /// gives), then those that are not drawn at all, since no symbol can be chosen for them, each
-    /// with its `reason` and no symbol.
+    /// gives).
     pub unplaced: Vec<Unplaced>,
 }
 
@@ -187,14 +186,8 @@ pub struct Unplaced {
     /// An instance's name; for a bundle or a usage, the label the diagnostics give it, such as
     /// "a usage of $GND".
     pub name: String,
-    /// The name of the symbol it is drawn with; empty for an object that has none (see `reason`).
+    /// The name of the symbol it is drawn with.
     pub symbol: String,
-    /// Why it is not drawn at all, whatever its position, such as `model card not found` for a
-    /// transistor whose model the netlist does not define; absent for an object that only lacks a
-    /// position, which a solver can place. Such an object has no symbol and no drawing.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(test, ts(optional))]
-    pub reason: Option<String>,
     /// The instances it stands for, indexes into `Document::objects`: one for an instance, its
     /// members for a bundle, none for a usage. A viewer shows the first one's statement.
     pub objects: Vec<usize>,
@@ -361,7 +354,7 @@ pub struct AutoIncludeCandidate {
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Hit {
-    /// For a 0.4 pin hit, its independent object index in Document.objects.
+    /// For a pin hit, its independent object index in Document.objects.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub pin: Option<usize>,
@@ -430,11 +423,11 @@ pub struct SourceFile {
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Object {
-    /// The data of an independent 0.4 pin. Absent for other object kinds.
+    /// The data of an independent pin. Absent for other object kinds.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub pin: Option<PinObject>,
-    /// "instance", "net", "usage", "group" (a set marked with GROUP), or "bundle" for a 0.4 pin host, or "pin".
+    /// "instance", "net", "usage", "group" (a set marked with GROUP), or "bundle" for a pin host, or "pin".
     pub kind: &'static str,
     /// An instance or net's name, or a usage's or group's editor identity (`%gnd1` when named).
     pub name: String,
@@ -492,9 +485,8 @@ pub struct Span {
 pub struct Diagnostic {
     /// "error", "violation", "warning" or "hint", in that rank (7.6).
     pub severity: &'static str,
-    /// Its kind's number in the toolkit's list of diagnostics, such as "RNL3120"; none for a kind of
-    /// the versions 0.2 and 0.3 alone.
-    pub code: Option<String>,
+    /// Its kind's number in the toolkit's list of diagnostics, such as "RNL3120".
+    pub code: String,
     /// Its kind's short name, such as "param-wrong-type".
     pub name: &'static str,
     /// The file as shown: relative to the opened file's directory when it is inside it.
@@ -573,7 +565,7 @@ pub(crate) fn document(
                     let (file, line) = h.loc.map(|l| (l.file, l.line)).unwrap_or_default();
                     LevelHint {
                         kind: h.kind.as_str(),
-                        code: h.kind.code().number().unwrap_or_default(),
+                        code: h.kind.code().number(),
                         severity: h.severity.as_str(),
                         message: h.message,
                         file: shown_file(&file),
@@ -584,8 +576,7 @@ pub(crate) fn document(
                 .collect();
         }
     }
-    let main_language = r.model.levels.iter().find(|lv| lv.level == 0).map_or("", |lv| lv.language.as_str());
-    let (params, notes) = Params::new(&r.doc, options.bind.as_ref(), main_language);
+    let (params, notes) = Params::new(&r.doc, options.bind.as_ref());
     let drawn: HashMap<usize, usize> = r.model.levels.iter().enumerate().map(|(k, lv)| (lv.level, k)).collect();
     for (k, lv) in r.model.levels.iter().enumerate() {
         let host = &r.doc.levels[lv.level];
@@ -1223,26 +1214,9 @@ impl<'a> Index<'a> {
                 kind: it.kind,
                 name: name.unwrap_or_else(|| it.id.clone()),
                 symbol: sym.name.clone(),
-                reason: None,
                 objects: it.host.iter().filter_map(|i| self.insts.get(&(lv.level, *i)).copied()).collect(),
                 svg: drawn.as_ref().and_then(|d| d.svg.clone()),
                 primitives: drawn.and_then(|d| d.primitives),
-            });
-        }
-        // the devices that are not drawn at all: listed after, with the reason and no drawing
-        for u in &lv.undrawn {
-            let name = match u.host.as_slice() {
-                [i] => self.doc.levels[lv.level].instances.get(*i).map(|inst| inst.name.clone()),
-                _ => None,
-            };
-            out.push(Unplaced {
-                kind: if u.host.len() == 1 { "instance" } else { "bundle" },
-                name: name.unwrap_or_else(|| u.id.clone()),
-                symbol: String::new(),
-                reason: Some(u.reason.clone()),
-                objects: u.host.iter().filter_map(|i| self.insts.get(&(lv.level, *i)).copied()).collect(),
-                svg: None,
-                primitives: None,
             });
         }
         out

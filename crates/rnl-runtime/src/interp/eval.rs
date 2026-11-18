@@ -316,34 +316,9 @@ impl<'p> Interp<'p> {
         }
     }
 
-    /// Whether `id` is, or holds, a selection with `recursive=false` written in a level other than
-    /// that of the scene `s`: a rule that takes it takes effect only in the level it is written in
-    /// (10.4), as the selection itself selects nothing elsewhere.
-    pub(crate) fn own_level_only(&self, id: ObjId, s: SceneId, seen: &mut HashSet<ObjId>) -> bool {
-        if id == LEVEL || !seen.insert(id) {
-            return false;
-        }
-        let ObjData::Set(set) = self.o(id) else { return false };
-        match &set.kind {
-            SetKind::Select { params, writer, scope, site, .. } => {
-                let w = &self.units[*writer];
-                let elsewhere = w.kind == UnitKind::Level && w.level != Some(self.scenes[s].level);
-                (elsewhere
-                    && params.get("recursive").and_then(Lit::boolean) == Some(false)
-                    && !(self.follows_0_4(*writer) && site.as_ref().is_some_and(|site| site.recursive_selection)))
-                    || self.own_level_only(*scope, s, seen)
-            }
-            SetKind::Union { source } => self.own_level_only(*source, s, seen),
-            SetKind::Plain | SetKind::Constraints { .. } => {
-                set.items.iter().any(|(o, _)| self.own_level_only(*o, s, seen))
-            }
-            SetKind::Gen { .. } => false,
-        }
-    }
-
     /// A selection or generated set, or a set that holds one: evaluated where and when used (10.3).
     pub(crate) fn is_lazy(&self, id: ObjId) -> bool {
-        if id == LEVEL || self.pending_constraints.contains_key(&id) || self.selected_by_draft_edit(id) {
+        if id == LEVEL || self.pending_constraints.contains_key(&id) || self.selected_by_selection_edit(id) {
             return true;
         }
         match self.o(id) {
@@ -387,7 +362,7 @@ impl<'p> Interp<'p> {
     /// Is a value not lazy now and never so later? Only the edits of a set change with time, and
     /// they can only make a plain set not lazy (`SetData::not_lazy`).
     pub(crate) fn stays_not_lazy(&self, id: ObjId) -> bool {
-        if id == LEVEL || self.selected_by_draft_edit(id) {
+        if id == LEVEL || self.selected_by_selection_edit(id) {
             return false;
         }
         match self.o(id) {
@@ -494,12 +469,10 @@ impl<'p> Interp<'p> {
         }
         if let (Some(fr), '%') = (&ctx.frame, prefix) {
             let fr = fr.borrow();
-            let modern = fr.kind == FrameKind::Definition
-                && fr.definition.is_some_and(|id| {
-                    let d = self.def(id);
-                    self.follows_0_4(d.rec.map_or(d.def_unit, |rec| self.rec_unit[rec]))
-                });
-            if modern && fr.local_members.iter().any(|(n, _, _)| n == name) {
+            if fr.kind == FrameKind::Definition
+                && fr.definition.is_some()
+                && fr.local_members.iter().any(|(n, _, _)| n == name)
+            {
                 let resolved = fr.local_bindings.get(name).is_some_and(|(first, _, valid)| {
                     *valid
                         && fr.local(name).is_some()
@@ -552,7 +525,7 @@ impl<'p> Interp<'p> {
     ) -> Found {
         if let Some(b) = self.units[unit].names.get(&(prefix, name.to_string())).cloned() {
             let candidates = self.binding_candidates(&b);
-            if self.modern_binding(&b) && candidates.iter().any(|candidate| Rc::ptr_eq(&candidate.member, &member.m)) {
+            if candidates.iter().any(|candidate| Rc::ptr_eq(&candidate.member, &member.m)) {
                 for candidate in candidates {
                     if Rc::ptr_eq(&candidate.member, &member.m) {
                         break;
@@ -692,11 +665,7 @@ impl<'p> Interp<'p> {
             Found::Binding(b) => b.clone(),
             _ => return Ok(NOTHING),
         };
-        if self.modern_binding(&b) {
-            self.first_valid_binding_value(&b, ctx)
-        } else {
-            self.binding_value_one(&b, ctx)
-        }
+        self.first_valid_binding_value(&b, ctx)
     }
 
     pub(super) fn binding_value_one(&mut self, b: &super::unit::Binding, ctx: &Ctx) -> R<ObjId> {
@@ -719,17 +688,9 @@ impl<'p> Interp<'p> {
             }
             other => other?,
         };
-        let val = if self.modern_binding(b) {
-            self.binding_result(b, scene, val).0
-        } else {
-            self.bound_value(&mkey, scene, b.prefix, &b.name, val)
-        };
+        let val = self.binding_result(b, scene, val).0;
         if let Some(bound) = self.bound_memo.get(&(mkey.clone(), scene)) {
-            let hit = if self.modern_binding(b) {
-                self.binding_slot(b, scene).and_then(|index| bound.get(index))
-            } else {
-                bound.iter().find(|(key, _, _)| key.0 == b.prefix && key.1 == b.name)
-            };
+            let hit = self.binding_slot(b, scene).and_then(|index| bound.get(index));
             if let Some((_, _, dependencies)) = hit {
                 ctx.depend_on(dependencies);
             }
@@ -738,22 +699,6 @@ impl<'p> Interp<'p> {
             return Err(Stop::LocalRef);
         }
         Ok(val)
-    }
-
-    pub(crate) fn bound_value(
-        &self,
-        mkey: &MemberKey,
-        scene: Option<SceneId>,
-        prefix: char,
-        name: &str,
-        default: ObjId,
-    ) -> ObjId {
-        if let Some(bound) = self.bound_memo.get(&(mkey.clone(), scene)) {
-            if let Some((_, v, _)) = bound.iter().find(|(k, _, _)| k.0 == prefix && k.1 == name) {
-                return *v;
-            }
-        }
-        default
     }
 
     // ------------------------------------------------------------------ evaluation entry
@@ -856,7 +801,7 @@ impl<'p> Interp<'p> {
             Err(Stop::NoCircuit) => return Err(Stop::NoCircuit),
             Err(Stop::Fail(d)) => self.new_obj(ObjData::Failed(d)),
         };
-        self.remember_binding_creation(&ctx.member_key, scene, &bound, &ctx);
+        self.remember_binding_creation(&ctx.member_key, scene, &bound);
         self.bound_memo.insert(skey.clone(), bound);
         self.memo.insert(skey, Memo::Val(val));
         self.finish_specific_definitions();
@@ -865,7 +810,7 @@ impl<'p> Interp<'p> {
 
     /// Segments in order; each `=> name` binds the handle its segment produced (5.5, PR8).
     pub(crate) fn eval_member(&mut self, m: &Rc<Member>, ctx: &Ctx) -> (R<ObjId>, Bound) {
-        if ctx.frame_kind() == Some(FrameKind::Definition) && self.follows_0_4(self.source_unit(ctx)) {
+        if ctx.frame_kind() == Some(FrameKind::Definition) {
             if let Some(&diagnostic) = self.body_member_errors.get(&ptr(&**m)) {
                 self.note_failed(ctx.rec, m.start, m.end, false);
                 return (Err(Stop::Fail(Some(diagnostic))), Vec::new());
@@ -882,10 +827,8 @@ impl<'p> Interp<'p> {
 
     fn eval_segments(&mut self, m: &Rc<Member>, ctx: &Ctx) -> (R<ObjId>, Bound) {
         let mut statement_ctx = ctx.clone();
-        statement_ctx.recursive_selection = self.follows_0_4(self.source_unit(ctx))
-            && (ctx.recursive_selection || self.writes_recursive_selection(m, ctx));
-        statement_ctx.written_selection =
-            self.follows_0_4(self.source_unit(ctx)) && (ctx.written_selection || self.writes_selection(m, ctx));
+        statement_ctx.recursive_selection = ctx.recursive_selection || self.writes_recursive_selection(m, ctx);
+        statement_ctx.written_selection = ctx.written_selection || self.writes_selection(m, ctx);
         let ctx = &statement_ctx;
         let mut val = NOTHING;
         let mut sel = false;
@@ -917,8 +860,7 @@ impl<'p> Interp<'p> {
                     }
                 }
                 Err(Stop::LocalRef)
-                    if self.follows_0_4(self.source_unit(ctx))
-                        && ctx.body_scene.is_some()
+                    if ctx.body_scene.is_some()
                         && (seg.call.as_ref().or_else(|| {
                             m.segments.get(k + 1).filter(|next| next.piped).and_then(|next| next.call.as_ref())
                         }))
@@ -1000,17 +942,8 @@ impl<'p> Interp<'p> {
                 explicit: false,
             });
         }
-        // a rule whose selection takes effect only in its own level does nothing below it (10.4),
-        // before what else it names, which may be host objects of that level
-        let own_level = |it: &Self, args: &[ArgV]| {
-            !it.follows_0_4(it.source_unit(ctx))
-                && ctx.scene.is_some_and(|s| args.iter().any(|a| it.own_level_only(a.obj, s, &mut HashSet::new())))
-        };
-        if seg.call.is_some() && own_level(self, &args) {
-            return Err(Stop::OwnLevel);
-        }
         let kw0 = seg.call.as_ref().map(|c| self.kw(&c.kw, ctx.unit));
-        let keeps_input = kw0.as_ref().is_some_and(|kw| self.modifier_keeps_input(kw, ctx));
+        let keeps_input = kw0.as_ref().is_some_and(|kw| self.modifier_keeps_input(kw));
         let mut input_error = None;
         for a in &seg.args {
             if let Some(k) = &kw0 {
@@ -1048,9 +981,6 @@ impl<'p> Interp<'p> {
                 off: a.start,
                 explicit: matches!(a.obj, ObjExpr::Set(_)),
             });
-            if seg.call.is_some() && own_level(self, &args[args.len() - 1..]) {
-                return Err(Stop::OwnLevel);
-            }
         }
         let Some(call) = &seg.call else {
             if args.len() == 1 {
@@ -1074,8 +1004,7 @@ impl<'p> Interp<'p> {
         }
         let call_ctx = self.language_call_context(ctx, &args);
         let ctx = &call_ctx;
-        if self.follows_0_4(self.source_unit(ctx))
-            && !ctx.in_symbol()
+        if !ctx.in_symbol()
             && !matches!(
                 kw.as_str(),
                 "ADD-TO" | "REMOVE-FROM" | "DEFINE" | "DEFINE-SYMBOL" | "DEFINE-STYLE" | "USE-PACKAGE"
@@ -1097,8 +1026,7 @@ impl<'p> Interp<'p> {
                 }
             }
         }
-        if self.follows_0_4(self.source_unit(ctx))
-            && !kw.starts_with("SELECT-")
+        if !kw.starts_with("SELECT-")
             && !matches!(
                 kw.as_str(),
                 "UNION" | "ADD-TO" | "REMOVE-FROM" | "DEFINE" | "DEFINE-SYMBOL" | "DEFINE-STYLE" | "USE-PACKAGE"
@@ -1148,7 +1076,7 @@ impl<'p> Interp<'p> {
 
     /// Only static errors from this exact ordinary-definition node are shared across uses.
     pub(crate) fn reported_body_error<T>(&self, node: &T, ctx: &Ctx) -> Option<DiagId> {
-        if ctx.frame_kind() == Some(FrameKind::Definition) && self.follows_0_4(self.source_unit(ctx)) {
+        if ctx.frame_kind() == Some(FrameKind::Definition) {
             self.body_errors.get(&ptr(node)).copied()
         } else {
             None
@@ -1178,13 +1106,8 @@ impl<'p> Interp<'p> {
                     );
                 }
             }
-            // A keyword that a later version adds. Preserve the released unknown-keyword
-            // diagnostic for solver settings while this new keyword is draft-only.
-            if let Some(since) = words()
-                .keyword(kw)
-                .filter(|_| !matches!(kw, "TABLE" | "SOLVER-CONFIG") || super::unit::keeps_0_4(&version))
-                .and_then(|k| k.since.clone())
-            {
+            // a keyword that a later version adds
+            if let Some(since) = words().keyword(kw).and_then(|k| k.since.clone()) {
                 if crate::interp::unit::version_key(&since) > crate::interp::unit::version_key(&version) {
                     let msg = format!("unknown keyword @{written}: the language {since} adds it, and this file is of {version} (16.1)");
                     return self.fail(ctx, codes::KEYWORD_UNKNOWN, msg, call.start);
@@ -1295,7 +1218,7 @@ impl<'p> Interp<'p> {
             }
         };
         let v = fr.borrow().param(name).cloned();
-        if v.is_none() && self.follows_0_4(self.source_unit(ctx)) {
+        if v.is_none() {
             if let Some(definition) = fr.borrow().definition {
                 if let Some(diagnostic) = self.body_parameter_errors.get(&(definition, name.to_string())) {
                     return Err(Stop::Fail(Some(*diagnostic)));
@@ -1304,7 +1227,9 @@ impl<'p> Interp<'p> {
         }
         match v {
             Some(v) => Ok(v),
-            None => self.fail(ctx, codes::REF_HOLE_COORD_NOT_PARAM, format!("?{name} is not a parameter (6.10)"), off),
+            None => {
+                self.fail(ctx, codes::REF_HOLE_NOT_A_PARAM, format!("?{name} is not in the parameter list (6.10)"), off)
+            }
         }
     }
 
@@ -1324,7 +1249,7 @@ impl<'p> Interp<'p> {
         }
         self.register_place_nested(e, ctx, &nested);
         for (k, m) in e.members.iter().enumerate() {
-            if ctx.frame_kind() == Some(FrameKind::Definition) && self.follows_0_4(self.source_unit(ctx)) {
+            if ctx.frame_kind() == Some(FrameKind::Definition) {
                 if let Some(&diagnostic) = self.body_member_errors.get(&ptr(&**m)) {
                     self.note_failed(ctx.rec, m.start, m.end, false);
                     let failed = self.new_obj(ObjData::Failed(Some(diagnostic)));
@@ -1357,9 +1282,7 @@ impl<'p> Interp<'p> {
                     let (obj, _sel) = match self.eval_obj(&a.obj, &arg_ctx) {
                         Ok(v) => v,
                         Err(Stop::Fail(d)) => (self.new_obj(ObjData::Failed(d)), false),
-                        Err(Stop::LocalRef) if self.follows_0_4(self.source_unit(ctx)) && ctx.body_scene.is_some() => {
-                            continue
-                        }
+                        Err(Stop::LocalRef) if ctx.body_scene.is_some() => continue,
                         Err(o) => return Err(o),
                     };
                     if self.is_empty_node(obj) {
@@ -1382,7 +1305,7 @@ impl<'p> Interp<'p> {
             let obj = match self.nested_member(m, &sub, &nested) {
                 Ok(v) => v,
                 Err(Stop::Fail(d)) => self.new_obj(ObjData::Failed(d)),
-                Err(Stop::OwnLevel) if self.follows_0_4(self.source_unit(ctx)) && ctx.body_scene.is_some() => continue,
+                Err(Stop::OwnLevel) if ctx.body_scene.is_some() => continue,
                 Err(o) => return Err(o),
             };
             if self.is_empty_node(obj) {
@@ -1509,11 +1432,7 @@ impl<'p> Interp<'p> {
                 let id = self.err_cause(ctx, codes::REF_FAILED, msg, e.start, d);
                 return Err(Stop::Fail(Some(id)));
             }
-            if external
-                && ctx.in_symbol()
-                && self.follows_0_4(self.source_unit(ctx))
-                && self.forbidden_body_scene_value(e.prefix, obj)
-            {
+            if external && ctx.in_symbol() && self.forbidden_body_scene_value(e.prefix, obj) {
                 return self.fail(ctx, codes::DEFINE_BODY_SCENE_REF,
                     format!("{} refers to an object of the drawing level; scene objects enter a definition body through roles (6.9)",e.text()), e.start);
             }
@@ -1544,7 +1463,7 @@ impl<'p> Interp<'p> {
     fn resolve_hole(&mut self, e: &Ref, ctx: &Ctx) -> R<ObjId> {
         let fk = ctx.frame_kind();
         let Some(name) = &e.name else {
-            if fk == Some(FrameKind::Definition) && self.follows_0_4(self.source_unit(ctx)) {
+            if fk == Some(FrameKind::Definition) {
                 if let Some(usage) = ctx.frame_usage() {
                     return Ok(usage);
                 }
@@ -1553,11 +1472,7 @@ impl<'p> Interp<'p> {
                 return self.fail(
                     ctx,
                     codes::REF_BARE_HOLE_OUTSIDE_SYMBOL,
-                    if self.follows_0_4(self.source_unit(ctx)) {
-                        "a bare `?` is written only in a general definition body or a symbol body (9.4, 13.3)"
-                    } else {
-                        "a bare `?` is written only in a symbol body, meaning the object the symbol draws (13.3)"
-                    },
+                    "a bare `?` is written only in a general definition body or a symbol body (9.4, 13.3)",
                     e.start,
                 );
             }
@@ -1596,14 +1511,10 @@ impl<'p> Interp<'p> {
     }
 
     fn resolve_host(&mut self, e: &Ref, ctx: &Ctx) -> R<ObjId> {
-        if self.follows_0_4(self.source_unit(ctx)) && e.prefix == '&' && e.name.is_none() {
-            // Allocate only when a modern file uses this value: released object ids stay intact.
+        if e.prefix == '&' && e.name.is_none() {
             return Ok(self.new_obj(ObjData::EmptyNode { direct: true }));
         }
-        if self.follows_0_4(self.source_unit(ctx))
-            && ctx.frame_kind() == Some(FrameKind::Definition)
-            && e.is_bare_level()
-        {
+        if ctx.frame_kind() == Some(FrameKind::Definition) && e.is_bare_level() {
             return Ok(LEVEL);
         }
         if matches!(ctx.frame_kind(), Some(FrameKind::Definition) | Some(FrameKind::Symbol)) {
@@ -1790,21 +1701,16 @@ impl<'p> Interp<'p> {
     }
 
     fn subobject(&mut self, obj: ObjId, p: &PathItem, ctx: &Ctx, e: &Ref) -> R<ObjId> {
-        if self.follows_0_4(self.source_unit(ctx)) {
-            if let Some(cause) = self.failed_obj(obj) {
-                let diagnostic =
-                    self.err_cause(ctx, codes::REF_FAILED, format!("{} failed", self.label(obj)), e.start, cause);
-                return Err(Stop::Fail(Some(diagnostic)));
-            }
+        if let Some(cause) = self.failed_obj(obj) {
+            let diagnostic =
+                self.err_cause(ctx, codes::REF_FAILED, format!("{} failed", self.label(obj)), e.start, cause);
+            return Err(Stop::Fail(Some(diagnostic)));
         }
-        if self.follows_0_4(self.source_unit(ctx))
-            && matches!(self.o(obj), ObjData::Usage(_) | ObjData::NamedSubobject { .. })
-        {
+        if matches!(self.o(obj), ObjData::Usage(_) | ObjData::NamedSubobject { .. }) {
             ctx.depend_on(&[obj]);
         }
         if self.is_set(obj)
             && p.sep == Sep::Sub
-            && self.follows_0_4(self.source_unit(ctx))
             && e.sub.is_none()
             && e.path.iter().all(|part| part.sub.is_none())
             && self.subobject_name(obj, &p.name, ctx) == "position"
@@ -1827,13 +1733,7 @@ impl<'p> Interp<'p> {
         }
         let name = self.subobject_name(obj, &p.name, ctx);
         if name == "position" {
-            if self.follows_0_4(self.source_unit(ctx)) {
-                return self.position_subobject(obj, ctx, e.start);
-            }
-            return Ok(match ctx.scene {
-                Some(s) => self.scene_pos_of(s, obj),
-                None => self.new_obj(ObjData::Pos { parent: obj }),
-            });
+            return self.position_subobject(obj, ctx, e.start);
         }
         if name == "net" {
             if matches!(self.o(obj), ObjData::Term { .. }) {
@@ -1842,9 +1742,7 @@ impl<'p> Interp<'p> {
                 };
                 return self.term_net(s, obj, ctx, e.start);
             }
-            if self.follows_0_4(self.source_unit(ctx))
-                && matches!(self.o(obj), ObjData::NamedSubobject { .. } | ObjData::ScenePin { .. })
-            {
+            if matches!(self.o(obj), ObjData::NamedSubobject { .. } | ObjData::ScenePin { .. }) {
                 let Some(scene) = ctx.scene else {
                     return self.fail(ctx, codes::REF_NO_CIRCUIT, "there is no circuit here", e.start);
                 };
@@ -1883,16 +1781,14 @@ impl<'p> Interp<'p> {
             let Some(s) = ctx.scene else {
                 return self.fail(ctx, codes::REF_NO_CIRCUIT, "there is no circuit here", e.start);
             };
-            if self.follows_0_4(self.source_unit(ctx))
-                && matches!(
-                    self.o(obj),
-                    ObjData::Inst { .. }
-                        | ObjData::Usage(_)
-                        | ObjData::Bundle { .. }
-                        | ObjData::ScenePin { .. }
-                        | ObjData::NamedSubobject { .. }
-                )
-            {
+            if matches!(
+                self.o(obj),
+                ObjData::Inst { .. }
+                    | ObjData::Usage(_)
+                    | ObjData::Bundle { .. }
+                    | ObjData::ScenePin { .. }
+                    | ObjData::NamedSubobject { .. }
+            ) {
                 return Ok(self.scene_named_subobject(s, obj, &name, ctx, e.start));
             }
             return Ok(self.scene_keytext(s, obj, &name));
@@ -2010,11 +1906,11 @@ impl<'p> Interp<'p> {
             let l = self.label(obj);
             return self.fail(ctx, codes::REF_NO_TERMINALS, format!("{l} has no terminals (6.4)"), e.start);
         }
-        // in 0.4 a quoted terminal made only of digits is a number too, as an unquoted one is (6.4)
+        // a quoted terminal made only of digits is a number too, as an unquoted one is (6.4)
         let number = p.number.or_else(|| {
             let digits =
                 p.quoted && p.sub.is_none() && !p.name.is_empty() && p.name.bytes().all(|b| b.is_ascii_digit());
-            if digits && self.follows_0_4(self.source_unit(ctx)) {
+            if digits {
                 p.name.parse::<u32>().ok().filter(|n| *n > 0)
             } else {
                 None
@@ -2022,7 +1918,7 @@ impl<'p> Interp<'p> {
         });
         // a number reaches a terminal by its place only, also a port named with digits, as in
         // `.subckt amp 3 1 2`, where `#X1:1` is the port named 3 (6.4)
-        let by_place = number.is_some() && self.follows_0_4(self.source_unit(ctx));
+        let by_place = number.is_some();
         let mut out = Vec::new();
         for nm in &names {
             let t = match ctx.scene {
@@ -2051,9 +1947,6 @@ impl<'p> Interp<'p> {
 
     fn local_member(&mut self, name: &str, ctx: &Ctx) -> R<ObjId> {
         let fr = ctx.frame.clone().unwrap();
-        let definition = fr.borrow().definition.unwrap();
-        let d = self.def(definition);
-        let modern = self.follows_0_4(d.rec.map_or(d.def_unit, |rec| self.rec_unit[rec]));
         let members: Vec<_> =
             fr.borrow().local_members.iter().filter(|(n, _, _)| n == name).map(|(_, m, k)| (m.clone(), *k)).collect();
         let mut last = NOTHING;
@@ -2064,7 +1957,7 @@ impl<'p> Interp<'p> {
             }
             last = self.definition_member(&member.m, k, ctx)?;
             let frame = fr.borrow();
-            if !modern || frame.local_bindings.get(name).is_some_and(|(first, _, valid)| *valid && *first <= k) {
+            if frame.local_bindings.get(name).is_some_and(|(first, _, valid)| *valid && *first <= k) {
                 return Ok(frame.local(name).unwrap_or(last));
             }
         }
@@ -2169,11 +2062,7 @@ impl<'p> Interp<'p> {
                     return self.fail(
                         ctx,
                         codes::KEYWORD_POSITION_LABELLED_TWICE,
-                        if self.follows_0_4(self.source_unit(ctx)) {
-                            format!("role {role} is labelled more than once (4.2 rule 6)")
-                        } else {
-                            "a role is labelled only once (4.2 rule 6)".to_string()
-                        },
+                        format!("role {role} is labelled more than once (4.2 rule 6)"),
                         a.off,
                     );
                 }
@@ -2194,7 +2083,7 @@ impl<'p> Interp<'p> {
         // 5.2.1 rule 2: a single set object is unpacked one level
         let mut unpacked_from: Option<ArgV> = None;
         let total = objs.len() + usize::from(!defs.is_empty());
-        let constraint_items = self.follows_0_4(self.source_unit(ctx)) && ConstraintKind::parse(kw).is_some();
+        let constraint_items = ConstraintKind::parse(kw).is_some();
         let phase = ctx.scene.map_or(3, |s| self.scenes[s].phase.max(3));
         if total == 1
             && kw != "TABLE"
@@ -2433,7 +2322,7 @@ impl<'p> Interp<'p> {
                     return interp.fail(
                         ctx,
                         codes::PARAM_WRONG_TYPE,
-                        super::unit::parameter_type_message(kw, name, &parameter.ty, true),
+                        super::unit::parameter_type_message(kw, name, &parameter.ty),
                         off,
                     );
                 }
@@ -2466,11 +2355,8 @@ impl<'p> Interp<'p> {
         let order: Vec<String> = positional.map(|p| p.to_vec()).unwrap_or(default_order);
         if !p.positional.is_empty() {
             if order.is_empty() {
-                let (code, message) = crate::parameter_errors::positional(
-                    kw,
-                    crate::parameter_errors::Site::Body,
-                    super::unit::keeps_0_4(&version),
-                );
+                let (code, message) =
+                    crate::parameter_errors::positional(kw, crate::parameter_errors::Site::Body, true);
                 return self.fail(ctx, code, message, p.start);
             }
             if p.positional.len() > order.len() {
@@ -2516,14 +2402,8 @@ impl<'p> Interp<'p> {
                 if open_style {
                     opts.extend(words().style_props.iter().filter(|s| s.in_version(&version)).map(|s| s.name.as_str()));
                 }
-                let (code, message) = crate::parameter_errors::unknown(
-                    kw,
-                    n,
-                    &std,
-                    &opts,
-                    crate::parameter_errors::Site::Body,
-                    super::unit::keeps_0_4(&version),
-                );
+                let (code, message) =
+                    crate::parameter_errors::unknown(kw, n, &std, &opts, crate::parameter_errors::Site::Body, true);
                 return self.fail(ctx, code, message, n.off);
             }
             if out.iter().any(|(k, _)| *k == std) {
@@ -2659,12 +2539,7 @@ impl<'p> Interp<'p> {
             _ => true,
         };
         if !ok {
-            return self.fail(
-                ctx,
-                codes::PARAM_WRONG_TYPE,
-                super::unit::parameter_type_message(kw, name, &sp.ty, self.follows_0_4(self.source_unit(ctx))),
-                off,
-            );
+            return self.fail(ctx, codes::PARAM_WRONG_TYPE, super::unit::parameter_type_message(kw, name, &sp.ty), off);
         }
         Ok(val)
     }
@@ -2704,27 +2579,14 @@ impl<'p> Interp<'p> {
                         )
                     }
                 };
-                let (param, is_role) = {
-                    let f = fr.borrow();
-                    (f.param(name).cloned(), f.role(name).is_some())
-                };
+                let param = fr.borrow().param(name).cloned();
                 if let Some(v) = param {
                     return Ok(v);
                 }
-                if self.follows_0_4(self.source_unit(ctx)) {
-                    if let Some(definition) = fr.borrow().definition {
-                        if let Some(diagnostic) = self.body_parameter_errors.get(&(definition, name.to_string())) {
-                            return Err(Stop::Fail(Some(*diagnostic)));
-                        }
+                if let Some(definition) = fr.borrow().definition {
+                    if let Some(diagnostic) = self.body_parameter_errors.get(&(definition, name.to_string())) {
+                        return Err(Stop::Fail(Some(*diagnostic)));
                     }
-                }
-                if is_role {
-                    return self.fail(
-                        ctx,
-                        codes::PARAM_HOLE_IS_ROLE,
-                        format!("?{name} is a role and cannot stand where a literal goes (6.10)"),
-                        off,
-                    );
                 }
                 self.fail(ctx, codes::REF_HOLE_NOT_A_PARAM, format!("?{name} is not in the parameter list (6.10)"), off)
             }

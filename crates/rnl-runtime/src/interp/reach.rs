@@ -15,9 +15,9 @@ pub(super) struct SetReach {
 }
 
 impl Interp<'_> {
-    /// A draft set edited with a selection remains a rule input, including when the
-    /// edit is reached through another set. Older edits keep their published classification.
-    pub(super) fn selected_by_draft_edit(&self, object: ObjId) -> bool {
+    /// A set edited with a selection remains a rule input, including when the
+    /// edit is reached through another set.
+    pub(super) fn selected_by_selection_edit(&self, object: ObjId) -> bool {
         if !self.places.enabled {
             return false;
         }
@@ -32,10 +32,7 @@ impl Interp<'_> {
                 return true;
             }
             set.made_of().any(|child| visit(it, child, edited, seen))
-                || set
-                    .mods
-                    .iter()
-                    .any(|edit| visit(it, edit.source, edited || it.follows_0_4(it.source_unit(&edit.ctx)), seen))
+                || set.mods.iter().any(|edit| visit(it, edit.source, true, seen))
         }
         visit(self, object, false, &mut HashSet::new())
     }
@@ -64,11 +61,6 @@ impl Interp<'_> {
         let SetKind::Select { params, writer, site, .. } = self.set(object).kind.clone() else {
             return true;
         };
-        if !self.follows_0_4(writer) {
-            return params.get("recursive").and_then(Lit::boolean) != Some(false)
-                || self.units[writer].kind != UnitKind::Level
-                || self.units[writer].level == Some(self.scenes[scene].level);
-        }
         self.selection_at_home(scene, writer, site.as_deref())
             || site.as_ref().is_some_and(|site| site.recursive_selection)
             || params.get("recursive").and_then(Lit::boolean) == Some(true)
@@ -121,13 +113,11 @@ impl Interp<'_> {
             }
         };
         if let Some(site) = &set.reach_site {
-            if self.follows_0_4(self.source_unit(site)) {
-                let home = self.selection_at_home(scene, site.unit, Some(site));
-                if site.written_selection {
-                    result.reaches = home || site.recursive_selection;
-                } else {
-                    result.reaches |= home;
-                }
+            let home = self.selection_at_home(scene, site.unit, Some(site));
+            if site.written_selection {
+                result.reaches = home || site.recursive_selection;
+            } else {
+                result.reaches |= home;
             }
         }
         for edit in set.mods {

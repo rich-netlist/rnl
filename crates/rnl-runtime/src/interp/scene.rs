@@ -37,7 +37,7 @@ pub enum TargetOp {
         priority: Option<Priority>,
         off: usize,
     },
-    /// `codes`, two or more, when a file of 0.4 writes a list of them, of which `code` is the first (11.2).
+    /// `codes`, two or more, when a list of them is written, of which `code` is the first (11.2).
     Orient {
         code: Orient,
         codes: Vec<Orient>,
@@ -77,7 +77,7 @@ pub enum TargetOp {
 #[derive(Clone, Debug)]
 pub enum FactData {
     Coord(char, f64),
-    /// A coordinate in a general definition body, relative to its usage (0.4, 9.4).
+    /// A coordinate in a general definition body, relative to its usage (9.4).
     RelativeCoord(char, f64, ObjId),
     Orient(Orient),
     Layer(String),
@@ -110,7 +110,7 @@ impl Fact {
     }
 }
 
-/// A WIRE given a wire in a statement of the draft 0.3, which rewrites the wire (its 13.1): the
+/// A WIRE given a wire in a statement, which rewrites the wire (13.1): the
 /// list of points and the mode that replace the wire's, read as a new WIRE's are, with where the
 /// statement is written. It has a key, the wire: of several, the one written last by position
 /// takes effect, and among those at one position (the segments of a pipe) the one read last
@@ -166,7 +166,7 @@ pub struct Scene {
     pub wires: Vec<ObjId>,
     /// The wires on each net, in the order of `wires`; `scene_add_wire` keeps it.
     pub wires_by_net: HashMap<ObjId, Vec<ObjId>>,
-    /// The rewrites of each wire, in the order they were read (the draft 0.3, 13.1).
+    /// The rewrites of each wire, in the order they were read (13.1).
     pub rewrites: HashMap<ObjId, Vec<Rewrite>>,
     pub rewrite_count: usize,
     pub bundles: Vec<ObjId>,
@@ -183,7 +183,7 @@ pub struct Scene {
     /// The indexes in `at` of each object's facts, in order; `add_at` keeps it.
     pub at_by_target: HashMap<ObjId, Vec<usize>>,
     pub orient: Vec<Fact>,
-    /// The ORIENT facts written with a list of codes in a file of 0.4 (11.2), by their index in
+    /// The ORIENT facts written with a list of codes (11.2), by their index in
     /// `orient`: every code, two or more, of which one is to hold; the fact's own is the first.
     pub orient_codes: HashMap<usize, Vec<Orient>>,
     pub appear: Vec<Fact>,
@@ -215,14 +215,11 @@ pub struct Scene {
     pub symbol_names: HashMap<ObjId, String>,
     pub bad_symbol_selections: HashSet<(Option<RecId>, usize)>,
     pub(crate) pin_text_sources: Vec<super::pin_names::PinTextSource>,
-    pub default_symbol: HashSet<ObjId>,
     pub pos: HashMap<ObjId, [Option<f64>; 2]>,
     pub ori: HashMap<ObjId, Orient>,
     pub style: HashMap<ObjId, BTreeMap<String, (Lit, Pos)>>,
     pub layer: HashMap<ObjId, (String, Pos)>,
     pub unplaced: Vec<String>,
-    /// The devices no symbol can be chosen for, with the reason; they are not drawn.
-    pub undrawn: Vec<(ObjId, String)>,
     pub failed_facts: HashSet<(u8, usize)>,
     /// The symbol facts weighed for some object, and those that won (8.3), by index in `appear`.
     pub symbol_weighed: HashSet<usize>,
@@ -346,13 +343,11 @@ impl Scene {
             symbol_names: HashMap::new(),
             bad_symbol_selections: HashSet::new(),
             pin_text_sources: Vec::new(),
-            default_symbol: HashSet::new(),
             pos: HashMap::new(),
             ori: HashMap::new(),
             style: HashMap::new(),
             layer: HashMap::new(),
             unplaced: Vec::new(),
-            undrawn: Vec::new(),
             failed_facts: HashSet::new(),
             symbol_weighed: HashSet::new(),
             symbol_won: HashSet::new(),
@@ -387,8 +382,8 @@ pub(crate) fn dedup(objs: Vec<ObjId>) -> Vec<ObjId> {
     objs.into_iter().filter(|o| seen.insert(*o)).collect()
 }
 
-/// The terminal names that the draft 0.3 adds to the defaults of the SPICE family, by element
-/// letter (6.12): `p1 n1 p2 n2` for T and O, `a b ref` for U, `d g s` for Z.
+/// The terminal names that the language adds to the adapter's defaults of the SPICE family, by
+/// element letter (6.12): `p1 n1 p2 n2` for T and O, `a b ref` for U, `d g s` for Z.
 pub(crate) fn added_terminals(letter: char) -> Option<&'static [&'static str]> {
     Some(match letter {
         'T' | 'O' => &["p1", "n1", "p2", "n2"],
@@ -522,34 +517,19 @@ impl Interp<'_> {
                 }
             }
         }
-        found.or_else(|| self.default_terminals(s, inst))
+        found.or_else(|| self.default_terminals(inst))
     }
 
-    /// The default terminal names of an instance, the defaults of the adapter (6.12): the table
-    /// every version has, which the adapter gives, and for an instance written in a file of the
-    /// draft 0.3 the names the draft adds for the SPICE family ([`added_terminals`]). The adapter
-    /// reads the host and does not know the language version of a file, so the runtime gives
-    /// these by the element letter.
-    pub(super) fn default_terminals(&self, s: SceneId, inst: &crate::host::Instance) -> Option<Vec<String>> {
-        let file = self.doc.file_level_of(inst).unwrap_or(self.scenes[s].level);
-        if self.follows_0_4(self.level_unit[file]) && inst.default_terminals_0_4.is_some() {
-            return inst.default_terminals_0_4.clone();
-        }
+    /// The default terminal names of an instance, the defaults of the adapter (6.12): the
+    /// adapter's table, and else the names the language adds for the SPICE family
+    /// ([`added_terminals`]). The adapter does not know these, so the runtime gives them by the
+    /// element letter.
+    pub(super) fn default_terminals(&self, inst: &crate::host::Instance) -> Option<Vec<String>> {
         if inst.default_terminals.is_some() {
             return inst.default_terminals.clone();
         }
         let names = added_terminals(inst.letter?)?;
-        self.written_in_0_3(s, inst).then(|| names.iter().map(|n| n.to_string()).collect())
-    }
-
-    /// Is an instance written in a file that follows the draft 0.3? The file of its line: in an
-    /// included file, an element outside a subcircuit belongs to the circuit that includes it
-    /// (6.1) and is still written in that file; in a library section, the section, which is read
-    /// as a file of its own (2.8). A file or section included twice is two file levels, and the
-    /// instance is of the one it was read through.
-    fn written_in_0_3(&self, s: SceneId, inst: &crate::host::Instance) -> bool {
-        let file = self.doc.file_level_of(inst);
-        self.follows_0_3(self.level_unit[file.unwrap_or(self.scenes[s].level)])
+        Some(names.iter().map(|n| n.to_string()).collect())
     }
 
     /// The terminals of an owner: (index from 1, name).
@@ -692,9 +672,7 @@ impl Interp<'_> {
                         Some(self.inst_net(s, member, &node))
                     })
                     .collect();
-                if site.as_ref().is_some_and(|site| self.follows_0_4(self.source_unit(site)))
-                    && nets.first().is_some_and(|first| nets.iter().all(|net| net == first))
-                {
+                if site.is_some() && nets.first().is_some_and(|first| nets.iter().all(|net| net == first)) {
                     nets.truncate(1);
                 }
                 nets
@@ -712,12 +690,12 @@ impl Interp<'_> {
         }
     }
 
-    /// A draft bundle terminal denotes the same name in each member (11.8).
+    /// A bundle terminal denotes the same name in each member (11.8).
     /// A terminal with no name still has its electrical number (6.4).
     fn bundle_member_terminals(&mut self, scene: SceneId, bundle: ObjId, index: u32) -> Vec<(ObjId, u32)> {
         let ObjData::Bundle { members, site, .. } = self.o(bundle).clone() else { return Vec::new() };
-        let modern = site.as_ref().is_some_and(|site| self.follows_0_4(self.source_unit(site)));
-        let name = modern
+        let name = site
+            .is_some()
             .then(|| {
                 self.owner_terms(scene, bundle)
                     .into_iter()
@@ -896,14 +874,13 @@ impl Interp<'_> {
         key_unit: UnitId,
         off: usize,
     ) -> R<ObjId> {
-        let diagnostic_off = if self.follows_0_4(self.source_unit(ctx)) { off } else { 0 };
         if let ObjData::Failed(d) = self.o(att) {
             let d = *d;
             let id = self.err_cause(
                 ctx,
                 codes::TEXT_ATTACHED_OBJECT_FAILED,
                 "the object the TEXT is attached to failed",
-                diagnostic_off,
+                off,
                 d,
             );
             return Err(Stop::Fail(Some(id)));
@@ -917,16 +894,11 @@ impl Interp<'_> {
                         ctx,
                         codes::TEXT_POINT_TAKES_NO_KEY,
                         "a text attached to a point takes no key= (13.3)",
-                        diagnostic_off,
+                        off,
                     );
                 }
                 if items.text.is_none() {
-                    return self.fail(
-                        ctx,
-                        codes::TEXT_MISSING_TEXT,
-                        "the text= of TEXT must be written (13.3)",
-                        diagnostic_off,
-                    );
+                    return self.fail(ctx, codes::TEXT_MISSING_TEXT, "the text= of TEXT must be written (13.3)", off);
                 }
                 self.new_obj(ObjData::Text {
                     attach: att,
@@ -964,8 +936,7 @@ impl Interp<'_> {
                         off,
                         generated,
                     });
-                    let keeps_creation =
-                        self.follows_0_4(self.source_unit(ctx)) && self.scenes[s].created.contains_key(&kt);
+                    let keeps_creation = self.scenes[s].created.contains_key(&kt);
                     if let ObjData::KeyText { layers, site: ks, generated: g, direct, .. } = self.om(kt) {
                         // its place in the order of writing, where a later segment is later (5.5)
                         layers.push((order_pos(&at, &ctx.segments), items, style));
@@ -987,12 +958,7 @@ impl Interp<'_> {
                     return Ok(kt);
                 }
                 if items.text.is_none() {
-                    return self.fail(
-                        ctx,
-                        codes::TEXT_MISSING_TEXT,
-                        "the text= of TEXT must be written (13.3)",
-                        diagnostic_off,
-                    );
+                    return self.fail(ctx, codes::TEXT_MISSING_TEXT, "the text= of TEXT must be written (13.3)", off);
                 }
                 let has_offset = items.dx.is_some() || items.dy.is_some();
                 if has_offset && matches!(kind, ObjData::Wire { .. } | ObjData::Net { .. }) {
@@ -1000,7 +966,7 @@ impl Interp<'_> {
                         ctx,
                         codes::TEXT_WIRE_NET_NO_OFFSET,
                         "a text attached to a wire or a net takes no dx, dy (13.3)",
-                        diagnostic_off,
+                        off,
                     );
                 }
                 self.new_obj(ObjData::Text {
@@ -1021,7 +987,7 @@ impl Interp<'_> {
                     ctx,
                     codes::TEXT_ATTACH_NOT_ALLOWED,
                     format!("TEXT cannot be attached to {l} (13.3)"),
-                    diagnostic_off,
+                    off,
                 );
             }
         };
@@ -1059,7 +1025,7 @@ impl Interp<'_> {
         }
     }
 
-    /// A WIRE given the wire `w` in a statement of the draft 0.3 (its 13.1): its list of points and
+    /// A WIRE given the wire `w` in a statement (13.1): its list of points and
     /// its mode are kept, to replace the wire's when this is the rewrite that takes effect; its
     /// style parameters are direct style of the wire, as if a SET-STYLE were written for the wire
     /// at the statement (8.3), unless the rewrite fails (`check_rewrites`).
@@ -1099,7 +1065,7 @@ impl Interp<'_> {
     }
 
     /// What a wire of scene `s` is drawn by (13.1): its points and its mode as the rewrite that
-    /// takes effect gives them (the draft 0.3), otherwise as the WIRE that made it. That is the
+    /// takes effect gives them, otherwise as the WIRE that made it. That is the
     /// latest rewrite by key that holds: one found to fail in the geometry phase takes no effect,
     /// and the wire keeps its earlier list and mode (5.8).
     pub(crate) fn wire_shape(&self, s: SceneId, w: ObjId) -> Option<WireShape> {
@@ -1160,7 +1126,7 @@ impl Interp<'_> {
                 // An ANNOTATION is locatable but PLACE takes its position subobject, not
                 // the annotation itself (13.5). Check before coordinate normalization so
                 // a following annotation cannot accidentally move its owner.
-                if self.follows_0_4(self.source_unit(ctx)) && matches!(self.o(obj), ObjData::Annotation(_)) {
+                if matches!(self.o(obj), ObjData::Annotation(_)) {
                     return self.fail(
                         ctx,
                         codes::PLACE_NOT_TAKEN,
@@ -1168,7 +1134,7 @@ impl Interp<'_> {
                         *off,
                     );
                 }
-                let obj = if self.follows_0_4(self.source_unit(ctx)) { self.coordinate_object(obj) } else { obj };
+                let obj = self.coordinate_object(obj);
                 let base = self.coordinate_base(ctx);
                 if base.is_some_and(|b| self.coordinate_object(obj) == b) {
                     return self.fail(
@@ -1397,7 +1363,7 @@ impl Interp<'_> {
             }
             return vec![InputMember::plain(obj)];
         }
-        if self.set(obj).reach_site.as_ref().is_some_and(|site| self.follows_0_4(self.source_unit(site))) {
+        if self.set(obj).reach_site.is_some() {
             let reach = self.set_reach(s, obj, &mut HashSet::new());
             if reach.selected && !reach.reaches {
                 return Vec::new();
@@ -1543,7 +1509,7 @@ impl Interp<'_> {
         let snapshot = phase <= 5; // generated objects are not seen before step 6 (10.5)
         let pool: Option<Vec<ObjId>> = if scope == LEVEL || matches!(self.o(scope), ObjData::LevelObj { .. }) {
             None
-        } else if phase >= 5 && self.follows_0_4(writer) {
+        } else if phase >= 5 {
             Some(
                 self.scene_input_members_at(s, scope, phase, ctx)
                     .into_iter()
@@ -1562,60 +1528,33 @@ impl Interp<'_> {
         if keyword == "SELECT-USAGE" || keyword == "SELECT-ANCESTOR-USAGE" {
             let pool =
                 pool.map(|members| members.into_iter().map(|member| self.selection_value(member, phase)).collect());
-            let usages = self.select_usages(
-                s,
-                sel,
-                &keyword,
-                pool,
-                definition,
-                phase,
-                ctx,
-                snapshot,
-                site,
-                off,
-                self.follows_0_4(writer),
-            );
+            let usages = self.select_usages(s, sel, &keyword, pool, definition, phase, ctx, snapshot, site, off);
             return usages.into_iter().filter(|usage| self.selection_symbol_matches(s, *usage, &params)).collect();
         }
         let role = params.get("role").cloned();
-        let (pool, via) = match pool {
-            Some(p) => {
-                let (p, v) = if self.follows_0_4(writer) {
-                    (self.walk_selection_usages(s, &p, role.as_ref(), writer, phase, ctx, &keyword), HashSet::new())
-                } else {
-                    self.walk_usages(&p, role.as_ref(), writer)
-                };
-                (Some(p), v)
-            }
-            None => (None, HashSet::new()),
-        };
+        let pool = pool.map(|p| self.walk_selection_usages(s, &p, role.as_ref(), writer, phase, ctx, &keyword));
         let mut selected = match keyword.as_str() {
-            "SELECT-PIN" => self.select_pins(s, pool, &via, &params, snapshot, writer),
+            "SELECT-PIN" => self.select_pins(s, pool, &params, snapshot),
             "SELECT-INSTANCE" => {
                 let cands = match &pool {
                     None => self.inst_like(s),
                     Some(pool) => {
-                        // A terminal gives its device, a net the devices with a terminal on it.
-                        // Only earlier languages restrict these steps to drawn terminals (10.1).
+                        // A terminal gives its device, a net the devices with a terminal on it,
+                        // drawn or not (10.1).
                         let mut cands = Vec::new();
                         for &o in pool {
                             match self.o(o).clone() {
                                 ObjData::Inst { .. } | ObjData::Bundle { .. } => cands.push(self.bundle_of(o)),
-                                _ if via.contains(&o) => {}
                                 ObjData::Term { owner, .. }
                                     if matches!(self.o(owner), ObjData::Inst { .. } | ObjData::Bundle { .. }) =>
                                 {
-                                    if self.follows_0_4(writer) || self.drawn(s, o, phase) {
-                                        cands.push(self.bundle_of(owner));
-                                    }
+                                    cands.push(self.bundle_of(owner));
                                 }
                                 ObjData::Net { .. } => {
                                     for ow in self.inst_like(s) {
                                         let mut hit = false;
                                         for t in self.terms_of(s, ow) {
-                                            if self.tnet_has(s, t, o)
-                                                && (self.follows_0_4(writer) || self.drawn(s, t, phase))
-                                            {
+                                            if self.tnet_has(s, t, o) {
                                                 hit = true;
                                                 break;
                                             }
@@ -1633,9 +1572,7 @@ impl Interp<'_> {
                 };
                 let out: Vec<ObjId> = cands
                     .into_iter()
-                    .filter(|o| {
-                        self.inst_match(*o, &params, false, writer) && self.selection_symbol_matches(s, *o, &params)
-                    })
+                    .filter(|o| self.inst_match(*o, &params, false) && self.selection_symbol_matches(s, *o, &params))
                     .collect();
                 dedup(out)
             }
@@ -1651,10 +1588,6 @@ impl Interp<'_> {
                     Some(pool) => {
                         let mut out = Vec::new();
                         for &o in pool {
-                            let is_term = matches!(self.o(o), ObjData::Term { .. });
-                            if via.contains(&o) && !is_term {
-                                continue; // members are taken by kind, not used as a scope again (10.1, PR16)
-                            }
                             match self.o(o).clone() {
                                 ObjData::Net { .. } => {
                                     for ow in self.inst_like(s) {
@@ -1670,7 +1603,7 @@ impl Interp<'_> {
                                     out.extend(self.terms_of(s, b));
                                 }
                                 ObjData::Term { .. } => out.push(o),
-                                ObjData::ScenePin { owner, index } if self.follows_0_4(writer) => {
+                                ObjData::ScenePin { owner, index } => {
                                     out.extend(self.selected_pin_terminals(s, owner, index));
                                 }
                                 _ => {}
@@ -1683,16 +1616,12 @@ impl Interp<'_> {
                 let mut out = Vec::new();
                 for t in terms {
                     let ObjData::Term { owner, index, name } = self.o(t).clone() else { continue };
-                    if !self.inst_match(owner, &params, true, writer) {
+                    if !self.inst_match(owner, &params, true) {
                         continue;
                     }
                     if let Some(pv) = params.get("terminal") {
-                        // in 0.4 a string of digits is the terminal number (6.4)
-                        let pv = &if self.follows_0_4(writer) {
-                            super::terminal_maps::terminal_value(pv)
-                        } else {
-                            pv.clone()
-                        };
+                        // a string of digits is the terminal number (6.4)
+                        let pv = &super::terminal_maps::terminal_value(pv);
                         let ok = match pv {
                             Lit::Num(n) => index == *n as u32,
                             Lit::Str(w) => name.as_ref().is_some_and(|n| {
@@ -1729,9 +1658,6 @@ impl Interp<'_> {
                             continue;
                         }
                     }
-                    if !self.follows_0_4(writer) && phase >= 5 && !self.has_pin(s, t) {
-                        continue;
-                    }
                     out.push(t);
                 }
                 dedup(out)
@@ -1745,24 +1671,13 @@ impl Interp<'_> {
                         for &o in pool {
                             match self.o(o).clone() {
                                 ObjData::Net { .. } => cands.push(o),
-                                _ if via.contains(&o) => {}
                                 ObjData::Inst { .. } | ObjData::Bundle { .. } => {
                                     let b = self.bundle_of(o);
                                     for t in self.terms_of(s, b) {
-                                        if self.follows_0_4(writer) || self.drawn(s, t, phase) {
-                                            cands.extend(self.tnets(s, t));
-                                        }
+                                        cands.extend(self.tnets(s, t));
                                     }
                                 }
-                                ObjData::Term { owner, .. } => {
-                                    // a port of this level names its net; other terminals count with a pin (TR11)
-                                    if self.follows_0_4(writer)
-                                        || matches!(self.o(owner), ObjData::LevelObj { .. })
-                                        || self.drawn(s, o, phase)
-                                    {
-                                        cands.extend(self.tnets(s, o));
-                                    }
-                                }
+                                ObjData::Term { .. } => cands.extend(self.tnets(s, o)),
                                 ObjData::Wire { nets, .. } => cands.extend(nets),
                                 ObjData::ScenePin { owner, index } => {
                                     cands.extend(self.scene_pin_nets(s, owner, index))
@@ -1800,12 +1715,7 @@ impl Interp<'_> {
                         }
                     }
                     if let Some(w) = params.get("wired").and_then(Lit::boolean) {
-                        let wired = if self.follows_0_4(writer) {
-                            self.routing_net_wired(s, n, &ends)
-                        } else {
-                            self.net_wired(s, n, &ends)
-                        };
-                        if wired != w {
+                        if self.routing_net_wired(s, n, &ends) != w {
                             continue;
                         }
                     }
@@ -1815,13 +1725,13 @@ impl Interp<'_> {
             }
             "SELECT-WIRE" => {
                 let wires: Vec<ObjId> = self
-                    .selection_drawables(s, snapshot, self.follows_0_4(writer))
+                    .selection_drawables(s, snapshot)
                     .into_iter()
                     .filter(|o| matches!(self.o(*o), ObjData::Wire { .. }))
                     .collect();
                 let cands: Vec<ObjId> = match &pool {
                     None => wires,
-                    Some(pool) if self.follows_0_4(writer) => {
+                    Some(pool) => {
                         let ids: HashSet<_> = wires.iter().copied().collect();
                         let mut by_net: HashMap<ObjId, Vec<ObjId>> = HashMap::new();
                         for wire in wires {
@@ -1840,20 +1750,6 @@ impl Interp<'_> {
                             }
                         }
                         dedup(out)
-                    }
-                    Some(pool) => {
-                        // a net in the scope gives the wires drawn on it; nets that are only usage members are not scopes (PR16)
-                        let nets: HashSet<ObjId> = pool
-                            .iter()
-                            .filter(|o| matches!(self.o(**o), ObjData::Net { .. }) && !via.contains(o))
-                            .copied()
-                            .collect();
-                        let ids: HashSet<ObjId> =
-                            pool.iter().filter(|o| matches!(self.o(**o), ObjData::Wire { .. })).copied().collect();
-                        wires
-                            .into_iter()
-                            .filter(|w| ids.contains(w) || matches!(self.o(*w), ObjData::Wire { nets: wn, .. } if wn.iter().any(|n| nets.contains(n))))
-                            .collect()
                     }
                 };
                 let mut out = Vec::new();
@@ -1878,13 +1774,13 @@ impl Interp<'_> {
             }
             "SELECT-LABEL" => {
                 let labels: Vec<ObjId> = self
-                    .selection_drawables(s, snapshot, self.follows_0_4(writer))
+                    .selection_drawables(s, snapshot)
                     .into_iter()
                     .filter(|o| self.obj_kind(*o) == Some("label"))
                     .collect();
                 let cands: Vec<ObjId> = match &pool {
                     None => labels,
-                    Some(pool) if self.follows_0_4(writer) => {
+                    Some(pool) => {
                         let ids: HashSet<_> = labels.iter().copied().collect();
                         let mut by_owner: HashMap<ObjId, Vec<ObjId>> = HashMap::new();
                         for label in labels {
@@ -1899,18 +1795,6 @@ impl Interp<'_> {
                             }
                         }
                         dedup(out)
-                    }
-                    Some(pool) => {
-                        // an object in the scope gives the labels attached to it; a label in the scope is taken itself
-                        let ids: HashSet<ObjId> = pool
-                            .iter()
-                            .filter(|o| {
-                                !via.contains(o)
-                                    || matches!(self.o(**o), ObjData::Text { .. } | ObjData::KeyText { .. })
-                            })
-                            .copied()
-                            .collect();
-                        labels.into_iter().filter(|x| ids.contains(x) || ids.contains(&self.text_attach(*x))).collect()
                     }
                 };
                 let mut out = Vec::new();
@@ -1931,19 +1815,14 @@ impl Interp<'_> {
             "SELECT-ANNOTATION" => {
                 // the graphics written in the scene, and texts attached to points (13.4, TR3)
                 let objs = match pool {
-                    None => self.selection_drawables(s, snapshot, self.follows_0_4(writer)),
+                    None => self.selection_drawables(s, snapshot),
                     Some(p) => p,
                 };
-                let out = objs.into_iter().filter(|o| self.obj_kind(*o) == Some("annotation")).collect();
-                if self.follows_0_4(writer) {
-                    dedup(out)
-                } else {
-                    out
-                }
+                dedup(objs.into_iter().filter(|o| self.obj_kind(*o) == Some("annotation")).collect())
             }
             _ => Vec::new(),
         };
-        if snapshot && self.follows_0_4(writer) {
+        if snapshot {
             // The snapshot excludes everything a generation creates, including graphics
             // inside its usages, which have no separate `generated` flag (10.5).
             selected.retain(|object| self.in_generation_snapshot(s, *object));
@@ -1972,7 +1851,6 @@ impl Interp<'_> {
         snapshot: bool,
         site: Option<Rc<Ctx>>,
         off: usize,
-        modern: bool,
     ) -> Vec<ObjId> {
         let mut usages: Vec<ObjId> = self.scenes[s]
             .usages
@@ -1983,9 +1861,7 @@ impl Interp<'_> {
                 !u.in_symbol && !(snapshot && u.generated)
             })
             .collect();
-        if modern {
-            usages.sort_by_cached_key(|object| self.selection_order_key(s, *object));
-        }
+        usages.sort_by_cached_key(|object| self.selection_order_key(s, *object));
         if kw == "SELECT-USAGE" {
             let Some(pool) = pool else {
                 return usages.into_iter().filter(|a| dfn.is_none_or(|d| self.usage(*a).definition == d)).collect();
@@ -2034,37 +1910,23 @@ impl Interp<'_> {
         }
         let pool = pool.unwrap_or_default();
         let ids: HashSet<ObjId> = pool.iter().copied().collect();
-        if modern {
-            let mut ancestors: HashMap<ObjId, Vec<ObjId>> = HashMap::new();
-            for usage in usages {
-                if Some(self.usage(usage).definition) != dfn || ids.contains(&usage) {
-                    continue;
-                }
-                let members = self.selected_usage_members(s, usage, phase, ctx);
-                for member in members.into_iter().collect::<HashSet<_>>() {
-                    ancestors.entry(member).or_default().push(usage);
-                }
-            }
-            let mut out = Vec::new();
-            for member in pool {
-                if let Some(usages) = ancestors.get(&member) {
-                    out.extend(usages);
-                }
-            }
-            return dedup(out);
-        }
-        let mut out = Vec::new();
-        for a in usages {
-            if Some(self.usage(a).definition) != dfn || ids.contains(&a) {
+        let mut ancestors: HashMap<ObjId, Vec<ObjId>> = HashMap::new();
+        for usage in usages {
+            if Some(self.usage(usage).definition) != dfn || ids.contains(&usage) {
                 continue;
             }
-            let mut seen = HashSet::new();
-            let members = self.all_members(s, a, phase, ctx, &mut seen);
-            if members.iter().any(|m| ids.contains(m)) {
-                out.push(a);
+            let members = self.selected_usage_members(s, usage, phase, ctx);
+            for member in members.into_iter().collect::<HashSet<_>>() {
+                ancestors.entry(member).or_default().push(usage);
             }
         }
-        out
+        let mut out = Vec::new();
+        for member in pool {
+            if let Some(usages) = ancestors.get(&member) {
+                out.extend(usages);
+            }
+        }
+        dedup(out)
     }
 
     pub(crate) fn usage_members(&mut self, s: SceneId, u: ObjId, phase: usize, ctx: Option<&Ctx>) -> Vec<ObjId> {
@@ -2080,93 +1942,6 @@ impl Interp<'_> {
         out
     }
 
-    /// Role members of a usage, and of the usages among them, all the way in.
-    fn all_members(
-        &mut self,
-        s: SceneId,
-        u: ObjId,
-        phase: usize,
-        ctx: Option<&Ctx>,
-        seen: &mut HashSet<ObjId>,
-    ) -> Vec<ObjId> {
-        if !seen.insert(u) {
-            return Vec::new();
-        }
-        let mut out = Vec::new();
-        for m in self.usage_members(s, u, phase, ctx) {
-            out.push(m);
-            if matches!(self.o(m), ObjData::Usage(_)) {
-                out.extend(self.all_members(s, m, phase, ctx, seen));
-            }
-        }
-        out
-    }
-
-    /// Selections scoped by usages go to their role members, all the way in (K3.12). Returns the
-    /// objects and those reached only as members, which are taken by kind (PR16).
-    fn walk_usages(&mut self, pool: &[ObjId], role: Option<&Lit>, writer: UnitId) -> (Vec<ObjId>, HashSet<ObjId>) {
-        let mut out = Vec::new();
-        let mut seen = HashSet::new();
-        let mut direct = HashSet::new();
-        let mut member = HashSet::new();
-        let role_name = role.and_then(Lit::str).map(String::from);
-        let unit = match role {
-            Some(Lit::Str(w)) => w.unit.unwrap_or(writer),
-            _ => writer,
-        };
-        #[allow(clippy::too_many_arguments)]
-        fn walk(
-            it: &mut Interp,
-            o: ObjId,
-            top: bool,
-            role: &Option<String>,
-            unit: UnitId,
-            seen: &mut HashSet<ObjId>,
-            out: &mut Vec<ObjId>,
-            direct: &mut HashSet<ObjId>,
-            member: &mut HashSet<ObjId>,
-        ) {
-            if let ObjData::Usage(u) = it.o(o).clone() {
-                if !seen.insert(o) {
-                    return;
-                }
-                let want = match (top, role) {
-                    (true, Some(r)) => {
-                        if u.role(r).is_some() {
-                            Some(r.clone())
-                        } else {
-                            let sc = it.scoped_for(unit, u.definition);
-                            Some(sc.iter().find(|(a, _)| a == r).map(|(_, o)| o.clone()).unwrap_or(r.clone()))
-                        }
-                    }
-                    _ => None,
-                };
-                for (r, v) in &u.roles {
-                    if top && role.is_some() && Some(r) != want.as_ref() {
-                        continue;
-                    }
-                    let items: Vec<ObjId> =
-                        if it.is_set(*v) { it.set(*v).items.iter().map(|(x, _)| *x).collect() } else { vec![*v] };
-                    for m in items {
-                        walk(it, m, false, role, unit, seen, out, direct, member);
-                    }
-                }
-            } else {
-                out.push(o);
-                if top {
-                    direct.insert(o);
-                } else {
-                    member.insert(o);
-                }
-            }
-        }
-        for &o in pool {
-            walk(self, o, true, &role_name, unit, &mut seen, &mut out, &mut direct, &mut member);
-        }
-        let via: HashSet<ObjId> = member.difference(&direct).copied().collect();
-        (out, via)
-    }
-
     pub(crate) fn inst_like(&mut self, s: SceneId) -> Vec<ObjId> {
         let insts = self.scenes[s].insts.clone();
         dedup(insts.into_iter().map(|i| self.bundle_of(i)).collect())
@@ -2176,7 +1951,7 @@ impl Interp<'_> {
         self.bundle_field(o).unwrap_or(o)
     }
 
-    pub(super) fn inst_match(&self, o: ObjId, p: &BTreeMap<String, Lit>, owner_only: bool, writer: UnitId) -> bool {
+    pub(super) fn inst_match(&self, o: ObjId, p: &BTreeMap<String, Lit>, owner_only: bool) -> bool {
         let o = match self.o(o) {
             ObjData::Bundle { members, .. } => members[0],
             _ => o,
@@ -2203,7 +1978,7 @@ impl Interp<'_> {
             }
         }
         if let Some(t) = p.get("type").and_then(Lit::str) {
-            if !self.instance_type_matches(o, t, writer) {
+            if !self.instance_type_matches(o, t) {
                 return false;
             }
         }
@@ -2215,7 +1990,7 @@ impl Interp<'_> {
     }
 
     /// The terminals that explicit wires touch, by owner: what `wired` looks among (10.2). A
-    /// rewritten wire touches the points of its latest rewrite (the draft 0.3, 13.1), as fixed in
+    /// rewritten wire touches the points of its latest rewrite (13.1), as fixed in
     /// step 3, before the geometry phase finds whether it holds (8.2).
     pub(crate) fn wire_ends(&self, s: SceneId) -> HashMap<ObjId, Vec<ObjId>> {
         let mut ends: HashMap<ObjId, Vec<ObjId>> = HashMap::new();
@@ -2265,24 +2040,6 @@ impl Interp<'_> {
         }
     }
 
-    pub(crate) fn net_wired(&mut self, s: SceneId, n: ObjId, ends: &HashMap<ObjId, Vec<ObjId>>) -> bool {
-        for point in ends.values().flatten() {
-            if let ObjData::ScenePin { owner, index } = *self.o(self.scene_value(*point)) {
-                if self.scene_pin_nets(s, owner, index).contains(&n) {
-                    return true;
-                }
-            }
-        }
-        for ow in self.inst_like(s) {
-            for t in self.terms_of(s, ow) {
-                if self.tnet_has(s, t, n) && self.wired(s, t, ends) {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
     pub(crate) fn has_pin(&mut self, s: SceneId, t: ObjId) -> bool {
         let t = self.scene_value(t);
         if let ObjData::ScenePin { owner, index } = *self.o(t) {
@@ -2296,11 +2053,6 @@ impl Interp<'_> {
         self.pin_for(s, owner, t).is_some()
     }
 
-    /// Selections see only terminals with a pin; before step 5 the symbols are not known yet (8.2, 10.1).
-    fn drawn(&mut self, s: SceneId, t: ObjId, phase: usize) -> bool {
-        phase < 5 || self.has_pin(s, t)
-    }
-
     /// The index of the pin of `owner`'s symbol that draws terminal `t`.
     pub(crate) fn pin_for(&mut self, s: SceneId, owner: ObjId, t: ObjId) -> Option<usize> {
         let pins = self.pins_for(s, owner, t);
@@ -2312,8 +2064,8 @@ impl Interp<'_> {
         }
     }
 
-    /// All pins bound to a terminal, in declaration order (9.2.4). Earlier languages have only
-    /// the first matching pin after their replacement rules have been applied.
+    /// All pins bound to a terminal, in declaration order (9.2.4); of a symbol whose pins are not
+    /// independent, only the first.
     pub(crate) fn pins_for(&mut self, s: SceneId, owner: ObjId, t: ObjId) -> Vec<usize> {
         let Some(&sym) = self.scenes[s].symbol.get(&owner) else { return Vec::new() };
         let ObjData::Term { index, .. } = self.o(t).clone() else { return Vec::new() };
@@ -2360,19 +2112,14 @@ impl Interp<'_> {
         }
     }
 
-    pub(super) fn selection_drawables(&mut self, s: SceneId, snapshot: bool, modern: bool) -> Vec<ObjId> {
-        let mut objects = self.drawables(s, snapshot && !modern);
+    /// What a selection may take in scene `s`, in the order of selection; with `snapshot`, only
+    /// what is there before generation (10.5).
+    pub(super) fn selection_drawables(&mut self, s: SceneId, snapshot: bool) -> Vec<ObjId> {
+        let mut objects = self.drawables(s, false);
         if snapshot {
-            if modern {
-                objects.retain(|object| self.in_generation_snapshot(s, *object));
-            } else {
-                // Earlier languages did not materialize symbol labels until after generation.
-                objects.retain(|object| !self.scenes[s].symbol_text_order.contains_key(object));
-            }
+            objects.retain(|object| self.in_generation_snapshot(s, *object));
         }
-        if modern {
-            objects.sort_by_cached_key(|object| self.selection_order_key(s, *object));
-        }
+        objects.sort_by_cached_key(|object| self.selection_order_key(s, *object));
         objects
     }
 

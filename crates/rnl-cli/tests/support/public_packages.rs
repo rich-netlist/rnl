@@ -14,13 +14,6 @@ fn cache_dir(name: &str, version: &str) -> PathBuf {
     root().join(".rnl-packages").join(name).join(version)
 }
 
-/// The locked directory of a package: its first entry, where the lock holds several versions.
-pub fn package_dir(name: &str) -> PathBuf {
-    let lock = read_lock();
-    let entry = lock["packages"].as_array().unwrap().iter().find(|p| p["name"] == name).unwrap();
-    cache_dir(name, entry["version"].as_str().unwrap())
-}
-
 /// The directory of one locked version of a package.
 pub fn version_dir(name: &str, version: &str) -> PathBuf {
     let lock = read_lock();

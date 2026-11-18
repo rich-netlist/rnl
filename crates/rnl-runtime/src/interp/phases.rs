@@ -38,7 +38,7 @@ impl Fault {
         }
     }
 
-    /// The error of a rewrite of `wire` whose list fails so (the draft 0.3, 13.1): it has no
+    /// The error of a rewrite of `wire` whose list fails so (13.1): it has no
     /// effect, its style parameters included, and the wire does not fail.
     fn for_rewrite(&self, wire: &str) -> (Code, String) {
         let (code, cause, section) = match self {
@@ -75,19 +75,14 @@ struct StyleIndex {
 
 impl Interp<'_> {
     pub(crate) fn run_scene(&mut self, s: SceneId) {
-        // in a level of 0.4 the bundles of step 3 are known when the symbol queue evaluates the
-        // selections of its rules, so that they select a bundle rather than its members (8.2, 10.1);
-        // a level of 0.2 or 0.3 resolves them after the queue's rules, as it did
-        let bundles_first = self.follows_0_4(self.level_unit[self.scenes[s].level]);
+        // the bundles of step 3 are known when the symbol queue evaluates the selections of its
+        // rules, so that they select a bundle rather than its members (8.2, 10.1)
         for ph in [3usize, 4] {
             self.scenes[s].phase = ph;
             self.run_tasks(s, ph);
-            if ph == 3 && bundles_first {
+            if ph == 3 {
                 self.resolve_bundles(s);
             }
-        }
-        if !bundles_first {
-            self.resolve_bundles(s);
         }
         self.scenes[s].phase = 4;
         self.resolve_symbols(s, false);
@@ -95,9 +90,7 @@ impl Interp<'_> {
         if self.check_scene_pin_bindings(s) {
             self.resolve_scene_subobjects(s);
         }
-        if (0..self.units.len()).any(|unit| self.follows_0_4(unit)) {
-            self.symbol_labels(s);
-        }
+        self.symbol_labels(s);
         self.resolve_currents(s, false);
         if !self.scenes[s].routing_requests.is_empty() || !self.scenes[s].tasks[9].is_empty() {
             // Routing rules read one common snapshot of ordinary statements. Their
@@ -228,38 +221,30 @@ impl Interp<'_> {
             }
             if let Some(&first) = kept.first() {
                 let f = self.inst_of(first).clone();
-                let modern = site.as_ref().is_some_and(|site| self.follows_0_4(self.source_unit(site)));
-                let first_terms = if modern { self.owner_terms(s, first) } else { Vec::new() };
+                let first_terms = self.owner_terms(s, first);
                 for &m in &kept[1..] {
                     let i = self.inst_of(m).clone();
-                    let same = if modern {
-                        let names_equal = |a: &str, b: &str| {
-                            if i.case_sensitive || f.case_sensitive {
-                                a == b
-                            } else {
-                                a.eq_ignore_ascii_case(b)
-                            }
-                        };
-                        let same_model = match (&i.model, &f.model) {
+                    let names_equal = |a: &str, b: &str| {
+                        if i.case_sensitive || f.case_sensitive {
+                            a == b
+                        } else {
+                            a.eq_ignore_ascii_case(b)
+                        }
+                    };
+                    let same_model = match (&i.model, &f.model) {
+                        (Some(a), Some(b)) => names_equal(a, b),
+                        (None, None) => true,
+                        _ => false,
+                    };
+                    let terms = self.owner_terms(s, m);
+                    let same = i.letter == f.letter
+                        && same_model
+                        && terms.len() == first_terms.len()
+                        && terms.iter().zip(&first_terms).all(|((_, a), (_, b))| match (a, b) {
                             (Some(a), Some(b)) => names_equal(a, b),
                             (None, None) => true,
                             _ => false,
-                        };
-                        let terms = self.owner_terms(s, m);
-                        i.letter == f.letter
-                            && same_model
-                            && terms.len() == first_terms.len()
-                            && terms.iter().zip(&first_terms).all(|((_, a), (_, b))| match (a, b) {
-                                (Some(a), Some(b)) => names_equal(a, b),
-                                (None, None) => true,
-                                _ => false,
-                            })
-                    } else {
-                        i.letter == f.letter
-                            && i.model.as_ref().map(|x| x.to_lowercase()) == f.model.as_ref().map(|x| x.to_lowercase())
-                            && i.nodes.len() == f.nodes.len()
-                            && i.params == f.params
-                    };
+                        });
                     if !same {
                         self.diag_site(
                             Severity::Warning,
@@ -373,29 +358,12 @@ impl Interp<'_> {
                 }
                 self.warn_pin_bindings(s, o, fact.map(|k| &appear[k]));
             } else if matches!(self.o(o), ObjData::Inst { .. } | ObjData::Bundle { .. }) {
-                if self.follows_0_4(self.level_unit[self.scenes[s].level]) {
-                    // no instance is left without a symbol: it has the default block symbol,
-                    // after the whole queue, and is drawn like any other (9.2.6, 9.2.8)
-                    let d = self.default_block_symbol(s, base);
-                    self.set_symbol(s, o, d);
-                    continue;
-                }
-                if self.inst_of(base).model_missing {
-                    // nothing tells which symbol this device has, and the renderer's own would
-                    // only pretend: it is not drawn (9.2.6), and listed with the reason
-                    let reason = match self.inst_of(base).model {
-                        Some(_) => "model card not found",
-                        None => "no model named",
-                    };
-                    self.scenes[s].undrawn.push((o, reason.to_string()));
-                    continue;
-                }
-                let d = self.default_symbol(s, base);
+                // no instance is left without a symbol: it has the default block symbol, after
+                // the whole queue, and is drawn like any other (9.2.6, 9.2.8)
+                let d = self.default_block_symbol(s, base);
                 self.set_symbol(s, o, d);
-                self.scenes[s].default_symbol.insert(o);
             }
         }
-        self.warn_undrawn(s);
         self.hint_undefined(s);
     }
 
@@ -406,7 +374,7 @@ impl Interp<'_> {
         let mut by_master: Vec<(String, Vec<ObjId>)> = Vec::new();
         for o in self.scenes[s].insts.clone() {
             let default = self.scenes[s].symbol.get(&o).is_some_and(|sym| self.symbol(*sym).default);
-            if !self.scenes[s].default_symbol.contains(&o) && !default {
+            if !default {
                 continue;
             }
             let inst = self.inst_of(o);
@@ -431,41 +399,6 @@ impl Interp<'_> {
                 ),
                 Some(Loc::line(first.file.clone(), first.line.max(1))),
             );
-        }
-    }
-
-    /// One warning for each model card that devices of the level name and the netlist lacks: they
-    /// are not drawn, since their polarity is not known.
-    fn warn_undrawn(&mut self, s: SceneId) {
-        let mut by_model: Vec<(Option<String>, Vec<ObjId>)> = Vec::new();
-        for (o, _) in self.scenes[s].undrawn.clone() {
-            let base = match self.o(o) {
-                ObjData::Bundle { members, .. } => members[0],
-                _ => o,
-            };
-            let model = self.inst_of(base).model.clone();
-            match by_model.iter_mut().find(|(m, _)| *m == model) {
-                Some((_, v)) => v.push(base),
-                None => by_model.push((model, vec![base])),
-            }
-        }
-        for (model, bases) in by_model {
-            let names: Vec<String> = bases.iter().map(|b| self.inst_of(*b).name.clone()).collect();
-            let first = self.inst_of(bases[0]).clone();
-            let shown: Vec<&String> = names.iter().take(8).collect();
-            let more = if names.len() > 8 { format!(" and {} more", names.len() - 8) } else { String::new() };
-            let list = shown.iter().map(|n| n.as_str()).collect::<Vec<_>>().join(", ");
-            let (what, verb) = if names.len() == 1 { ("it", "is") } else { ("they", "are") };
-            let (code, message) = match &model {
-                Some(m) => (codes::SYMBOL_MODEL_CARD_MISSING, format!(
-                    "the model card `{m}` is not found, so the polarity of {list}{more} is not known and {what} {verb} not drawn (a `.model` card or an include may be missing)"
-                )),
-                None => (codes::SYMBOL_NO_MODEL, format!(
-                    "{list}{more} name{} no model, so the polarity is not known and {what} {verb} not drawn",
-                    if names.len() == 1 { "s" } else { "" }
-                )),
-            };
-            self.sink.warning(code, message, Some(Loc::line(first.file.clone(), first.line.max(1))));
         }
     }
 
@@ -638,64 +571,6 @@ impl Interp<'_> {
         id
     }
 
-    /// The renderer's own default for an instance no symbol is given to, in a file of a version
-    /// before 0.4 (9.2.6, F18; principle 2.7).
-    fn default_symbol(&mut self, s: SceneId, inst: ObjId) -> ObjId {
-        let terms = self.owner_terms(s, inst);
-        let n = terms.len();
-        let left: Vec<_> = terms[..n.div_ceil(2)].to_vec();
-        let right: Vec<_> = terms[n.div_ceil(2)..].to_vec();
-        let h = (left.len().max(right.len()).max(1) * 2) as f64;
-        let mut sym = SymbolDef { default: true, ..SymbolDef::default() };
-        let mut dashed = StyleMap::new();
-        dashed.insert("linestyle".into(), Lit::Str(WStr::new("dashed", None)));
-        sym.push_prim(SymPrim {
-            shape: Shape::Rectangle,
-            points: vec![(-2.0, -h / 2.0), (2.0, h / 2.0)],
-            params: PrimParams::default(),
-            style: dashed,
-            text: None,
-        });
-        for (side, x0, x1, dir) in [(&left, -3.0, -2.0, 180u16), (&right, 3.0, 2.0, 0u16)] {
-            for (k, (idx, name)) in side.iter().enumerate() {
-                let y = h / 2.0 - 1.0 - 2.0 * k as f64;
-                sym.pins.push(Pin {
-                    names: Vec::new(),
-                    terms: vec![TermKey::Num(*idx)],
-                    bus: false,
-                    pos: (x0, y),
-                    label: name.clone(),
-                    label_name_formats: false,
-                    dir: Some(dir),
-                });
-                sym.push_prim(SymPrim {
-                    shape: Shape::Line,
-                    points: vec![(x0, y), (x1, y)],
-                    params: PrimParams::default(),
-                    style: StyleMap::new(),
-                    text: None,
-                });
-            }
-        }
-        sym.push_label(SymLabel {
-            key: Some("name".into()),
-            items: TextItems {
-                text: Some(WStr::new("${name}", None)),
-                halign: Some("middle".into()),
-                valign: Some("bottom".into()),
-                ..TextItems::default()
-            },
-            position: Some((0.0, h / 2.0 + 0.3)),
-            style: StyleMap::new(),
-            unit: 0,
-            site: None,
-            off: 0,
-        });
-        let id = self.new_obj(ObjData::Symbol(Box::new(sym)));
-        self.objs[id.0 as usize].name = "(viewer default)".into();
-        id
-    }
-
     /// Texts written in a symbol under a key are sub-objects of what the symbol draws (13.3).
     fn symbol_labels(&mut self, s: SceneId) {
         let order = self.symbol_order.get(&s).cloned().unwrap_or_default();
@@ -707,9 +582,7 @@ impl Interp<'_> {
             let labels = self.symbol(sym).labels.clone();
             for (label_index, lab) in labels.into_iter().enumerate() {
                 if let Some(key) = &lab.key {
-                    if lab.site.as_ref().is_some_and(|ctx| self.follows_0_4(self.source_unit(ctx)))
-                        && self.symbol_has_pin_name(sym, key)
-                    {
+                    if lab.site.is_some() && self.symbol_has_pin_name(sym, key) {
                         let label = self.label(owner);
                         self.diag_site(Severity::Error, codes::PIN_NAME_IS_TEXT_KEY_SYMBOL, &lab.site, lab.off,
                             format!("the text key {key} of the symbol drawn on {label} is a pin name: `::` finds the pin first; this TEXT fails (6.5, 13.3)"));
@@ -774,8 +647,7 @@ impl Interp<'_> {
 
     // ---- priorities (14.8)
 
-    /// The effective priority of a fact (14.8, in the order the draft 0.3 makes clear in its 7.3,
-    /// which holds in every version). `priority` is the fact's own parameter or its record head's
+    /// The effective priority of a fact (14.8). `priority` is the fact's own parameter or its record head's
     /// default, `chain` the usages whose expansion made it, outermost first, and `own` its own
     /// object, a constraint or a set with GROUP, when PRIORITY can name it.
     ///
@@ -909,11 +781,11 @@ impl Interp<'_> {
                     let FactData::Coord(_, cv) = at[cur.2].data else { continue };
                     if (level(p), &order, k) > (level(cur.0), &cur.1, cur.2) {
                         if (cv - v).abs() > tol {
-                            self.drop_fact(s, &at[cur.2], f);
+                            self.note_conflict(s, &at[cur.2]);
                         }
                         best.insert(key, (p, order, k));
                     } else if (cv - v).abs() > tol {
-                        self.drop_fact(s, f, &at[cur.2]);
+                        self.note_conflict(s, f);
                     }
                 }
             }
@@ -964,11 +836,11 @@ impl Interp<'_> {
                         let FactData::Orient(cc) = orient[cur.2].data else { continue };
                         if (level(p), &order, k) > (level(cur.0), &cur.1, cur.2) {
                             if cc != code {
-                                self.drop_fact(s, &orient[cur.2], f);
+                                self.note_conflict(s, &orient[cur.2]);
                             }
                             ob.insert(f.target, (p, order, k));
                         } else if cc != code {
-                            self.drop_fact(s, f, &orient[cur.2]);
+                            self.note_conflict(s, f);
                         }
                     }
                 }
@@ -1002,8 +874,8 @@ impl Interp<'_> {
                 if let Some(current) = choices.get_mut(&f.target) {
                     let intersection: Vec<_> = current.iter().copied().filter(|c| values.contains(c)).collect();
                     if intersection.is_empty() {
-                        if let Some(winner) = ob.get(&f.target) {
-                            self.drop_fact(s, f, &orient[winner.2]);
+                        if ob.contains_key(&f.target) {
+                            self.note_conflict(s, f);
                         }
                     } else {
                         *current = intersection;
@@ -1035,24 +907,11 @@ impl Interp<'_> {
         if coordinate_graph {
             self.resolve_body_coordinates(s);
         }
-        // 3. usages drawn on their main object in earlier languages (12.1 rule 5)
-        for a in self.scenes[s].usages.clone() {
-            if self.usage(a).in_symbol {
-                continue;
-            }
-            if self.at_point(a) {
-                if let Some(m) = self.main_of(a) {
-                    if let Some(pt) = self.point_of(s, m) {
-                        self.scenes[s].pos.insert(a, [Some(pt.0), Some(pt.1)]);
-                    }
-                }
-            }
-        }
-        // 4. check constraints against the positions (no solver)
+        // 3. check constraints against the positions (no solver)
         self.check_constraints(s);
         self.report_discards(s);
-        // 5. failures that need symbols: wires to pinless terminals, labels on symbol-less usages.
-        // A rewrite of the draft 0.3 that fails so is an error and has no effect, its style
+        // 4. failures that need symbols: wires to pinless terminals, labels on symbol-less usages.
+        // A rewrite that fails so is an error and has no effect, its style
         // parameters included: the wire keeps the list and mode of the latest rewrite that holds,
         // or those it was made with, and is warned about and checked by them, there (5.8, 13.1)
         self.check_rewrites(s);
@@ -1205,12 +1064,11 @@ impl Interp<'_> {
                 }
             }
         }
-        // 6. unplaced drawn objects
+        // 5. unplaced drawn objects
         self.hint_idle_usage_points(s);
         let mut un = Vec::new();
-        let undrawn: Vec<ObjId> = self.scenes[s].undrawn.iter().map(|(o, _)| *o).collect();
         for o in self.inst_like(s) {
-            if self.bundle_empty(o) || undrawn.contains(&o) {
+            if self.bundle_empty(o) {
                 continue;
             }
             if self.xy(s, o).is_none() {
@@ -1231,7 +1089,7 @@ impl Interp<'_> {
             let loc = Loc::line(lv.file.clone(), lv.line.max(1));
             let shown: Vec<&String> = un.iter().take(12).collect();
             let more = if un.len() > 12 { ", …" } else { "" };
-            let description = if un.len() == 1 && self.follows_0_4(self.level_unit[self.scenes[s].level]) {
+            let description = if un.len() == 1 {
                 "1 object has no position and is left to a solver; it is not drawn".to_owned()
             } else {
                 format!("{} objects have no position and are left to a solver; they are not drawn", un.len())
@@ -1309,30 +1167,6 @@ impl Interp<'_> {
         }
     }
 
-    fn drop_fact(&mut self, s: SceneId, loser: &Fact, winner: &Fact) {
-        if self.conflicts_0_3(s) {
-            // the hint names the kept facts, known once every fact of the object and axis is
-            // weighed: `report_discards` gives it
-            self.note_conflict(s, loser);
-            return;
-        }
-        if self.fact_priority(s, loser) == Priority::Low || loser.ctx.is_none() {
-            return;
-        }
-        self.scenes[s].dropped += 1;
-        if let Some(c) = &loser.ctx {
-            self.note_failed_at(c.rec, loser.off, true);
-        }
-        let a = self.fact_text(loser);
-        let b = self.fact_text(winner);
-        self.diag_fact(
-            Severity::Hint,
-            codes::PLACE_FACT_DROPPED,
-            loser,
-            format!("{a} conflicts with {b} and is dropped in the order of 8.5 (8.5)"),
-        );
-    }
-
     pub(super) fn fact_text(&self, f: &Fact) -> String {
         match &f.data {
             FactData::Coord(axis, v) => format!("the {axis} of {} = {}", self.label(f.target), fmt_num(*v)),
@@ -1355,10 +1189,7 @@ impl Interp<'_> {
             return true;
         }
         let obj = f.target;
-        if what == "ORIENT"
-            && f.ctx.as_ref().is_some_and(|ctx| self.follows_0_4(self.source_unit(ctx)))
-            && self.is_pin_direction_input(obj)
-        {
+        if what == "ORIENT" && self.is_pin_direction_input(obj) {
             return match self.direction_pin(s, obj) {
                 Some((_, _, Some(_))) => true,
                 Some((_, _, None)) => {
@@ -1389,30 +1220,15 @@ impl Interp<'_> {
                 self.member_draw_error(s, list, k, f, obj);
                 return false;
             }
-            ObjData::Usage(_) => {
-                if !self.scenes[s].symbol.contains_key(&obj) && (what != "PLACE" || !self.usage_own_point(obj)) {
-                    let l = self.label(obj);
-                    self.diag_fact(
-                        Severity::Error,
-                        codes::PLACE_USAGE_NO_SYMBOL,
-                        f,
-                        format!("{l} has no symbol and no drawing meaning: {what} fails (12.1)"),
-                    );
-                    return false;
-                }
-                if what == "PLACE" && self.at_point(obj) {
-                    let l = self.label(obj);
-                    self.diag_fact(Severity::Error, codes::PLACE_USAGE_AT_POINT, f, format!("{l} is drawn on the point of its main object and has no position of its own: PLACE fails (12.1)"));
-                    return false;
-                }
-            }
-            ObjData::Pos { parent } if matches!(self.o(parent), ObjData::Usage(_)) && self.at_point(parent) => {
-                let l = self.label(parent);
+            ObjData::Usage(_)
+                if !self.scenes[s].symbol.contains_key(&obj) && (what != "PLACE" || !self.usage_own_point(obj)) =>
+            {
+                let l = self.label(obj);
                 self.diag_fact(
                     Severity::Error,
-                    codes::PLACE_POSITION_OF_USAGE_AT_POINT,
+                    codes::PLACE_USAGE_NO_SYMBOL,
                     f,
-                    format!("{l} is drawn on the point of its main object: PLACE fails (12.1)"),
+                    format!("{l} has no symbol and no drawing meaning: {what} fails (12.1)"),
                 );
                 return false;
             }
@@ -1447,30 +1263,6 @@ impl Interp<'_> {
         true
     }
 
-    pub(crate) fn main_of(&self, a: ObjId) -> Option<ObjId> {
-        let u = self.usage(a);
-        let d = self.def(u.definition);
-        let first = d.roles.first()?;
-        u.role(&first.name)
-    }
-
-    pub(crate) fn at_point(&self, a: ObjId) -> bool {
-        if self.usage_own_point(a) {
-            return false;
-        }
-        match self.main_of(a) {
-            Some(m) => matches!(
-                self.o(m),
-                ObjData::Term { .. }
-                    | ObjData::Inst { .. }
-                    | ObjData::Point { .. }
-                    | ObjData::Pos { .. }
-                    | ObjData::Bundle { .. }
-            ),
-            None => false,
-        }
-    }
-
     /// Why a wire cannot reach a point of its list, once the symbols are known: a terminal of a
     /// usage without a symbol (12.1), a terminal without a pin (9.2.4), or a terminal of an
     /// instance in a bundle (11.8). None for a terminal it reaches, and for a point.
@@ -1488,7 +1280,7 @@ impl Interp<'_> {
         None
     }
 
-    /// The CURRENT statements of a net together are an assertion (15.2): in a file of 0.4, when every
+    /// The CURRENT statements of a net together are an assertion (15.2): when every
     /// terminal on the net, the ports of this level included, has a CURRENT of "in" or "out", and all
     /// of them move current the same way with respect to the net, the current has nowhere to go. That
     /// is a violation (7.6), which names the net and its terminals, at the latest of those CURRENTs;
@@ -1497,7 +1289,7 @@ impl Interp<'_> {
     /// `0`, is not checked: it is the same node in every level, so the current may leave through the
     /// terminals of other levels.
     fn check_currents(&mut self, s: SceneId) {
-        if self.scenes[s].currents.is_empty() || !self.follows_0_4(self.level_unit[self.scenes[s].level]) {
+        if self.scenes[s].currents.is_empty() {
             return;
         }
         let levelobj = self.scenes[s].levelobj;
@@ -1562,7 +1354,7 @@ impl Interp<'_> {
         }
     }
 
-    /// Find which rewrites of the wires of scene `s` fail (the draft 0.3, 13.1): those whose list
+    /// Find which rewrites of the wires of scene `s` fail (13.1): those whose list
     /// has a point that a wire cannot reach. Such a rewrite has no effect: its list and its mode
     /// do not replace the wire's (`wire_shape`), and its style parameters are taken back here, in
     /// step 7, before the style queue of step 8 reads them (8.2). Its error is given with the other
@@ -1698,10 +1490,7 @@ impl Interp<'_> {
         }
         let items = self.text_items(t);
         let text = items.text.as_ref()?;
-        if !(items.modern_text || text.unit.is_some_and(|u| self.follows_0_4(u)))
-            || items.dx.is_some()
-            || items.dy.is_some()
-        {
+        if !(items.modern_text || text.unit.is_some()) || items.dx.is_some() || items.dy.is_some() {
             return None;
         }
         let sc = &self.scenes[s];
@@ -1858,7 +1647,7 @@ impl Interp<'_> {
         }
     }
 
-    /// Where a viewer that does not solve draws a text (13.3; the draft 0.3, section 9): at its
+    /// Where a viewer that does not solve draws a text (13.3): at its
     /// anchor, or, when the anchor leaves it without a position while what it is attached to is
     /// drawn, beside that by this implementation's default rule. That is a wire drawn only in part
     /// or as a flyline, a net none of whose wires has all its points placed, and a graphic. The axes
@@ -2035,16 +1824,16 @@ impl Interp<'_> {
 
     /// Route one complete run. `ends` identifies whether the run retains each endpoint of the
     /// original WIRE; an internal gap is not an endpoint pin, even if its coordinate coincides.
+    /// An `"auto"` run leaves and enters its pins along their directions (13.1).
     pub(crate) fn routed_wire_run(
         &mut self,
         scene: SceneId,
         points: &[ObjId],
         mode: &str,
-        modern: bool,
         ends: (bool, bool),
     ) -> Option<Vec<Pt>> {
         let coords: Vec<Pt> = points.iter().map(|&p| self.point_of(scene, p)).collect::<Option<_>>()?;
-        if !modern || mode != "auto" || coords.len() < 2 {
+        if mode != "auto" || coords.len() < 2 {
             return Some(route(&coords, mode));
         }
         let first = if ends.0 { points.first().and_then(|&p| self.auto_wire_direction(scene, p)) } else { None };
@@ -2064,23 +1853,15 @@ impl Interp<'_> {
         Some(out)
     }
 
-    /// The source of the effective rewrite controls the version at the WIRE statement (16.1).
-    pub(crate) fn modern_wire_source(&self, scene: SceneId, site: Option<&std::rc::Rc<super::ctx::Ctx>>) -> bool {
-        let unit = site.map_or(self.level_unit[self.scenes[scene].level], |ctx| self.source_unit(ctx));
-        self.follows_0_4(unit)
-    }
-
     pub(crate) fn wire_points(&mut self, scene: SceneId, wire: ObjId) -> Option<Vec<Pt>> {
         let shape = self.wire_shape(scene, wire)?;
-        let modern = self.modern_wire_source(scene, shape.site.as_ref());
-        self.routed_wire_run(scene, &shape.points, &shape.mode, modern, (true, true))
+        self.routed_wire_run(scene, &shape.points, &shape.mode, (true, true))
     }
 
     /// Consecutive positioned runs after routing. The corresponding source indices distinguish
     /// real wire endpoints from the free ends of an intermediate partially positioned run.
     pub(crate) fn wire_runs(&mut self, scene: SceneId, wire: ObjId) -> Option<Vec<Vec<Pt>>> {
         let shape = self.wire_shape(scene, wire)?;
-        let modern = self.modern_wire_source(scene, shape.site.as_ref());
         let mut ranges: Vec<Vec<ObjId>> = Vec::new();
         let mut starts = Vec::new();
         let mut ends = Vec::new();
@@ -2101,7 +1882,7 @@ impl Interp<'_> {
         }
         let mut runs = Vec::new();
         for ((points, first), last) in ranges.into_iter().zip(starts).zip(ends) {
-            runs.push(self.routed_wire_run(scene, &points, &shape.mode, modern, (first, last))?);
+            runs.push(self.routed_wire_run(scene, &points, &shape.mode, (first, last))?);
         }
         Some(runs)
     }
@@ -2175,7 +1956,7 @@ impl Interp<'_> {
                 vec![cd.args[0]]
             };
             let leaves = self.leaves(s, &members);
-            if relation && site.as_ref().is_some_and(|ctx| self.follows_0_4(self.source_unit(ctx))) {
+            if relation && site.is_some() {
                 let pin_count = leaves.iter().filter(|m| self.is_pin_direction_input(**m)).count();
                 if pin_count > 0 && pin_count < leaves.len() {
                     self.diag_site(
@@ -2213,14 +1994,12 @@ impl Interp<'_> {
             let mut bad = None;
             for &m in &leaves {
                 let why = if relation {
-                    if site.as_ref().is_some_and(|ctx| self.follows_0_4(self.source_unit(ctx)))
-                        && self.direction_pin(s, m).is_some_and(|(_, _, dir)| dir.is_some())
-                    {
+                    if site.is_some() && self.direction_pin(s, m).is_some_and(|(_, _, dir)| dir.is_some()) {
                         None
                     } else {
                         self.orientable(s, m)
                     }
-                } else if site.as_ref().is_some_and(|c| self.follows_0_4(self.source_unit(c)))
+                } else if site.is_some()
                     && matches!(
                         self.o(m),
                         ObjData::Prim { .. }
@@ -2242,11 +2021,7 @@ impl Interp<'_> {
             }
             if let Some(why) = bad {
                 let l = self.label(c);
-                let section = if relation && site.as_ref().is_some_and(|ctx| self.follows_0_4(self.source_unit(ctx))) {
-                    "14.9"
-                } else {
-                    "14.1"
-                };
+                let section = if relation && site.is_some() { "14.9" } else { "14.1" };
                 self.diag_site(
                     Severity::Error,
                     codes::CONSTRAINT_MEMBER_NOT_LOCATABLE,
@@ -2257,9 +2032,9 @@ impl Interp<'_> {
                 self.constraint_mut(c).failed = true;
                 continue;
             }
-            // in a file of 0.4 ORIENT-RELATION relates one object to one object: a set of more than
+            // ORIENT-RELATION relates one object to one object: a set of more than
             // one member in both slots is an error (5.2.1, 14.9)
-            if relation && site.as_ref().is_some_and(|c| self.follows_0_4(self.source_unit(c))) {
+            if relation && site.is_some() {
                 let mut sides = Vec::new();
                 for a in &cd.args[..2] {
                     sides.push(if self.is_set(*a) { self.flatten(s, *a, 7, ctx) } else { vec![*a] });
@@ -2345,18 +2120,8 @@ impl Interp<'_> {
                     if let Some(sc) = &site {
                         self.note_failed_at(sc.rec, cd.off, true);
                     }
-                    if self.conflicts_0_3(s) {
-                        // its hint, with the other discards, once the geometry is resolved
-                        self.note_discarded(s, c, &cd, &members, &involved);
-                    } else {
-                        self.diag_site(
-                            Severity::Hint,
-                            codes::CONSTRAINT_DROPPED,
-                            &site,
-                            cd.off,
-                            format!("{l} conflicts with fixed {what} and is dropped in the order of 8.5 (8.5)"),
-                        );
-                    }
+                    // its hint, with the other discards, once the geometry is resolved
+                    self.note_discarded(s, c, &cd, &members, &involved);
                 }
             } else {
                 self.constraint_mut(c).status = Some("needs-solver");
@@ -2396,9 +2161,6 @@ impl Interp<'_> {
             ObjData::Usage(_) => {
                 if !self.scenes[s].symbol.contains_key(&m) && !self.usage_own_point(m) {
                     return Some(format!("{l} has no symbol"));
-                }
-                if self.at_point(m) {
-                    return Some(format!("{l} is drawn on the point of its main object"));
                 }
                 None
             }
@@ -2469,10 +2231,7 @@ impl Interp<'_> {
             return if unknown { None } else { Some(true) };
         }
         if cd.kind == ConstraintKind::OrientRelation {
-            if cd.site.as_ref().is_some_and(|ctx| self.follows_0_4(self.source_unit(ctx)))
-                && cd.args.len() == 2
-                && self.is_pin_direction_input(cd.args[0])
-            {
+            if cd.site.is_some() && cd.args.len() == 2 && self.is_pin_direction_input(cd.args[0]) {
                 let (a, _, ad) = self.direction_pin(s, cd.args[0])?;
                 let (b, _, bd) = self.direction_pin(s, cd.args[1])?;
                 let from = self.scenes[s].ori.get(&a)?.direction(ad?)?;
@@ -2540,7 +2299,7 @@ impl Interp<'_> {
                 })
             }
             ConstraintKind::Distribute => {
-                // with a sense, which a file of 0.4 writes, the members follow one another in it as
+                // with a sense, the members follow one another in it as
                 // for ORDER (14.4)
                 let ordered = match cd.params.sense {
                     Some("increasing") => vals.windows(2).all(|w| w[1] - w[0] >= 1.0 - tol),
@@ -2696,7 +2455,7 @@ impl Interp<'_> {
                 continue;
             }
             let o = f.target;
-            if f.ctx.as_ref().is_some_and(|ctx| self.follows_0_4(self.source_unit(ctx)))
+            if f.ctx.is_some()
                 && !matches!(
                     self.o(o),
                     ObjData::Inst { .. }

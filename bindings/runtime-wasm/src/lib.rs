@@ -68,7 +68,7 @@ pub struct Request {
     /// Use the standard package at the root (16.3); true when not given.
     #[serde(default = "yes")]
     pub std: bool,
-    /// Add the standard package to draft 0.4 files; false when omitted.
+    /// Add the standard package to the main file (16.3); false when omitted.
     #[serde(default)]
     pub include_std: bool,
     /// The version of the standard package at the root, whatever the files' language version, such
@@ -150,7 +150,7 @@ pub struct WriteRequest {
     pub package_dirs: Vec<String>,
     #[serde(default = "yes")]
     pub std: bool,
-    /// Add the standard package to draft 0.4 files; false when omitted.
+    /// Add the standard package to the main file (16.3); false when omitted.
     #[serde(default)]
     pub include_std: bool,
     #[serde(default)]
@@ -197,7 +197,7 @@ pub struct ReplaceRequest {
     pub formats: BTreeMap<String, String>,
     #[serde(default = "yes")]
     pub std: bool,
-    /// Add the standard package to draft 0.4 files; false when omitted.
+    /// Add the standard package to the main file (16.3); false when omitted.
     #[serde(default)]
     pub include_std: bool,
     #[serde(default)]
@@ -238,7 +238,7 @@ pub struct CatalogRequest {
     /// given.
     #[serde(default = "yes")]
     pub std: bool,
-    /// Add the standard package to draft 0.4 files; false when omitted.
+    /// Add the standard package to the main file (16.3); false when omitted.
     #[serde(default)]
     pub include_std: bool,
     /// The version of the standard package each package is read with, as in a [`Request`].
@@ -321,11 +321,13 @@ pub enum Response {
     /// the refusal, such as `RNL8405 writeback-replace-region-encrypted`), or no build kept the
     /// drawings asked for.
     Error(String),
-    /// Draft 0.4 edit refusals keep the existing error string and add machine-readable fields.
+    /// Edit refusals of a write in a language version this implementation reads, the one it names
+    /// or, when it names none, the default, keep the existing error string and add
+    /// machine-readable fields.
     #[serde(untagged)]
     EditError {
         error: String,
-        code: Option<String>,
+        code: String,
         name: &'static str,
         diagnostics: Vec<rnl_view::Diagnostic>,
     },
@@ -385,7 +387,8 @@ pub fn respond(request: &[u8]) -> Response {
         };
     }
     if value.get("write").is_some() {
-        let modern = value["write"]["language_version"].as_str() == Some("0.4");
+        // a write without language_version is written in the default version, as rnl-edit writes it
+        let modern = value["write"]["language_version"].as_str().is_none_or(rnl_runtime::interp::unit::is_read_version);
         return match serde_json::from_value(value) {
             Ok(w) => write(w),
             Err(e) if modern => Response::EditError {
@@ -611,7 +614,7 @@ fn write(request: WriteRequest) -> Response {
         std_version: request.std_version.clone(),
         ..Options::default()
     };
-    let text = if request.write.language_version.as_deref() == Some("0.4") {
+    let text = if request.write.language_version.as_deref().is_none_or(rnl_runtime::interp::unit::is_read_version) {
         match rnl_edit::write_with_options_diagnosed(&request.write, &files, &runtime) {
             Ok(written) => written.text,
             Err(e) => {
@@ -1201,15 +1204,16 @@ R1 a 0 1k
     }
 
     #[test]
-    fn modern_edit_refusals_have_codes_and_legacy_responses_stay_unchanged() {
+    fn edit_refusals_have_codes_with_or_without_a_language_version() {
+        // a write that names no language version is written in the default one (16.1)
         let mut write = json!({"dialect":"spice", "netlist":"title\nR1 a 0 1k\n", "author":"test",
             "ops":[{"op":"set","level":"file","object":"#R1"}]});
-        let old = answer(json!({"write":write}));
-        assert_eq!(old, json!({"error":"op 0 (set): nothing to set: no `symbol`, `style`, `at` or `orient`"}));
+        let unnamed = answer(json!({"write":write}));
+        assert_eq!(unnamed["error"], "op 0 (set): nothing to set: no `symbol`, `style`, `at` or `orient`");
+        assert_eq!(unnamed["code"], "RNL8619");
         write["language_version"] = json!("0.4");
         let new = answer(json!({"write":write}));
-        assert_eq!(new["error"], old["error"]);
-        assert_eq!(new["code"], "RNL8619");
+        assert_eq!(new, unnamed);
         assert_eq!(new["name"], "edit-set-nothing");
         assert_eq!(new["diagnostics"], json!([]));
         write["ops"] = json!(false);
@@ -1450,9 +1454,10 @@ R1 a 0 1k
     fn what_cannot_be_written_is_an_error() {
         let write = json!({ "dialect": "spice", "netlist": "\nR1 a 0 1k\n", "author": "test",
                             "ops": [{"level": "subckt:none", "op": "set", "object": "#R1", "at": [0, 0]}] });
+        let v = answer(json!({ "write": write }));
         assert_eq!(
-            answer(json!({ "write": write })),
-            json!({ "error": "op 0 (set): the netlist has no subcircuit none" })
+            (&v["error"], &v["code"]),
+            (&json!("op 0 (set): the netlist has no subcircuit none"), &json!("RNL8606"))
         );
         let v = answer(json!({ "write": { "dialect": "spice", "netlist": "" } }));
         assert!(v["error"].as_str().unwrap().starts_with("the request is not valid: missing field `author`"), "{v}");

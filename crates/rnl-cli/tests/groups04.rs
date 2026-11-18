@@ -41,11 +41,6 @@ fn solver_groups_export_provenance_and_set_identity_independently_of_labels() {
     let mut changed = p.clone();
     changed.groups[0].direct = !changed.groups[0].direct;
     assert_ne!(rnl_runtime::problem::input_digest(p), rnl_runtime::problem::input_digest(&changed));
-    let mut old = p.clone();
-    old.version = "0.3".into();
-    changed.version = "0.3".into();
-    changed.groups[0].identity += 100;
-    assert_eq!(rnl_runtime::problem::input_digest(&old), rnl_runtime::problem::input_digest(&changed));
 }
 fn problem(r: &Interpretation, name: &str) -> Vec<String> {
     let p = r.problems.iter().find(|p| p.groups.iter().any(|g| g.label == name)).unwrap();

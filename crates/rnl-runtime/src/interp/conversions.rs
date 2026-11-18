@@ -86,9 +86,6 @@ impl Interp<'_> {
     ) -> R<ObjId> {
         let Some(kinds) = kinds else { return Ok(object) };
         let Some(scene) = ctx.scene else { return Ok(object) };
-        if !self.follows_0_4(self.source_unit(ctx)) {
-            return Ok(object);
-        }
         if !collection && kinds.iter().any(|kind| self.role_kind_matches(object, kind)) {
             return Ok(object);
         }

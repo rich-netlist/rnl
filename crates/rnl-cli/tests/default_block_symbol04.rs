@@ -108,7 +108,6 @@ fn what_is_written_about_its_drawing_takes_effect() {
     let r = read(lines, body);
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     let level = r.model.levels.iter().find(|l| l.title == "t.sp").unwrap();
-    assert!(level.undrawn.is_empty());
     assert_eq!(level.wires.len(), 1);
     assert!(level.texts.iter().any(|t| format!("{:?}", t.markup).contains("gate")));
     // its texts: the name above the box and the model below

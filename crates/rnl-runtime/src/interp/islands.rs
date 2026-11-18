@@ -1,7 +1,7 @@
 //! The connected parts of a net as a level draws it: the parts its flylines join (13.7) and that a
 //! viewer may label with the net's name. This is what a viewer that does not solve draws, not a
-//! fact of the netlist: two wires of a net are one part where an end or a bend of one is an end or
-//! a bend of the other as drawn, and a pin is in the part of a wire that ends or bends on it.
+//! fact of the netlist: two wires of a net are one part where they share a point object, and a pin
+//! is in the part of a wire that has it among its points (13.1).
 
 use std::collections::{HashMap, HashSet};
 
@@ -10,8 +10,8 @@ use crate::geom::Pt;
 use super::obj::*;
 use super::Interp;
 
-/// One connected part of a net as drawn: wires that meet at their ends and bends, and the pins
-/// they meet, or a pin that no wire meets.
+/// One connected part of a net as drawn: wires that share their points, and the pins among
+/// these points, or a pin that no wire has.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Island {
     /// What a flyline may start or end at: the vertices of its wires as drawn, after their mode,
@@ -111,29 +111,26 @@ impl Interp<'_> {
     /// The connected parts of `net` as the scene draws it, each wire of the net and each pin on it
     /// that has a position in one of them, in the order of their first wire or pin. A wire some of
     /// whose points have no position is one piece, its runs joined by its own flylines
-    /// ([`Interp::wire_runs`]). Two pieces are in one part where a vertex of one as drawn, an end
-    /// or a bend after its mode, or a pin, is a vertex of the other: a wire that ends on the middle
-    /// of another, or crosses it, is apart from it. `terms` is what `route_terms` gives.
+    /// ([`Interp::wire_runs`]). Two pieces are in one part where they share a point object, a pin
+    /// or a point a wire is written through: equal coordinates, bends a drawing mode inserts
+    /// included, make no connection (13.1), and a wire that ends on the middle of another, or
+    /// crosses it, is apart from it. `terms` is what `route_terms` gives.
     pub(crate) fn islands(
         &mut self,
         s: SceneId,
         net: ObjId,
         terms: &HashMap<ObjId, Vec<(ObjId, ObjId, u32)>>,
     ) -> Vec<Island> {
-        let by_handle = self.follows_0_4(self.level_unit[self.scenes[s].level]);
         let mut pieces = Vec::new();
         for w in self.scenes[s].wires_by_net.get(&net).cloned().unwrap_or_default() {
             if !matches!(self.o(w), ObjData::Wire { failed: false, .. }) {
                 continue;
             }
             let Some(runs) = self.wire_runs(s, w) else { continue };
-            let handles = if by_handle {
-                self.wire_shape(s, w)
-                    .map(|shape| shape.points.into_iter().map(|point| self.wire_point_handle(s, point)).collect())
-                    .unwrap_or_default()
-            } else {
-                Vec::new()
-            };
+            let handles = self
+                .wire_shape(s, w)
+                .map(|shape| shape.points.into_iter().map(|point| self.wire_point_handle(s, point)).collect())
+                .unwrap_or_default();
             let mut piece = Piece { points: Vec::new(), segments: Vec::new(), pin: None, handles };
             for run in runs {
                 let drawn = run;
@@ -150,21 +147,17 @@ impl Interp<'_> {
                 continue;
             }
             if let Some(p) = self.point_of(s, t) {
-                let handles = if by_handle { vec![self.wire_point_handle(s, t)] } else { Vec::new() };
+                let handles = vec![self.wire_point_handle(s, t)];
                 pieces.push(Piece { points: vec![p], segments: Vec::new(), pin: Some(p), handles });
             }
         }
-        // In 0.4 only shared objects connect. Equal coordinates, including bends inserted by
-        // a drawing mode, make no connection (13.1). Keep the released drawing of older files.
+        // only shared objects connect: equal coordinates, including bends inserted by a drawing
+        // mode, make no connection (13.1)
         let mut parent: Vec<usize> = (0..pieces.len()).collect();
-        let mut at: HashMap<(i64, i64), usize> = HashMap::new();
         let mut connected = HashMap::new();
         for (i, piece) in pieces.iter().enumerate() {
-            let shared: Vec<usize> = if by_handle {
-                piece.handles.iter().map(|handle| *connected.entry(*handle).or_insert(i)).collect()
-            } else {
-                piece.points.iter().map(|point| *at.entry(key(*point)).or_insert(i)).collect()
-            };
+            let shared: Vec<usize> =
+                piece.handles.iter().map(|handle| *connected.entry(*handle).or_insert(i)).collect();
             for first in shared {
                 let (a, b) = (find(&mut parent, first), find(&mut parent, i));
                 parent[a.max(b)] = a.min(b);

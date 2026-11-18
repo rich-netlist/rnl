@@ -9,21 +9,19 @@ use rnl_solver_io::{decode_solution, encode_solution};
 use serde_json::json;
 
 fn problem() -> LevelProblem {
-    let text = format!(
-        r#"* protocol round trip
-* @RNL(type="header") {{ @VERSION("0.4") }}
+    let text = r#"* protocol round trip
+* @RNL(type="header") { @VERSION("0.4") }
 R1 a n 1k
 R2 n b 1k
-* @RNL {{
-* $S = @DEFINE-SYMBOL {{ (-1,-1) (1,1) @RECTANGLE; (-2,0) @PIN(terminal=1); (2,0) @PIN(terminal=2) }};
-* {{#R1 #R2}} @SET-SYMBOL $S;
+* @RNL {
+* $S = @DEFINE-SYMBOL { (-1,-1) (1,1) @RECTANGLE; (-2,0) @PIN(terminal=1); (2,0) @PIN(terminal=2) };
+* {#R1 #R2} @SET-SYMBOL $S;
 * &n @ROUTE-NET;
-* &a @WIRE(mode="straight") {{#R1:1 (-6,0)}}
-* }}
+* &a @WIRE(mode="straight") {#R1:1 (-6,0)}
+* }
 .end
-"#
-    );
-    let files = MemoryProvider::new().with("test.sp", &text);
+"#;
+    let files = MemoryProvider::new().with("test.sp", text);
     let read = rnl_view::interpret("test.sp", None, &files, &Options { std: false, ..Options::solver() }).unwrap();
     assert!(read.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", read.diagnostics());
     read.problems[0].clone()

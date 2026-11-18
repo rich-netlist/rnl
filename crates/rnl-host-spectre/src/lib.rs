@@ -50,11 +50,12 @@ const PRIMITIVES: [(&str, &[&str], Option<&str>); 15] = [
     ("bsource", &["p", "n"], None),
     // a switch between p and n, controlled by the voltage between cp and cn, as S of SPICE
     ("relay", &["p", "n", "cp", "cn"], None),
-    // its first winding between p_plus and p_minus, its second between s_plus and s_minus
-    ("transformer", &["p_plus", "p_minus", "s_plus", "s_minus"], None),
+    // its first winding between p1 and n1, its second between p2 and n2, named as the language
+    // names those of T and O (6.12)
+    ("transformer", &["p1", "n1", "p2", "n2"], None),
     ("port", &["p", "n"], Some("r")),
-    // a transmission line has four nodes and no terminal names yet (6.12)
-    ("tline", &[], Some("z0")),
+    // a transmission line, named as T of the language (6.12)
+    ("tline", &["p1", "n1", "p2", "n2"], Some("z0")),
 ];
 
 /// The master of Spectre's switch, `Name (t0 t1 … tn) switch`: a common terminal, t0, and its
@@ -1331,10 +1332,6 @@ fn finish(cx: &mut Reading) {
             };
             let inst = &mut cx.doc.levels[lv].instances[k];
             inst.default_terminals = terms;
-            // The adapter owns the dialect's table. The runtime chooses the replacement
-            // for the language version of the instance's source file (6.12, 16.1).
-            inst.default_terminals_0_4 = matches!(master.as_str(), "tline" | "transformer")
-                .then(|| ["p1", "n1", "p2", "n2"].into_iter().map(String::from).collect());
             inst.mtype = mtype;
             inst.is_subckt = is_subckt;
             let param =
@@ -1490,7 +1487,8 @@ mod tests {
     #[test]
     fn switches_relays_and_transformers() {
         // a switch has a terminal for each node, t0 its common one; a relay is S of SPICE, as a
-        // primitive or a model card of type sw; a transformer has two windings
+        // primitive or a model card of type sw; a transformer has two windings, named as the
+        // language names those of T and O (6.12)
         let net = "// t\nsimulator lang=spectre\nmodel rl relay ropen=1G\nS1 (a b) switch\n\
                    S2 (a b c d) switch position=2\nK1 (a b c d) relay\nK2 (a b c d) rl\n\
                    T1 (a b c d) transformer n1=1 n2=2\n";
@@ -1508,7 +1506,7 @@ mod tests {
                 (t(&["t0", "t1", "t2", "t3"]), None),
                 (t(&["p", "n", "cp", "cn"]), None),
                 (t(&["p", "n", "cp", "cn"]), Some("sw")),
-                (t(&["p_plus", "p_minus", "s_plus", "s_minus"]), None),
+                (t(&["p1", "n1", "p2", "n2"]), None),
             ]
         );
         assert!(doc.main().instances.iter().all(|i| !i.is_subckt));
@@ -1817,7 +1815,7 @@ mod tests {
         assert_eq!(names, ["L1", "L2", "TL1"]);
         let tl = named(&doc, "TL1");
         assert_eq!((tl.is_subckt, tl.model.as_deref(), tl.value.as_deref()), (false, Some("tline"), Some("50")));
-        assert_eq!((tl.nodes.len(), tl.default_terminals.clone()), (4, None));
+        assert_eq!((tl.nodes.len(), tl.default_terminals.clone()), (4, Some(words(&["p1", "n1", "p2", "n2"]))));
     }
 
     #[test]

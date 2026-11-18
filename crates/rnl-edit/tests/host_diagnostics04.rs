@@ -18,8 +18,8 @@ fn undeclared_input_uses_the_requested_output_language() {
         ("spectre", "// title\ninclude\nR1 (a b) resistor r=1k\n"),
     ] {
         let failure = write_diagnosed(&request(Some("0.4"), dialect, netlist)).unwrap_err();
-        assert_eq!(failure.code.number().as_deref(), Some("RNL9012"));
-        let d = failure.diagnostics.iter().find(|d| d.code.as_deref() == Some("RNL9012")).unwrap();
+        assert_eq!(failure.code.number(), "RNL9012");
+        let d = failure.diagnostics.iter().find(|d| d.code == "RNL9012").unwrap();
         assert_eq!(d.line, 2);
         assert_eq!(d.severity, "error");
     }
@@ -32,7 +32,7 @@ fn editor_host_errors_use_the_named_declaration_location() {
         ("spectre", "// title\nsubckt open_cell (a b)\nR1 (a b) resistor r=1k\n"),
     ] {
         let failure = write_diagnosed(&request(Some("0.4"), dialect, netlist)).unwrap_err();
-        let d = failure.diagnostics.iter().find(|d| d.code.as_deref() == Some("RNL9008")).unwrap();
+        let d = failure.diagnostics.iter().find(|d| d.code == "RNL9008").unwrap();
         assert_eq!(d.line, 2);
         assert!(d.message.contains("open_cell") && d.message.contains("no closing ends declaration"));
     }
@@ -46,14 +46,14 @@ fn includes_are_checked_in_their_own_declared_language() {
     let req = request(Some("0.4"), "spice", "title\n.include child.sp\nR1 a b 1k\n");
     let failure =
         write_with_options_diagnosed(&req, &files, &Options { std: false, ..Default::default() }).unwrap_err();
-    assert_eq!(failure.code.number().as_deref(), Some("RNL9012"));
+    assert_eq!(failure.code.number(), "RNL9012");
     assert!(failure.diagnostics.iter().any(|d| d.line == 3 && d.file.ends_with("child.sp")));
     // one that declares a version this core does not read refuses the write, at its declaration
     let child = "* child\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n.include\n";
     let files = MemoryProvider::new().with("/rnl-edit/child.sp", child);
     let failure =
         write_with_options_diagnosed(&req, &files, &Options { std: false, ..Default::default() }).unwrap_err();
-    assert_eq!(failure.code.number().as_deref(), Some("RNL2102"));
+    assert_eq!(failure.code.number(), "RNL2102");
     assert!(failure.diagnostics.iter().any(|d| d.line == 2 && d.file.ends_with("child.sp")));
 }
 
@@ -63,7 +63,7 @@ fn an_undeclared_include_inherits_the_requested_output_language() {
     let req = request(Some("0.4"), "spice", "title\n.include child.sp\n");
     let failure =
         write_with_options_diagnosed(&req, &files, &Options { std: false, ..Default::default() }).unwrap_err();
-    assert_eq!(failure.code.number().as_deref(), Some("RNL9012"));
+    assert_eq!(failure.code.number(), "RNL9012");
 }
 
 #[test]
@@ -73,7 +73,7 @@ fn only_the_selected_library_section_is_checked() {
     let req = request(Some("0.4"), "spice", "title\n.lib lib.sp tt\n");
     let failure =
         write_with_options_diagnosed(&req, &files, &Options { std: false, ..Default::default() }).unwrap_err();
-    assert_eq!(failure.diagnostics.iter().filter(|d| d.code.as_deref() == Some("RNL9012")).count(), 1);
+    assert_eq!(failure.diagnostics.iter().filter(|d| d.code == "RNL9012").count(), 1);
 }
 
 #[test]
@@ -123,9 +123,6 @@ fn final_host_locations_follow_junction_insertions_and_keep_junction_errors() {
         assert_eq!(host.len(), 1, "{:?}", written.diagnostics);
         assert_eq!(host[0].line as usize, written.text.lines().position(|line| line == "* @RNL {}").unwrap() + 1);
         assert_eq!(written.text.contains("$DOT @ATTACH %j"), configured);
-        assert_eq!(
-            written.diagnostics.iter().filter(|d| d.code.as_deref() == Some("RNL3128")).count(),
-            usize::from(!configured)
-        );
+        assert_eq!(written.diagnostics.iter().filter(|d| d.code == "RNL3128").count(), usize::from(!configured));
     }
 }

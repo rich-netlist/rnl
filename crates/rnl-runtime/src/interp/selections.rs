@@ -1,4 +1,4 @@
-//! Circuit and drawing selections of 0.4 (10.1).
+//! Circuit and drawing selections (10.1).
 
 use std::collections::{BTreeMap, HashSet};
 
@@ -116,11 +116,10 @@ impl Interp<'_> {
                                     _ => *writer,
                                 },
                             };
-                            it.follows_0_4(*writer)
-                                && (keyword == "SELECT-PIN"
-                                    || params.contains_key("symbol")
-                                    || params.contains_key("drawn")
-                                    || visit(it, *selected_scope, Some(selected), seen))
+                            keyword == "SELECT-PIN"
+                                || params.contains_key("symbol")
+                                || params.contains_key("drawn")
+                                || visit(it, *selected_scope, Some(selected), seen)
                         }
                         SetKind::Union { source } => visit(it, *source, scope.clone(), seen),
                         _ => false,
@@ -164,7 +163,7 @@ impl Interp<'_> {
         ctx: &Ctx,
         off: usize,
     ) -> super::eval::R<()> {
-        if !self.follows_0_4(self.source_unit(ctx)) || !self.symbol_selection_dependency(object) {
+        if !self.symbol_selection_dependency(object) {
             return Ok(());
         }
         let first = self.scenes[scene].bad_symbol_selections.insert((ctx.rec, off));
@@ -177,9 +176,7 @@ impl Interp<'_> {
     }
 
     pub(crate) fn object_drawn(&self, scene: SceneId, object: ObjId) -> bool {
-        !self.is_failed(object)
-            && self.scenes[scene].symbol.contains_key(&object)
-            && !self.scenes[scene].default_symbol.contains(&object)
+        !self.is_failed(object) && self.scenes[scene].symbol.contains_key(&object)
     }
 
     pub(crate) fn symbol_matches(&self, scene: SceneId, object: ObjId, pattern: &str) -> bool {
@@ -358,13 +355,11 @@ impl Interp<'_> {
         &mut self,
         scene: SceneId,
         pool: Option<Vec<ObjId>>,
-        via: &HashSet<ObjId>,
         params: &BTreeMap<String, Lit>,
         snapshot: bool,
-        writer: UnitId,
     ) -> Vec<ObjId> {
         let mut all = Vec::new();
-        for owner in self.selection_drawables(scene, snapshot, true) {
+        for owner in self.selection_drawables(scene, snapshot) {
             all.extend(self.owner_pins(scene, owner));
         }
         let mut candidates = Vec::new();
@@ -372,7 +367,6 @@ impl Interp<'_> {
             for object in pool {
                 match self.o(object).clone() {
                     ObjData::ScenePin { .. } => candidates.push(object),
-                    _ if via.contains(&object) => {}
                     ObjData::Inst { .. } | ObjData::Bundle { .. } => {
                         let owner = self.bundle_of(object);
                         candidates.extend(self.owner_pins(scene, owner));
@@ -405,16 +399,12 @@ impl Interp<'_> {
                     return false;
                 }
                 let ObjData::ScenePin { owner, index } = *self.o(*pin) else { return false };
-                if !self.object_drawn(scene, owner) || !self.inst_match(owner, params, true, writer) {
+                if !self.object_drawn(scene, owner) || !self.inst_match(owner, params, true) {
                     return false;
                 }
                 if let Some(want) = params.get("terminal") {
-                    // in 0.4 a string of digits is the terminal number (6.4)
-                    let want = &if self.follows_0_4(writer) {
-                        super::terminal_maps::terminal_value(want)
-                    } else {
-                        want.clone()
-                    };
+                    // a string of digits is the terminal number (6.4)
+                    let want = &super::terminal_maps::terminal_value(want);
                     let matched = if let ObjData::Usage(_) = self.o(owner) {
                         let symbol = self.scenes[scene].symbol[&owner];
                         self.symbol(symbol).pins[index].terms.iter().any(|term| match (term, want) {

@@ -46,7 +46,7 @@ impl Interp<'_> {
     }
 
     pub(super) fn record_has_language(&self, unit: usize, header: &super::unit::Header) -> bool {
-        if header.languages == Languages::ALL && (self.units[unit].level.is_some() || !self.follows_0_4(unit)) {
+        if header.languages == Languages::ALL && self.units[unit].level.is_some() {
             return true;
         }
         let Some(level) = self.units[unit].level else {

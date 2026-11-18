@@ -89,12 +89,8 @@ pub struct Node {
     pub children: Vec<Node>,
 }
 
-/// The tree of groups of a level of 0.4, with what each node holds directly; none for a level of
-/// an earlier version, which has no tree of groups.
-pub fn tree(lv: &LevelView) -> Option<Node> {
-    if !crate::interp::unit::keeps_0_4(&lv.language) {
-        return None;
-    }
+/// The tree of groups of a level, with what each node holds directly.
+pub fn tree(lv: &LevelView) -> Node {
     let members: Vec<Vec<String>> = lv.groups.iter().map(member_ids).collect();
     let index: BTreeMap<&str, usize> = lv.objects.iter().enumerate().map(|(k, o)| (o.id.as_str(), k)).collect();
     let first = |k: usize| members[k].iter().filter_map(|id| index.get(id.as_str()).copied()).min();
@@ -124,7 +120,7 @@ pub fn tree(lv: &LevelView) -> Option<Node> {
     let children = build(None, lv, &members, &parent, &first);
     let top: BTreeSet<&String> = children.iter().flat_map(|c| &members[c.group.unwrap()]).collect();
     let parts = lv.objects.iter().filter(|o| !o.disabled && part(o).is_some() && !top.contains(&o.id));
-    Some(Node { group: None, held: held(lv, parts.map(|o| o.id.clone())), children })
+    Node { group: None, held: held(lv, parts.map(|o| o.id.clone())), children }
 }
 
 /// The text that names an object: its id, or for a usage without a name of its own, whose id is
@@ -186,9 +182,7 @@ pub fn crowded(lv: &LevelView) -> Vec<(Option<usize>, usize)> {
         }
     }
     let mut out = Vec::new();
-    if let Some(root) = tree(lv) {
-        walk(&root, &mut out);
-    }
+    walk(&tree(lv), &mut out);
     out
 }
 

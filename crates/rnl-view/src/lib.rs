@@ -66,7 +66,7 @@ pub use snapshot::{
 include!(concat!(env!("OUT_DIR"), "/bundled.rs"));
 
 /// The directory of the bundled packages, as the runtime names it. Each version of the standard
-/// series has a directory of its own in it, as in `libraries/standard`, such as `<bundled>/0.2`.
+/// series has a directory of its own in it, as in `libraries/standard`, such as `<bundled>/0.4`.
 /// Extension and PDK packages are supplied by the frontend or its search paths.
 pub const BUNDLED_DIR: &str = "<bundled>";
 
@@ -83,8 +83,7 @@ pub fn bundled() -> MemoryProvider {
     p
 }
 
-/// The bundled package files of a draft series, by their paths in [`bundled`], such as
-/// `<bundled>/0.4/rnl-std.rnl`: those written in a language version newer than the tool's default
+/// The bundled package files of a draft series, by their paths in [`bundled`]: those written in a language version newer than the tool's default
 /// (16.1), whose standard is not released yet. A frontend that lists the bundled packages, as the
 /// desktop viewer does, leaves them out, as the web viewer's library does; the core reads them all
 /// the same, so a file of that version uses them (16.3).

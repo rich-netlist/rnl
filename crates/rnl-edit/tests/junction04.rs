@@ -64,7 +64,7 @@ fn invalid_setting_returns_a_numbered_error_in_each_level_and_keeps_points() {
     assert_eq!(w.diagnostics.len(), 2, "{:?}", w.diagnostics);
     for d in &w.diagnostics {
         assert_eq!(d.severity, "error");
-        assert_eq!(d.code.as_deref(), Some("RNL3128"));
+        assert_eq!(d.code, "RNL3128");
         assert!(d.full_path.ends_with("dots.rnl"));
     }
 }

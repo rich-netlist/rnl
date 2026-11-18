@@ -8,10 +8,10 @@ use std::collections::HashMap;
 
 use rnl_runtime::host::file_name;
 use rnl_runtime::interp::catalog::{
-    package_contents, package_version_key, version_key, DefinedName, PackageContents, PackageSymbol,
+    package_contents, package_version_key, DefinedName, PackageContents, PackageSymbol,
 };
 use rnl_runtime::interp::obj::TermKey;
-use rnl_runtime::interp::unit::{scan_language_decl, scan_package_decl, DEFAULT_VERSION};
+use rnl_runtime::interp::unit::scan_package_decl;
 use rnl_runtime::source::Provider;
 use rnl_runtime::Options;
 use serde::Serialize;
@@ -25,8 +25,7 @@ use crate::Workspace;
 pub struct CatalogOptions {
     /// Only the packages of these names; every package when None.
     pub packages: Option<Vec<String>>,
-    /// Every version of each package, not only the newest (of the versions written in a language
-    /// version not newer than the tool's default, when a package has one).
+    /// Every version of each package, not only the newest.
     pub all_versions: bool,
     /// The runtime's options each package file is checked with, as `rnl check` checks it: with the
     /// standard package of its language version unless `std` is false (16.3).
@@ -64,7 +63,8 @@ pub struct CatalogPackage {
     /// not from a package directory, whatever its name.
     pub series: bool,
     /// The package that the setting of 16.3 brings in at the root of a document, the standard
-    /// package, when the catalog's reading has that setting on (`CatalogOptions::runtime`).
+    /// package `rnl-std-all`, when the catalog's reading has that setting on
+    /// (`CatalogOptions::runtime`): the version the reading asks for, or else the newest listed.
     pub implicit: bool,
 }
 
@@ -173,8 +173,7 @@ pub(crate) fn catalog(ws: &Workspace, options: &CatalogOptions) -> Catalog {
         })
         .collect();
     read.sort_by(|(a, ..), (b, ..)| {
-        let key =
-            |c: &PackageContents| (c.name.clone(), package_version_key(&c.version, &c.language), c.version.clone());
+        let key = |c: &PackageContents| (c.name.clone(), package_version_key(&c.version), c.version.clone());
         key(a).cmp(&key(b))
     });
     // what the rules draw with what, across the packages listed; of several rules, the first
@@ -186,6 +185,14 @@ pub(crate) fn catalog(ws: &Workspace, options: &CatalogOptions) -> Catalog {
             symbol_of.entry(&rule.definition).or_insert(&rule.symbol.name);
         }
     }
+    // the version of the standard package that the setting of 16.3 brings in: the one the
+    // reading asks for, or else the newest listed
+    let standard = rnl_runtime::interp::STANDARD_PACKAGE;
+    let implicit_version = options
+        .runtime
+        .std_version
+        .clone()
+        .or_else(|| read.iter().rev().find(|(c, ..)| c.name == standard).map(|(c, ..)| c.version.clone()));
     let mut out = Catalog::default();
     for (c, file, bundled) in &read {
         let named =
@@ -198,8 +205,9 @@ pub(crate) fn catalog(ws: &Workspace, options: &CatalogOptions) -> Catalog {
             references: c.references.clone(),
             series: *bundled,
             implicit: options.runtime.std
-                && c.name == rnl_runtime::interp::STD_NAME
-                && (!rnl_runtime::interp::unit::keeps_0_4(&c.language) || options.runtime.include_std),
+                && options.runtime.include_std
+                && c.name == standard
+                && implicit_version.as_ref() == Some(&c.version),
         });
         for s in &c.symbols {
             out.symbols.push(CatalogSymbol {
@@ -252,11 +260,8 @@ pub(crate) fn catalog(ws: &Workspace, options: &CatalogOptions) -> Catalog {
 
 /// The package files a catalog lists: of each name and version the first the package directories
 /// have, the frontend's before the bundled ones, as the runtime finds a package by name (16.2); of
-/// each name the newest version, by the runtime's order of versions, or every version with
-/// `all_versions`; and only the names `packages` gives, when it gives them. A version written in a
-/// language version newer than the tool's default, a draft such as the standard series 0.4, is the
-/// newest only for a name that has no other, as a file of the default version finds a package that
-/// names no version (16.2).
+/// each name the newest version, by the runtime's order of package versions (16.2), or every
+/// version with `all_versions`; and only the names `packages` gives, when it gives them.
 fn listed(ws: &Workspace, options: &CatalogOptions) -> Vec<String> {
     let mut found: Vec<(String, String, String)> = Vec::new();
     for path in ws.package_files() {
@@ -275,20 +280,8 @@ fn listed(ws: &Workspace, options: &CatalogOptions) -> Vec<String> {
         }
     }
     if !options.all_versions {
-        let by_default = |path: &str| {
-            let language = ws.read(path).as_deref().and_then(scan_language_decl);
-            version_key(language.as_deref().unwrap_or(DEFAULT_VERSION)) <= version_key(DEFAULT_VERSION)
-        };
-        let rank: HashMap<_, _> = found
-            .iter()
-            .map(|f| {
-                let language = ws.read(&f.2).as_deref().and_then(scan_language_decl);
-                (
-                    f.2.as_str(),
-                    (by_default(&f.2), package_version_key(&f.1, language.as_deref().unwrap_or(DEFAULT_VERSION))),
-                )
-            })
-            .collect();
+        // the language version of a package's file does not change the order of its versions
+        let rank: HashMap<_, _> = found.iter().map(|f| (f.2.as_str(), package_version_key(&f.1))).collect();
         let newest = |name: &str| found.iter().filter(|f| f.0 == name).map(|f| &rank[f.2.as_str()]).max();
         // of versions equally new, the first found
         let mut kept: Vec<&(String, String, String)> = Vec::new();
@@ -530,7 +523,7 @@ mod tests {
             .map(String::from)
             .to_vec(),
             series: true,
-            // in 0.4 no standard package comes in unless the reading asks for it (16.3)
+            // no standard package comes in unless the reading asks for it (16.3)
             implicit: false,
         };
         assert_eq!(*all, want);
@@ -540,6 +533,19 @@ mod tests {
         assert_eq!(packages(&every), listed);
         assert_eq!(packages(&every).len(), crate::BUNDLED.len());
         assert!(every.packages.iter().all(|p| p.language == "0.4" && p.series && !p.implicit));
+    }
+
+    #[test]
+    fn the_standard_package_is_implicit_when_the_reading_brings_it_in() {
+        // the setting of 16.3 brings in rnl-std-all, and no other package
+        let runtime = Options { include_std: true, ..Options::default() };
+        let c = crate::catalog(&MemoryProvider::new(), &CatalogOptions { runtime, ..CatalogOptions::default() });
+        let implicit: Vec<&str> = c.packages.iter().filter(|p| p.implicit).map(|p| p.name.as_str()).collect();
+        assert_eq!(implicit, [rnl_runtime::interp::STANDARD_PACKAGE]);
+        // a reading that turns the standard package off brings in none
+        let runtime = Options { include_std: true, std: false, ..Options::default() };
+        let c = crate::catalog(&MemoryProvider::new(), &CatalogOptions { runtime, ..CatalogOptions::default() });
+        assert!(c.packages.iter().all(|p| !p.implicit));
     }
 
     #[test]
@@ -716,7 +722,7 @@ mod tests {
     }
 
     #[test]
-    fn draft_catalog_versions_use_unbounded_decimal_order() {
+    fn catalog_versions_use_unbounded_decimal_order() {
         let huge = "9999999999999999999999999999999999999999.7";
         let mut files = MemoryProvider::new();
         files.package_dirs.push("pkg".into());

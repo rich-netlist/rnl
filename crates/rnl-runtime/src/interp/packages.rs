@@ -19,92 +19,18 @@ use crate::host::{LevelId, LevelKind};
 
 use super::obj::{SceneId, UnitId};
 use super::unit::{
-    is_alias_package, package_version_cmp, same_package_major, version_key, Binding, DeviceDecl, EffPackage, Place,
-    UnitKind, UseDecl,
+    is_alias_package, is_read_version, package_version_cmp, same_package_major, version_key, Binding, DeviceDecl,
+    EffPackage, Place, UnitKind, UseDecl,
 };
 use super::Interp;
 
-/// The standard collection of the released 0.2/0.3 languages (16.3).
-pub const STD_NAME: &str = "rnl-std";
+/// The standard collection (16.3): the package that the tool setting `include_std` references at
+/// the root of the main file.
+pub const STANDARD_PACKAGE: &str = "rnl-std-all";
 
-/// The collection name follows the file's language, independently of the package version.
-pub fn standard_package_name(language: &str) -> &'static str {
-    if super::unit::keeps_0_4(language) {
-        "rnl-std-all"
-    } else {
-        STD_NAME
-    }
-}
-
-/// The rule packages of the standard series 0.3, which give instances their symbols in each
-/// dialect: by element letter and model type in SPICE, by master and model type in Spectre (16.3).
-pub const SPICE_RULES: &str = "rnl-std-spice";
-pub const SPECTRE_RULES: &str = "rnl-std-spectre";
-
-/// The dialect of one file of a netlist, "spice" or "spectre": the language mode in which its
-/// first statement of the host is read (2.2, 16.3), the first line that is not a comment, a blank
-/// line, the title of the main file or a `simulator lang=` line. `netlist` is the dialect of the
-/// netlist, as the adapter that reads it names it ([`crate::host::Dialect::name`]), `path` and
-/// `text` are the file's, and `main` says whether it is the main file. Every file of a SPICE
-/// netlist is in the SPICE dialect. In a Spectre netlist a file starts in the Spectre mode when it
-/// is a `.scs` file and in the SPICE mode otherwise, and a `simulator lang=` line switches the mode
-/// of what follows it, as the Spectre adapter reads them; one after the first statement does not
-/// change the dialect of the file, and writing a record, a comment, does not either. A file
-/// without a statement is in the mode it ends in. A netlist of another host keeps its own dialect.
-///
-/// This is the rule of the draft 0.3 for dropping the rule package of the other dialect, and the
-/// one place that decides it, with [`section_dialect`] for a library section.
-pub fn file_dialect<'a>(netlist: &'a str, path: &str, text: &str, main: bool) -> &'a str {
-    if netlist != "spectre" {
-        return netlist;
-    }
-    dialect_named(first_statement_mode(path.to_lowercase().ends_with(".scs"), text.lines().enumerate(), main))
-}
-
-/// The dialect of a library section, which is read as a file (2.8): [`file_dialect`] of the lines
-/// of `text` between those that open and close it, `lines` ([`crate::host::Level::section_lines`]),
-/// from the mode it starts in, as the Spectre adapter reads it: Spectre's after `section`, SPICE's
-/// after `.lib`. What lies outside the section is not read (2.2), and does not count.
-pub fn section_dialect<'a>(netlist: &'a str, text: &str, lines: (u32, u32)) -> &'a str {
-    if netlist != "spectre" {
-        return netlist;
-    }
-    let (open, close) = (lines.0 as usize, lines.1 as usize);
-    let spectre = !text.lines().nth(open.saturating_sub(1)).unwrap_or("").trim_start().starts_with('.');
-    let inside = text.lines().enumerate().skip(open).take(close.saturating_sub(open + 1));
-    dialect_named(first_statement_mode(spectre, inside, false))
-}
-
-fn dialect_named(spectre: bool) -> &'static str {
-    if spectre {
-        "spectre"
-    } else {
-        "spice"
-    }
-}
-
-/// Whether the first statement of the host among `lines`, each with its index in its file, is read
-/// in Spectre mode, from `spectre`, the mode they start in ([`file_dialect`]).
-fn first_statement_mode<'t>(mut spectre: bool, lines: impl Iterator<Item = (usize, &'t str)>, main: bool) -> bool {
-    for (k, raw) in lines {
-        // the title of the main file; a comment line, `*` in both modes, `//` in Spectre's, and on
-        // the first line of an included file either, as the adapter reads them
-        let comment = raw.starts_with('*') || ((spectre || k == 0) && raw.starts_with("//"));
-        if (k == 0 && main) || comment || raw.trim().is_empty() {
-            continue;
-        }
-        let low = raw.trim().to_lowercase();
-        if low.split_whitespace().next() == Some("simulator") {
-            if !spectre && low.contains("spectre") {
-                spectre = true;
-            } else if spectre && low.contains("spice") && !low.contains("spectre") {
-                spectre = false;
-            }
-            continue;
-        }
-        break;
-    }
-    spectre
+/// The name of the standard collection (16.3), [`STANDARD_PACKAGE`].
+pub fn standard_package_name() -> &'static str {
+    STANDARD_PACKAGE
 }
 
 /// A reference, a USE-PACKAGE in the header record of a package file (16.2): the package and the
@@ -153,8 +79,8 @@ enum At {
     Level(LevelId),
 }
 
-/// A USE-PACKAGE written in a file, the standard package used implicitly, or a package checked on
-/// its own, in the order of nearness: a later one is nearer.
+/// A USE-PACKAGE written in a file, the standard package that the tool setting adds, or a package
+/// checked on its own, in the order of nearness: a later one is nearer.
 struct Use {
     decl: Option<UseDecl>,
     unit: Option<UnitId>,
@@ -211,10 +137,6 @@ impl Interp<'_> {
         }
     }
 
-    pub(super) fn standard_name(&self, key: EffKey) -> &'static str {
-        standard_package_name(&self.version_of(Some(self.standard_unit(key))))
-    }
-
     fn standard_request_location(&self, unit: UnitId) -> Option<Loc> {
         let writer = self.file_unit(unit).unwrap_or(unit);
         self.units[writer].header_record.and_then(|record| self.rec_loc(Some(record), 0)).or_else(|| {
@@ -226,20 +148,19 @@ impl Interp<'_> {
         })
     }
 
-    /// The standard package used implicitly for the files of the language version `language`
-    /// (16.3): the newest version in the package directories of the standard series written in
-    /// that version, as the collection header declares, so that a file of 0.2 uses
-    /// the series 0.2 and a file of 0.3 the series 0.3; or the version that the reading asks for
-    /// ([`crate::Options::std_version`]). The implicit reference checks the 0.4 boundary before
-    /// making its names available. Reading it reads the packages it references.
+    /// The standard package that the tool setting references for the files of the language
+    /// version `language` (16.3): the newest version in the package directories of the standard
+    /// series written in that version, as the collection header declares; or the version that the
+    /// reading asks for ([`crate::Options::std_version`]). The reference checks the language of
+    /// the package before making its names available. Reading it reads the packages it references.
     pub(crate) fn std_package(&mut self, language: &str) -> Option<UnitId> {
-        if !self.std_enabled || (super::unit::keeps_0_4(language) && !self.include_std) {
+        if !self.std_enabled || !self.include_std {
             return None;
         }
         if let Some(&s) = self.std_units.get(language) {
             return s;
         }
-        let standard = standard_package_name(language);
+        let standard = STANDARD_PACKAGE;
         self.scan_packages(standard);
         // of the files of one version, the one found is the first in the order of the package
         // directories (16.2): one of a frontend's own directories hides the bundled one
@@ -278,15 +199,14 @@ impl Interp<'_> {
             // of that series the newest version
             let mut best: Option<&(String, String, String)> = None;
             for c in found.iter().filter(|c| Some(written_in(c)) == series) {
-                if best.is_none_or(|b| package_version_cmp(&c.1, &b.1, super::unit::keeps_0_4(language)).is_gt()) {
+                if best.is_none_or(|b| package_version_cmp(&c.1, &b.1).is_gt()) {
                     best = Some(c);
                 }
             }
             best.cloned()
         };
         let out = chosen.map(|(n, v, path)| {
-            let language = self.pkg_languages[&path].clone();
-            let key = super::unit::package_cache_key(n.clone(), v.clone(), language == "0.4");
+            let key = super::unit::package_cache_key(n.clone(), v.clone());
             match self.packages.get(&key) {
                 Some(&u) => u,
                 None => self.load_package_file(&path, Some((n, v))),
@@ -296,10 +216,13 @@ impl Interp<'_> {
         out
     }
 
-    /// The standard package used implicitly on a chain (16.3): the one of the language version of
-    /// the file of its level, or of a package read alone; none where the file's version is not
-    /// supported (16.1), and none for a package read alone that is not read, such as one of a
-    /// version not supported.
+    /// The standard package that the tool setting `include_std` references on a chain (16.3): one
+    /// reference at the root of the main file, or of the package checked on its own, the one of
+    /// the language version of the file of the chain's level; none when the header record of that
+    /// root writes a USE-PACKAGE of it, which stands instead, none where the file's version is not
+    /// read (16.1), and none for a package read alone that is not read, such as one of a version
+    /// not read. A standard package of another language version, or an alias package, is not
+    /// used.
     pub(crate) fn implicit_std(&mut self, key: EffKey) -> Option<UnitId> {
         let unit = match key {
             EffKey::Level(level) if !self.file_ok(level) => return None,
@@ -307,28 +230,22 @@ impl Interp<'_> {
             EffKey::Alone(u) if !self.units[u].ok => return None,
             EffKey::Alone(u) => u,
         };
-        let language = self.version_of(Some(unit));
-        if self.follows_0_4(unit) {
-            // The setting adds one reference at the main file's root. It does not add a
-            // separate default to each included file or cross a language-version boundary.
-            let root = match key {
-                EffKey::Level(_) => self.level_unit[0],
-                EffKey::Alone(u) if self.package_main == Some(u) => u,
-                EffKey::Alone(_) => return None,
-            };
-            if !self.include_std
-                || !self.follows_0_4(root)
-                || self.units[root]
-                    .uses
-                    .iter()
-                    .any(|decl| decl.in_header && decl.name == standard_package_name(&language))
-            {
-                return None;
-            }
+        // the setting adds one reference at the main file's root: not a separate one for each
+        // included file, and none when the main file is not read
+        let root = match key {
+            EffKey::Level(_) if !self.file_ok(0) => return None,
+            EffKey::Level(_) => self.level_unit[0],
+            EffKey::Alone(u) if self.package_main == Some(u) => u,
+            EffKey::Alone(_) => return None,
+        };
+        if !self.include_std || self.units[root].uses.iter().any(|decl| decl.in_header && decl.name == STANDARD_PACKAGE)
+        {
+            return None;
         }
+        let language = self.version_of(Some(unit));
         self.std_package(&language)
-            .filter(|&p| super::unit::package_languages_match(&self.version_of(Some(p)), &language))
-            .filter(|&p| !self.follows_0_4(unit) || !is_alias_package(&self.units[p]))
+            .filter(|&p| is_read_version(&self.version_of(Some(p))))
+            .filter(|&p| !is_alias_package(&self.units[p]))
     }
 
     /// A package's version: what its PACKAGE says, or the `version=` of the USE-PACKAGE of an
@@ -361,8 +278,7 @@ impl Interp<'_> {
             return e.clone();
         }
         let uses = self.uses_on(key);
-        let standard_first = self.follows_0_4(self.standard_unit(key)).then(|| self.standard_name(key));
-        let e = Rc::new(self.effective(&uses, standard_first));
+        let e = Rc::new(self.effective(&uses, Some(STANDARD_PACKAGE)));
         self.effs.insert(key, e.clone());
         e
     }
@@ -370,7 +286,7 @@ impl Interp<'_> {
     /// The uses on a chain, in the order of nearness: the standard package at the root, then
     /// level by level the USE-PACKAGEs of the header record (at the root) and of the level (16.3).
     fn uses_on(&mut self, key: EffKey) -> Vec<Use> {
-        let standard = self.standard_name(key);
+        let standard = STANDARD_PACKAGE;
         let mut uses = Vec::new();
         let std = self.implicit_std(key);
         if let Some(s) = std {
@@ -378,10 +294,13 @@ impl Interp<'_> {
         }
         match key {
             EffKey::Level(level) => {
-                let language = self.version_of(Some(self.level_unit[level]));
                 let mut chain = self.doc.ancestors(level);
                 chain.reverse();
                 chain.push(level);
+                // the level of a file whose version is not read has no packages in effect (16.1)
+                if !self.file_ok(level) {
+                    chain.clear();
+                }
                 for lv in chain {
                     let unit = &self.units[self.level_unit[lv]];
                     if !unit.ok {
@@ -389,13 +308,6 @@ impl Interp<'_> {
                     }
                     for header in [true, false] {
                         for d in unit.uses.iter().filter(|d| d.in_header == header) {
-                            // Includes can cross the 0.4 boundary, but their packages cannot.
-                            if !super::unit::package_languages_match(
-                                &self.version_of(Some(self.use_writer(d))),
-                                &language,
-                            ) {
-                                continue;
-                            }
                             let at = if header { At::Root } else { At::Level(lv) };
                             uses.push(Use { decl: Some(d.clone()), unit: d.pkg, at, name: d.name.clone() });
                         }
@@ -412,12 +324,6 @@ impl Interp<'_> {
                         uses[0].unit = Some(p);
                     }
                 }
-                if let Some(name) = self.other_dialect_rules(level, &uses) {
-                    // as if the header record of the level's file wrote an empty inline package of
-                    // that name: in effect, it brings nothing in. No other use names it, so where
-                    // it stands among the uses changes nothing
-                    uses.push(Use { decl: None, unit: None, at: At::Root, name });
-                }
             }
             EffKey::Alone(u) => {
                 let name = self.units[u].pkg_name.clone();
@@ -425,21 +331,20 @@ impl Interp<'_> {
             }
         }
         self.tell_missing_std(key, &uses);
-        self.tell_std_language(key, &uses);
         self.tell_std_alias(key, &uses);
         uses
     }
 
     fn tell_std_alias(&mut self, key: EffKey, uses: &[Use]) {
         let unit = self.standard_unit(key);
-        let standard = self.standard_name(key);
-        if !self.follows_0_4(unit) || uses.iter().any(|u| u.name == standard) {
+        let standard = STANDARD_PACKAGE;
+        if uses.iter().any(|u| u.name == standard) {
             return;
         }
         let language = self.version_of(Some(unit));
         let Some(package) = self.std_units.get(&language).copied().flatten() else { return };
         if !self.units[package].ok
-            || !super::unit::package_languages_match(&self.version_of(Some(package)), &language)
+            || !is_read_version(&self.version_of(Some(package)))
             || !is_alias_package(&self.units[package])
         {
             return;
@@ -461,35 +366,14 @@ impl Interp<'_> {
             loc, &context);
     }
 
-    fn tell_std_language(&mut self, key: EffKey, uses: &[Use]) {
-        let standard = self.standard_name(key);
-        if uses.iter().any(|u| u.name == standard) {
-            return;
-        }
-        let unit = match key {
-            EffKey::Level(level) if self.file_ok(level) => self.level_unit[level],
-            EffKey::Alone(u) if self.package_main == Some(u) && self.units[u].ok => u,
-            _ => return,
-        };
-        let reader = self.version_of(Some(unit));
-        let Some(p) = self.std_units.get(&reader).copied().flatten() else { return };
-        let language = self.version_of(Some(p));
-        let writer = self.file_unit(unit).unwrap_or(unit);
-        if !super::unit::package_languages_match(&language, &reader) && self.std_language_reported.insert(writer) {
-            let loc = self.units[writer].header_record.and_then(|r| self.rec_loc(Some(r), 0));
-            self.reject_package_language(standard, &reader, &language, loc, "", "implicit reference");
-        }
-    }
-
     /// Say that the version of the standard package that the reading asks for cannot be found,
     /// once, on the first chain that would use it (16.3): one whose files are read, or the package
-    /// checked on its own, where no use names the standard package but the implicit one. On a
+    /// checked on its own, where no use names the standard package but the one the setting adds. On a
     /// chain where a header record pins a version of it, or an inline package of its name drops or
     /// freezes it, that use stands in its place, and the version asked for is not needed; nor is it
-    /// for a package in effect nowhere, such as the rule package of the other dialect that the
-    /// series pinned references and a file drops.
+    /// for a package in effect nowhere.
     fn tell_missing_std(&mut self, key: EffKey, uses: &[Use]) {
-        let standard = self.standard_name(key);
+        let standard = STANDARD_PACKAGE;
         let Some((v, false)) = self.missing_std.clone() else { return };
         let read = match key {
             EffKey::Level(level) => self.file_ok(level),
@@ -501,54 +385,9 @@ impl Interp<'_> {
         self.missing_std = Some((v.clone(), true));
         let message = format!("the standard package {standard} {v} that the reading asks for cannot be found, in the package directories or among the bundled packages: the files that do not pin a version of it are read without a standard package (16.3)");
         let unit = self.standard_unit(key);
-        if self.follows_0_4(unit) {
-            let loc = self.standard_request_location(unit);
-            let package = self.units[unit].pkg().to_string();
-            self.diag_in(Severity::Error, codes::STD_VERSION_NOT_FOUND, message, loc, &package);
-        } else {
-            self.sink.error(codes::STD_VERSION_NOT_FOUND, message, None);
-        }
-    }
-
-    /// The dialect of the file a level's text is in (2.2, 16.3), in the dialect of the netlist:
-    /// [`file_dialect`] of that file, whose first line is a title when it is the main file, the
-    /// subcircuits written in it included; or [`section_dialect`] of the library section it is
-    /// read through, which is read as a file (2.8).
-    pub(crate) fn level_dialect(&self, level: LevelId) -> &str {
-        let file = self.doc.file_level(level);
-        let lv = &self.doc.levels[file];
-        let text = self.doc.source(&lv.file).unwrap_or("");
-        // each file by the dialect of its own format, also when a file of another includes it
-        let dialect = &self.doc.rules(&lv.file).name;
-        match lv.section_lines {
-            Some(lines) => section_dialect(dialect, text, lines),
-            None => file_dialect(dialect, &lv.path, text, file == 0),
-        }
-    }
-
-    /// The rule package of the other dialect that a level of a file of the draft 0.3 drops
-    /// implicitly (16.3): `rnl-std-spectre` in a file of the SPICE dialect, `rnl-std-spice` in one
-    /// of the Spectre dialect, each file by its own dialect, also when another file includes it.
-    /// None when a file on the chain, the level's own or one that includes it, writes a
-    /// USE-PACKAGE of that package, the package or an inline package of its name: that one takes
-    /// effect (16.2). None too when no standard package is used, or when the one in effect does
-    /// not bring that package in, as the series 0.2 does not.
-    fn other_dialect_rules(&mut self, level: LevelId, uses: &[Use]) -> Option<String> {
-        if !self.follows_0_3(self.level_unit[level]) || self.follows_0_4(self.level_unit[level]) {
-            return None;
-        }
-        let other = match self.level_dialect(level) {
-            "spice" => SPECTRE_RULES,
-            "spectre" => SPICE_RULES,
-            _ => return None,
-        };
-        if uses.iter().any(|u| u.decl.is_some() && u.name == other) {
-            return None;
-        }
-        // the standard package in effect: the use of it nearest to the level
-        let std = uses.iter().rev().find(|u| u.name == STD_NAME)?;
-        let brought = self.expansion(&std.name, std.unit);
-        brought.0.iter().any(|n| n == other).then(|| other.to_string())
+        let loc = self.standard_request_location(unit);
+        let package = self.units[unit].pkg().to_string();
+        self.diag_in(Severity::Error, codes::STD_VERSION_NOT_FOUND, message, loc, &package);
     }
 
     /// What a package brings in when used, as its references are written: the packages it
@@ -684,10 +523,9 @@ impl Interp<'_> {
                 // placed at the nearest use that brings in a version of the major version chosen
                 let cs = &cands.by[n];
                 let first = self.pkg_ver(cs[0].unit);
-                let modern = self.follows_0_4(cs[0].unit);
                 let i = cs
                     .iter()
-                    .filter(|c| same_package_major(&self.pkg_ver(c.unit), &first, modern))
+                    .filter(|c| same_package_major(&self.pkg_ver(c.unit), &first))
                     .map(|c| c.by)
                     .max()
                     .unwrap();
@@ -766,10 +604,9 @@ impl Interp<'_> {
     /// the first.
     fn newest(&self, cs: &[Cand]) -> UnitId {
         let first = self.pkg_ver(cs[0].unit);
-        let modern = self.follows_0_4(cs[0].unit);
         let mut best = cs[0].unit;
-        for c in cs.iter().filter(|c| same_package_major(&self.pkg_ver(c.unit), &first, modern)) {
-            if package_version_cmp(&self.pkg_ver(c.unit), &self.pkg_ver(best), modern).is_gt() {
+        for c in cs.iter().filter(|c| same_package_major(&self.pkg_ver(c.unit), &first)) {
+            if package_version_cmp(&self.pkg_ver(c.unit), &self.pkg_ver(best)).is_gt() {
                 best = c.unit;
             }
         }
@@ -827,7 +664,7 @@ impl Interp<'_> {
                 let wv = self.pkg_ver(w);
                 for c in cs {
                     let cv = self.pkg_ver(c.unit);
-                    if wv.is_empty() || cv.is_empty() || same_package_major(&cv, &wv, self.follows_0_4(w)) {
+                    if wv.is_empty() || cv.is_empty() || same_package_major(&cv, &wv) {
                         continue;
                     }
                     let who = self.units[c.reference.0].pkg_name.clone();
@@ -847,7 +684,7 @@ impl Interp<'_> {
             for c in cs {
                 let cv = self.pkg_ver(c.unit);
                 let who = self.units[c.reference.0].pkg_name.clone();
-                if !same_package_major(&cv, &fv, self.follows_0_4(first.unit)) {
+                if !same_package_major(&cv, &fv) {
                     eff.failed.insert(c.reference);
                     let r = &self.units[c.reference.0].refs[c.reference.1];
                     let loc = self.rec_loc(r.rec, r.offset);
@@ -872,8 +709,8 @@ impl Interp<'_> {
     }
 
     /// Where a choice among references is reported: at the USE-PACKAGE written in a file that
-    /// brings the package in; for the standard package used implicitly and a package checked on
-    /// its own, at the first reference on the way, in its package (16.2, 7.6).
+    /// brings the package in; for the standard package that the tool setting adds and a package
+    /// checked on its own, at the first reference on the way, in its package (16.2, 7.6).
     fn use_loc(&self, top: Option<&UseDecl>, c: &Cand) -> (Option<Loc>, String) {
         if let Some(d) = top.filter(|d| d.rec.is_some()) {
             return (self.rec_loc(d.rec, d.offset), self.units[d.unit].pkg().to_string());
@@ -918,7 +755,7 @@ impl Interp<'_> {
     /// The standard package in effect on a chain and every package it references, directly or
     /// not (16.2): their names, and the packages, the later first.
     pub(crate) fn std_env(&mut self, key: EffKey) -> Rc<(HashSet<String>, Vec<UnitId>)> {
-        let standard = self.standard_name(key);
+        let standard = STANDARD_PACKAGE;
         let eff = self.eff(key);
         if let Some(x) = self.std_envs.get(&key) {
             return x.clone();
@@ -1116,43 +953,4 @@ struct Walk<'a> {
     direct: &'a HashMap<&'a str, usize>,
     chosen: &'a HashMap<String, UnitId>,
     failed: &'a HashSet<RefKey>,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::file_dialect;
-
-    #[test]
-    fn every_file_of_a_spice_netlist_is_in_the_spice_dialect() {
-        for (path, text) in [("a.sp", "R1 a 0 1k\n"), ("lib.scs", ""), ("x.inc", "simulator lang=spectre\n")] {
-            assert_eq!(file_dialect("spice", path, text, false), "spice", "{path}");
-        }
-        // a netlist of another host keeps its own dialect
-        assert_eq!(file_dialect("none", "a.rnl", "", false), "none");
-    }
-
-    #[test]
-    fn a_file_of_a_spectre_netlist_is_in_the_mode_of_its_first_statement() {
-        // by the name of the file, in any case
-        assert_eq!(file_dialect("spectre", "a.scs", "R1 a 0 1k\n", false), "spectre");
-        assert_eq!(file_dialect("spectre", "lib/A.SCS", "", false), "spectre");
-        // by `simulator lang=` before the first statement, past the title, comments and blank lines
-        assert_eq!(file_dialect("spectre", "a.inc", "simulator lang=spectre\nR1 (a 0) resistor\n", false), "spectre");
-        assert_eq!(file_dialect("spectre", "a.sp", "* title\n  Simulator Lang = Spectre\n", true), "spectre");
-        let far = "* 1\n* 2\n* 3\n* 4\n* 5\n\nsimulator lang=spectre\nR1 (a 0) resistor\n";
-        assert_eq!(file_dialect("spectre", "a.inc", far, false), "spectre");
-        assert_eq!(file_dialect("spectre", "b.scs", "// lib\nsimulator lang=spice\nR1 a 0 1k\n", false), "spice");
-        // a header record written above the switch, a comment, does not change the dialect
-        let header = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nsimulator lang=spectre\nR1 (a 0) resistor\n";
-        assert_eq!(file_dialect("spectre", "t.net", header, true), "spectre");
-        // any other file is in the SPICE dialect, and a switch after the first statement changes only
-        // the mode of what follows it
-        assert_eq!(file_dialect("spectre", "a.sp", "R1 a 0 1k\n", false), "spice");
-        let after = "R1 a 0 1k\nsimulator lang=spectre\nR2 (a 0) resistor\n";
-        assert_eq!(file_dialect("spectre", "a.inc", after, false), "spice");
-        assert_eq!(file_dialect("spectre", "a.scs.bak", "simulator lang=spice\n", false), "spice");
-        // in the SPICE mode `//` is no comment (2.2): the line is the first statement
-        let slashes = "* t\n// a note\nsimulator lang=spectre\nR1 (a 0) resistor\n";
-        assert_eq!(file_dialect("spectre", "t.net", slashes, true), "spice");
-    }
 }

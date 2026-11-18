@@ -114,5 +114,5 @@ fn the_document_gives_the_violation() {
     let d = rnl_view::build("t.sp", &MemoryProvider::new().with("t.sp", &text), &options).unwrap();
     let v: Vec<_> = d.diagnostics.iter().filter(|d| d.severity == "violation").collect();
     assert_eq!(v.len(), 1, "{:?}", d.diagnostics);
-    assert_eq!((v[0].code.as_deref(), v[0].name), (Some("RNL6003"), "violation-current-one-way"));
+    assert_eq!((v[0].code.as_str(), v[0].name), ("RNL6003", "violation-current-one-way"));
 }

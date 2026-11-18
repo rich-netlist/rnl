@@ -31,13 +31,10 @@ impl Interp<'_> {
                 return true;
             }
         }
-        self.follows_0_4(self.source_unit(&group.site)) && (self.failed_body(&group.site) || self.is_failed(group.set))
+        self.failed_body(&group.site) || self.is_failed(group.set)
     }
 
     pub(super) fn group_members(&mut self, scene: SceneId, group: &GroupFact) -> Vec<ObjId> {
-        if !self.follows_0_4(self.source_unit(&group.site)) {
-            return self.flatten(scene, group.set, 7, None);
-        }
         let mut out = Vec::new();
         let mut active = HashSet::new();
         let mut stack = vec![(group.set, false)];

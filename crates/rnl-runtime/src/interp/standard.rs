@@ -9,9 +9,10 @@ use crate::source::{dirname, join, Provider};
 use crate::syntax::{parse_record_features, ObjExpr, Value};
 
 use super::ctx::Ctx;
-use super::packages::standard_package_name;
+use super::packages::STANDARD_PACKAGE;
 use super::unit::{
-    package_version_cmp, params_by_name, scan_language_decl, scan_package_decl, valid_package_version, version_ok,
+    is_read_version, package_version_cmp, params_by_name, scan_language_decl, scan_package_decl, valid_package_version,
+    version_ok,
 };
 use super::Interp;
 
@@ -31,7 +32,7 @@ struct Package {
 
 fn package(files: &dyn Provider, path: &str) -> Option<Package> {
     let text = files.read(path)?;
-    if scan_language_decl(&text).as_deref() != Some("0.4") {
+    if !scan_language_decl(&text).is_some_and(|v| is_read_version(&v)) {
         return None;
     }
     let (name, version) = scan_package_decl(&text)?;
@@ -43,7 +44,7 @@ fn index(files: &dyn Provider) -> BTreeMap<String, Vec<String>> {
     let mut candidates: HashMap<String, Vec<Package>> = HashMap::new();
     let mut seen = HashSet::new();
     // Discover names by following the formal collection, without recognizing definition names.
-    let mut pending = vec![(standard_package_name("0.4").to_string(), None::<String>, None::<String>)];
+    let mut pending = vec![(STANDARD_PACKAGE.to_string(), None::<String>, None::<String>)];
     while let Some((name, version, path)) = pending.pop() {
         if version.as_ref().is_some_and(|v| !valid_package_version(v)) {
             continue;
@@ -53,7 +54,7 @@ fn index(files: &dyn Provider) -> BTreeMap<String, Vec<String>> {
         // quiet, since these packages have not been requested by the document.
         let by_name = path.as_ref().and_then(|path| files.read(path)).is_none_or(|text| {
             scan_package_decl(&text)
-                .is_some_and(|(declared, have)| declared != name || !version_ok(version.as_deref(), &have, true))
+                .is_some_and(|(declared, have)| declared != name || !version_ok(version.as_deref(), &have))
         });
         let found = if by_name {
             let choices = candidates.entry(name.clone()).or_insert_with(|| {
@@ -61,23 +62,22 @@ fn index(files: &dyn Provider) -> BTreeMap<String, Vec<String>> {
                 for path in files.package_candidates(&name) {
                     if let Some(p) = package(files, &path).filter(|p| p.name == name) {
                         // The first copy of a version wins, as in normal package lookup.
-                        if !choices.iter().any(|before| package_version_cmp(&before.version, &p.version, true).is_eq())
-                        {
+                        if !choices.iter().any(|before| package_version_cmp(&before.version, &p.version).is_eq()) {
                             choices.push(p);
                         }
                     }
                 }
                 choices
             });
-            let compatible = choices.iter().filter(|p| version_ok(version.as_deref(), &p.version, true));
+            let compatible = choices.iter().filter(|p| version_ok(version.as_deref(), &p.version));
             if version.is_some() {
-                compatible.min_by(|a, b| package_version_cmp(&a.version, &b.version, true)).cloned()
+                compatible.min_by(|a, b| package_version_cmp(&a.version, &b.version)).cloned()
             } else {
-                compatible.max_by(|a, b| package_version_cmp(&a.version, &b.version, true)).cloned()
+                compatible.max_by(|a, b| package_version_cmp(&a.version, &b.version)).cloned()
             }
         } else {
             path.and_then(|path| package(files, &path))
-                .filter(|p| p.name == name && version_ok(version.as_deref(), &p.version, true))
+                .filter(|p| p.name == name && version_ok(version.as_deref(), &p.version))
         };
         let Some(p) = found else { continue };
         if !seen.insert(p.path.clone()) {
@@ -131,9 +131,6 @@ fn index(files: &dyn Provider) -> BTreeMap<String, Vec<String>> {
 
 impl Interp<'_> {
     pub(super) fn hint_standard_name(&mut self, name: &str, ctx: &Ctx, offset: usize) {
-        if !self.follows_0_4(self.source_unit(ctx)) {
-            return;
-        }
         let Some(loc) = self.rec_loc(ctx.rec, offset) else { return };
         if self.standard_hints.reported.contains(&loc.file) {
             return;

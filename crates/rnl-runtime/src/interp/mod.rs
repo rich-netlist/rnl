@@ -47,7 +47,7 @@ mod solver_config;
 mod specific;
 mod table;
 /// The name of the standard package that the setting of 16.3 brings in at the root.
-pub use packages::{standard_package_name, STD_NAME};
+pub use packages::{standard_package_name, STANDARD_PACKAGE};
 pub mod phases;
 pub mod scene;
 mod selfcheck;
@@ -94,16 +94,16 @@ pub struct Options {
     /// Explicit tool settings for core-owned policies such as junction writeback. They do not
     /// replace the file settings in the solver problem's input identity.
     pub solver_config: Vec<crate::problem::SolverSetting>,
-    /// Use the released versions' implicit standard package (16.3). False also disables
-    /// `include_std`; explicit USE-PACKAGE statements always keep their meaning.
+    /// Allow the standard package that `include_std` adds (16.3): false disables `include_std`;
+    /// explicit USE-PACKAGE statements always keep their meaning.
     pub std: bool,
-    /// In draft 0.4, add the standard package to the main file's header when it has no
-    /// USE-PACKAGE of that name. A writer must persist that reference (16.3).
+    /// Add the standard package to the main file's header when it has no USE-PACKAGE of that
+    /// name. A writer must persist that reference (16.3).
     pub include_std: bool,
-    /// The version of the standard package at the root, instead of the newest of the series written
-    /// in the file's language version (16.3: its version is the tool's default), such as "0.2" to
-    /// read a file of 0.3 with the series 0.2. A version pinned in a header record still comes
-    /// first. None: by the language version. The draft 0.4 cannot cross this language boundary.
+    /// The version of the standard package that `include_std` adds, instead of the newest of the
+    /// series written in the file's language version (16.3). A version pinned in a header record
+    /// still comes first. None: by the language version. A package of another language version
+    /// is not used.
     pub std_version: Option<String>,
     /// Read the records with `type="generated"`, the solver's results. A solver interprets a level
     /// without them (2.8, 14.8): every file of the document is read as if they were not written.
@@ -158,7 +158,7 @@ pub struct ImportedAlias {
 pub struct Interpretation {
     pub model: Model,
     pub sink: Sink,
-    /// The standard-package version added by the draft `include_std` setting. When saving
+    /// The standard-package version added by the `include_std` setting. When saving
     /// the main file, a writer persists this reference in its unqualified header (16.3).
     pub included_standard: Option<String>,
     /// The name of the package checked on its own, when the document is a package file (2.7).
@@ -233,9 +233,9 @@ pub struct Interp<'p> {
     pub(crate) rec_chars: Vec<Option<Rc<[char]>>>,
     pub(crate) pkg_levels: Vec<Level>,
     pub(crate) pkg_sources: Vec<(String, String)>,
-    /// Package name, package version, and whether its language is 0.4. Keep the published
-    /// shared cache for 0.2/0.3; a mixed-version include must not reuse it for a 0.4 package.
-    pub(crate) packages: HashMap<(String, String, bool), UnitId>,
+    /// The packages read, by name and version, the version in its numeric form
+    /// ([`unit::package_cache_key`], 16.2).
+    pub(crate) packages: HashMap<(String, String), UnitId>,
     pub(crate) pkg_files: HashMap<String, Vec<(String, String, String)>>,
     pub(crate) pkg_headers: HashMap<String, Option<(String, String)>>,
     /// The language version each package file of the package directories is written in (16.1).
@@ -248,8 +248,6 @@ pub struct Interp<'p> {
     pub(crate) tm_memo: HashMap<(usize, ObjId, Option<SceneId>), ObjId>,
     pub(crate) tm_in_progress: HashSet<(usize, ObjId, Option<SceneId>)>,
     pub(crate) node_memo: HashMap<(&'static str, usize, usize, usize), ObjId>,
-    /// Active symbol-body expansions; a limit failure invalidates only the active chain.
-    pub(crate) symbol_expansions: Vec<Option<DiagId>>,
     specific: specific::SpecificDefinitions,
     pub(crate) rules: Rules,
     body_rules: body_rules::BodyRules,
@@ -291,12 +289,11 @@ pub struct Interp<'p> {
     /// The tolerance of the checks against written coordinates (`Options::tolerance`, 11.7).
     pub(crate) tol: f64,
     tool_solver_config: Vec<crate::problem::SolverSetting>,
-    /// The standard package used implicitly for the files of each language version (16.3).
+    /// The standard package that `include_std` adds for the files of each language version (16.3).
     pub(crate) std_units: HashMap<String, Option<UnitId>>,
     /// The version of the standard package that the reading asks for ([`Options::std_version`]),
     /// when it cannot be found, and whether a chain that would use it has said so (16.3).
     pub(crate) missing_std: Option<(String, bool)>,
-    pub(crate) std_language_reported: HashSet<UnitId>,
     pub(crate) std_alias_reported: HashSet<UnitId>,
     /// The packages in effect on each chain of levels, and the number of units they were found
     /// among (16.2).
@@ -362,8 +359,8 @@ pub struct Interp<'p> {
     pub(crate) forward: bool,
     /// What this run takes from the readings before it (5.9).
     pub(crate) numbers: NumberRun,
-    /// The conflicts found while the geometry of a level of the draft 0.3 is resolved, whose
-    /// hints are given once it is (its 8.5).
+    /// The conflicts found while the geometry of a level is resolved, whose hints are given once it
+    /// is (8.5).
     pub(crate) conflicts: conflicts::Conflicts,
 }
 
@@ -406,7 +403,6 @@ impl<'p> Interp<'p> {
             tm_memo: HashMap::new(),
             tm_in_progress: HashSet::new(),
             node_memo: HashMap::new(),
-            symbol_expansions: Vec::new(),
             specific: Default::default(),
             rules: Rules::default(),
             body_rules: body_rules::BodyRules::default(),
@@ -433,7 +429,6 @@ impl<'p> Interp<'p> {
             tool_solver_config: options.solver_config.clone(),
             std_units: HashMap::new(),
             missing_std: None,
-            std_language_reported: HashSet::new(),
             std_alias_reported: HashSet::new(),
             effs: HashMap::new(),
             effs_units: 0,
@@ -668,9 +663,7 @@ impl<'p> Interp<'p> {
             }
             let _ = self.eval_member_at(u, m.rec, m.k, m.embedded, &m.m, None, m.header.clone(), None, "");
         }
-        if self.follows_0_4(u) {
-            self.check_unit_duplicates(u, None);
-        }
+        self.check_unit_duplicates(u, None);
     }
 
     fn build_scene(&mut self, lv: usize) {
@@ -754,43 +747,7 @@ impl<'p> Interp<'p> {
 
     /// Check already evaluated bindings without forcing failed or inactive statements (6.6).
     fn check_unit_duplicates(&mut self, unit: UnitId, scene: Option<SceneId>) {
-        self.check_modern_binding_duplicates(unit, scene);
-        // Keep released scene diagnostics unchanged; new package checks carry their package.
-        let package = if scene.is_none() { self.units[unit].pkg().to_string() } else { String::new() };
-        for b in self.units[unit].dups.clone() {
-            let first = self.units[unit].names[&(b.prefix, b.name.clone())].clone();
-            if self.modern_binding(&first) {
-                continue;
-            }
-            let k1 = first.key();
-            let k2 = b.key();
-            let v1 = match self.memo.get(&(k1.clone(), scene)) {
-                Some(Memo::Val(v)) => Some(self.bound_value(&k1, scene, b.prefix, &b.name, *v)),
-                _ => None,
-            };
-            let v2 = match self.memo.get(&(k2.clone(), scene)) {
-                Some(Memo::Val(v)) => Some(self.bound_value(&k2, scene, b.prefix, &b.name, *v)),
-                _ => None,
-            };
-            if let (Some(a), Some(c)) = (v1, v2) {
-                if self.follows_0_4(unit) && (self.is_failed(a) || self.is_failed(c)) {
-                    continue;
-                }
-                if a != c {
-                    let loc = self.rec_loc(b.rec, b.member.start);
-                    self.diag_in(
-                        crate::diag::Severity::Error,
-                        codes::NAME_BOUND_TWICE,
-                        format!(
-                            "{}{} is already bound to another object in this level; the first binding is kept (6.6)",
-                            b.prefix, b.name
-                        ),
-                        loc,
-                        &package,
-                    );
-                }
-            }
-        }
+        self.check_binding_duplicates(unit, scene);
     }
 
     /// The members of a unit that are rules, in order, those of the records written into it with
@@ -923,10 +880,10 @@ impl<'p> Interp<'p> {
                     let pn = self.units[owner].pkg_name.clone();
                     if !self.std_env(EffKey::Level(lv)).0.contains(&pn) {
                         format!("in the package {pn}")
-                    } else if pn == self.standard_name(EffKey::Level(lv)) {
+                    } else if pn == STANDARD_PACKAGE {
                         format!("in the standard package {pn}")
                     } else {
-                        format!("in {pn} of the standard package {}", self.standard_name(EffKey::Level(lv)))
+                        format!("in {pn} of the standard package {STANDARD_PACKAGE}")
                     }
                 } else {
                     let l = self.units[owner].level.map(|l| self.doc.levels[l].title()).unwrap_or_default();
@@ -984,7 +941,7 @@ impl<'p> Interp<'p> {
                         let (pn, qn) = (self.units[p].pkg_name.clone(), self.units[q].pkg_name.clone());
                         let what = match by {
                             _ if std.0.contains(&qn) => {
-                                format!("the standard package {}", self.standard_name(EffKey::Level(lv)))
+                                format!("the standard package {STANDARD_PACKAGE}")
                             }
                             Some(by) if Some(q) != by.pkg => {
                                 format!("the package {qn} that the earlier USE-PACKAGE of {} brings in", by.name)
@@ -1031,12 +988,11 @@ impl<'p> Interp<'p> {
 
     /// Build the output.
     pub fn finish(mut self) -> Interpretation {
-        let included_standard =
-            if self.package_main.is_none() && self.include_std && self.follows_0_4(self.level_unit[0]) {
-                self.implicit_std(packages::EffKey::Level(0)).map(|unit| self.pkg_ver(unit))
-            } else {
-                None
-            };
+        let included_standard = if self.package_main.is_none() && self.include_std {
+            self.implicit_std(packages::EffKey::Level(0)).map(|unit| self.pkg_ver(unit))
+        } else {
+            None
+        };
         if !self.numbers.count {
             self.check_auto_wire_geometry();
         }
@@ -1099,8 +1055,8 @@ impl<'p> Interp<'p> {
 /// Interpret a host document: the effective model and the diagnostics. `sink` holds what the
 /// host adapter reported, if anything.
 ///
-/// The numbers of 0.3 take more than one reading of the document (5.9), only when a file of 0.3 is
-/// read with its records of the solver:
+/// The numbers take more than one reading of the document (5.9), only when a file is read with its
+/// records of the solver:
 ///
 /// - the objects of the authored records are counted as the level reads without its records of
 ///   the solver, so that reading comes first (`NumberRun::authored`);

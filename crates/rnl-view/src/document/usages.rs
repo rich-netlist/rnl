@@ -13,19 +13,19 @@ pub struct Usage {
     /// Shared frame and label anchors in SVG pixels; absent when no member is drawn.
     pub frame: Option<crate::UsageFrame>,
     pub object: usize,
-    /// For a 0.4 usage attached to pins of one owner: that owner's Document object index.
+    /// For a usage attached to pins of one owner: that owner's Document object index.
     /// Absent without a unique host; independent of the usage's symbol, coordinates and constraints.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub pin_of: Option<usize>,
-    /// The enclosing 0.4 usage's Document object index. Follow this chain for inherited pin attachment.
+    /// The enclosing usage's Document object index. Follow this chain for inherited pin attachment.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub parent: Option<usize>,
     /// "usage", or "group" for a set marked with GROUP (11.5), whose one role, `members`, holds
     /// its members.
     pub kind: &'static str,
-    /// For a group of a 0.4 level in the tree of groups: the group above it, by its Document
+    /// For a group in the tree of groups: the group above it, by its Document
     /// object index, as `pin_of`; absent at the top. The tree is that of the solver's rules on the
     /// members with a place of their own (`rnl_runtime::group_tree`); the solver's own may leave
     /// out a group of fewer than two of the objects it lays out.
@@ -42,7 +42,7 @@ pub struct Usage {
     #[cfg_attr(test, ts(optional))]
     pub crosses: Option<usize>,
     pub id: String,
-    /// Its definition, such as `$GROUND`, or in a 0.4 level, `%dot` for one a level defines, whose `%` a level before 0.4 leaves out; empty for a group.
+    /// Its definition, such as `$GROUND`, or `%dot` for one a level defines; empty for a group.
     pub definition: String,
     /// Whether the usage itself is a virtual part with its own symbol.
     pub has_symbol: bool,
@@ -54,7 +54,7 @@ pub struct Usage {
     pub roles: Vec<UsageRole>,
     /// "in-effect"; "overridden", a fact its statement writes lost a conflict to one of higher
     /// priority (8.5); "disabled", its priority, or that of the usage it is made in, is
-    /// "disabled" (14.8). A group is "in-effect" or "disabled" (11.5), and in a 0.4 level also
+    /// "disabled" (14.8). A group is "in-effect" or "disabled" (11.5), or
     /// "same", its members are those of another group (`same_as`), or "left-out", it crosses a
     /// group in the tree (`crosses`) or has no member with a place of its own. As `MemberOf::state`; an application that failed makes no
     /// usage and has no row.
@@ -241,7 +241,6 @@ fn inspect(
     let by_id: HashMap<_, _> = lv.objects.iter().map(|o| (o.id.as_str(), o)).collect();
     let point_ids: HashSet<&str> = lv.points.iter().map(|p| p.id.as_str()).collect();
     let mut memo = HashMap::new();
-    let modern = rnl_runtime::interp::unit::keeps_0_4(&lv.language);
     let mut usages: Vec<Usage> = listed
         .iter()
         .map(|o| {
@@ -366,16 +365,13 @@ fn inspect(
             }
         })
         .collect();
-    if modern {
-        tree_order(&mut usages);
-    }
+    tree_order(&mut usages);
     usages
 }
 
-/// Where a group of a 0.4 level stands in the tree of groups (`GroupInfo::place`), over its state
-/// as a usage: the group above it, the group it is, or the group it crosses, by their index in
-/// `LevelView::groups`. A usage, a group turned off, and a group of a level before 0.4 keep their
-/// state as it is.
+/// Where a group stands in the tree of groups (`GroupInfo::place`), over its state as a usage: the
+/// group above it, the group it is, or the group it crosses, by their index in
+/// `LevelView::groups`. A usage and a group turned off keep their state as it is.
 pub(super) struct Standing {
     pub state: &'static str,
     pub reason: Option<String>,
@@ -386,7 +382,7 @@ pub(super) struct Standing {
 
 pub(super) fn standing(lv: &LevelView, o: &ObjectInfo, (state, reason): (&'static str, Option<String>)) -> Standing {
     let mut out = Standing { state, reason, parent: None, same_as: None, crosses: None };
-    if o.kind != "group" || state == "disabled" || !rnl_runtime::interp::unit::keeps_0_4(&lv.language) {
+    if o.kind != "group" || state == "disabled" {
         return out;
     }
     let Some(row) = lv.groups.iter().position(|g| g.id == o.id) else { return out };

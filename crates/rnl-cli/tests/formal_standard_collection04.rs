@@ -31,7 +31,7 @@ fn a_setting_selects_the_collection_by_language_not_package_version() {
     let r = read(&provider, Options { include_std: true, std_version: Some("1.7".into()), ..Options::solver() });
     no_errors(&r);
     assert_eq!(r.problems[0].usages.len(), 1);
-    assert_eq!(rnl_runtime::interp::standard_package_name("0.4"), "rnl-std-all");
+    assert_eq!(rnl_runtime::interp::standard_package_name(), "rnl-std-all");
 }
 
 #[test]

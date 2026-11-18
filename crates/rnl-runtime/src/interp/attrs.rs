@@ -250,16 +250,18 @@ impl Interp<'_> {
             k += 1;
             v
         };
-        if unit.is_some_and(|u| self.follows_0_4(u)) {
+        // a text that no file wrote, such as a default label, reads plain markup
+        if unit.is_some() {
             crate::markup::expand_math(text.as_str(), value)
         } else {
             crate::markup::expand(text.as_str(), value)
         }
     }
 
-    /// Read markup by the version of the file that wrote the text, including passed parameters.
+    /// Read the markup of a text, including passed parameters; name formats apply to a text
+    /// that a file wrote.
     pub(crate) fn text_lines(&mut self, s: SceneId, text: &WStr, att: ObjId) -> Vec<crate::markup::Line> {
-        let name_formats = text.unit.is_some_and(|u| self.follows_0_4(u));
+        let name_formats = text.unit.is_some();
         crate::markup::parse_with_name_formats(&self.expand_text(s, text, att), name_formats)
     }
 }

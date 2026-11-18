@@ -29,7 +29,7 @@ pub struct InspectedSymbol {
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct InspectedPin {
-    /// The 0.4 pin's local names, independently of its display label (`name`).
+    /// The pin's local names, independently of its display label (`name`).
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub names: Option<Vec<String>>,

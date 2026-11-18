@@ -11,7 +11,7 @@ impl Interp<'_> {
                     continue;
                 }
                 let Some(shape) = self.wire_shape(scene, wire) else { continue };
-                if shape.mode != "auto" || !self.modern_wire_source(scene, shape.site.as_ref()) {
+                if shape.mode != "auto" {
                     continue;
                 }
                 // Unknown coordinates split the wire into valid positioned runs. None here

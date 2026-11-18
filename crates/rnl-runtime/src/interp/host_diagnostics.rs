@@ -1,4 +1,5 @@
-//! Select host diagnostic presentation after resolving each reading's language version.
+//! Present the host's diagnostics about the RNL of a file once its version is known: a file none of
+//! whose RNL is interpreted (16.1) keeps the host's own wording and gets no input diagnostics.
 use super::Interp;
 use crate::diag::{Diag, DiagId, Extra, Sink};
 use std::collections::HashMap;
@@ -19,7 +20,7 @@ impl Interp<'_> {
                 continue;
             }
             let mut diagnostic = original.clone();
-            if self.follows_0_4(self.level_unit[reading.level]) {
+            if self.file_ok(reading.level) {
                 let (message, loc) = reading.detail.presentation();
                 let severity = reading.detail.severity(diagnostic.severity);
                 changed |= diagnostic.severity != severity;
@@ -61,7 +62,7 @@ impl Interp<'_> {
 impl Interp<'_> {
     pub(super) fn check_host_input_diagnostics(&mut self) {
         for input in &self.doc.input_diagnostics {
-            if self.follows_0_4(self.level_unit[input.level]) {
+            if self.file_ok(input.level) {
                 let (code, severity, message) = input.issue.diagnostic();
                 self.sink.add(severity, code, message, Some(input.loc.clone()), Extra::default());
             }

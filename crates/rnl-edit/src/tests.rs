@@ -1257,7 +1257,7 @@ fn binding_warnings(out: &str) -> usize {
     let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options { std: false, ..Options::default() })
         .unwrap();
     assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{out}");
-    r.diagnostics().iter().filter(|d| d.code.number().as_deref() == Some("RNL4119")).count()
+    r.diagnostics().iter().filter(|d| d.code.number() == "RNL4119").count()
 }
 
 #[test]

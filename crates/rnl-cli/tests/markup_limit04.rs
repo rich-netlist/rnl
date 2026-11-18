@@ -129,16 +129,14 @@ fn forwarded_math_is_limited_where_the_string_is_written() {
 .end
 "#
     );
-    let defs = format!(
-        r#"* definition
-* @RNL(type="header") {{ @VERSION("0.4") }}
+    let defs = r#"* definition
+* @RNL(type="header") { @VERSION("0.4") }
 .subckt cell a b
 R1 a b 1k
-* @RNL {{ $S = @DEFINE-SYMBOL {{ (0,0) @CIRCLE(radius=1) }}; #R1 @SET-SYMBOL $S => @PLACE(0,0); $D = @DEFINE(roles=["r"],parameters=["s"]) {{ ?r @TEXT(?s) }} }}
+* @RNL { $S = @DEFINE-SYMBOL { (0,0) @CIRCLE(radius=1) }; #R1 @SET-SYMBOL $S => @PLACE(0,0); $D = @DEFINE(roles=["r"],parameters=["s"]) { ?r @TEXT(?s) } }
 .ends cell
-"#
-    );
-    let files = MemoryProvider::new().with("main.sp", &main).with("defs.inc", &defs);
+"#;
+    let files = MemoryProvider::new().with("main.sp", &main).with("defs.inc", defs);
     let r = interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Default::default() }).unwrap();
     let errors: Vec<_> = r.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).collect();
     let level = r.model.levels.iter().find(|level| level.title == "cell").unwrap();

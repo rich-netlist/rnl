@@ -130,7 +130,7 @@ fn in_a_symbol_body_the_later_pin_and_place_win() {
     ]);
     let lv = &r.model.levels[0];
     let pins = &lv.symbols[item(&r, "#R4").symbol].pins;
-    assert_eq!(pins.iter().filter(|p| p.terminals == ["1"]).last().unwrap().label.as_deref(), Some("b"));
+    assert_eq!(pins.iter().rfind(|p| p.terminals == ["1"]).unwrap().label.as_deref(), Some("b"));
     let name =
         lv.texts.iter().find(|t| t.key.as_deref() == Some("name") && t.attach.as_deref() == Some("#R4")).unwrap();
     assert_eq!(name.anchor, (22.0, 5.0));

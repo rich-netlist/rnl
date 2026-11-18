@@ -12,17 +12,11 @@ use super::obj::{ObjData, ObjId, SetKind};
 use super::Interp;
 
 impl Interp<'_> {
-    pub(super) fn modifier_keeps_input(&self, kw: &str, ctx: &Ctx) -> bool {
-        self.follows_0_4(self.source_unit(ctx))
-            && words()
-                .keyword(kw)
-                .is_some_and(|sig| matches!(sig.output.as_str(), "pass" | "pass-target") || kw == "WIRE")
+    pub(super) fn modifier_keeps_input(&self, kw: &str) -> bool {
+        words().keyword(kw).is_some_and(|sig| matches!(sig.output.as_str(), "pass" | "pass-target") || kw == "WIRE")
     }
 
     pub(super) fn remember_modifier_input(&self, kw: &str, mapped: &HashMap<String, ArgV>, ctx: &Ctx) {
-        if !self.follows_0_4(self.source_unit(ctx)) {
-            return;
-        }
         let Some(sig) = words().keyword(kw) else { return };
         let slot = match sig.output.as_str() {
             "pass" => sig.position_list().iter().find(|p| !matches!(p.takes, Takes::Def(_))).map(|p| p.name.as_str()),

@@ -64,7 +64,7 @@ impl Interp<'_> {
         Model { levels, failed: None, language, packages }
     }
 
-    /// The hint of a node of the tree of groups of a level of 0.4 that holds more than
+    /// The hint of a node of the tree of groups of a level that holds more than
     /// [`crate::group_nodes::CROWDED`] devices directly (11.5): on the level, at its first line, or
     /// on the group, at its GROUP or, for a group the body of a definition makes, at the statement
     /// of the document that applies the definition ([`crate::group_nodes::applied_at`]).
@@ -132,18 +132,7 @@ impl Interp<'_> {
         let Some(b) = self.units[u].names.get(&('%', name.clone())) else {
             return false;
         };
-        if self.modern_binding(b) {
-            return [Some(s), None].into_iter().any(|scene| self.evaluated_binding(b, scene) == Some(o));
-        }
-        let key = b.key();
-        [Some(s), None].into_iter().any(|sc| {
-            let k = (key.clone(), sc);
-            matches!(self.memo.get(&k), Some(super::Memo::Val(v)) if *v == o)
-                || self
-                    .bound_memo
-                    .get(&k)
-                    .is_some_and(|bound| bound.iter().any(|((p, n), v, _)| *p == '%' && n == name && *v == o))
-        })
+        [Some(s), None].into_iter().any(|scene| self.evaluated_binding(b, scene) == Some(o))
     }
 
     /// An object's id before the level's other objects are known: its name in the level, or
@@ -420,16 +409,12 @@ impl Interp<'_> {
             }
         }
         let refs = self.editor_references(s);
-        let language_0_4 = self.follows_0_4(self.level_unit[self.scenes[s].level]);
         let new_assignments: HashSet<ObjId> = self.scenes[s]
             .symbol_won
             .iter()
             .filter_map(|k| {
                 let fact = &self.scenes[s].appear[*k];
-                fact.ctx
-                    .as_ref()
-                    .filter(|ctx| self.follows_0_4(self.source_unit(ctx)))
-                    .map(|_| self.scene_value(fact.target))
+                fact.ctx.as_ref().map(|_| self.scene_value(fact.target))
             })
             .collect();
         let mut out = Vec::new();
@@ -444,7 +429,7 @@ impl Interp<'_> {
             let (definition, attach) = match self.o(o).clone() {
                 ObjData::Usage(u) => {
                     let roles = u.roles.iter().map(|(name, r)| (name.clone(), self.attached(s, *r, ids))).collect();
-                    (Some(self.definition_name(u.definition, language_0_4)), roles)
+                    (Some(self.definition_name(u.definition)), roles)
                 }
                 _ => (None, Vec::new()),
             };
@@ -459,9 +444,7 @@ impl Interp<'_> {
             let own_point = kind == "usage" && self.usage_own_point(o);
             let pin_objects = self.object_drawn(s, o)
                 && sym.is_some_and(|sym| {
-                    self.symbol(sym).independent_pins
-                        || new_assignments.contains(&o)
-                        || if kind == "usage" { own_point } else { language_0_4 }
+                    self.symbol(sym).independent_pins || new_assignments.contains(&o) || kind != "usage" || own_point
                 });
             let mut pins = Vec::new();
             if let Some(sym) = sym.filter(|_| at.is_some() || pin_objects) {
@@ -553,27 +536,18 @@ impl Interp<'_> {
                 symbol_view: None,
             });
         }
-        let junction_at: Vec<ObjId> = if self.follows_0_4(self.level_unit[self.scenes[s].level]) {
-            let settings = self.solver_config_for(s);
-            let definition = self.junction_with_tools_for(s, &settings).1;
-            let roles: Vec<_> = self.scenes[s]
-                .usages
-                .iter()
-                .filter_map(|a| {
-                    let usage = self.usage(*a);
-                    (Some(usage.definition) == definition).then(|| usage.roles.first().map(|(_, r)| *r)).flatten()
-                })
-                .collect();
-            let members: Vec<_> = roles.into_iter().flat_map(|r| self.flatten(s, r, 7, None)).collect();
-            members.into_iter().map(|r| self.input_value(r)).collect()
-        } else {
-            self.scenes[s]
-                .usages
-                .iter()
-                .filter(|a| self.label(self.usage(**a).definition) == "$JUNCTION")
-                .flat_map(|a| self.usage(*a).roles.iter().map(|(_, r)| *r).collect::<Vec<_>>())
-                .collect()
-        };
+        let settings = self.solver_config_for(s);
+        let definition = self.junction_with_tools_for(s, &settings).1;
+        let roles: Vec<_> = self.scenes[s]
+            .usages
+            .iter()
+            .filter_map(|a| {
+                let usage = self.usage(*a);
+                (Some(usage.definition) == definition).then(|| usage.roles.first().map(|(_, r)| *r)).flatten()
+            })
+            .collect();
+        let members: Vec<_> = roles.into_iter().flat_map(|r| self.flatten(s, r, 7, None)).collect();
+        let junction_at: Vec<ObjId> = members.into_iter().map(|r| self.input_value(r)).collect();
         let points = points
             .iter()
             .map(|p| PointInfo { id: ids[p].clone(), at: self.xy(s, *p), junction: junction_at.contains(p) })
@@ -608,27 +582,23 @@ impl Interp<'_> {
         (origin, parent, disabled)
     }
 
-    /// A definition as a usage names it: `$NAME`, or in a 0.4 level `%name` for one a level
-    /// defines, whose name the reading keeps without its `%`. A level before 0.4 shows the name as
-    /// it always has, without it.
-    fn definition_name(&self, d: ObjId, language_0_4: bool) -> String {
+    /// A definition as a usage names it: `$NAME`, or `%name` for one a level defines, whose name
+    /// the reading keeps without its `%`.
+    fn definition_name(&self, d: ObjId) -> String {
         let name = &self.objs[d.0 as usize].name;
-        if language_0_4 && matches!(self.o(d), ObjData::Definition(_)) && !name.is_empty() && !name.starts_with('$') {
+        if matches!(self.o(d), ObjData::Definition(_)) && !name.is_empty() && !name.starts_with('$') {
             format!("%{}", quoted(name))
         } else {
             self.label(d)
         }
     }
 
-    /// The junction definition of a 0.4 level and the symbol its usages there are drawn with
-    /// ([`JunctionInfo`]); None before 0.4, and when none is selected.
+    /// The junction definition of a level and the symbol its usages there are drawn with
+    /// ([`JunctionInfo`]); None when none is selected (13.2).
     fn junction_info(&mut self, s: SceneId, objects: &[ObjectInfo]) -> Option<JunctionInfo> {
-        if !self.follows_0_4(self.level_unit[self.scenes[s].level]) {
-            return None;
-        }
         let settings = self.solver_config_for(s);
         let selected = self.junction_with_tools_for(s, &settings).1?;
-        let definition = self.definition_name(selected, true);
+        let definition = self.definition_name(selected);
         let symbol = objects
             .iter()
             .find(|o| o.kind == "usage" && o.definition.as_deref() == Some(definition.as_str()))
@@ -638,7 +608,6 @@ impl Interp<'_> {
 
     /// The applications of definitions in the level's records that failed ([`FailedUsage`]).
     fn failed_usages(&mut self, s: SceneId, ids: &HashMap<ObjId, String>) -> Vec<FailedUsage> {
-        let language_0_4 = self.follows_0_4(self.level_unit[self.scenes[s].level]);
         let failed = self.scenes[s].failed_usages.clone();
         failed
             .into_iter()
@@ -648,7 +617,7 @@ impl Interp<'_> {
                 let roles = f.roles.iter().map(|(r, o)| (r.clone(), self.attached(s, *o, ids))).collect();
                 Some(FailedUsage {
                     id: f.name.map(|n| format!("%{}", quoted(&n))),
-                    definition: f.definition.map(|d| self.definition_name(d, language_0_4)),
+                    definition: f.definition.map(|d| self.definition_name(d)),
                     roles,
                     source,
                     reason: f.diag.map(|d| self.sink.get(d).message.clone()).unwrap_or_default(),
@@ -716,10 +685,8 @@ impl Interp<'_> {
                 place: GroupPlace::Off,
             });
         }
-        // the tree of groups is the solver's of 0.4 (11.5); earlier versions have none
-        if self.follows_0_4(self.level_unit[self.scenes[s].level]) {
-            self.place_groups(s, &rows, &mut out);
-        }
+        // the tree of groups is the solver's (11.5)
+        self.place_groups(s, &rows, &mut out);
         out
     }
 
@@ -871,7 +838,7 @@ impl Interp<'_> {
                 .map(|l| SymbolLabel {
                     key: l.key.clone(),
                     text: l.items.text.as_ref().map(|t| t.as_str().to_string()).unwrap_or_default(),
-                    text_name_formats: l.items.text.as_ref().and_then(|t| t.unit).is_some_and(|u| self.follows_0_4(u)),
+                    text_name_formats: l.items.text.as_ref().and_then(|t| t.unit).is_some(),
                     modern_text: l.items.modern_text,
                     at: l.position,
                     halign: l.items.halign.clone(),
@@ -900,12 +867,7 @@ impl Interp<'_> {
             .map(|(i, p)| SymbolPrim {
                 order: sd.prim_order[i],
                 text: p.text.as_ref().and_then(|t| t.text.as_ref().map(|s| s.as_str().to_string())),
-                text_name_formats: p
-                    .text
-                    .as_ref()
-                    .and_then(|t| t.text.as_ref())
-                    .and_then(|t| t.unit)
-                    .is_some_and(|u| self.follows_0_4(u)),
+                text_name_formats: p.text.as_ref().and_then(|t| t.text.as_ref()).and_then(|t| t.unit).is_some(),
                 modern_text: p.text.as_ref().is_some_and(|t| t.modern_text),
                 shape: p.shape,
                 points: p.points.clone(),
@@ -965,8 +927,7 @@ impl Interp<'_> {
                 if !matches!(self.o(inner), ObjData::Symbol(_)) {
                     return None;
                 }
-                let modern = u.site.as_ref().is_some_and(|ctx| self.follows_0_4(self.source_unit(ctx)));
-                let point = self.symbol_point(*pt, modern)?;
+                let point = self.symbol_point(*pt, u.site.is_some())?;
                 Some((index, inner, point, u.sym_orient))
             })
             .collect()
@@ -1141,26 +1102,6 @@ impl Interp<'_> {
         out
     }
 
-    /// The devices the level does not draw, since no symbol can be chosen for them.
-    fn undrawn_views(&mut self, s: SceneId) -> Vec<UndrawnView> {
-        let mut out = Vec::new();
-        for (o, reason) in self.scenes[s].undrawn.clone() {
-            let host = match self.o(o).clone() {
-                ObjData::Inst { idx, .. } => vec![idx],
-                ObjData::Bundle { members, .. } => members
-                    .iter()
-                    .filter_map(|m| match self.o(*m) {
-                        ObjData::Inst { idx, .. } => Some(*idx),
-                        _ => None,
-                    })
-                    .collect(),
-                _ => Vec::new(),
-            };
-            out.push(UndrawnView { id: self.label(o), host, reason });
-        }
-        out
-    }
-
     /// The objects of the editor interface, drawn or not, and the named points, with the ids unique
     /// in the level of those, the wires, the texts and the primitives.
     fn level_ids(&mut self, s: SceneId) -> (Vec<ObjId>, Vec<ObjId>, HashMap<ObjId, String>) {
@@ -1252,10 +1193,7 @@ impl Interp<'_> {
                 primitive: SymbolPrim {
                     order,
                     text: t.and_then(|t| t.text.as_ref().map(|s| s.as_str().to_string())),
-                    text_name_formats: t
-                        .and_then(|t| t.text.as_ref())
-                        .and_then(|t| t.unit)
-                        .is_some_and(|u| self.follows_0_4(u)),
+                    text_name_formats: t.and_then(|t| t.text.as_ref()).and_then(|t| t.unit).is_some(),
                     modern_text: t.is_some_and(|t| t.modern_text),
                     shape: p.shape,
                     points: p.points.clone(),
@@ -1278,7 +1216,7 @@ impl Interp<'_> {
                 primitive: SymbolPrim {
                     order: label_order[index],
                     text: t.text.as_ref().map(|s| s.as_str().to_string()),
-                    text_name_formats: t.text.as_ref().and_then(|t| t.unit).is_some_and(|u| self.follows_0_4(u)),
+                    text_name_formats: t.text.as_ref().and_then(|t| t.unit).is_some(),
                     modern_text: t.modern_text,
                     shape: Shape::Text,
                     points: vec![label.position.unwrap_or((0.0, 0.0))],
@@ -1379,8 +1317,7 @@ impl Interp<'_> {
             info.symbol_view = self.scenes[s].symbol.get(&o).and_then(|sym| table.get(sym).copied());
         }
         // a wire some of whose points have no position yet is drawn in its runs of points that
-        // have one, each a WireView of the wire, with flylines over the gaps (the draft 0.3,
-        // section 9); a rewritten wire is drawn by its rewrite (13.1)
+        // have one, each a WireView of the wire, with flylines over the gaps; a rewritten wire is drawn by its rewrite (13.1)
         let mut wires = Vec::new();
         let mut flylines = Vec::new();
         let refs = self.editor_references(s);
@@ -1480,13 +1417,13 @@ impl Interp<'_> {
             if self.is_obj_failed(t) {
                 continue;
             }
-            // a text whose attached object is drawn is drawn too (13.3; the draft 0.3, section 9)
+            // a text whose attached object is drawn is drawn too (13.3)
             let Some((anchor, from_symbol)) = self.text_drawn_at(s, t) else { continue };
             let it = self.text_items(t);
             let Some(text) = it.text.clone() else { continue };
             let att = self.text_attach(t);
             let drawable_att = matches!(self.o(att), ObjData::Inst { .. } | ObjData::Usage(_) | ObjData::Bundle { .. });
-            let modern_text = it.modern_text || text.unit.is_some_and(|u| self.follows_0_4(u));
+            let modern_text = it.modern_text || text.unit.is_some();
             let orient = if from_symbol && (modern_text || !it.fix_rotate.unwrap_or(false)) {
                 self.orientation(s, att)
             } else {
@@ -1623,7 +1560,7 @@ impl Interp<'_> {
             net_labels,
             constraints,
             unplaced: self.scenes[s].unplaced.clone(),
-            undrawn: self.undrawn_views(s),
+            // every instance has a symbol, the default block symbol at least (9.2.6)
             unplaced_items,
             unplaced_symbols,
             objects,

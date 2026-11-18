@@ -96,7 +96,7 @@ fn a_model_library_is_spectre_by_its_simulator_statement() {
     let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/models.lib", lib);
     let (doc, _) = host("/w/top.sp", &files, &[]);
     let m1 = &doc.levels[0].instances[0];
-    assert_eq!((m1.mtype.as_deref(), m1.model_missing), (Some("nmos"), false));
+    assert_eq!(m1.mtype.as_deref(), Some("nmos"));
     assert_eq!(doc.file_format("models.lib").map(|f| f.format.as_str()), Some("spectre"));
 }
 
@@ -275,7 +275,7 @@ fn model_cards_are_found_across_formats() {
     let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/models.scs", models).with("/w/spice.inc", spice);
     let (doc, sink) = host("/w/top.sp", &files, &[("/w/models.scs", "spectre")]);
     let inst = |name: &str| doc.levels[0].instances.iter().find(|i| i.name == name).unwrap();
-    assert_eq!((inst("M1").mtype.as_deref(), inst("M1").model_missing), (Some("nmos"), false));
+    assert_eq!(inst("M1").mtype.as_deref(), Some("nmos"));
     // Spectre's `pch_s` finds SPICE's `PCH_S`, whose card ignores case
     assert_eq!(inst("M4").mtype.as_deref(), Some("pmos"));
     // `nmix` is spelt as no card is, and two are found for it; `Nmix` too

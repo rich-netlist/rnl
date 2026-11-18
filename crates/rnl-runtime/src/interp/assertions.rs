@@ -7,7 +7,7 @@
 //! gives a violation (7.6), which names the members, the attribute and the statement's `message`:
 //! nothing fails, it makes no fact and changes nothing drawn.
 //!
-//! **Where and when.** In any level of a file of 0.4, and in the body of a general definition,
+//! **Where and when.** In any level of a file, and in the body of a general definition,
 //! where it is checked for each application, on the objects that fill the roles: the diagnostic
 //! names the usage and its definition. Assertions are checked after the geometry phase (8.2), when
 //! every condition can be read and every PRIORITY is in. A set with no members holds trivially; in
@@ -367,7 +367,6 @@ impl Interp<'_> {
     /// How a member fails a condition, if it does: what it has instead.
     fn condition_fails(&mut self, s: SceneId, a: &Assertion, m: ObjId, cond: &str, v: &Lit) -> Option<String> {
         let kw = a.kw.as_str();
-        let modern = self.follows_0_4(self.source_unit(&a.site));
         let lv = self.scenes[s].level;
         match kw {
             "ASSERT-INSTANCE" | "ASSERT-TERMINAL" if matches!(cond, "name" | "model" | "type") => {
@@ -385,10 +384,7 @@ impl Interp<'_> {
                 let (has, ok) = match cond {
                     "name" => (Some(inst.name.clone()), glob(want, &inst.name, cs)),
                     "model" => (inst.model.clone(), inst.model.as_deref().is_some_and(|x| glob(want, x, cs))),
-                    _ => (
-                        self.instance_type(i).map(str::to_string),
-                        self.instance_type_matches(i, want, self.source_unit(&a.site)),
-                    ),
+                    _ => (self.instance_type(i).map(str::to_string), self.instance_type_matches(i, want)),
                 };
                 let of = if kw == "ASSERT-TERMINAL" { "is a terminal of a device with" } else { "has" };
                 (!ok).then(|| match has {
@@ -423,8 +419,8 @@ impl Interp<'_> {
                 match cond {
                     // as SELECT-TERMINAL compares it (10.1)
                     "terminal" => {
-                        // in 0.4 a string of digits is the terminal number (6.4)
-                        let v = &if modern { super::terminal_maps::terminal_value(v) } else { v.clone() };
+                        // a string of digits is the terminal number (6.4)
+                        let v = &super::terminal_maps::terminal_value(v);
                         let ok = match v {
                             Lit::Num(n) => index == *n as u32,
                             Lit::Str(w) => name.as_ref().is_some_and(|n| {
@@ -484,11 +480,7 @@ impl Interp<'_> {
                     // as SELECT-NET reads it (10.2)
                     "wired" => {
                         let ends = self.wire_ends(s);
-                        (
-                            "is wired",
-                            "is not wired",
-                            if modern { self.routing_net_wired(s, m, &ends) } else { self.net_wired(s, m, &ends) },
-                        )
+                        ("is wired", "is not wired", self.routing_net_wired(s, m, &ends))
                     }
                     _ => return None,
                 };
@@ -645,7 +637,7 @@ impl Interp<'_> {
             return;
         }
         let kw = a.kw.as_str();
-        let members: Vec<ObjId> = if self.follows_0_4(self.source_unit(&a.site)) {
+        let members: Vec<ObjId> = {
             let inputs = self.scene_input_members(s, a.members, Some(&a.site));
             let failed = self.failed_body(&a.site)
                 || self.failed_obj(a.members).is_some()
@@ -664,10 +656,6 @@ impl Interp<'_> {
                 return;
             }
             inputs.into_iter().map(|input| self.scene_value(input.object)).collect()
-        } else if self.is_set(a.members) {
-            self.flatten(s, a.members, 7, Some(&a.site))
-        } else {
-            vec![a.members]
         };
         let want = kind_of_assertion(kw);
         // a terminal converts to its net (5.2.4)
@@ -682,7 +670,7 @@ impl Interp<'_> {
                         ns
                     }
                 }
-                ("terminal", ObjData::ScenePin { owner, index }) if self.follows_0_4(self.source_unit(&a.site)) => {
+                ("terminal", ObjData::ScenePin { owner, index }) => {
                     let terminals = self.scene_pin_terminals(s, *owner, *index);
                     if terminals.is_empty() {
                         vec![m]

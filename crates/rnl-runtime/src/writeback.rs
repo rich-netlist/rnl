@@ -470,7 +470,7 @@ pub fn replace_generated(doc: &HostDocument, level: LevelId, text: &str, record:
 /// what a solver writes into the file of a level it solved, which it saves (16.1). The header
 /// record stays the first record of its file (2.8): one written after a subcircuit solved, which
 /// the record put at the end of the subcircuit would come before, moves to where a new header
-/// goes ([`with_header`]; the draft 0.3, 16.3 and 2.2): on line 2, after the title or the first
+/// goes ([`with_header`]; 16.3 and 2.2): on line 2, after the title or the first
 /// line, which never carries RNL, written with the carrier of the file; in a file that is not a
 /// `.scs` file and whose first statement is `simulator lang=spectre`, after that statement with
 /// `//`, and otherwise above it with `*`, in SPICE mode. It keeps its VERSION, or gets one, and
@@ -686,7 +686,7 @@ pub fn with_header(doc: &HostDocument, file: &str, text: &str, version: &str) ->
     apply(text, carrier(doc, file, text), header_edits(doc, file, None, text, version).0)
 }
 
-/// Persist a standard-package reference added by a draft tool setting (16.3). Only the main
+/// Persist a standard-package reference added by a tool setting (16.3). Only the main
 /// file is changed, and only where its header can be written. The caller supplies the package
 /// version from `Interpretation::included_standard` and rereads the returned text before making
 /// further edits, since the document's character positions refer to the original `text`.
@@ -695,9 +695,7 @@ pub fn with_standard_package(doc: &HostDocument, text: &str, package_version: &s
     if doc.is_package(file) {
         return text.to_string();
     }
-    let language = crate::interp::unit::scan_language_decl(text)
-        .unwrap_or_else(|| crate::interp::unit::DEFAULT_VERSION.to_string());
-    let standard = crate::interp::standard_package_name(&language);
+    let standard = crate::interp::STANDARD_PACKAGE;
     let statement = format!(
         "@USE-PACKAGE(name={}, version={})",
         crate::problem::written_string(standard),
@@ -900,7 +898,7 @@ impl Top {
     }
 }
 
-/// Where a file's header record goes at its top ([`with_header`]; the draft 0.3, 16.3 and 2.2),
+/// Where a file's header record goes at its top ([`with_header`]; 16.3 and 2.2),
 /// carried by `marker`, the file's carrier, unless said otherwise: line 2, after a title or a
 /// comment on the first line, which never carries RNL, and after the lines that continue it; the
 /// bare marker first before a statement on the first line of an included file. In a file that is not a `.scs` file, carried by `//`, whose
@@ -992,15 +990,15 @@ mod tests {
         // a `.rnl` file read as a netlist, as a user may choose, is carried in comments and gets a
         // header; a package file of another suffix gets neither (2.7)
         let net = "* t\nR1 a b 1k\n.end\n";
-        let header = "* @RNL(type=\"header\") { @VERSION(\"0.3\")}";
+        let header = "* @RNL(type=\"header\") { @VERSION(\"0.4\")}";
         assert_eq!(
-            with_header(&doc(net, "a.rnl", "*"), "a.rnl", net, "0.3"),
+            with_header(&doc(net, "a.rnl", "*"), "a.rnl", net, "0.4"),
             format!("* t\n{header}\nR1 a b 1k\n.end\n")
         );
-        let package = "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"acme\")}\n@RNL {}\n";
+        let package = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"acme\")}\n@RNL {}\n";
         let d = as_package(&doc(package, "acme.pkg", "*"), "acme.pkg");
         assert_eq!(carrier(&d, "acme.pkg", package), "");
-        assert_eq!(with_header(&d, "acme.pkg", package, "0.3"), package);
+        assert_eq!(with_header(&d, "acme.pkg", package, "0.4"), package);
         assert_eq!(add_header(&d, "acme.pkg", package, |_| "@RNL {}".into()), package);
     }
 
@@ -1138,79 +1136,79 @@ mod tests {
 
     #[test]
     fn a_file_saved_has_its_header_and_its_version() {
-        let header = "* @RNL(type=\"header\") { @VERSION(\"0.2\")}";
+        let header = "* @RNL(type=\"header\") { @VERSION(\"0.4\")}";
         // the main file: after its title, in its line endings
         let net = "* t\r\nR1 a b 1k\r\n.end\r\n";
         let d = doc(net, "a.sp", "*");
-        assert_eq!(with_header(&d, "a.sp", net, "0.2"), format!("* t\r\n{header}\r\nR1 a b 1k\r\n.end\r\n"));
+        assert_eq!(with_header(&d, "a.sp", net, "0.4"), format!("* t\r\n{header}\r\nR1 a b 1k\r\n.end\r\n"));
         // with a header that has its version, as it is; one without a version gets it
         let with = format!("* t\n{header}\nR1 a b 1k\n.end\n");
-        assert_eq!(with_header(&doc(&with, "a.sp", "*"), "a.sp", &with, "0.2"), with);
-        for (body, want) in [("{}", "{ @VERSION(\"0.2\")}"), ("{ @DEVICE(x) }", "{ @VERSION(\"0.2\"); @DEVICE(x) }")] {
+        assert_eq!(with_header(&doc(&with, "a.sp", "*"), "a.sp", &with, "0.4"), with);
+        for (body, want) in [("{}", "{ @VERSION(\"0.4\")}"), ("{ @DEVICE(x) }", "{ @VERSION(\"0.4\"); @DEVICE(x) }")] {
             let net = format!("* t\n* @RNL(type=\"header\") {body}\n.end\n");
-            let out = with_header(&doc(&net, "a.sp", "*"), "a.sp", &net, "0.2");
+            let out = with_header(&doc(&net, "a.sp", "*"), "a.sp", &net, "0.4");
             assert_eq!(out, format!("* t\n* @RNL(type=\"header\") {want}\n.end\n"));
         }
         // a header that is not the first record is left to its author
         let late = "* t\n* @RNL {#R1}\n* @RNL(type=\"header\") {}\n.end\n";
-        assert_eq!(with_header(&doc(late, "a.sp", "*"), "a.sp", late, "0.2"), late);
+        assert_eq!(with_header(&doc(late, "a.sp", "*"), "a.sp", late, "0.4"), late);
         // an included file: after a comment on its first line; before a statement there, a comment
         // line first, so that the statement stays a statement
         let mut d = doc("* t\n.end\n", "a.sp", "*");
         d.add_level(Level::new(LevelKind::File, "lib.inc", "lib.inc", "lib.inc"), Some(0));
         let lib = "* lib\n.subckt div p n\nR1 p n 1k\n.ends\n";
         assert_eq!(
-            with_header(&d, "lib.inc", lib, "0.2"),
+            with_header(&d, "lib.inc", lib, "0.4"),
             format!("* lib\n{header}\n.subckt div p n\nR1 p n 1k\n.ends\n")
         );
         let lib = ".subckt div p n\nR1 p n 1k\n.ends";
-        assert_eq!(with_header(&d, "lib.inc", lib, "0.2"), format!("*\n{header}\n.subckt div p n\nR1 p n 1k\n.ends"));
+        assert_eq!(with_header(&d, "lib.inc", lib, "0.4"), format!("*\n{header}\n.subckt div p n\nR1 p n 1k\n.ends"));
         // Spectre's carrier; a package file as it is
         let net = "// t\nR1 (a b) resistor r=1k\n";
         let d = doc(net, "a.scs", "//");
         assert_eq!(
-            with_header(&d, "a.scs", net, "0.2"),
-            "// t\n// @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 (a b) resistor r=1k\n"
+            with_header(&d, "a.scs", net, "0.4"),
+            "// t\n// @RNL(type=\"header\") { @VERSION(\"0.4\")}\nR1 (a b) resistor r=1k\n"
         );
-        assert_eq!(with_header(&as_package(&d, "p.rnl"), "p.rnl", "@RNL {}\n", "0.2"), "@RNL {}\n");
+        assert_eq!(with_header(&as_package(&d, "p.rnl"), "p.rnl", "@RNL {}\n", "0.4"), "@RNL {}\n");
     }
 
     #[test]
     fn a_header_below_a_subcircuit_solved_moves_to_line_2() {
         // a header record after a subcircuit: the record of the subcircuit goes in before its
         // `.ends`, and would come before the header, which must be the first record of the file
-        // (2.8); so the header moves where a new header goes, line 2 after the title (the draft
-        // 0.3, 16.3 and 2.2), with its VERSION (16.1, 17)
+        // (2.8); so the header moves where a new header goes, line 2 after the title (16.3 and 2.2),
+        // with its VERSION (16.1, 17)
         let net = "* t\nR0 a 0 1k\n.subckt s a b\nR1 a b 1k\n.ends\n* @RNL(type=\"header\") { }\nX1 a b s\n.end\n";
         let d = doc(net, "a.sp", "*");
         let record = "@RNL(type=\"generated\") {\n  #R1 @PLACE(0, 0)\n}";
-        let out = replace_generated_with_header(&d, 1, net, record, "0.2");
-        let moved = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\nR0 a 0 1k\n.subckt s a b\nR1 a b 1k\n\
+        let out = replace_generated_with_header(&d, 1, net, record, "0.4");
+        let moved = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nR0 a 0 1k\n.subckt s a b\nR1 a b 1k\n\
                      * @RNL(type=\"generated\") {\n*   #R1 @PLACE(0, 0)\n* }\n.ends\nX1 a b s\n.end\n";
         assert_eq!(out, moved);
         // the next level written finds it whole, and leaves it where it is
-        assert_eq!(with_header(&doc(&out, "a.sp", "*"), "a.sp", &out, "0.2"), out);
-        let bare = out.replace(" @VERSION(\"0.2\")", "");
-        assert_eq!(with_header(&doc(&bare, "a.sp", "*"), "a.sp", &bare, "0.2"), out);
-        let again = replace_generated_with_header(&doc(&out, "a.sp", "*"), 1, &out, record, "0.2");
+        assert_eq!(with_header(&doc(&out, "a.sp", "*"), "a.sp", &out, "0.4"), out);
+        let bare = out.replace(" @VERSION(\"0.4\")", "");
+        assert_eq!(with_header(&doc(&bare, "a.sp", "*"), "a.sp", &bare, "0.4"), out);
+        let again = replace_generated_with_header(&doc(&out, "a.sp", "*"), 1, &out, record, "0.4");
         assert_eq!(again, out);
         // the file level written first: its record goes at its end, below the header, which gets its
         // version where it is; the subcircuit written next moves it
-        let top = replace_generated_with_header(&d, 0, net, "@RNL(type=\"generated\") {}", "0.2");
-        let kept = "* t\nR0 a 0 1k\n.subckt s a b\nR1 a b 1k\n.ends\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n\
+        let top = replace_generated_with_header(&d, 0, net, "@RNL(type=\"generated\") {}", "0.4");
+        let kept = "* t\nR0 a 0 1k\n.subckt s a b\nR1 a b 1k\n.ends\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n\
                     X1 a b s\n* @RNL(type=\"generated\") {}\n.end\n";
         assert_eq!(top, kept);
-        let both = replace_generated_with_header(&doc(&top, "a.sp", "*"), 1, &top, record, "0.2");
+        let both = replace_generated_with_header(&doc(&top, "a.sp", "*"), 1, &top, record, "0.4");
         assert_eq!(both, moved.replace(".end\n", "* @RNL(type=\"generated\") {}\n.end\n"));
         // a header on several lines keeps its indentation where it goes
         let long = net.replace("{ }", "{\n*   @DEVICE(x)\n* }");
-        let out = replace_generated_with_header(&doc(&long, "a.sp", "*"), 1, &long, record, "0.2");
-        let header = "* @RNL(type=\"header\") { @VERSION(\"0.2\");\n*   @DEVICE(x)\n* }\nR0 a 0 1k\n.subckt s a b\n";
+        let out = replace_generated_with_header(&doc(&long, "a.sp", "*"), 1, &long, record, "0.4");
+        let header = "* @RNL(type=\"header\") { @VERSION(\"0.4\");\n*   @DEVICE(x)\n* }\nR0 a 0 1k\n.subckt s a b\n";
         assert!(out.starts_with(&format!("* t\n{header}")) && out.matches("type=\"header\"").count() == 1, "{out}");
-        assert_eq!(replace_generated_with_header(&doc(&out, "a.sp", "*"), 1, &out, record, "0.2"), out);
+        assert_eq!(replace_generated_with_header(&doc(&out, "a.sp", "*"), 1, &out, record, "0.4"), out);
         // a subcircuit right after the title: line 2 is above it
         let first = net.replace("R0 a 0 1k\n", "");
-        let out = replace_generated_with_header(&doc(&first, "a.sp", "*"), 1, &first, record, "0.2");
+        let out = replace_generated_with_header(&doc(&first, "a.sp", "*"), 1, &first, record, "0.4");
         assert_eq!(out, moved.replace("R0 a 0 1k\n", ""));
         // a file read only through a library section, whose line 2 is not read (2.2): above the
         // subcircuit instead, inside the section
@@ -1219,37 +1217,37 @@ mod tests {
         let mut d = doc(lib, "models.lib", "*");
         d.levels[0].section = Some("tt".into());
         d.levels[0].section_lines = Some((2, 8));
-        let out = replace_generated_with_header(&d, 1, lib, "@RNL(type=\"generated\") {}", "0.2");
+        let out = replace_generated_with_header(&d, 1, lib, "@RNL(type=\"generated\") {}", "0.4");
         let want =
-            "* models\n.lib tt\nR0 a 0 1k\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.subckt s a b\nR1 a b 1k\n\
+            "* models\n.lib tt\nR0 a 0 1k\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt s a b\nR1 a b 1k\n\
                     * @RNL(type=\"generated\") {}\n.ends\n.endl tt\n";
         assert_eq!(out, want);
         // a header after a record of a subcircuit is not the first record of the file: an error
         // its author fixes, left as it is
         let late = net.replace("R1 a b 1k\n", "R1 a b 1k\n* @RNL {#R1}\n");
-        assert_eq!(with_header(&doc(&late, "a.sp", "*"), "a.sp", &late, "0.2"), late);
-        let out = replace_generated_with_header(&doc(&late, "a.sp", "*"), 1, &late, record, "0.2");
+        assert_eq!(with_header(&doc(&late, "a.sp", "*"), "a.sp", &late, "0.4"), late);
+        let out = replace_generated_with_header(&doc(&late, "a.sp", "*"), 1, &late, record, "0.4");
         assert_eq!(
             out,
             late.replace("* @RNL {#R1}\n", "* @RNL {#R1}\n* @RNL(type=\"generated\") {\n*   #R1 @PLACE(0, 0)\n* }\n")
         );
         // without a header, at the end of a level on line 2: the header first, then the record
         let net = "* t\n.end\n";
-        let out = replace_generated_with_header(&doc(net, "a.sp", "*"), 0, net, "@RNL(type=\"generated\") {}", "0.2");
-        assert_eq!(out, "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n* @RNL(type=\"generated\") {}\n.end\n");
+        let out = replace_generated_with_header(&doc(net, "a.sp", "*"), 0, net, "@RNL(type=\"generated\") {}", "0.4");
+        assert_eq!(out, "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n* @RNL(type=\"generated\") {}\n.end\n");
         // a record with scope= removed from below a header that has no version
         let net =
             "* t\n* @RNL(type=\"header\") {}\n* @RNL(type=\"generated\", scope=\"s\") {\n*   #R1 @PLACE(0, 0)\n* }\n\
                    .subckt s a b\nR1 a b 1k\n.ends\n.end\n";
-        let out = remove_generated_with_header(&doc(net, "a.sp", "*"), 1, "a.sp", net, "0.2");
-        assert_eq!(out, "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.subckt s a b\nR1 a b 1k\n.ends\n.end\n");
+        let out = remove_generated_with_header(&doc(net, "a.sp", "*"), 1, "a.sp", net, "0.4");
+        assert_eq!(out, "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.subckt s a b\nR1 a b 1k\n.ends\n.end\n");
     }
 
     #[test]
     fn a_header_in_slashes_goes_after_the_switch_to_spectre() {
         // a file that is not a .scs file is read in SPICE mode until `simulator lang=spectre`, where
         // `//` carries nothing (2.2): the header goes after it and the lines that continue it
-        let header = "// @RNL(type=\"header\") { @VERSION(\"0.2\")}";
+        let header = "// @RNL(type=\"header\") { @VERSION(\"0.4\")}";
         let mut d = doc("// t\nX1 (a b) div\n", "a.scs", "//");
         d.add_level(Level::new(LevelKind::File, "lib.inc", "lib.inc", "lib.inc"), Some(0));
         let body = "subckt div (p n)\nR1 (p n) resistor r=1k\nends div\n";
@@ -1263,20 +1261,20 @@ mod tests {
         ] {
             let lib = format!("{head}{body}");
             assert_eq!(carrier(&d, "lib.inc", &lib), "//");
-            assert_eq!(with_header(&d, "lib.inc", &lib, "0.2"), format!("{want}{body}"), "{head}");
+            assert_eq!(with_header(&d, "lib.inc", &lib, "0.4"), format!("{want}{body}"), "{head}");
         }
         // the main file, after its title
         let net = "* t\nsimulator lang=spectre\nR1 (a b) resistor r=1k\n";
         let d = doc(net, "a.net", "//");
         assert_eq!(
-            with_header(&d, "a.net", net, "0.2"),
+            with_header(&d, "a.net", net, "0.4"),
             format!("* t\nsimulator lang=spectre\n{header}\nR1 (a b) resistor r=1k\n")
         );
         // a .scs file is in Spectre mode from its first line
         let mut d = doc("// t\n", "a.scs", "//");
         d.add_level(Level::new(LevelKind::File, "lib.scs", "lib.scs", "lib.scs"), Some(0));
         let lib = format!("simulator lang=spectre\n{body}");
-        assert_eq!(with_header(&d, "lib.scs", &lib, "0.2"), format!("//\n{header}\n{lib}"));
+        assert_eq!(with_header(&d, "lib.scs", &lib, "0.4"), format!("//\n{header}\n{lib}"));
     }
 
     #[test]
@@ -1284,7 +1282,7 @@ mod tests {
         // above the first `simulator lang=spectre` of a file that is not a .scs file, Spectre reads
         // SPICE, where `//` is no comment (2.2): the header there, and the bare marker before a
         // statement, are written with `*`, which carries in both modes
-        let star = "* @RNL(type=\"header\") { @VERSION(\"0.2\")}";
+        let star = "* @RNL(type=\"header\") { @VERSION(\"0.4\")}";
         let mut d = doc("// t\nX1 (a b) div\n", "a.scs", "//");
         d.add_level(Level::new(LevelKind::File, "lib.inc", "lib.inc", "lib.inc"), Some(0));
         let body = "simulator lang=spectre\nsubckt div (p n)\nR1 (p n) resistor r=1k\nends div\n";
@@ -1294,13 +1292,13 @@ mod tests {
         ] {
             let lib = format!("{head}{body}");
             assert_eq!(carrier(&d, "lib.inc", &lib), "//");
-            assert_eq!(with_header(&d, "lib.inc", &lib, "0.2"), format!("{want}{body}"), "{head}");
+            assert_eq!(with_header(&d, "lib.inc", &lib, "0.4"), format!("{want}{body}"), "{head}");
         }
         // a main file; the record written with the header follows it, so that the next solve
         // writes the same
         let net = "* t\n.param rr=1k\nsimulator lang=spectre\nR1 (a b) resistor r=1k\n";
         let d = doc(net, "a.net", "//");
-        let out = replace_generated_with_header(&d, 0, net, "@RNL(type=\"generated\") {#R1 @PLACE(0, 0)}", "0.2");
+        let out = replace_generated_with_header(&d, 0, net, "@RNL(type=\"generated\") {#R1 @PLACE(0, 0)}", "0.4");
         let want = format!("* t\n{star}\n.param rr=1k\nsimulator lang=spectre\nR1 (a b) resistor r=1k\n");
         assert_eq!(out, format!("{want}* @RNL(type=\"generated\") {{#R1 @PLACE(0, 0)}}\n"));
         // a record above the switch, which the reading takes: the header goes before it, not after
@@ -1309,7 +1307,7 @@ mod tests {
         let d = doc(net, "a.net", "//");
         assert_eq!(d.levels[0].records.len(), 1);
         assert_eq!(
-            with_header(&d, "a.net", net, "0.2"),
+            with_header(&d, "a.net", net, "0.4"),
             format!("* t\n{star}\n// @RNL {{ /* note */ }}\nsimulator lang=spectre\nR1 (a b) resistor r=1k\n")
         );
     }
@@ -1317,22 +1315,22 @@ mod tests {
     #[test]
     fn a_header_below_a_subcircuit_moves_after_the_switch_to_spectre_or_in_stars_above_it() {
         // a file that is not a .scs file, whose header in `//` comes after a subcircuit solved:
-        // where a new header goes (the draft 0.3, 16.3 and 2.2), after its `simulator
+        // where a new header goes (16.3 and 2.2), after its `simulator
         // lang=spectre` when that is its first statement, still in `//`; above the switch, in
         // SPICE mode, in `*`, which the record written with it follows
         let body = "subckt s (a b)\nR1 (a b) resistor r=1k\nends s\n// @RNL(type=\"header\") { }\nX1 (a b) s\n";
         let record = "@RNL(type=\"generated\") {#R1 @PLACE(0, 0)}";
         let net = format!("* t\nsimulator lang=spectre\n{body}");
         let d = doc(&net, "a.net", "//");
-        let out = replace_generated_with_header(&d, 1, &net, record, "0.2");
-        let want = "* t\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.2\") }\nsubckt s (a b)\n\
+        let out = replace_generated_with_header(&d, 1, &net, record, "0.4");
+        let want = "* t\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.4\") }\nsubckt s (a b)\n\
                     R1 (a b) resistor r=1k\n// @RNL(type=\"generated\") {#R1 @PLACE(0, 0)}\nends s\nX1 (a b) s\n";
         assert_eq!(out, want);
-        assert_eq!(replace_generated_with_header(&doc(&out, "a.net", "//"), 1, &out, record, "0.2"), out);
+        assert_eq!(replace_generated_with_header(&doc(&out, "a.net", "//"), 1, &out, record, "0.4"), out);
         let net = format!("* t\n.param rr=1k\nsimulator lang=spectre\n{body}");
         let d = doc(&net, "a.net", "//");
-        let out = replace_generated_with_header(&d, 1, &net, record, "0.2");
-        let head = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.param rr=1k\nsimulator lang=spectre\n";
+        let out = replace_generated_with_header(&d, 1, &net, record, "0.4");
+        let head = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.param rr=1k\nsimulator lang=spectre\n";
         let want = format!(
             "{head}subckt s (a b)\nR1 (a b) resistor r=1k\n* @RNL(type=\"generated\") {{#R1 @PLACE(0, 0)}}\nends s\n\
              X1 (a b) s\n"
@@ -1340,14 +1338,14 @@ mod tests {
         assert_eq!(out, want);
         // moved before the file level, which comes first, is written: the record of the file level
         // then follows the header in `*` as well, as the next solve, which finds it there, writes it
-        let moved = move_header_for(&d, 1, &net, "0.2");
+        let moved = move_header_for(&d, 1, &net, "0.4");
         assert_eq!(moved, format!("{head}subckt s (a b)\nR1 (a b) resistor r=1k\nends s\nX1 (a b) s\n"));
-        assert_eq!(move_header_for(&d, 0, &net, "0.2"), net);
+        assert_eq!(move_header_for(&d, 0, &net, "0.4"), net);
         let d = doc(&moved, "a.net", "//");
         assert_eq!(carrier(&d, "a.net", &moved), "*");
-        assert_eq!(move_header_for(&d, 1, &moved, "0.2"), moved);
-        let top = replace_generated_with_header(&d, 0, &moved, "@RNL(type=\"generated\") {}", "0.2");
-        let both = replace_generated_with_header(&doc(&top, "a.net", "//"), 1, &top, record, "0.2");
+        assert_eq!(move_header_for(&d, 1, &moved, "0.4"), moved);
+        let top = replace_generated_with_header(&d, 0, &moved, "@RNL(type=\"generated\") {}", "0.4");
+        let both = replace_generated_with_header(&doc(&top, "a.net", "//"), 1, &top, record, "0.4");
         assert_eq!(both, format!("{want}* @RNL(type=\"generated\") {{}}\n"));
     }
 
@@ -1356,14 +1354,14 @@ mod tests {
         // a file in Spectre's dialect whose carrier is `*`, that of its header above its
         // `simulator lang=spectre`, with records in `//` below it: each removed takes its line
         // with it, or leaves one `//` and one space before what follows it on its line
-        let net = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.param rr=1k\nsimulator lang=spectre\n\
+        let net = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.param rr=1k\nsimulator lang=spectre\n\
                    // @RNL(type=\"generated\") {\n//   #R1 @PLACE(0, 0)\n// }\n\
                    // @RNL(type=\"generated\") {#R1}   /* note */\nR1 (a b) resistor r=1k\n";
         let d = doc(net, "a.net", "//");
         assert_eq!(carrier(&d, "a.net", net), "*");
         assert_eq!(
             strip_generated(&d, "a.net", net),
-            "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.param rr=1k\nsimulator lang=spectre\n\
+            "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.param rr=1k\nsimulator lang=spectre\n\
              // /* note */\nR1 (a b) resistor r=1k\n"
         );
     }
@@ -1372,17 +1370,17 @@ mod tests {
     fn a_file_read_only_through_library_sections_gets_no_header() {
         // what lies outside the selected section is not read, and tools must not write there
         // (2.2): no header goes on line 2 of a file read only through its sections
-        let header = "* @RNL(type=\"header\") { @VERSION(\"0.2\")}";
+        let header = "* @RNL(type=\"header\") { @VERSION(\"0.4\")}";
         let mut d = doc("* t\n.end\n", "a.sp", "*");
         let mut tt = Level::new(LevelKind::File, "models.lib (tt)", "models.lib", "models.lib");
         tt.section = Some("tt".into());
         tt.section_lines = Some((2, 6));
         d.add_level(tt, Some(0));
         let lib = "* models\n.lib tt\n.subckt pair a b\nR1 a b 1k\n.ends\n.endl tt\n";
-        assert_eq!(with_header(&d, "models.lib", lib, "0.2"), lib);
+        assert_eq!(with_header(&d, "models.lib", lib, "0.4"), lib);
         // read whole as well, it reads line 2
         d.add_level(Level::new(LevelKind::File, "models.lib", "models.lib", "models.lib"), Some(0));
-        assert_eq!(with_header(&d, "models.lib", lib, "0.2"), format!("* models\n{header}\n{}", &lib[9..]));
+        assert_eq!(with_header(&d, "models.lib", lib, "0.4"), format!("* models\n{header}\n{}", &lib[9..]));
     }
 
     #[test]
@@ -1404,9 +1402,9 @@ mod tests {
         assert_eq!(d.protected, [("a.sp".to_string(), 4, 8)]);
         assert_eq!((record_line(&d, 1, net), record_line(&d, 0, net)), (Ok(4), Ok(10)));
         let record = "@RNL(type=\"generated\") {#R1 @PLACE(0, 0)}";
-        let header = "* @RNL(type=\"header\") { @VERSION(\"0.2\")}";
+        let header = "* @RNL(type=\"header\") { @VERSION(\"0.4\")}";
         assert_eq!(
-            replace_generated_with_header(&d, 1, net, record, "0.2"),
+            replace_generated_with_header(&d, 1, net, record, "0.4"),
             format!("* t\n{header}\n.subckt s a b\nR1 a b 1k\n* {record}\n.prot\nR2 a b 1k\n.ends\n.unprot\nX1 a b s\n.end\n")
         );
         // a main file whose `.end` lies in a region left open, which begins in a subcircuit: before
@@ -1431,15 +1429,15 @@ mod tests {
         let d = doc(net, "a.sp", "*");
         assert_eq!((record_line(&d, 1, net), record_line(&d, 0, net)), (Err((2, 7)), Ok(9)));
         let record = "@RNL(type=\"generated\") {#R1 @PLACE(0, 0)}";
-        assert_eq!(replace_generated_with_header(&d, 1, net, record, "0.2"), net);
+        assert_eq!(replace_generated_with_header(&d, 1, net, record, "0.4"), net);
         assert_eq!(replace_generated(&d, 1, net, record), net);
         assert_eq!(append_record(&d, 1, net, record), net);
-        assert_eq!(move_header_for(&d, 1, net, "0.2"), net);
+        assert_eq!(move_header_for(&d, 1, net, "0.4"), net);
         // a header record in such a region gets no VERSION there
         let net = "* t\n.prot\n* @RNL(type=\"header\") { }\nR1 a b 1k\n.unprot\n.end\n";
         let d = doc(net, "a.sp", "*");
-        assert_eq!(with_header(&d, "a.sp", net, "0.2"), net);
-        let out = replace_generated_with_header(&d, 0, net, "@RNL(type=\"generated\") {}", "0.2");
+        assert_eq!(with_header(&d, "a.sp", net, "0.4"), net);
+        let out = replace_generated_with_header(&d, 0, net, "@RNL(type=\"generated\") {}", "0.4");
         assert_eq!(out, net.replace(".end\n", "* @RNL(type=\"generated\") {}\n.end\n"));
     }
 
@@ -1453,9 +1451,9 @@ mod tests {
         let mut d = doc(lib, "models.lib", "*");
         d.levels[0].section = Some("tt".into());
         d.levels[0].section_lines = Some((2, 10));
-        let out = replace_generated_with_header(&d, 1, lib, "@RNL(type=\"generated\") {}", "0.2");
+        let out = replace_generated_with_header(&d, 1, lib, "@RNL(type=\"generated\") {}", "0.4");
         let want =
-            "* models\n.lib tt\nR0 a 0 1k\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.prot\n.subckt s a b\n\
+            "* models\n.lib tt\nR0 a 0 1k\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.prot\n.subckt s a b\n\
                     .unprot\nR1 a b 1k\n* @RNL(type=\"generated\") {}\n.ends\n.endl tt\n";
         assert_eq!(out, want);
     }
@@ -1478,13 +1476,13 @@ mod tests {
         assert_eq!(append_record(&d, 2, net, record), out);
         // a file whose records are in `//` after its switch to Spectre mode, with a subcircuit in a
         // later SPICE section: its record in `*`, and so is that of the file level, at its end there
-        let net = "* t\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.2\")}\nX1 (a b) p\n\
+        let net = "* t\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.4\")}\nX1 (a b) p\n\
                    simulator lang=spice\n.subckt p a b\nR2 a b 1k\n.ends\n";
         let d = doc(net, "a.net", "//");
         assert_eq!(carrier(&d, "a.net", net), "//");
-        let out = replace_generated_with_header(&d, 1, net, record, "0.2");
+        let out = replace_generated_with_header(&d, 1, net, record, "0.4");
         assert_eq!(out, net.replace("R2 a b 1k\n", &format!("R2 a b 1k\n* {record}\n")));
-        let out = replace_generated_with_header(&d, 0, net, "@RNL(type=\"generated\") {}", "0.2");
+        let out = replace_generated_with_header(&d, 0, net, "@RNL(type=\"generated\") {}", "0.4");
         assert_eq!(out, format!("{net}* @RNL(type=\"generated\") {{}}\n"));
     }
 
@@ -1493,24 +1491,24 @@ mod tests {
         // `add_header` writes the record that its caller makes for the marker that carries it, by
         // the rules of `with_header`: after line 1 and the lines that continue it, a `+` line, or
         // in Spectre's dialect the line after one that ends with `\` (2.2)
-        let record = |m: &'static str| format!("@RNL(type=\"header\") {{ @VERSION(\"0.3\"); @DEVICE(m={})}}", m.len());
+        let record = |m: &'static str| format!("@RNL(type=\"header\") {{ @VERSION(\"0.4\"); @DEVICE(m={})}}", m.len());
         let net = "title\n+ more of it\nR1 a 0 1k\n";
         let d = doc(net, "a.sp", "*");
-        let head = "title\n+ more of it\n* @RNL(type=\"header\") { @VERSION(\"0.3\")";
+        let head = "title\n+ more of it\n* @RNL(type=\"header\") { @VERSION(\"0.4\")";
         assert_eq!(add_header(&d, "a.sp", net, record), format!("{head}; @DEVICE(m=1)}}\nR1 a 0 1k\n"));
-        assert_eq!(with_header(&d, "a.sp", net, "0.3"), format!("{head}}}\nR1 a 0 1k\n"));
+        assert_eq!(with_header(&d, "a.sp", net, "0.4"), format!("{head}}}\nR1 a 0 1k\n"));
         let net = "t \\\nmore\nR1 (a b) resistor r=1k\n";
         let d = doc(net, "a.scs", "//");
         assert_eq!(
             add_header(&d, "a.scs", net, record),
-            "t \\\nmore\n// @RNL(type=\"header\") { @VERSION(\"0.3\"); @DEVICE(m=2)}\nR1 (a b) resistor r=1k\n"
+            "t \\\nmore\n// @RNL(type=\"header\") { @VERSION(\"0.4\"); @DEVICE(m=2)}\nR1 (a b) resistor r=1k\n"
         );
         // an empty text keeps line 1, which is never read, empty
         let d = doc("", "a.sp", "*");
-        assert_eq!(with_header(&d, "a.sp", "", "0.3"), "\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n");
+        assert_eq!(with_header(&d, "a.sp", "", "0.4"), "\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n");
         assert_eq!(
             add_header(&d, "a.sp", "", record),
-            "\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @DEVICE(m=1)}\n"
+            "\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @DEVICE(m=1)}\n"
         );
         // a file that has a header record, and a package file, come back as they are
         let with = "* t\n* @RNL(type=\"header\") {}\n.end\n";

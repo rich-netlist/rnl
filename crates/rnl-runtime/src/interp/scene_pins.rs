@@ -363,18 +363,12 @@ impl Interp<'_> {
             }
             let rewrites = self.scenes[scene].rewrites.get(&wire).cloned().unwrap_or_default();
             for (index, rewrite) in rewrites.iter().enumerate() {
-                if !self.follows_0_4(self.source_unit(&rewrite.site)) {
-                    continue;
-                }
                 if let Some(fault) = self.wire_rewrite_error(&rewrite.site, &rewrite.points) {
                     self.scenes[scene].rewrites.get_mut(&wire).unwrap()[index].fault = Some(fault);
                 }
             }
             let Some(shape) = self.wire_shape(scene, wire) else { continue };
             let Some(site) = &shape.site else { continue };
-            if !self.follows_0_4(self.source_unit(site)) {
-                continue;
-            }
             if let Some((code, message)) = shape.points.iter().find_map(|point| self.wire_vertex_error(*point)) {
                 let diagnostic = self.err(site, code, message, shape.off);
                 self.late_failures.insert(wire, diagnostic);
@@ -384,7 +378,7 @@ impl Interp<'_> {
     }
 
     pub(crate) fn wire_rewrite_error(&self, site: &Ctx, points: &[ObjId]) -> Option<(Code, String)> {
-        if self.follows_0_4(self.source_unit(site)) && self.failed_body(site) {
+        if self.failed_body(site) {
             return Some((codes::REF_FAILED, "an object used by this wire rewrite failed (7.3, 13.1)".into()));
         }
         points.iter().find_map(|point| self.wire_vertex_error(*point))
@@ -392,12 +386,10 @@ impl Interp<'_> {
 
     fn resolve_scene_wire_nets(&mut self, scene: SceneId, wire: ObjId) {
         let ObjData::Wire { nets, bus, site: Some(site), off, .. } = self.o(wire).clone() else { return };
-        if !self.follows_0_4(self.source_unit(&site))
-            || !nets.iter().any(|net| {
-                matches!(self.o(*net), ObjData::NamedSubobject { .. } | ObjData::ScenePin { .. })
-                    || self.role_inputs.contains_key(net)
-            })
-        {
+        if !nets.iter().any(|net| {
+            matches!(self.o(*net), ObjData::NamedSubobject { .. } | ObjData::ScenePin { .. })
+                || self.role_inputs.contains_key(net)
+        }) {
             return;
         }
         let mut resolved = Vec::new();
@@ -482,7 +474,7 @@ impl Interp<'_> {
                 }
                 let data = self.usage(usage).clone();
                 let Some(site) = &data.site else { continue };
-                if data.in_symbol || !self.follows_0_4(self.source_unit(site)) {
+                if data.in_symbol {
                     continue;
                 }
                 if let Some(Some(cause)) = data.parent.and_then(|parent| self.failed_obj(parent)) {
@@ -590,9 +582,8 @@ impl Interp<'_> {
             let Some(site) = site else { continue };
             for input in inputs {
                 let value = self.scene_value(input);
-                let terminal_point = self.follows_0_4(self.source_unit(&site))
-                    && matches!(self.o(object), ObjData::Prim { .. })
-                    && matches!(self.o(value), ObjData::Term { .. });
+                let terminal_point =
+                    matches!(self.o(object), ObjData::Prim { .. }) && matches!(self.o(value), ObjData::Term { .. });
                 if !terminal_point
                     && !matches!(self.o(input), ObjData::NamedSubobject { .. })
                     && !self.role_inputs.contains_key(&input)

@@ -26,7 +26,6 @@ pub mod solver_table;
 pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const BUILD_COMMIT: &str = env!("RNL_BUILD_COMMIT");
 
-
 use std::collections::BTreeMap;
 use std::path::Path;
 

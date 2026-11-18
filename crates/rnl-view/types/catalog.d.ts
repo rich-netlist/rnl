@@ -49,7 +49,8 @@ export type CatalogPackage = {
   series: boolean,
   /**
    * The package that the setting of 16.3 brings in at the root of a document, the standard
-   * package, when the catalog's reading has that setting on (`CatalogOptions::runtime`).
+   * package `rnl-std-all`, when the catalog's reading has that setting on
+   * (`CatalogOptions::runtime`): the version the reading asks for, or else the newest listed.
    */
   implicit: boolean,
 };

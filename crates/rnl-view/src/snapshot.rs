@@ -185,8 +185,8 @@ pub struct UsageOf {
     /// The usage's id, as its object view has it: `%dp1`, `@file:line:col`. A failed application,
     /// which made no usage, has the name it binds, or where it is written.
     pub id: String,
-    /// Its definition, such as `$DIFFERENTIAL_PAIR`, or in a 0.4 level, `%dot` for one a level defines, whose `%` a level before 0.4 leaves out;
-    /// empty for a group, and when a failed statement names none.
+    /// Its definition, such as `$DIFFERENTIAL_PAIR`, or `%dot` for one a level defines; empty for a
+    /// group, and when a failed statement names none.
     pub definition: String,
     /// The roles the object fills in it: for a group, `members`; none for a group within this one,
     /// as `MemberOf::roles`.
@@ -282,14 +282,14 @@ pub struct LevelModel {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(test, ts(as = "Option<Vec<GroupView>>", optional))]
     pub groups: Vec<GroupView>,
-    /// For a 0.4 level, the definition of its junction dots, which SOLVER-CONFIG `junction` selects
-    /// (14.10), readable before any solve; absent before 0.4, and when none is selected.
+    /// The definition of the level's junction dots, which SOLVER-CONFIG `junction` selects (13.2,
+    /// 14.10), readable before any solve; absent when none is selected.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub junction: Option<JunctionView>,
 }
 
-/// The junction dots of a 0.4 level ([`LevelModel::junction`]).
+/// The junction dots of a level ([`LevelModel::junction`]).
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct JunctionView {
@@ -337,7 +337,7 @@ pub struct SymbolDefinition {
 #[derive(Serialize, Debug, Clone, PartialEq)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SymbolPin {
-    /// Local names of a 0.4 pin, in binding order; empty for an unnamed pin.
+    /// Local names of a pin, in binding order; empty for an unnamed pin.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub names: Option<Vec<String>>,
@@ -394,11 +394,11 @@ impl<T> Slot<T> {
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ObjectView {
-    /// The owner id of a 0.4 usage's pin attachment; absent without a unique structural host.
+    /// The owner id of a usage's pin attachment; absent without a unique structural host.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub pin_of: Option<String>,
-    /// The enclosing 0.4 usage's id. Follow this chain for inherited pin attachment.
+    /// The enclosing usage's id. Follow this chain for inherited pin attachment.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub parent: Option<String>,
@@ -409,7 +409,7 @@ pub struct ObjectView {
     pub kind: String,
     /// The host instances it draws: one for an instance, the members of a bundle, none for a usage.
     pub host: Vec<String>,
-    /// A usage's definition, such as `$GROUND`, or in a 0.4 level, `%dot` for one a level defines, whose `%` a level before 0.4 leaves out.
+    /// A usage's definition, such as `$GROUND`, or `%dot` for one a level defines.
     pub definition: Option<String>,
     /// A usage's roles, each with the id of what it is attached to, or a point; a set role (9.4)
     /// with the list of its members, each an id or a point, nested sets followed down, empty when the
@@ -434,7 +434,7 @@ pub struct ObjectView {
     pub at: Slot<[f64; 2]>,
     /// "R0", "R90", "R180", "R270", "MX", "MY", "MXR90" or "MYR90".
     pub orient: Slot<String>,
-    /// The assigned symbol's pins. In 0.4 these include unplaced pins with a null scene position.
+    /// The assigned symbol's pins, unplaced pins included, with a null scene position.
     pub pins: Vec<PinView>,
     /// The usages it is a member of in the level, with the roles it fills, those of its terminals
     /// too for an instance ([`UsageOf`]); only for an object that is in some.
@@ -446,7 +446,7 @@ pub struct ObjectView {
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct PinView {
-    /// The independent pin object kind, present in 0.4.
+    /// The independent pin object kind, present when the pin is an object of its own.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional, type = "\"pin\""))]
     pub kind: Option<&'static str>,
@@ -718,7 +718,7 @@ pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts, opt
 /// what the texts give: the standard package at the root and the version asked for, if any, the
 /// generated records and the tolerance. Each part has its length before it, so that no two inputs
 /// give the same bytes. `draft=false` stays in the text, as the revisions made while there was a
-/// switch for the draft 0.3 have it, so that the same texts keep their revisions.
+/// switch for a draft language version have it, so that the same texts keep their revisions.
 fn revision(r: &Interpretation, options: &Options) -> String {
     let mut files: Vec<(&str, String)> =
         r.sources.iter().map(|(name, text)| (name.as_str(), text.replace("\r\n", "\n").replace('\r', "\n"))).collect();
@@ -892,11 +892,9 @@ fn symbol_refs(doc: &HostDocument, lv: &LevelView) -> Vec<(SymbolInfo, SymbolRef
                 {
                     lv.unplaced_symbols.iter().find(|v| v.name == s.name && v.origin == s.origin)
                 }
-                // in a 0.4 level, any symbol an object uses, drawn or not, such as that of a junction
-                // dot, which has no place of its own before a solve
-                _ if rnl_runtime::interp::unit::keeps_0_4(&lv.language)
-                    && lv.objects.iter().any(|o| o.symbol.as_ref() == Some(s)) =>
-                {
+                // any symbol an object uses, drawn or not, such as that of a junction dot, which has
+                // no place of its own before a solve
+                _ if lv.objects.iter().any(|o| o.symbol.as_ref() == Some(s)) => {
                     // a view names a level's symbol without its `%`, as the reading keeps it
                     let named = |v: &&rnl_runtime::model::SymbolView| {
                         v.origin == s.origin && (v.name == s.name || format!("%{}", quoted(&v.name)) == s.name)

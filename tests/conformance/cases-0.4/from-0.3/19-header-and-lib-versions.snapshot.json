@@ -436,8 +436,8 @@
       "model": {
         "symbols": [
           {
-            "id": "%\"(viewer default)\"",
-            "name": "%\"(viewer default)\"",
+            "id": "%\"(default block symbol)\"",
+            "name": "%\"(default block symbol)\"",
             "package": null,
             "level": null,
             "default": true,
@@ -458,7 +458,7 @@
             "definition": null,
             "attach": null,
             "symbol": {
-              "value": "%\"(viewer default)\"",
+              "value": "%\"(default block symbol)\"",
               "source": null
             },
             "at": {
@@ -469,7 +469,48 @@
               "value": "R0",
               "source": null
             },
-            "pins": []
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#R1,0)",
+                "index": 0,
+                "names": [],
+                "bus": false,
+                "reference": "#R1:1",
+                "local_at": [
+                  -1.0,
+                  0.0
+                ],
+                "terminals": [
+                  "#R1:1"
+                ],
+                "at": null,
+                "dir": 180,
+                "nets": [
+                  "&a"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#R1,1)",
+                "index": 1,
+                "names": [],
+                "bus": false,
+                "reference": "#R1:2",
+                "local_at": [
+                  1.0,
+                  0.0
+                ],
+                "terminals": [
+                  "#R1:2"
+                ],
+                "at": null,
+                "dir": 0,
+                "nets": [
+                  "&b"
+                ]
+              }
+            ]
           },
           {
             "id": "#R2",
@@ -480,7 +521,7 @@
             "definition": null,
             "attach": null,
             "symbol": {
-              "value": "%\"(viewer default)\"",
+              "value": "%\"(default block symbol)\"",
               "source": null
             },
             "at": {
@@ -491,7 +532,48 @@
               "value": "R0",
               "source": null
             },
-            "pins": []
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#R2,0)",
+                "index": 0,
+                "names": [],
+                "bus": false,
+                "reference": "#R2:1",
+                "local_at": [
+                  -1.0,
+                  0.0
+                ],
+                "terminals": [
+                  "#R2:1"
+                ],
+                "at": null,
+                "dir": 180,
+                "nets": [
+                  "&a"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#R2,1)",
+                "index": 1,
+                "names": [],
+                "bus": false,
+                "reference": "#R2:2",
+                "local_at": [
+                  1.0,
+                  0.0
+                ],
+                "terminals": [
+                  "#R2:2"
+                ],
+                "at": null,
+                "dir": 0,
+                "nets": [
+                  "&b"
+                ]
+              }
+            ]
           }
         ],
         "points": [],
@@ -548,8 +630,8 @@
       "model": {
         "symbols": [
           {
-            "id": "%\"(viewer default)\"",
-            "name": "%\"(viewer default)\"",
+            "id": "%\"(default block symbol)\"",
+            "name": "%\"(default block symbol)\"",
             "package": null,
             "level": null,
             "default": true,
@@ -570,7 +652,7 @@
             "definition": null,
             "attach": null,
             "symbol": {
-              "value": "%\"(viewer default)\"",
+              "value": "%\"(default block symbol)\"",
               "source": null
             },
             "at": {
@@ -581,7 +663,48 @@
               "value": "R0",
               "source": null
             },
-            "pins": []
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#R3,0)",
+                "index": 0,
+                "names": [],
+                "bus": false,
+                "reference": "#R3:1",
+                "local_at": [
+                  -1.0,
+                  0.0
+                ],
+                "terminals": [
+                  "#R3:1"
+                ],
+                "at": null,
+                "dir": 180,
+                "nets": [
+                  "&a"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#R3,1)",
+                "index": 1,
+                "names": [],
+                "bus": false,
+                "reference": "#R3:2",
+                "local_at": [
+                  1.0,
+                  0.0
+                ],
+                "terminals": [
+                  "#R3:2"
+                ],
+                "at": null,
+                "dir": 0,
+                "nets": [
+                  "&b"
+                ]
+              }
+            ]
           }
         ],
         "points": [],

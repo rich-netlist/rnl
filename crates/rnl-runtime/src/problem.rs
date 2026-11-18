@@ -203,13 +203,11 @@ pub enum Reference {
     /// with a name, and the object is that name followed by `path`, such as `["::g"]`. An empty
     /// path is the usage itself.
     Generated { usage: usize, path: Vec<String> },
-    /// By its number, `%#3` (the draft 0.3, 5.9): an object without a name that no name reaches
+    /// By its number, `%#3` (5.9): an object without a name that no name reaches
     /// through `::`, such as the free point `(_, _)` written in a wire, a text without a key or a
     /// name, or a usage without a name; then `path`, such as `["::mid"]` for a local object of such
     /// a usage, `[":p"]` for one of its terminals. The numbers are those of the level read without
-    /// the records of the solver, followed by the objects of each record of the solver read. They
-    /// are computed for every version, but only the record of the solver of a file of the draft
-    /// writes them ([`LevelProblem::version`]).
+    /// the records of the solver, followed by the objects of each record of the solver read.
     Number { number: usize, path: Vec<String> },
     /// Without a name in the body of a usage that a rule makes, `usage` in
     /// [`LevelProblem::usages`], and reached through no name of it (5.9, 10.5), such as the wire of
@@ -218,8 +216,7 @@ pub enum Reference {
     /// and the record refers to it by number: the objects that the statement writing the usage out
     /// makes are numbered right after those of the statements before it, the first of them after
     /// the objects of the authored records ([`LevelProblem::authored_numbers`]), and `index`, from
-    /// 1, is this one's place among them ([`UsageEntry::written_numbers`]); then `path`. Computed
-    /// for every version, written only by the record of the solver of a file of the draft.
+    /// 1, is this one's place among them ([`UsageEntry::written_numbers`]); then `path`.
     GeneratedNumber { usage: usize, index: usize, path: Vec<String> },
     /// Not at all: an object reached only through one that has no reference, such as a local
     /// object of a usage named only inside a `{…}`, or an object that no statement of the level
@@ -358,8 +355,7 @@ pub struct ProblemSymbol {
     /// x1, y1, x2, y2 in local coordinates: `box=`, or the extent of the graphics.
     pub bbox: [f64; 4],
     pub box_written: bool,
-    /// The default block symbol of an instance no symbol is given to (9.2.6), or in a file of a
-    /// version before 0.4 the viewer's own stand-in.
+    /// The default block symbol of an instance no symbol is given to (9.2.6).
     pub default: bool,
     pub pins: Vec<PinView>,
 }
@@ -652,8 +648,7 @@ pub struct LevelProblem {
     pub name: String,
     /// The language version the level's file is read in (16.1): what it declares; for an included
     /// file that declares none, the version of the file that includes it; else the toolkit's
-    /// default, "0.3". Only the record of the solver of a file of the draft 0.3, or of a later
-    /// version, writes numbers ([`Reference::Number`]).
+    /// default, "0.4".
     pub version: String,
     /// How many objects the authored records of the level number (5.9): the record of the solver
     /// numbers its own objects from the next number on ([`Reference::GeneratedNumber`]).
@@ -677,8 +672,8 @@ pub struct LevelProblem {
     pub facts: Vec<ProblemFact>,
     pub wires: Vec<ProblemWire>,
     pub routes: Vec<RouteIntent>,
-    /// Final effective CURRENT declarations in a 0.4 level, mapped to their terminals' pins.
-    /// Empty in released language versions, preserving their JSON and input digests.
+    /// Final effective CURRENT declarations of the level, mapped to their terminals' pins (empty
+    /// when it has none, which leaves its JSON and input digest as they were).
     pub currents: Vec<TerminalCurrent>,
     /// Compound annotations, keyed by an Annotation object index.
     pub annotations: Vec<AnnotationInfo>,
@@ -689,8 +684,7 @@ pub struct LevelProblem {
     /// The nets of the level, in the order the netlist first names them: the ports of the
     /// subcircuit, then the nets of the instances, line by line.
     pub nets: Vec<ProblemNet>,
-    /// The ORIENT and ORIENT-RELATION facts written with a list of codes in a file of 0.4 (11.2,
-    /// 14.9), by their index in `facts`: every code of the list, two or more, of which one is to
+    /// The ORIENT and ORIENT-RELATION facts written with a list of codes (11.2, 14.9), by their index in `facts`: every code of the list, two or more, of which one is to
     /// hold. The fact itself has the first, which is what a solver that does not read the lists
     /// takes. Empty in a problem without such lists, which leaves the input digest as it was.
     pub orient_lists: Vec<(usize, Vec<Orient>)>,
@@ -723,14 +717,6 @@ pub struct AnnotationInfo {
 pub struct ProblemIds {
     pub objects: Vec<String>,
     pub usages: Vec<String>,
-}
-
-impl LevelProblem {
-    /// Does the level's file follow 0.3 ([`Self::version`]): is it of 0.3 or a later version? Only
-    /// there does the record of the solver refer to objects by number (5.9) and rewrite wires (13.1).
-    pub fn follows_0_3(&self) -> bool {
-        crate::interp::unit::keeps_0_3(&self.version)
-    }
 }
 
 /// A point as the report of a solve names it: an object by its name, or else its label, `:` and
@@ -991,7 +977,7 @@ pub fn options_digest(options: &str) -> String {
 /// numbers of the objects without a name ([`Reference::Number`], [`Reference::GeneratedNumber`],
 /// [`LevelProblem::authored_numbers`], [`UsageEntry::written_numbers`]) are left out, the object
 /// counting as one without a reference: they follow from the text, which the check of the record
-/// of the solver covers (the draft 0.3, 5.9), and so the digest is the same in every version.
+/// of the solver covers (5.9).
 ///
 /// `sig2` is `sig1` with the nets of the level (6.3): each net, the pins on it, the wires and the
 /// ROUTEs on it, its place among the ports, and the nets of each object, so that connecting a
@@ -1391,12 +1377,10 @@ pub fn canonical_sig1(p: &LevelProblem) -> String {
     }
     c.word("groups");
     for g in &p.groups {
-        if p.version == "0.4" {
-            c.word("group-origin");
-            c.index(g.identity);
-            c.word(if g.first { "first" } else { "repeated" });
-            c.word(if g.direct { "direct" } else { "expanded" });
-        }
+        c.word("group-origin");
+        c.index(g.identity);
+        c.word(if g.first { "first" } else { "repeated" });
+        c.word(if g.direct { "direct" } else { "expanded" });
         c.str(&g.label);
         c.indexes(&g.members);
         // Preserve the canonical text for groups written before spacing was available.
@@ -1657,7 +1641,7 @@ mod tests {
             title: "t.sp".into(),
             kind: "file",
             name: "t.sp".into(),
-            version: "0.2".into(),
+            version: "0.4".into(),
             authored_numbers: 0,
             file: "t.sp".into(),
             line: 1,
@@ -1712,7 +1696,7 @@ mod tests {
             title: "t.sp".into(),
             kind: "file",
             name: "t.sp".into(),
-            version: "0.3".into(),
+            version: "0.4".into(),
             authored_numbers: 0,
             file: "t.sp".into(),
             line: 1,

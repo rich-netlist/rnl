@@ -1,5 +1,5 @@
 {
- "about": "The kinds of diagnostics of the toolkit: each with its number, RNL and four digits, and its short name, which are kept from one version to the next and never given to another kind; the severity and the message it is given with, as the code writes it; and the sections of the standard it is about. The thousands give the domain: 0 to 6 the domains of the standard, 7 the geometry hints, 8 the tools, 9 the kinds of the implementation of the domains 0 to 6 (9D00, D the domain). A kind of the versions 0.2 and 0.3 alone has no number. A kind that the toolkit no longer gives is listed among the retired, with the last core that gave it: its number and name are given to no other kind.",
+ "about": "The kinds of diagnostics of the toolkit: each with its number, RNL and four digits, and its short name, which are kept from one version to the next and never given to another kind; the severity and the message it is given with, as the code writes it; and the sections of the standard it is about. The thousands give the domain: 0 to 6 the domains of the standard, 7 the geometry hints, 8 the tools, 9 the kinds of the implementation of the domains 0 to 6 (9D00, D the domain). A kind that the toolkit no longer gives is listed among the retired, with the last core that gave it: its number and name are given to no other kind.",
  "kinds": [
   {
    "number": "RNL3418",
@@ -724,15 +724,6 @@
    ]
   },
   {
-   "number": "RNL1138",
-   "name": "syntax-set-not-closed",
-   "severity": "error",
-   "message": "the set is not closed (missing `}`)",
-   "sections": [
-    "7.4"
-   ]
-  },
-  {
    "number": "RNL1139",
    "name": "syntax-stray-equals",
    "severity": "error",
@@ -1216,15 +1207,6 @@
    ]
   },
   {
-   "number": "RNL2300",
-   "name": "use-aliases-alias-is-added-word",
-   "severity": "error",
-   "message": "in alias package {package}, the alias {alias} is the name of a standard word in this file's language version {version}; the alias is not used (16.5)",
-   "sections": [
-    "16.5"
-   ]
-  },
-  {
    "number": "RNL2301",
    "name": "use-aliases-missing-name",
    "severity": "error",
@@ -1288,17 +1270,6 @@
    "sections": [
     "5.3",
     "16.2"
-   ]
-  },
-  {
-   "number": "RNL2308",
-   "name": "package-language-mismatch",
-   "severity": "error",
-   "message": "package {package} is written in language {language}, but this file uses {reader}: language 0.4 cannot use packages of earlier languages or be used by them; this {reference} fails (16.1, 16.2, 16.3)",
-   "sections": [
-    "16.1",
-    "16.2",
-    "16.3"
    ]
   },
   {
@@ -1679,16 +1650,6 @@
    ]
   },
   {
-   "number": "RNL3011",
-   "name": "keyword-group-not-a-set",
-   "severity": "error",
-   "message": "GROUP takes a set (11.5)",
-   "sections": [
-    "11.5",
-    "5.2.1"
-   ]
-  },
-  {
    "number": "RNL3012",
    "name": "keyword-header-only",
    "severity": "error",
@@ -1934,15 +1895,6 @@
    ]
   },
   {
-   "number": "RNL3107",
-   "name": "param-hole-is-role",
-   "severity": "error",
-   "message": "?{name} is a role and cannot stand where a literal goes (6.10)",
-   "sections": [
-    "6.10"
-   ]
-  },
-  {
    "number": "RNL3108",
    "name": "param-hole-not-number",
    "severity": "error",
@@ -2145,15 +2097,6 @@
    "message": "{prefix}{name} failed",
    "sections": [
     "7.2"
-   ]
-  },
-  {
-   "number": "RNL3204",
-   "name": "ref-hole-coord-not-param",
-   "severity": "error",
-   "message": "?{name} is not a parameter (6.10)",
-   "sections": [
-    "6.10"
    ]
   },
   {
@@ -2513,16 +2456,6 @@
    "message": "this statement cannot be written in a symbol body (9.2.2)",
    "sections": [
     "9.2.2"
-   ]
-  },
-  {
-   "number": "RNL3412",
-   "name": "define-symbol-cycle",
-   "severity": "error",
-   "message": "nested symbols form a cycle (9.2.7)",
-   "sections": [
-    "9.1",
-    "9.2.7"
    ]
   },
   {
@@ -2959,24 +2892,6 @@
    "sections": [
     "6.3",
     "5.2.1"
-   ]
-  },
-  {
-   "number": "RNL4000",
-   "name": "symbol-model-card-missing",
-   "severity": "warning",
-   "message": "the model card `{model}` is not found, so the polarity of {instances}[ and {n} more] is not known and {it|they} {is|are} not drawn (a `.model` card or an include may be missing) [in language 0.4: drawing positions, orientations and texts on these instances or their terminals, and constraints and wires containing them, have no effect and do not fail (9.2.8)]",
-   "sections": [
-    "9.2.8"
-   ]
-  },
-  {
-   "number": "RNL4001",
-   "name": "symbol-no-model",
-   "severity": "warning",
-   "message": "{instances}[ and {n} more] name{s} no model, so the polarity is not known and {it|they} {is|are} not drawn [in language 0.4: drawing positions, orientations and texts on these instances or their terminals, and constraints and wires containing them, have no effect and do not fail (9.2.8)]",
-   "sections": [
-    "9.2.8"
    ]
   },
   {
@@ -4355,6 +4270,20 @@
    ]
   },
   {
+   "number": "RNL8215",
+   "name": "unsolved-at-point",
+   "severity": "warning",
+   "message": "{decision}{label}: it is drawn at the point of its main object and has no position of its own (12.1)",
+   "sections": []
+  },
+  {
+   "number": "RNL8216",
+   "name": "unsolved-wire-through-centre",
+   "severity": "warning",
+   "message": "{decision}{label}: a point of it is the centre of a set, which this writer does not write (6.5)",
+   "sections": []
+  },
+  {
    "number": "RNL8400",
    "name": "writeback-region-encrypted",
    "severity": "hint",
@@ -4966,69 +4895,6 @@
    "sections": []
   },
   {
-   "number": null,
-   "name": "constraint-dropped",
-   "severity": "hint",
-   "message": "{constraint} conflicts with fixed {coordinates|orientations} and is dropped in the order of 8.5 (8.5)",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "param-distance-negative-without-sense",
-   "severity": "error",
-   "message": "without a sense (\"x\", \"y\") the bounds of DISTANCE cannot be negative (14.5)",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "place-fact-dropped",
-   "severity": "hint",
-   "message": "{fact} conflicts with {winner} and is dropped in the order of 8.5 (8.5)",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "place-position-of-usage-at-point",
-   "severity": "error",
-   "message": "{usage} is drawn on the point of its main object: PLACE fails (12.1)",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "place-usage-at-point",
-   "severity": "error",
-   "message": "{usage} is drawn on the point of its main object and has no position of its own: PLACE fails (12.1)",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "unsolved-at-point",
-   "severity": "warning",
-   "message": "{decision}{label}: it is drawn at the point of its main object and has no position of its own (12.1)",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "unsolved-no-numbers",
-   "severity": "warning",
-   "message": "{decision}{label}: it has no name, and a file of 0.2 cannot refer to it; the draft 0.3 refers to it by its number (5.9)",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "unsolved-no-rewrite",
-   "severity": "warning",
-   "message": "the route of {wire}: a file of 0.2 cannot rewrite a wire; the draft 0.3 writes its route with WIRE given the wire (13.1)",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "unsolved-wire-through-centre",
-   "severity": "warning",
-   "message": "{decision}{label}: a point of it is the centre of a set, which this writer does not write (6.5)",
-   "sections": []
-  },
-  {
    "number": "RNL2104",
    "name": "standard-package-not-used",
    "severity": "hint",
@@ -5269,6 +5135,79 @@
   {
    "number": "RNL8111",
    "name": "solve-preview-notice",
+   "last": "0.5.7"
+  },
+  {
+   "number": "RNL3011",
+   "name": "keyword-group-not-a-set",
+   "last": "0.5.7"
+  },
+  {
+   "number": "RNL2308",
+   "name": "package-language-mismatch",
+   "last": "0.5.7"
+  },
+  {
+   "number": "RNL2300",
+   "name": "use-aliases-alias-is-added-word",
+   "last": "0.5.7"
+  },
+  {
+   "number": "RNL4000",
+   "name": "symbol-model-card-missing",
+   "last": "0.5.7"
+  },
+  {
+   "number": "RNL4001",
+   "name": "symbol-no-model",
+   "last": "0.5.7"
+  },
+  {
+   "number": "RNL3107",
+   "name": "param-hole-is-role",
+   "last": "0.5.7"
+  },
+  {
+   "number": "RNL3204",
+   "name": "ref-hole-coord-not-param",
+   "last": "0.5.7"
+  },
+  {
+   "number": "RNL3412",
+   "name": "define-symbol-cycle",
+   "last": "0.5.7"
+  },
+  {
+   "number": "RNL1138",
+   "name": "syntax-set-not-closed",
+   "last": "0.5.7"
+  },
+  {
+   "name": "param-distance-negative-without-sense",
+   "last": "0.5.7"
+  },
+  {
+   "name": "constraint-dropped",
+   "last": "0.5.7"
+  },
+  {
+   "name": "place-fact-dropped",
+   "last": "0.5.7"
+  },
+  {
+   "name": "unsolved-no-numbers",
+   "last": "0.5.7"
+  },
+  {
+   "name": "unsolved-no-rewrite",
+   "last": "0.5.7"
+  },
+  {
+   "name": "place-position-of-usage-at-point",
+   "last": "0.5.7"
+  },
+  {
+   "name": "place-usage-at-point",
    "last": "0.5.7"
   }
  ]

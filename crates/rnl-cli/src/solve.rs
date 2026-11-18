@@ -4,8 +4,8 @@
 //! The document is read as a solver reads it, `Options::solver()`, without the records with
 //! `type="generated"` (2.8). Each level is solved by `rnl-solver`; its record is written with
 //! `solution::write_record`, the hash `sig2` of its problem and of the solver's canonical options in
-//! the head, finished with `rnl_view::finish_record`, which adds the check of its numbers in a file
-//! of the draft 0.3 (5.9), and put in place of the level's records of the solver with
+//! the head, finished with `rnl_view::finish_record_with_formats`, which adds the check of its
+//! numbers (5.9), and put in place of the level's records of the solver with
 //! `writeback::replace_generated_with_header`, at the end of the level's own text (17). A record of
 //! the solver written for the level with scope= in another file, which a solver does not write
 //! (2.6) but which applies to the level all the same, is removed from that file. Every file written
@@ -13,7 +13,7 @@
 //! record, at the positions the reading gives; but a file read only through library sections,
 //! where what lies outside them is not read (2.2), gets no new header. The header record stays the
 //! first record of its file (2.8): one written after a subcircuit that gets its record moves where
-//! a new header goes, to line 2 (the draft 0.3, 16.3 and 2.2), before any level of its file is
+//! a new header goes, to line 2 (16.3 and 2.2), before any level of its file is
 //! written (`writeback::move_header_for`), so that every record written into the file follows the
 //! carrier it has there, `*` above the `simulator lang=spectre` of a file in `//`, as the next
 //! solve, which finds it there, writes them. A file may hold several levels, and
@@ -27,8 +27,7 @@
 //! `simulator lang=spice` section of a Spectre file, where `//` is no comment, a record is carried
 //! by `*` (2.2).
 //!
-//! The resolution of each level is limited in time by the solver's `time_limit` (the draft 0.3,
-//! 8.5), 5 seconds unless `--solver-options` says otherwise, measured on the wall clock
+//! The resolution of each level is limited in time by the solver's `time_limit` (8.5), 5 seconds unless `--solver-options` says otherwise, measured on the wall clock
 //! ([`WallClock`]): a fact whose check does not finish within it is discarded undecided, and the
 //! report of the level has a warning for it (7.6); a fact whose minimal conflict groups are not
 //! all found within it has those found, and its hint says that the list is not complete.
@@ -37,12 +36,12 @@
 //!
 //! The report of a level gives each fact discarded with every minimal group of facts it conflicts
 //! with, and each statement whose facts are in such a group with the facts discarded because of it
-//! (the draft 0.3, 8.5); the hints of a fact of priority low, and of the statements that only such
+//! (8.5); the hints of a fact of priority low, and of the statements that only such
 //! facts lose, only with `--report` ([`report`]), as 7.6 allows them to be left out. Without it the
 //! solver does not seek the groups of such a fact beyond its first, which can cost far more than
 //! the rest of the resolution (`SolverOptions::hints_for_low`), and a note says so.
 //!
-//! A fact that has no solution on its own contradicts itself and fails (the draft 0.3, 8.5; 7.6):
+//! A fact that has no solution on its own contradicts itself and fails (8.5; 7.6):
 //! the report of its level has an error for it, on a line that begins with `error:`, and the level
 //! is solved and written back without it, as if it were not written ([`errors`]). The runtime fails
 //! those it sees from what is written alone, with an error of the netlist, and leaves them out of
@@ -66,7 +65,7 @@ use std::time::{Duration, Instant};
 use rnl_runtime::diag::{codes, Diag, Loc, Severity};
 use rnl_runtime::host::file_name;
 use rnl_runtime::interp::obj::Priority;
-use rnl_runtime::interp::unit::{keeps_0_4, DEFAULT_VERSION};
+use rnl_runtime::interp::unit::DEFAULT_VERSION;
 use rnl_runtime::problem::{sig2, FactKind, LevelProblem, PointRef, Reference};
 use rnl_runtime::solution::{write_record, Written};
 use rnl_runtime::source::{dirname, normalize, relative_to, Layered, MemoryProvider, Provider};
@@ -91,14 +90,14 @@ pub struct SolveOptions {
     pub dialect: Option<String>,
     /// The formats set for files by path (`rnl_view::BuildOptions::formats`).
     pub formats: BTreeMap<String, String>,
-    /// Use the standard package implicitly at the root (16.3).
+    /// Allow the standard package that `include_std` adds (16.3).
     pub std: bool,
-    /// Add the standard package to a draft main file and persist it when that file is written.
+    /// Add the standard package to the main file and persist it when that file is written (16.3).
     pub include_std: bool,
     /// Only the level with this title: a subcircuit name, or the file name.
     pub level: Option<String>,
     /// The solver's options; their canonical text is the second segment of the hash (17). Its
-    /// time limit is the toolkit's default of 5 seconds unless set otherwise (the draft 0.3, 8.5).
+    /// time limit is the toolkit's default of 5 seconds unless set otherwise (8.5).
     pub solver: SolverOptions,
     /// The whole file's time (`--timeall`): the seconds that the levels of 0.4 of a time limit, or
     /// of none, share, on the clock of the solve. Each has at most what is left of them shared
@@ -221,7 +220,7 @@ pub enum Target {
     InPlace,
 }
 
-/// The clock that the time limit of the resolution is measured on (the draft 0.3, 8.5): the
+/// The clock that the time limit of the resolution is measured on (8.5): the
 /// seconds since it was made, by `std::time::Instant`, which the solver itself does not read.
 #[derive(Clone, Copy, Debug)]
 pub struct WallClock(Instant);
@@ -320,8 +319,7 @@ pub fn solve(file: &Path, files: &dyn Provider, options: &SolveOptions) -> Resul
     solve_with_clock(file, files, options, &WallClock::new())
 }
 
-/// [`solve`], with the time limit of the resolution of each level measured on `clock` (the draft
-/// 0.3, 8.5): the limit of a level runs from the reading when its resolution begins.
+/// [`solve`], with the time limit of the resolution of each level measured on `clock` (8.5): the limit of a level runs from the reading when its resolution begins.
 pub fn solve_with_clock(
     file: &Path,
     files: &dyn Provider,
@@ -451,12 +449,8 @@ struct Total<'a> {
 
 impl Total<'_> {
     /// The limit of the level `p` solved with `solver`, its own settings applied, when it shares
-    /// the time: a level of 0.4 of a time limit, as seconds, or of none, as infinite. A level
-    /// before 0.4 does not read the limits of 0.4.
+    /// the time: a level of a time limit, as seconds, or of none, as infinite.
     fn own(&self, solver: &SolverOptions, p: &LevelProblem) -> Option<f64> {
-        if p.version != "0.4" {
-            return None;
-        }
         match rnl_solver::run_limit(&solver.for_problem(p).0, self.clock) {
             RunLimit::Time(seconds) => Some(seconds),
             RunLimit::Unlimited => Some(f64::INFINITY),
@@ -520,7 +514,7 @@ impl Reserve {
         clock: &dyn Clock,
         reading: f64,
     ) -> Result<Option<Reserve>, String> {
-        if p.version != "0.4" || !clock.advances() {
+        if !clock.advances() {
             return Ok(None);
         }
         let own = solver.for_problem(p).0;
@@ -653,7 +647,7 @@ fn pass(
         first = read(&memory)?;
     }
     // a header that the record of a level would come before moves before any level of its file is
-    // written (2.8; the draft 0.3, 16.3 and 2.2), so that every record written into the file
+    // written (2.8; 16.3 and 2.2), so that every record written into the file
     // follows the carrier it has where it goes, as the next solve, which finds it there, writes them
     let mut moved: Vec<String> = Vec::new();
     for (level, title) in &targets {
@@ -774,7 +768,7 @@ fn pass(
         // the record the dots were placed in, finished with the check of its numbers as their last
         // trial read it: written as it is, not finished again
         let mut numbered: Option<(String, String)> = None;
-        if p.version == "0.4" && !written.junctions.is_empty() {
+        if !written.junctions.is_empty() {
             watch(Mark::Stage("junctions"));
             if !report_available {
                 return Err(format!("junction placement unresolved in {title}: backend omitted retained-fact report"));
@@ -857,36 +851,30 @@ fn pass(
             let both = Layered { layers: vec![&memory, &files] };
             let record = if let Some((_, finished)) = numbered.filter(|(record, _)| *record == written.record) {
                 finished
-            } else if p.version == "0.4" {
-                rnl_view::finish_record_with_formats(&r.doc, &both, &options.formats, &runtime, p, &written.record)
             } else {
-                rnl_view::finish_record(&r.doc, &both, &runtime, p, &written.record)
+                rnl_view::finish_record_with_formats(&r.doc, &both, &options.formats, &runtime, p, &written.record)
             };
             let text = text_of(&r, &both, &host.file, &path)?;
             let mut texts = Vec::new();
             let mut refuse = |code, message: String| {
-                if keeps_0_4(&p.version) {
-                    // The host already reports a missing selected section. Keep that one cause.
-                    if code == codes::WRITEBACK_SECTION_NOT_FOUND
-                        && r.diagnostics().iter().any(|d| {
-                            d.code == codes::HOST_SECTION_NOT_FOUND
-                                && d.loc.as_ref().is_some_and(|loc| loc.file == host.file)
-                        })
-                    {
-                        return;
-                    }
-                    write_errors.push(Diag {
-                        severity: Severity::Error,
-                        code,
-                        message,
-                        loc: Some(Loc::line(&host.file, host.line)),
-                        cause: None,
-                        origin: String::new(),
-                        in_package: String::new(),
-                    });
-                } else {
-                    written.notes.push(message);
+                // The host already reports a missing selected section. Keep that one cause.
+                if code == codes::WRITEBACK_SECTION_NOT_FOUND
+                    && r.diagnostics().iter().any(|d| {
+                        d.code == codes::HOST_SECTION_NOT_FOUND
+                            && d.loc.as_ref().is_some_and(|loc| loc.file == host.file)
+                    })
+                {
+                    return;
                 }
+                write_errors.push(Diag {
+                    severity: Severity::Error,
+                    code,
+                    message,
+                    loc: Some(Loc::line(&host.file, host.line)),
+                    cause: None,
+                    origin: String::new(),
+                    in_package: String::new(),
+                });
             };
             match record_line(&r.doc, p.level, &text) {
                 // a level whose own text lies in a region written to be encrypted has no place for a
@@ -1253,7 +1241,7 @@ pub(crate) fn fact_what(p: &LevelProblem, k: usize) -> String {
     format!("[{k}] {named}")
 }
 
-/// A statement as the hints of 8.5 name it (the draft 0.3, 8.5; 7.6): where it is written, such
+/// A statement as the hints of 8.5 name it (8.5; 7.6): where it is written, such
 /// as `T4-miller-conflicts.sp:37`; for one in the body of a definition, the usage written in the
 /// level that it was expanded from, the first of its chain, where it is written, with how the
 /// level writes its roles, a role that cannot be referred to left out, and the line of the
@@ -1298,7 +1286,7 @@ fn ranks(ks: &[usize], last: &str) -> String {
     }
 }
 
-/// What the hint of a fact discarded says of it (the draft 0.3, 8.5): every minimal group of facts
+/// What the hint of a fact discarded says of it (8.5): every minimal group of facts
 /// kept before it that it conflicts with, such as `it conflicts with [3]; or with [0] and [4]`,
 /// and that the list is not complete when the time limit cut it.
 pub(crate) fn conflicts(d: &Discarded) -> String {
@@ -1315,7 +1303,7 @@ pub(crate) fn conflicts(d: &Discarded) -> String {
 }
 
 /// How many errors the solver reported over the levels of a run: the facts that contradict
-/// themselves and fail (the draft 0.3, 8.5; 7.6). `rnl solve` exits with 1 when there is one, or
+/// themselves and fail (8.5; 7.6). `rnl solve` exits with 1 when there is one, or
 /// an error of the netlist ([`SolveRun::errors`]).
 pub fn errors(run: &SolveRun) -> usize {
     run.levels
@@ -1356,7 +1344,7 @@ pub fn not_solved(n: &NotSolved) -> String {
 
 /// What the command prints of one level: its title, with how many facts are kept, discarded and,
 /// when there are any, failed; the facts kept and discarded, every fact with `all`, a fact that
-/// fails among them, otherwise the discarded ones, each with its hint (the draft 0.3, 8.5): every
+/// fails among them, otherwise the discarded ones, each with its hint (8.5): every
 /// minimal group of facts it conflicts with, and whether the list is complete; the hints by
 /// statement, each statement whose facts took part in discarding with the facts discarded because
 /// of it; the hints of a fact of priority low, and of the statements that only such facts lose,
@@ -1384,8 +1372,7 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
     if let Some(canonical) = &r.canonical_options {
         out.push(format!("  replay options: {canonical}"));
     }
-    // Discarding a fact of priority low is expected, and its hints may be left out (the draft 0.3,
-    // 8.5; 7.6): they are printed with `all` alone, the hint of the fact and those of the
+    // Discarding a fact of priority low is expected, and its hints may be left out (8.5; 7.6): they are printed with `all` alone, the hint of the fact and those of the
     // statements that only such facts lose, when the solver sought them.
     let hinted = |f: usize| (all && level.hints_for_low) || p.facts.get(f).is_none_or(|f| f.priority != Priority::Low);
     // a fact discarded and its hint: every minimal group of facts kept before it that it conflicts
@@ -1437,7 +1424,7 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
             out.extend(lines.into_iter().map(|l| format!("    {l}")));
         }
     };
-    // the hints by statement (the draft 0.3, 8.5): each statement whose facts are in a group, with
+    // the hints by statement (8.5): each statement whose facts are in a group, with
     // the facts discarded because of it
     let mut statements = Vec::new();
     for (s, hint) in &r.statements {

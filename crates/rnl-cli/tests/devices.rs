@@ -174,8 +174,6 @@ fn a_transistor_whose_model_card_is_not_found_has_the_default_block_symbol() {
             "R1=$RESISTOR".to_string()
         ]
     );
-    // no instance is left undrawn
-    assert!(level.undrawn.is_empty(), "{:?}", level.undrawn.iter().map(|u| &u.id).collect::<Vec<_>>());
     let m2 = level.objects.iter().find(|o| o.id == "#M2").unwrap();
     assert_eq!(m2.pins.iter().map(|p| p.terminals.join(",")).collect::<Vec<_>>(), ["#M2:1", "#M2:2", "#M2:3", "#M2:4"]);
 }
@@ -186,8 +184,6 @@ fn a_transistor_without_a_card_is_drawn_with_the_symbol_the_file_gives_it() {
     let r = read_as("/w/t.sp", net);
     assert_eq!(symbol(&r, "M1"), "$PMOS_4TERM");
     assert_eq!(symbol(&r, "M2"), "%\"(default block symbol)\"");
-    let level = r.model.levels.iter().find(|l| l.title == "t.sp").unwrap();
-    assert!(level.undrawn.is_empty());
 }
 
 #[test]

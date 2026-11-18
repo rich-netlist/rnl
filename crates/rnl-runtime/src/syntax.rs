@@ -602,7 +602,13 @@ impl Parser {
                     self.i += 1;
                     return Ok(SetExpr { id, members, start, end: self.i });
                 }
-                None => return self.err(codes::SYNTAX_SET_NOT_CLOSED, "the set is not closed (missing `}`)"),
+                // the scan of the records closes every set of a record it takes (2.4)
+                None => {
+                    return self.err(
+                        codes::RECORD_CUT_OFF,
+                        "incomplete record: cut off by a blank line, a host statement or the end of the file (2.4)",
+                    )
+                }
                 // a member stopped on something unexpected: recover
                 Some(_) => self.i += 1,
             }
@@ -1991,63 +1997,10 @@ fn reference_token(t: &[char], i: usize, end: usize) -> (usize, String) {
     (j, s)
 }
 
-/// Every reference in a member, its segments and nested sets, except inside definition bodies.
-pub fn walk_refs<'a>(m: &'a Member, out: &mut Vec<RefOrHole<'a>>) {
-    for seg in &m.segments {
-        for a in &seg.args {
-            walk_obj(&a.obj, out);
-        }
-        if let Some(p) = seg.call.as_ref().and_then(|c| c.params.as_ref()) {
-            for v in &p.positional {
-                walk_val(v, out);
-            }
-            for n in &p.named {
-                walk_val(&n.value, out);
-            }
-        }
-    }
-}
-
+/// A reference or a hole written in a definition body (9.4).
 pub enum RefOrHole<'a> {
     Ref(&'a Ref),
     Hole(&'a str),
-}
-
-fn walk_obj<'a>(o: &'a ObjExpr, out: &mut Vec<RefOrHole<'a>>) {
-    match o {
-        ObjExpr::Ref(r) => out.push(RefOrHole::Ref(r)),
-        ObjExpr::Point(p) => {
-            for c in [&p.x, &p.y] {
-                if let Coord::Hole(n) = c {
-                    out.push(RefOrHole::Hole(n));
-                }
-            }
-        }
-        ObjExpr::Set(s) => {
-            for m in &s.members {
-                let defines = m.segments.iter().any(|sg| {
-                    sg.call
-                        .as_ref()
-                        .is_some_and(|c| matches!(c.kw.as_str(), "DEFINE-SYMBOL" | "DEFINE" | "DEFINE-STYLE"))
-                });
-                if !defines {
-                    walk_refs(m, out);
-                }
-            }
-        }
-    }
-}
-
-fn walk_val<'a>(v: &'a Value, out: &mut Vec<RefOrHole<'a>>) {
-    match v {
-        Value::Hole(n) => out.push(RefOrHole::Hole(n)),
-        Value::Arr(items) => {
-            for x in items {
-                walk_val(x, out);
-            }
-        }
-        _ => {}
-    }
 }
 
 #[cfg(test)]

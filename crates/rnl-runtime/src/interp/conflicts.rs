@@ -1,9 +1,9 @@
-//! The hints of a conflict of geometric facts in a level of the draft 0.3 (its 8.5). A fact
+//! The hints of a conflict of geometric facts in a level (8.5). A fact
 //! discarded in a conflict gives a hint that names every set of facts taken in that has no
 //! solution together with it and from which no fact can be left out, each fact by the statement
 //! that wrote it (7.6); each statement whose facts are in such a set gets a hint that names the
 //! facts discarded because of it. They are given once the geometry of the level is resolved
-//! (`phases.rs`), when the facts kept are known. A level of 0.2 gives the hints it always gave.
+//! (`phases.rs`), when the facts kept are known.
 
 use std::rc::Rc;
 
@@ -19,8 +19,8 @@ use super::Interp;
 const MOST_FACTS: usize = 16;
 const MOST_CHECKS: usize = 4096;
 
-/// The conflicts found while the geometry of a level of the draft 0.3 is resolved, whose hints
-/// name every set of facts taken in that a discarded fact conflicts with (its 8.5): they are given
+/// The conflicts found while the geometry of a level is resolved, whose hints
+/// name every set of facts taken in that a discarded fact conflicts with (8.5): they are given
 /// once the level's geometry is resolved, when the facts kept are known (`report_discards`).
 #[derive(Default)]
 pub(crate) struct Conflicts {
@@ -34,8 +34,7 @@ pub(crate) struct Conflicts {
     constraints: Vec<(SceneId, ObjId, Vec<Vec<Fact>>, bool)>,
 }
 
-/// The hints that tell each statement which facts were discarded because of it (8.5, in the draft
-/// 0.3), by the place of the statement and the origin it is shown with (7.6): each discarded fact
+/// The hints that tell each statement which facts were discarded because of it (8.5), by the place of the statement and the origin it is shown with (7.6): each discarded fact
 /// named once, in the order named.
 #[derive(Default)]
 struct Notes {
@@ -83,15 +82,9 @@ impl Interp<'_> {
     pub(super) fn note_coordinate_conflict(&mut self, s: SceneId, f: Fact, sets: Vec<Vec<Fact>>, complete: bool) {
         self.conflicts.coordinates.push((s, f, sets, complete));
     }
-    /// Does the level of scene `s` follow the draft 0.3? Then the hint of a fact discarded in a
-    /// conflict names every set of facts taken in that it conflicts with, and the statements in
-    /// these sets are told; a level of 0.2 gives the hints it always gave.
-    pub(super) fn conflicts_0_3(&self, s: SceneId) -> bool {
-        self.follows_0_3(self.level_unit[self.scenes[s].level])
-    }
 
-    /// A fact lost in a conflict as the coordinates and orientations of a level of the draft 0.3
-    /// are picked (`drop_fact`): its object and axis are weighed again once the pick is done.
+    /// A fact lost in a conflict as the coordinates and orientations of a level
+    /// are picked: its object and axis are weighed again once the pick is done.
     pub(super) fn note_conflict(&mut self, s: SceneId, f: &Fact) {
         let key = match f.data {
             FactData::Coord(axis, _) => (s, f.target, axis),
@@ -102,7 +95,7 @@ impl Interp<'_> {
         }
     }
 
-    /// A constraint of a level of the draft 0.3 discarded against fixed coordinates or
+    /// A constraint discarded against fixed coordinates or
     /// orientations (`check_constraints`), with the sets of facts it conflicts with.
     pub(super) fn note_discarded(
         &mut self,
@@ -146,7 +139,7 @@ impl Interp<'_> {
         }
     }
 
-    /// The hints of the facts discarded in a level of the draft 0.3, once its geometry is resolved
+    /// The hints of the facts discarded in a level, once its geometry is resolved
     /// (8.5). The toolkit does not solve. Of the facts of one object on one axis, or of its
     /// orientation, it keeps the one first in the order of 8.5, and takes in with it those that do
     /// not contradict it; each of the others is discarded, and the sets of facts taken in that have
@@ -156,9 +149,6 @@ impl Interp<'_> {
     /// weighed. Then each statement whose facts are in these sets is told which facts were
     /// discarded because of it. Discarding a `"low"` fact is expected and gives no hint (7.6).
     pub(super) fn report_discards(&mut self, s: SceneId) {
-        if !self.conflicts_0_3(s) {
-            return;
-        }
         let mut notes = Notes::default();
         let (coordinates, rest): (Vec<_>, Vec<_>) =
             std::mem::take(&mut self.conflicts.coordinates).into_iter().partition(|c| c.0 == s);
@@ -318,7 +308,7 @@ impl Interp<'_> {
         }
     }
 
-    /// The hint of a fact discarded in a level of the draft 0.3 (8.5), at the statement that wrote
+    /// The hint of a fact discarded in a level (8.5), at the statement that wrote
     /// it: every set of facts taken in that has no solution together with it, each fact by the
     /// statement that wrote it. Each statement in these sets is noted in `notes`.
     fn discard_hint(
@@ -441,8 +431,8 @@ impl Interp<'_> {
         }
     }
 
-    /// The sets of facts taken in that a constraint conflicts with, for its hint in a level of the
-    /// draft 0.3 (8.5), when fixed coordinates violate it (fixed orientations, for
+    /// The sets of facts taken in that a constraint conflicts with, for its hint in a level (8.5),
+    /// when fixed coordinates violate it (fixed orientations, for
     /// ORIENT-RELATION) that all come before it in the order of 8.5. Of the kept facts that place
     /// its members on its axis, or orient them, a set is named when the constraint has no solution
     /// while the facts of the set keep their values and the members they do not fix are free, and
@@ -566,7 +556,7 @@ impl Interp<'_> {
                         // one step between neighbours (14.4): the mean steps between the members
                         // fixed are the same
                         let mut steps = at.windows(2).map(|w| (w[1].1 - w[0].1) / (w[1].0 - w[0].0));
-                        // with a sense, which a file of 0.4 writes, the members follow one
+                        // with a sense, the members follow one
                         // another in it as for ORDER (14.4)
                         let ordered = match cd.params.sense {
                             Some("increasing") => {

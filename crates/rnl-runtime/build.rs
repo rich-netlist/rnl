@@ -20,19 +20,10 @@ fn main() {
             kind["sections"].as_array().map_or(Vec::new(), |s| s.iter().filter_map(|v| v.as_str()).collect());
         let constant = name.to_uppercase().replace('-', "_");
         let about = if sections.is_empty() { String::new() } else { format!(" ({})", sections.join(", ")) };
-        match kind["number"].as_str() {
-            Some(number) => {
-                let n: u16 =
-                    number.strip_prefix("RNL").and_then(|n| n.parse().ok()).expect("a number is RNL and four digits");
-                writeln!(out, "/// {number}, {severity}{about}.").unwrap();
-                writeln!(out, "pub const {constant}: Code = Code::new({n}, {name:?});").unwrap();
-            }
-            None => {
-                writeln!(out, "/// Without a number: a kind of the versions 0.2 and 0.3 alone; {severity}{about}.")
-                    .unwrap();
-                writeln!(out, "pub const {constant}: Code = Code::unnumbered({name:?});").unwrap();
-            }
-        }
+        let number = kind["number"].as_str().unwrap_or_else(|| panic!("the kind {name} has a number"));
+        let n: u16 = number.strip_prefix("RNL").and_then(|n| n.parse().ok()).expect("a number is RNL and four digits");
+        writeln!(out, "/// {number}, {severity}{about}.").unwrap();
+        writeln!(out, "pub const {constant}: Code = Code::new({n}, {name:?});").unwrap();
         all.push(constant);
     }
     // a retired kind keeps its number and its name: no kind of the list takes either

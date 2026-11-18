@@ -32,9 +32,6 @@ impl Interp<'_> {
         off: usize,
     ) -> R<()> {
         let unit = self.source_unit(ctx);
-        if !self.follows_0_4(unit) {
-            return Ok(());
-        }
         let names: Vec<String> = self.symbol(symbol).pins.iter().flat_map(|p| p.names.clone()).collect();
         let (own, aliases) = match owner {
             Some(o) if matches!(self.o(o), ObjData::Usage(_)) => self.usage_subnames(o, unit),
@@ -76,8 +73,8 @@ impl Interp<'_> {
         let mut rejected: HashMap<ObjId, Vec<Pos>> = HashMap::new();
         for source in &sources {
             let ObjData::KeyText { attach, key, .. } = self.o(source.text) else { continue };
-            let collision = self.follows_0_4(self.source_unit(&source.ctx))
-                && self.scenes[s].symbol.get(attach).is_some_and(|symbol| self.symbol_has_pin_name(*symbol, key));
+            let collision =
+                self.scenes[s].symbol.get(attach).is_some_and(|symbol| self.symbol_has_pin_name(*symbol, key));
             if !collision {
                 kept.insert(source.text, source);
                 if !source.generated {

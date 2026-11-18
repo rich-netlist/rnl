@@ -117,8 +117,7 @@ groups options:
   is written. A group a definition's body makes is named by the usage and the definition,
   %amp1 · $TRANSCONDUCTOR_Z_AMPLIFIER, and where the file applies it. The groups outside the tree follow: one with the members of
   another, one that CROSSES another (they share members and neither holds the other), one with no
-  member with a place of its own, one turned off. A level before 0.4 has no tree; its groups are
-  listed each with all its members. rnl check hints at a node of more than 20 devices
+  member with a place of its own, one turned off. rnl check hints at a node of more than 20 devices
 snapshot options:
   --parts LIST        the parts to give, of drawing, host and model; host,model by default
 catalog options (the packages are those of --package-dir and the bundled ones, each read as rnl
@@ -669,17 +668,20 @@ fn diagnostic_summary(
     warnings: usize,
     hints: usize,
 ) -> String {
-    let modern =
-        r.problems.iter().find(|problem| problem.level == 0).map(|problem| problem.version == "0.4").unwrap_or_else(
-            || {
-                r.sources
-                    .iter()
-                    .find(|(file, _)| file == &r.doc.main().file)
-                    .and_then(|(_, text)| rnl_runtime::interp::unit::scan_language_decl(text))
-                    .as_deref()
-                    == Some("0.4")
-            },
-        );
+    use rnl_runtime::interp::unit::{is_read_version, scan_language_decl};
+    // the counts in words of their number for a main file that declares a version this
+    // implementation reads, or none, as it is then read in the default version (16.1); a main
+    // file that declares another version keeps the plain plurals
+    let modern = r.problems.iter().find(|problem| problem.level == 0).map_or_else(
+        || {
+            r.sources
+                .iter()
+                .find(|(file, _)| file == &r.doc.main().file)
+                .and_then(|(_, text)| scan_language_decl(text))
+                .is_none_or(|version| is_read_version(&version))
+        },
+        |problem| is_read_version(&problem.version),
+    );
     if modern {
         let count = |n, noun| if n == 1 { format!("1 {noun}") } else { format!("{n} {noun}s") };
         format!(
@@ -1070,7 +1072,7 @@ mod count_tests {
 
     #[test]
     fn check_summary_counts_follow_the_main_language_version() {
-        for version in ["0.2", "0.3", "0.4"] {
+        for version in ["0.3", "0.4"] {
             for problems in [false, true] {
                 let source = format!("* counts\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\nR1 a b 1k\n");
                 let provider = rnl_runtime::source::MemoryProvider::new().with("counts.sp", &source);

@@ -15,10 +15,7 @@ fn read(body: &str) -> Interpretation {
     .unwrap()
 }
 fn geometry_errors(r: &Interpretation) -> usize {
-    r.diagnostics()
-        .iter()
-        .filter(|d| d.severity == Severity::Error && d.code.number().as_deref() == Some("RNL9405"))
-        .count()
+    r.diagnostics().iter().filter(|d| d.severity == Severity::Error && d.code.number() == "RNL9405").count()
 }
 /// A pin at the largest coordinate that faces up: a wire to a point below it cannot leave it
 /// upward and come back past it, nor at a right angle, as no finite coordinate lies beside it.
