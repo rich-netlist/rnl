@@ -222,49 +222,81 @@ impl<'a> NetsOf<'a> {
     }
 }
 
+/// A point at which the wires that pass it are joined, by the identity it keeps however a wire
+/// refers to it: a pin, an object by its origin (a named point, 13.1), a branch point of the
+/// result. The coordinate point of a pin and the centre of a set join nothing.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Joint {
+    Pin(usize, usize),
+    Origin(usize),
+    Branch(usize),
+}
+
+impl Joint {
+    fn of(point: &WirePoint) -> Option<Joint> {
+        match point {
+            WirePoint::Anchor(PointRef::Origin(k)) => Some(Joint::Origin(*k)),
+            WirePoint::Anchor(r) => r.pin_key().map(|(object, pin)| Joint::Pin(object, pin)),
+            WirePoint::Branch(b) => Some(Joint::Branch(*b)),
+            WirePoint::Bend(_) => None,
+        }
+    }
+}
+
 /// Each wire stays on its net: a wire routed for a ROUTE, on the ROUTE's net; a wire written in
 /// RNL that the result routes, on its own nets. Every pin or point a wire passes that the problem
 /// ties to nets is on one of them, but for a point that a wire written of the ROUTE's tree, or the
 /// wire written itself, passes as its author wrote it (a wire written may pass a pin of another
-/// net, which the reading warns of); and the wires that meet at one branch point share a net. A
-/// result that joined two nets would be written as one, under the name of one of them. A wire may
-/// pass pins of another tree of its own net: the solver joins the trees of a net
-/// (`join_trees`), and gives their wires the first tree's ROUTE.
+/// net, which the reading warns of). A point the problem ties to several nets, such as the pin of a
+/// bundle's bus, which is on each net of its members, takes a wire of any of them. The wires of
+/// the whole result that pass one point the problem ties to no net, or one branch point
+/// ([`Joint`]), share a net: a point no wire was written through, which two wires of the result
+/// pass, joins them. A result
+/// that joined two nets would be written as one, under the name of one of them. A wire may pass
+/// pins of another tree of its own net: the solver joins the trees of a net (`join_trees`), and
+/// gives their wires the first tree's ROUTE.
 fn validate_nets(s: &Solution, p: &LevelProblem) -> Result<()> {
     let nets_of = NetsOf::new(p);
-    // the nets each branch point can be on, narrowed by each wire that meets there
-    let mut branches: BTreeMap<usize, BTreeSet<String>> = BTreeMap::new();
+    // the nets each joint the problem ties to no net can be on, narrowed by each wire of the
+    // result that passes it
+    let mut joints: BTreeMap<Joint, BTreeSet<String>> = BTreeMap::new();
     let mut check =
         |points: &[WirePoint], nets: BTreeSet<&str>, written: &[&PointRef], path: &str, what: &str| -> Result<()> {
             for (i, point) in points.iter().enumerate() {
-                match point {
-                    WirePoint::Anchor(r) => {
-                        if let Some(on) = nets_of.of(r).filter(|_| !written.contains(&r)) {
-                            if on.is_disjoint(&nets) {
-                                return Err(Error {
-                                    path: format!("{path}[{i}].point"),
-                                    message: format!(
-                                        "this point is on {}, not on {what}",
-                                        on.iter().map(|n| format!("&{n}")).collect::<Vec<_>>().join(", ")
-                                    ),
-                                });
-                            }
-                        }
-                    }
-                    WirePoint::Branch(b) => {
-                        let shared: BTreeSet<String> = match branches.get(b) {
-                            Some(before) => before.iter().filter(|n| nets.contains(n.as_str())).cloned().collect(),
-                            None => nets.iter().map(|n| n.to_string()).collect(),
-                        };
-                        if shared.is_empty() {
-                            return Err(Error {
-                                path: format!("{path}[{i}].branch"),
-                                message: format!("branch {b} joins {what} to a wire of another net"),
-                            });
-                        }
-                        branches.insert(*b, shared);
-                    }
-                    WirePoint::Bend(_) => {}
+                let Some(joint) = Joint::of(point) else { continue };
+                let anchor = match point {
+                    WirePoint::Anchor(r) => Some(r),
+                    _ => None,
+                };
+                if anchor.is_some_and(|r| written.contains(&r)) {
+                    // as its author wrote it: neither checked nor narrowed
+                    continue;
+                }
+                // a point the problem ties to nets: on one of them, whatever other wires pass it
+                let tied = anchor.and_then(|r| nets_of.of(r));
+                let before: Option<BTreeSet<String>> = match tied {
+                    Some(on) => Some(on.iter().map(|n| n.to_string()).collect()),
+                    None => joints.get(&joint).cloned(),
+                };
+                let shared: BTreeSet<String> = match &before {
+                    Some(before) => before.iter().filter(|n| nets.contains(n.as_str())).cloned().collect(),
+                    None => nets.iter().map(|n| n.to_string()).collect(),
+                };
+                if shared.is_empty() {
+                    let on = before.unwrap_or_default().iter().map(|n| format!("&{n}")).collect::<Vec<_>>().join(", ");
+                    return Err(match point {
+                        WirePoint::Branch(b) => Error {
+                            path: format!("{path}[{i}].branch"),
+                            message: format!("branch {b} joins {what} to a wire of another net, on {on}"),
+                        },
+                        _ => Error {
+                            path: format!("{path}[{i}].point"),
+                            message: format!("this point is on {on}, not on {what}"),
+                        },
+                    });
+                }
+                if tied.is_none() {
+                    joints.insert(joint, shared);
                 }
             }
             Ok(())
