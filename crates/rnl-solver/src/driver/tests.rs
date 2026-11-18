@@ -1474,6 +1474,27 @@ fn only_groups_pairs_and_elements_of_one_role_are_spaced_evenly() {
         v.sort();
         v
     };
+    let names = |prefix: &str, bits: std::ops::Range<usize>| -> Vec<String> {
+        let mut v: Vec<String> = bits.map(|i| format!("#{prefix}{i}")).collect();
+        v.sort();
+        v
+    };
+    // the R-2R ladder, in no group: the legs of 2R, the bit sources and the series arm with the
+    // termination RT, each a set of its own; not a row, nor a leg with its source, as the
+    // branches of the file put them
+    let p = problems(&repo().join("tests/integration/solver-0.4/r2r-dac4.sp")).remove(0);
+    let options = SolverOptions::without_time_limit();
+    let resolved = crate::resolve(&p, &options);
+    let s = crate::structure::analyse(&p, &resolved, &options, CAPS, &mut crate::Work::default());
+    let sets: Vec<Vec<String>> = s.even_sets.iter().map(|set| labels(&p, set)).collect();
+    assert_eq!(sets.len(), 3, "{sets:?}");
+    let (legs, sources) = (names("R2B", 0..4), names("VB", 0..4));
+    assert!(sets.contains(&legs), "{legs:?} in {sets:?}");
+    assert!(sets.contains(&sources), "{sources:?} in {sets:?}");
+    let series = sets.iter().find(|set| **set != legs && **set != sources).unwrap();
+    assert!(names("RS", 1..4).iter().all(|r| series.contains(r)), "{series:?}");
+    assert!(!series.iter().any(|k| legs.contains(k) || sources.contains(k)), "{series:?}");
+    assert!(s.scopes.is_empty());
     // T4: the two stages, and no set of the two halves of a mirror pair alone; the sources, a group
     // of two, are a scope but no set
     let (p, s) = case_structure("T4-miller-conflicts.sp", "T4-miller-conflicts.sp");
