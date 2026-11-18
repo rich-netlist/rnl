@@ -52,6 +52,44 @@ fn run(body: &str) -> Result<String, String> {
 }
 
 #[test]
+fn two_old_records_each_with_tokens_after_it_keep_the_dot() {
+    // each old generated record is followed on its last line by a comment; each comment stays
+    // behind an empty record where its record was, and the lines between them map as before
+    let text = "* junction\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @SOLVER-CONFIG(junction=\"$DOT\") }\nR1 a 0 1k\n\
+                * @RNL(type=\"generated\") {} /* first note */\nR2 a b 1k\n\
+                * @RNL(type=\"generated\") {} /* second note */\nR3 a c 1k\n\
+                * @RNL { $DOT = @DEFINE(roles=[[\"p\",\"point\"]]) { {? ?p} @ALIGN(\"x\"); {? ?p} @ALIGN(\"y\") }; %p=(3,4) }\n.end\n";
+    let files = MemoryProvider::new().with("main.sp", text);
+    let opts = Options { std: false, problems: true, generated: false, ..Default::default() };
+    let interpreted = interpret_file(Path::new("main.sp"), None, &files, &opts).unwrap();
+    let p = &interpreted.problems[0];
+    let written = write_record(
+        p,
+        &Solution { branches: vec![Branch { at: (0., 0.), junction: true }], ..Default::default() },
+        "test",
+        "test",
+    );
+    let formats = BTreeMap::new();
+    let ctx = Context {
+        entry: "main.sp",
+        dialect: None,
+        formats: &formats,
+        files: &files,
+        runtime: &opts,
+        original: &interpreted,
+        problem: p,
+        original_text: text,
+        host_path: "main.sp",
+        kept: &[],
+        solution: &Solution::default(),
+        tolerance: opts.tolerance,
+        on_interpret: None,
+    };
+    let result = complete_record(&ctx, &written).unwrap().record;
+    assert!(result.contains("$DOT @ATTACH %rt1 => @PLACE(0, 0)"), "{result}");
+}
+
+#[test]
 fn a_statement_written_wrong_and_tokens_after_the_old_record_keep_the_dot() {
     // the DISTANCE fails as it did before the dot, and `#R1 @PLACE(0, 0)` after the old generated
     // record stays behind an empty record of its own when the record is written anew: the error

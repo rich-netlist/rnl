@@ -139,7 +139,7 @@
   "The five-transistor OTA from the introduction, showing the complete file at Step 2.": "介紹頁中的五電晶體 OTA，此處顯示其在步驟 2 時的完整檔案。",
   "Open in viewer": "在檢視器中開啟",
   "T2 · Definitions": "T2 · 定義",
-  "A definition (@DEFINE) has roles, parameters and a body. Applying it with AS or ATTACH makes a usage: an object that can be named and selected. Differential pairs, mirrored pairs, grounds and port tags all come about this way, and their definitions live in the standard package.": "一般定義（@DEFINE）包含角色、參數與定義本體。使用 AS 或 ATTACH 套用定義時，會產生一個「用例（usage）」物件，可供命名與篩選。差動對、鏡像對、接地與連接埠標籤皆是由此機制產生，而它們的定義皆位於標準套件中。",
+  "A definition (@DEFINE) has roles, parameters and a body. Applying it with AS or ATTACH makes a usage: an object that can be named and selected. Differential pairs, mirrored pairs, grounds and port tags all come about this way, and their definitions live in the standard package.": "一般定義（@DEFINE）包含角色、參數與定義本體。使用 AS 或 ATTACH 套用定義時，會產生一個「用例（usage）」物件，可供命名與篩選。差動對、鏡像對、接地與連接埠標記皆是由此機制產生，而它們的定義皆位於標準套件中。",
   "The objects together form the thing. The definition comes last, and the objects fill its roles: M1 fills in_p, M2 fills in_n.": "前方物件共同構成該結構。定義寫在最後，物件依角色填入：M1 填入 in_p，M2 填入 in_n。",
   "The thing is added onto the objects. The definition comes first: a ground is added on net vss; it exists only for display and makes no connection.": "將前方的定義套用至後方的物件上。定義寫在最前面：為網路 vss 套用一個接地符號；它僅供顯示而存在，不產生電氣連接。",
   "What things are, and how they are drawn": "「是什麼」與「怎麼畫」",

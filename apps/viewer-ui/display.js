@@ -8,7 +8,7 @@ import { append, m, setText, tr } from "./i18n.js";
 // they are now, into a project or a manifest of links when the user asks.
 import { isDark, setBackground } from "./background.js";
 import { load } from "./util.js";
-import { form, modal } from "./dialog.js";
+import { form, inTurn, modal } from "./dialog.js";
 import { fit, notice, showView, viewCentre } from "./drawing.js";
 import { flylinesShown, setFlylines } from "./flylines.js";
 import { gridSettings, setGrid } from "./grid.js";
@@ -112,7 +112,8 @@ export function displayFollows(path) {
  * Offer the display settings `display` of the manifest named `name` (its address, or a file's name),
  * whose files are those `has` says: list them, each with a box ticked, and apply those the user
  * keeps while a file of it is shown (displayFollows). Those of another shape that the manifest had
- * (`ignored`) are told. Asked once per manifest in a page.
+ * (`ignored`) are told. Asked once per manifest in a page, in turn with the other questions of an
+ * opening (dialog.js inTurn), such as whether to solve the netlist opened.
  */
 export async function offerDisplay(display, name, ignored = [], has = () => false) {
   if (ignored.length) notice(m`This viewer leaves out display settings it does not know or cannot read: ${ignored.join(", ")}.`);
@@ -124,7 +125,11 @@ export async function offerDisplay(display, name, ignored = [], has = () => fals
     if (known.keys.size) enter(known, true);
     return;
   }
-  if (modal()) return;
+  return inTurn(() => (modal() ? undefined : chooseDisplay(display, name, list, has)));
+}
+
+/** Ask which of the display settings `list` of the manifest named `name` to apply, and apply them. */
+async function chooseDisplay(display, name, list, has) {
   const boxes = list.map(({ key, label }) => {
     const row = document.createElement("label");
     row.className = "display-setting";

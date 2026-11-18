@@ -386,6 +386,15 @@
    "kind": "rnl"
   },
   {
+   "en": "net label",
+   "term": "网络标签",
+   "avoid": [
+    "网名标签"
+   ],
+   "kind": "rnl",
+   "note": "The aliases of rnl-zh keep their names: $网名标签 is $NET_LABEL."
+  },
+  {
    "en": "netlist",
    "term": "网表",
    "kind": "rnl"
@@ -433,6 +442,15 @@
    "en": "port",
    "term": "端口",
    "kind": "rnl"
+  },
+  {
+   "en": "port tag",
+   "term": "端口标签",
+   "avoid": [
+    "端口标记"
+   ],
+   "kind": "rnl",
+   "note": "Not 端口符号, which is a port symbol: the symbol a port tag is drawn with, $IO_PORT_SYMBOL (alias $端口符号)."
   },
   {
    "en": "power",
