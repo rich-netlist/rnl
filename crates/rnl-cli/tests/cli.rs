@@ -61,6 +61,22 @@ fn usage_errors_exit_with_two() {
         let help = run(&[flag]);
         assert!(help.status.success() && help.stderr.is_empty(), "{flag}");
         assert!(String::from_utf8_lossy(&help.stdout).contains("rnl check"), "{flag}");
+        assert!(!String::from_utf8_lossy(&help.stdout).contains("rnl upgrade"), "{flag}");
+    }
+}
+
+#[test]
+fn upgrade_is_not_a_command_and_says_which_core_has_it() {
+    let run = |args: &[&str]| Command::new(env!("CARGO_BIN_EXE_rnl")).args(args).output().unwrap();
+    for args in [&["upgrade"][..], &["upgrade", "x.sp", "--in-place"][..]] {
+        let out = run(args);
+        let err = String::from_utf8_lossy(&out.stderr);
+        assert_eq!(out.status.code(), Some(2), "{err}");
+        assert_eq!(
+            err.trim(),
+            "error: RNL8032 cli-unknown-command: rnl upgrade is not a command of this core, which reads only the \
+             language 0.4: core 0.5.6, the last core that reads 0.2 and 0.3, has it, and writes a file of 0.2 or 0.3 in 0.4"
+        );
     }
 }
 

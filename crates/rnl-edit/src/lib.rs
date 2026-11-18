@@ -32,7 +32,6 @@ pub use error::{Refusal, Written};
 pub mod form;
 pub mod ops;
 pub mod replace;
-pub mod upgrade;
 
 use std::collections::BTreeMap;
 

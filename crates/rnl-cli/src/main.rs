@@ -13,7 +13,6 @@ use rnl_runtime::{Interpretation, Options};
 use rnl_view::BuildOptions;
 
 mod solver_args;
-mod upgrade_args;
 
 const USAGE: &str = concat!(
     "usage:
@@ -34,8 +33,6 @@ const USAGE: &str = concat!(
                                     first; with --json the table of the solver's settings, objectives
                                     and stages, each with the layouts it applies to; --layout NAME
                                     gives those of one layout, lines, rows or tree
-  rnl upgrade FILE [-o DIR | --in-place] [--report REPORT.json] [--approximate] [--keep-generated]
-                                    preview migration to 0.4, or save it
   rnl preview FILE [options]        print the solve as the desktop viewer previews it, as JSON; writes nothing
   rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
   rnl catalog [options]             print the symbols, definitions and sets of the packages, as JSON
@@ -71,12 +68,6 @@ options:
                       --dialect before them. A file set to rnl is a package that USE-PACKAGE finds
                       by name, before those of --package-dir, whatever its suffix; FILE set to rnl
                       is checked as a package file, an error when its header has no @PACKAGE
-upgrade options:
-  --approximate      opt into documented choices that may change meaning; off by default
-                      report each choice and its risk separately from exact edits
-  --keep-generated   upgrade the records of the solver (type generated) like authored ones, keeping their author
-                      and priority, instead of discarding them; a matching sig2 hash is made current,
-                      and what cannot be rewritten is reported as for authored records
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
@@ -184,9 +175,6 @@ struct Args {
     level: Option<String>,
     /// The options of `problem`, `solve` and `preview`.
     solver: solver_args::SolverArgs,
-    upgrade_report: Option<PathBuf>,
-    upgrade_approximate: bool,
-    upgrade_keep_generated: bool,
     author: Option<String>,
     /// `replace-records`' `--records`: the file of the new records.
     records: Option<PathBuf>,
@@ -258,7 +246,7 @@ fn unknown_encoding(text: String) -> Said {
 }
 
 /// The commands, as `run` takes them.
-const COMMANDS: [&str; 17] = [
+const COMMANDS: [&str; 16] = [
     "solver-defaults",
     "check",
     "dump",
@@ -271,16 +259,23 @@ const COMMANDS: [&str; 17] = [
     "catalog",
     "render",
     "solve",
-    "upgrade",
     "preview",
     "strip-generated",
     "write",
     "replace-records",
 ];
 
+/// What `rnl upgrade` says: the command that wrote a file of 0.2 or 0.3 in 0.4 is a command of the
+/// cores of 0.5.x, the last of which is 0.5.6, and not of this one, which reads only 0.4 (16.1).
+const UPGRADE_GONE: &str = "rnl upgrade is not a command of this core, which reads only the language 0.4: \
+     core 0.5.6, the last core that reads 0.2 and 0.3, has it, and writes a file of 0.2 or 0.3 in 0.4";
+
 fn parse_args() -> Result<Args, Said> {
     let mut it = std::env::args().skip(1);
     let command = it.next().ok_or_else(|| Said::new(codes::CLI_USAGE, USAGE))?;
+    if command == "upgrade" {
+        return Err(Said::new(codes::CLI_UNKNOWN_COMMAND, UPGRADE_GONE));
+    }
     if !COMMANDS.contains(&command.as_str()) && !command.starts_with('-') {
         return Err(Said::new(codes::CLI_UNKNOWN_COMMAND, format!("unknown command {command}\n{USAGE}")));
     }
@@ -307,9 +302,6 @@ fn parse_args() -> Result<Args, Said> {
     let (mut png, mut scale) = (false, None);
     let mut level = None;
     let mut solver = solver_args::SolverArgs::default();
-    let mut upgrade_report = None;
-    let mut upgrade_approximate = false;
-    let mut upgrade_keep_generated = false;
     let mut author = None;
     let mut records = None;
     let mut parts = None;
@@ -431,12 +423,6 @@ fn parse_args() -> Result<Args, Said> {
                 )
             }
             _ if a.starts_with("--encoding=") => encoding = Some(a[11..].parse().map_err(unknown_encoding)?),
-            "--approximate" if command == "upgrade" => upgrade_approximate = true,
-            "--keep-generated" if command == "upgrade" => upgrade_keep_generated = true,
-            "--report" if command == "upgrade" => {
-                upgrade_report =
-                    Some(PathBuf::from(it.next().ok_or_else(|| needs("upgrade --report needs a JSON path"))?));
-            }
             _ if solver.take(&a, &mut it)? => {}
             _ if a.starts_with('-') => {
                 return Err(Said::new(codes::CLI_UNKNOWN_OPTION, format!("unknown option {a}\n{USAGE}")))
@@ -445,16 +431,12 @@ fn parse_args() -> Result<Args, Said> {
         }
     }
     for option in &written_options {
-        // Upgrade owns these existing whole-source validation errors.
-        if command == "upgrade" && matches!(option.as_str(), "--level" | "--solver-options" | "--previous") {
-            continue;
-        }
         let commands: &[&str] = match option.as_str() {
             "--level" => &["problem", "solve", "preview", "explain", "groups", "replace-records"],
             "--parts" => &["snapshot"],
             "--author" => &["write"],
-            "--report" => &["solve", "upgrade"],
-            "--in-place" => &["solve", "upgrade", "replace-records"],
+            "--report" => &["solve"],
+            "--in-place" => &["solve", "replace-records"],
             "--solver-options" | "--solver-config" => &["problem", "solve", "preview"],
             "--progress=json" | "--respace" | "--timeall" => &["solve", "preview"],
             "--confine" => &["preview"],
@@ -467,7 +449,7 @@ fn parse_args() -> Result<Args, Said> {
             "--flylines" => &["view", "snapshot", "render"],
             "--hints" => &["view"],
             "--package" | "--all-versions" => &["catalog"],
-            "-o" | "--out" => &["render", "solve", "upgrade", "strip-generated", "write", "replace-records"],
+            "-o" | "--out" => &["render", "solve", "strip-generated", "write", "replace-records"],
             _ => continue,
         };
         if !commands.contains(&command.as_str()) {
@@ -491,9 +473,6 @@ fn parse_args() -> Result<Args, Said> {
     } else {
         None
     };
-    if command == "upgrade" && positional.len() != 1 {
-        return Err(needs("upgrade takes exactly one input FILE"));
-    }
     let file = positional.pop().map(PathBuf::from);
     if solver.check && out.is_some() {
         let text = "solve --check solves and writes nothing, so it takes no -o";
@@ -543,9 +522,6 @@ fn parse_args() -> Result<Args, Said> {
     };
     let formats = formats.into_iter().map(|(path, name)| (format_path(&path, &file), name)).collect();
     Ok(Args {
-        upgrade_report,
-        upgrade_approximate,
-        upgrade_keep_generated,
         overlays,
         command,
         file,
@@ -930,7 +906,6 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
             Ok(ExitCode::SUCCESS)
         }
         "solve" => solver_args::solve(args, &provider),
-        "upgrade" => upgrade_args::run(args, &provider),
         "preview" => solver_args::preview(args, &provider),
         "replace-records" => replace_records(args, &provider),
         "strip-generated" => {

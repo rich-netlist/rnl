@@ -4077,7 +4077,7 @@
    "number": "RNL8032",
    "name": "cli-unknown-command",
    "severity": "error",
-   "message": "unknown command {command}\n{usage}",
+   "message": "[unknown command {command}\n{usage} | rnl upgrade is not a command of this core, which reads only the language 0.4: core 0.5.6, the last core that reads 0.2 and 0.3, has it, and writes a file of 0.2 or 0.3 in 0.4]",
    "sections": []
   },
   {
