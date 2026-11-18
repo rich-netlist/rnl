@@ -1369,8 +1369,16 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
     if !level.report_available {
         out[0] = format!("level {} ({} in {}): fact report not supplied", p.title, p.kind, file_name(&level.path));
     }
+    // the options the level is signed with replay it, but after a stop by the safety limit, which
+    // the clock made: its work does not replay it ([`rnl_solver::BudgetReport::reproducible`])
     if let Some(canonical) = &r.canonical_options {
-        out.push(format!("  replay options: {canonical}"));
+        if r.budget.is_some_and(|b| !b.reproducible()) {
+            out.push(format!(
+                "  options: {canonical} (not replayed by them: the safety limit stopped the solve by the clock)"
+            ));
+        } else {
+            out.push(format!("  replay options: {canonical}"));
+        }
     }
     // Discarding a fact of priority low is expected, and its hints may be left out (8.5; 7.6): they are printed with `all` alone, the hint of the fact and those of the
     // statements that only such facts lose, when the solver sought them.
