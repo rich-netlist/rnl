@@ -33,6 +33,8 @@ pub(super) struct RoutingRequest {
     pub off: usize,
     /// ROUTE-NET creates a route object; the other keywords pass their input through.
     pub object: Option<ObjId>,
+    /// The statement names its one object itself, not a set or a selection rule's result.
+    pub direct: bool,
 }
 
 /// Pins in one resolved tree are physical pin objects, not terminal or written-name aliases.
@@ -211,6 +213,7 @@ impl Interp<'_> {
         out
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn record_routing(
         &mut self,
         scene: SceneId,
@@ -219,6 +222,7 @@ impl Interp<'_> {
         pos: Pos,
         site: &Ctx,
         off: usize,
+        direct: bool,
     ) -> R<ObjId> {
         if let Some(cause) = self.failed_obj(input) {
             let diagnostic = self.err_cause(
@@ -274,6 +278,7 @@ impl Interp<'_> {
             chain: self.apply_chain(site),
             off,
             object,
+            direct,
         };
         self.scenes[scene].routing_requests.push(request);
         Ok(object.unwrap_or(input))
@@ -612,15 +617,14 @@ impl Interp<'_> {
                 chain: self.apply_chain(site),
                 off: 0,
                 object: Some(route),
+                direct: false,
             });
         }
         sources
     }
 
-    /// Resolve scopes against the current symbols. Collection membership is the captured input;
-    /// conversions may still resolve a pin to its net without revisiting creation.
-    fn routing_covers(&mut self, scene: SceneId, report: bool) -> (Vec<RankedCover>, Vec<RoutingRequest>) {
-        let sources = self.routing_sources(scene);
+    /// The physical pins of each net of the level, as the current symbols give them.
+    fn routing_net_pins(&mut self, scene: SceneId) -> HashMap<ObjId, Vec<ObjId>> {
         let terms = self.route_terms(scene);
         let mut by_net: HashMap<ObjId, Vec<ObjId>> = HashMap::new();
         for &net in &self.scenes[scene].nets.clone() {
@@ -642,6 +646,14 @@ impl Interp<'_> {
             }
             by_net.insert(net, pins);
         }
+        by_net
+    }
+
+    /// Resolve scopes against the current symbols. Collection membership is the captured input;
+    /// conversions may still resolve a pin to its net without revisiting creation.
+    fn routing_covers(&mut self, scene: SceneId, report: bool) -> (Vec<RankedCover>, Vec<RoutingRequest>) {
+        let sources = self.routing_sources(scene);
+        let by_net = self.routing_net_pins(scene);
         let mut covers = Vec::new();
         'request: for (first, source) in sources.iter().enumerate() {
             let priority = self.eff_priority(scene, source.spec.priority, &source.chain, source.object);
@@ -717,6 +729,74 @@ impl Interp<'_> {
         }
         covers.sort_by(|a, b| a.pos.cmp(&b.pos));
         (covers, sources)
+    }
+
+    /// A ROUTE-NET written in a level's own statements whose net has fewer than two pins and no
+    /// written wire in the snapshot that generation reads does nothing (13.7): its tree is fixed
+    /// before generation (8.2), and what generation adds, such as the port tag of the standard fill,
+    /// does not join it. Warned when the statement names the net itself, or when the net is a port
+    /// of the level; a request over a set or made by a rule, such as `# @SELECT-NET => @ROUTE-NET`,
+    /// is not warned of its other nets, which may have one pin each by design. A net whose pins an
+    /// UNROUTE takes out is not this case: RNL9403 tells of that.
+    pub(super) fn note_routes_without_a_tree(&mut self, scene: SceneId) {
+        let level = self.scenes[scene].level;
+        if !self.follows_0_4(self.level_unit[level]) {
+            return;
+        }
+        let requests = self.scenes[scene].routing_requests.clone();
+        let file = self.doc.levels[level].file.clone();
+        let by_net = self.routing_net_pins(scene);
+        let wired: HashSet<ObjId> = self.routing_wire_pieces(scene, true).iter().map(|piece| piece.net).collect();
+        for request in &requests {
+            if !request.spec.net || !request.spec.join || !request.chain.is_empty() {
+                continue;
+            }
+            let authored = request
+                .site
+                .rec
+                .is_some_and(|rec| self.units[self.rec_unit[rec]].kind != super::unit::UnitKind::Package)
+                && request.site.header.type_ != "generated";
+            if !authored
+                || self.eff_priority(scene, request.spec.priority, &request.chain, request.object) == Priority::Disabled
+                || self.failed_body(&request.site)
+                || self.is_failed(request.input)
+            {
+                continue;
+            }
+            let Some(Some(net)) = self.routing_net_value(scene, request.input, &request.frozen_sets) else {
+                continue;
+            };
+            if by_net.get(&net).map_or(0, Vec::len) >= 2
+                || wired.contains(&net)
+                || self.scenes[scene].condition_trees.iter().any(|tree| tree.net == net)
+            {
+                continue;
+            }
+            let ObjData::Net { key, .. } = self.o(net) else { continue };
+            let key = key.clone();
+            let port = self.doc.levels[level].ports.iter().any(|p| self.doc.net_key_in(level, p, &file) == key);
+            if !request.direct && !port {
+                continue;
+            }
+            let shown = self.net_display(net);
+            let advice = if port {
+                format!(
+                    "; a port tag that generation adds, as the standard fill does, does not join it: write the port in the file, such as `$IO_PORT @ATTACH &{}`",
+                    shown.trim_start_matches('&')
+                )
+            } else {
+                String::new()
+            };
+            self.diag_site(
+                crate::diag::Severity::Warning,
+                codes::ROUTE_NET_SINGLE_POINT,
+                &Some(request.site.clone()),
+                request.off,
+                format!(
+                    "ROUTE-NET on {shown} does nothing: before generation the net has fewer than two points to join (8.2, 13.7){advice}"
+                ),
+            );
+        }
     }
 
     /// Resolve every positive request separately before merging connected trees.
