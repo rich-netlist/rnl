@@ -20,6 +20,7 @@ The header record of a file that uses the whole series, the optional `rnl-std-no
 | Package | References | What it is for |
 | --- | --- | --- |
 | `alias-zh` 0.4 | – | Provides Chinese spellings for RNL 0.4 keywords and standard words, all $ names of the standard 0.4 packages, and role, parameter and public local names of standard definitions. |
+| `analog-canvas-extensions` 0.7 | – | Not standard: Analog Canvas's appearance variants of standard symbols, named $CANVAS_ and its component id, its four-input gates, its four-terminal MOSFETs with the body pin at (1, 0), and facts of its drawings that the netlist does not … |
 | `rnl-std-45deg` 0.4 | `rnl-std-basic` | 45-degree symbols for bridges, cross-coupled pairs, diagonal windings and 45-degree wires. |
 | `rnl-std-all` 0.4 | `rnl-std-style`, `rnl-std-basic`, `rnl-std-semiconductors`, `rnl-std-fill`, `rnl-std-semantics`, `rnl-std-functional`, `rnl-std-rf`, `rnl-std-logic`, `rnl-std-signal-flow`, `rnl-std-spice`, `rnl-std-spectre` | The one package collection of the series 0.4, with no content of its own: it brings in styles, basic and semiconductor symbols and definitions, automatic fill, circuit semantics, the four domain packages, and the rule package of each host … |
 | `rnl-std-basic` 0.4 | – | The symbols of passive parts, sources, switches, transmission lines, virtual parts and marks; the definitions of virtual parts, marks, figures and stubs, each with the rule that draws its usages; and the sets of ground, supply and bias … |
@@ -39,6 +40,21 @@ The header record of a file that uses the whole series, the optional `rnl-std-no
 ## Definitions
 
 A definition is used as `#A(role) #B(role) @AS $DEFINITION` or `$DEFINITION @ATTACH #A(role) …` (the standard 9.4, 9.5). A role in braces, such as `{members}`, is a set: it takes any number of objects, none included. A role has a kind, which says what may fill it; parameters have defaults. Group is read from the body of the definition: *yes* with the roles whose members it makes one group, *via* `$X` with the roles it passes to a definition `$X` that makes the group, and – when it makes none (the standard 11.5; see Groups in good-drawings.md).
+
+### analog-canvas-extensions
+
+| Definition | Roles | Parameters (defaults) | Symbol | Group | Comment before it in the file |
+| --- | --- | --- | --- | --- | --- |
+| `$CANVAS_NAME` | `part` (instance) | `name` = `null` | – | – | The name Analog Canvas gives the part, where the netlist must spell it otherwise: a part written as a subcircuit call starts with X in SPICE, so the card is XM1 for the part Analog Canvas calls M1. Attached to the part: $CANVAS_NAME … |
+| `$CANVAS_LABEL` | `label` | `bind` = `null`, `parameter` = `null`, `show_value` = `null` | – | – | A label whose text is a fact of the drawing, set as Analog Canvas sets names: it follows when the fact changes in Analog Canvas, while the text written in the TEXT is what any viewer shows. bind: "name" the part's name, "value" the part's … |
+| `$CANVAS_TYPESETTING` | `level` | `subscript_case` = `null`, `subscript_italic` = `null`, `underscore_subscript` = `null`, `subscript_after_first` = `null`, `first_letter_italic` = `null`, `face` = `null`, `crossings` = `null` | – | – | How Analog Canvas sets the names in labels in a level: the case of a subscript ("preserve", "uppercase" or "lowercase"), whether a subscript is italic, whether an underscore starts a subscript, whether the characters after a leading letter … |
+| `$CANVAS_PARAMETER_TEXT` | `part` (instance) | `name` = `null`, `text` = `null` | – | – | The text the author wrote for a parameter, where the netlist writes it otherwise: Spectre takes 100f for 100fF, and 1M for 1Meg followed by an ohm sign. name is the parameter as the netlist names it, text the author's text. Attached to the … |
+| `$CANVAS_TYPOGRAPHY` | `text` (text) | `token` = `null` | – | – | The typography role in which Analog Canvas sets a drawing text: "caption", "body" or "label". There its size follows the document's size for that role, while the size written in the TEXT is what any viewer shows. Absent, "body". Attached … |
+| `$CANVAS_PARAMETER` | `part` (instance) | `name` = `null`, `text` = `null` | – | – | A parameter Analog Canvas keeps for the part that the netlist does not print: a field of a source's waveform other than the one the source is set to, such as the frequency of a source set to dc, or the output rails vhigh and vlow of an op … |
+| `$CANVAS_UNNAMED` | `part` (instance) | – | – | – | The part has no name in Analog Canvas: the netlist gives it the name a card must have, and Analog Canvas leaves it unnamed again. Attached to the part: $CANVAS_UNNAMED @ATTACH #X1 |
+| `$CANVAS_VARIANT` | `part` (instance) | `symbol` = `null` | – | – | The Analog Canvas symbol a part is drawn with, where RNL draws two of its symbols alike: an op-amp flipped top to bottom is drawn as the op-amp with its inputs swapped, unflipped. symbol is Analog Canvas's id of the symbol; without it, … |
+| `$CANVAS_CELL_NAME` | `level` | `name` = `null` | – | – | The name Analog Canvas gives the Cell a level is, where the netlist must write it otherwise: a subcircuit name has no spaces, so the Cell "Bootstrap switch" is the subcircuit Bootstrap_switch. Attached to the level, a lone # (6.3), in the … |
+| `$CANVAS_TOP` | `level` | – | – | – | The level is the Cell Analog Canvas opens as its project's top, which the netlist need not show: a Cell that calls it is printed too, so the netlist's top is that Cell. Attached to the level, a lone #, in the level's own record: … |
 
 ### rnl-std-45deg
 
@@ -171,6 +187,43 @@ A definition is used as `#A(role) #B(role) @AS $DEFINITION` or `$DEFINITION @ATT
 ## Symbols
 
 A symbol is chosen by the rules of the next section, or by `@SET-SYMBOL $NAME` on an object or a set. Pins are listed by terminal with the direction a wire leaves in. The standard symbols are drawn in grid steps, y up.
+
+### analog-canvas-extensions
+
+| Symbol | Pins | Labels | Definition |
+| --- | --- | --- | --- |
+| `$CANVAS_AND_4INPUT` | a:left b:left c:left d:left y:right | name | – |
+| `$CANVAS_CCCS_CIRCLE` | n:down p:up | name, value | – |
+| `$CANVAS_CCVS_CIRCLE` | n:down p:up | name, value | – |
+| `$CANVAS_COMPARATOR_UNMARKED` | inn:left inp:left out:right | name | – |
+| `$CANVAS_CURRENT_SOURCE_DIAMOND` | n:down p:up | name, value | – |
+| `$CANVAS_DEPLETION_NMOS_4TERM` | b:right d:up g:left s:down | name, model | – |
+| `$CANVAS_DEPLETION_PMOS_4TERM` | b:right d:down g:left s:up | name, model | – |
+| `$CANVAS_INDUCTOR_LARGE` | n:down p:up | name, value | – |
+| `$CANVAS_NAND_4INPUT` | a:left b:left c:left d:left y:right | name | – |
+| `$CANVAS_NDMOS_4TERM` | b:right d:up g:left s:down | name, model | – |
+| `$CANVAS_NMOS_4TERM` | b:right d:up g:left s:down | name, model | – |
+| `$CANVAS_NOR_4INPUT` | a:left b:left c:left d:left y:right | name | – |
+| `$CANVAS_OPAMP_DIFFERENTIAL_CROSSED_LETTERED` | inn:left inp:left outn:right outp:right | formula, name | – |
+| `$CANVAS_OPAMP_DIFFERENTIAL_LETTERED` | inn:left inp:left outn:right outp:right | formula, name | – |
+| `$CANVAS_OPAMP_DIFFERENTIAL_WIDE` | inn:left inp:left outn:right outp:right | name | – |
+| `$CANVAS_OPAMP_DIFFERENTIAL_WIDE_CROSSED` | inn:left inp:left outn:right outp:right | name | – |
+| `$CANVAS_OPAMP_DIFFERENTIAL_WIDE_CROSSED_LETTERED` | inn:left inp:left outn:right outp:right | formula, name | – |
+| `$CANVAS_OPAMP_DIFFERENTIAL_WIDE_LETTERED` | inn:left inp:left outn:right outp:right | formula, name | – |
+| `$CANVAS_OPAMP_LETTERED` | inn:left inp:left out:right | formula, name | – |
+| `$CANVAS_OPAMP_WIDE` | inn:left inp:left out:right | name | – |
+| `$CANVAS_OPAMP_WIDE_LETTERED` | inn:left inp:left out:right | formula, name | – |
+| `$CANVAS_OR_4INPUT` | a:left b:left c:left d:left y:right | name | – |
+| `$CANVAS_PDMOS_4TERM` | b:right d:down g:left s:up | name, model | – |
+| `$CANVAS_PMOS_4TERM` | b:right d:down g:left s:up | name, model | – |
+| `$CANVAS_PORT_FILLED` | p:right | netname | – |
+| `$CANVAS_SIMPLE_SPDT_SWITCH` | – | – | – |
+| `$CANVAS_SIMPLE_SWITCH` | n:right p:left | name | – |
+| `$CANVAS_VCCS_CIRCLE` | n:down p:up | name, value | – |
+| `$CANVAS_VCVS_CIRCLE` | n:down p:up | name, value | – |
+| `$CANVAS_VOLTAGE_AMPLIFIER_LETTERED` | in:left out:right | formula, name | – |
+| `$CANVAS_XNOR_4INPUT` | a:left b:left c:left d:left y:right | name | – |
+| `$CANVAS_XOR_4INPUT` | a:left b:left c:left d:left y:right | name | – |
 
 ### rnl-std-45deg
 
