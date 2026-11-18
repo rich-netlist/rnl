@@ -10,7 +10,8 @@ import { fileFormats, isPackagePath } from "../formats.js";
 let pool = [];
 let poolReady = Promise.resolve();
 const tauri = window.__TAURI__;
-// (the options are the third argument: write_bytes and save_image take their file's path, name and kind from its headers)
+// (the options are the third argument: write_project_file and save_image take their file's path, name and kind from its
+// headers)
 const invoke = (cmd, args, options) => tauri.core.invoke(cmd, args, options);
 let preloadGeneration = 0;
 const cancelPreload = () => { preloadGeneration++; return invoke("cancel_preload"); };
@@ -26,7 +27,10 @@ const sessionSource = source => source ? { path: source.path, name: source.name,
 let openingDrop = false;
 // the project archive this window opened or saved last, where Save Project offers to save again
 let lastProject = null;
-const writeBytes = (path, bytes) => invoke("write_bytes", bytes, { headers: { path: encodeURIComponent(path) } });
+// a project's file, by its name within the folder chosen to open the project in, which the app keeps (project.rs)
+const writeProjectFile = (relative, bytes) => invoke("write_project_file", bytes, { headers: { path: encodeURIComponent(relative) } });
+// the folder the user chose to open a project in, as projectRoot gives it
+let projectFolder = null;
 
 /** @type {import("../shell.js").Shell} */
 export default {
@@ -218,7 +222,8 @@ export default {
   async saveProject(name, build) {
     const path = await invoke("pick_project_save", { name, last: lastProject });
     if (!path) return false;
-    await writeBytes(path, new Uint8Array(await (await build()).arrayBuffer()));
+    // (the app writes the archive where its dialog was answered, and nowhere else)
+    await invoke("write_project_archive", new Uint8Array(await (await build()).arrayBuffer()));
     lastProject = path;
     return path;
   },
@@ -231,17 +236,21 @@ export default {
   async projectRoot(picked, manifest) {
     const folder = await invoke("pick_project_folder", { near: picked.path });
     if (!folder) return null;
-    const existing = await invoke("existing_files", { root: folder, paths: manifest.files.map((f) => f.path) });
+    const existing = await invoke("existing_files", { paths: manifest.files.map((f) => f.path) });
     if (existing.length) {
       const shown = existing.slice(0, 5).join(", ") + (existing.length > 5 ? m`, and ${existing.length - 5} more` : "");
       const choice = await decide({ title: m("Open Project"), paragraphs: [m`The folder already has files of this project: ${shown}.`, m("Replace them?")], action: tr("Replace") });
       if (choice !== "Replace") return null;
     }
-    return `${folder.replace(/\\/g, "/").replace(/\/$/, "")}/`;
+    projectFolder = `${folder.replace(/\\/g, "/").replace(/\/$/, "")}/`;
+    return projectFolder;
   },
   /** Write a project read into its folder: its entry, and its pool as Library files. */
   async projectSource(read, picked) {
-    for (const [path, bytes] of Object.entries(read.bytes)) await writeBytes(path, bytes);
+    for (const [path, bytes] of Object.entries(read.bytes)) {
+      if (!projectFolder || !path.startsWith(projectFolder)) throw new Error(`${path} is not in the folder chosen for the project.`);
+      await writeProjectFile(path.slice(projectFolder.length), bytes);
+    }
     lastProject = picked.path;
     return { source: file(read.entry), items: read.pool.map((path) => ({ path, name: path, source: file(path) })) };
   },

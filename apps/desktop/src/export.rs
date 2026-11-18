@@ -110,7 +110,8 @@ pub async fn save_image(window: WebviewWindow, request: Request<'_>) -> Result<O
         tauri::async_runtime::spawn_blocking(move || dialog.blocking_save_file()).await.map_err(|e| e.to_string())?;
     let Some(chosen) = chosen else { return Ok(None) };
     let to = chosen.into_path().map_err(|e| e.to_string())?;
-    tauri::async_runtime::spawn_blocking(move || std::fs::write(&to, bytes).map(|_| to))
+    // (as Save writes a file: an image that cannot be written whole leaves the old one as it was)
+    tauri::async_runtime::spawn_blocking(move || crate::atomic::write(&to, &bytes).map(|_| to))
         .await
         .map_err(|e| e.to_string())?
         .map(|to| Some(rnl_cli::path_str(&to)))
