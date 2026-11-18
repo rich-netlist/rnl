@@ -213,6 +213,8 @@ export default {
     invoke("save_image", new Uint8Array(await blob.arrayBuffer()), { headers: { name: encodeURIComponent(name), kind } }),
   // projects (project.js): the page makes and reads the archive; the app asks where, and reads and writes the bytes
   readFile: async (path) => new Uint8Array(await invoke("read_bytes", { path })),
+  /** `text` as bytes in the encoding of the file at `path`, as Save writes it (project.js, for an edited file). */
+  encodeLike: async (path, text) => new Uint8Array(await invoke("encode_like", { path, text })),
   async saveProject(name, build) {
     const path = await invoke("pick_project_save", { name, last: lastProject });
     if (!path) return false;

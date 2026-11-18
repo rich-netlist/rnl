@@ -487,6 +487,7 @@ fn main() {
             export::export_svg,
             export::save_image,
             project::read_bytes,
+            project::encode_like,
             project::write_bytes,
             project::pick_project,
             project::pick_project_save,

@@ -6,7 +6,8 @@ const temporaryPath = source => `<temporary>/${source.name || "clipboard.sp"}`;
 
 /**
  * Lazy archive entries. Folder selections retain unreferenced files; loaded URL includes are local
- * snapshots. `readPath` reads a file that its item gives no reader for, such as one on the desktop's disk.
+ * snapshots. `readPath` reads a file that its item gives no reader for, such as one on the desktop's disk: its bytes
+ * as they are, which an unedited file is archived as (its encoding and line ends kept).
  */
 export function libraryFiles({ items, temporary }, source, document, editedText, otherEdits = {}, readPath = null) {
   const files = new Map(), folders = new Set(), raw = new Set();
@@ -30,7 +31,8 @@ export function libraryFiles({ items, temporary }, source, document, editedText,
       add(item.path, () => text);
     } else {
       const original = owner.files?.get(item.path);
-      add(item.path, original || item.read || (readPath && (() => readPath(item.path))), !!original);
+      const fromDisk = !original && !item.read && readPath ? () => readPath(item.path) : null;
+      add(item.path, original || item.read || fromDisk, !!(original || fromDisk));
     }
   }
   if (temporary) {

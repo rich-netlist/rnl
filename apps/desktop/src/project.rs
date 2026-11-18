@@ -21,6 +21,19 @@ pub async fn read_bytes(path: String) -> Result<Response, String> {
     .map_err(|e| e.to_string())?
 }
 
+/// `text` as bytes in the encoding the file at `path` has (UTF-8 with or without its byte order mark, or Latin-1), as
+/// Save writes an edit: a project archives an edited file so (apps/viewer-ui/project.js).
+#[tauri::command]
+pub async fn encode_like(path: String, text: String) -> Result<Response, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        rnl_cli::codec::encode_file(Some(Path::new(&path)), &text, rnl_cli::codec::OutputEncoding::Preserve)
+            .map(Response::new)
+            .map_err(|e| format!("{path}: {e}"))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// Write the request's bytes to the file its `path` header names (URI-encoded), with the folders it
 /// needs: the archive the user chose to save, or a project's file in the folder the user chose.
 #[tauri::command]

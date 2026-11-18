@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { archiveNames, libraryZip, readZip } from '../viewer-ui/zip.js';
 import { libraryFiles } from '../viewer-ui/library-files.js';
+import { loadManifest, PROJECT_MANIFEST, writeManifest } from '../viewer-ui/manifest.js';
+import * as edits from '../viewer-ui/edits.js';
 
 // An independent ZIP implementation checks headers, Unicode names, body sizes and CRCs.
 function unzip(blob) {
@@ -129,6 +131,38 @@ test('readZip reads what libraryZip writes, and archive names give themselves ag
   assert.deepEqual([...read.keys()], names);
   assert.equal(new TextDecoder().decode(await read.get('project/电路.sp').read()), '* 网表\n');
   assert.deepEqual(await read.get('data.bin').read(), binary);
+});
+
+test('a project whose file has % in its name is saved and opened again: the manifest and the archive name it once', async () => {
+  const bytes = new TextEncoder().encode('* gain\nR1 a 0 1k\n.end\n');
+  const [, name] = archiveNames([PROJECT_MANIFEST, 'gain%20.sp']);
+  assert.equal(name, 'gain%2520.sp');
+  const manifest = await writeManifest({ archive: true, entry: name, files: [{ path: name, bytes }] });
+  const blob = await libraryZip([{ path: PROJECT_MANIFEST, read: () => JSON.stringify(manifest) }, { path: name, read: () => bytes }], { named: true });
+  const archive = readZip(new Uint8Array(await blob.arrayBuffer()));
+  assert.deepEqual([...archive.keys()], [PROJECT_MANIFEST, name]);
+  const written = JSON.parse(new TextDecoder().decode(await archive.get(PROJECT_MANIFEST).read()));
+  const loaded = await loadManifest(written, { readFile: (key) => archive.get(key)?.read() ?? null });
+  // (the files open under the project's own folder)
+  assert.ok(loaded.entry.endsWith(`/${name}`), loaded.entry);
+});
+
+test('an unedited file of the desktop is archived as its bytes, and an edit keeps the ends of the other lines', async () => {
+  const path = '/review/gain.sp';
+  const original = Buffer.from('* caf\xe9\r\nR1 out 0 1k\n.end\r\n', 'latin1');
+  const document = { path, files: [{ path: 'gain.sp', name: 'gain.sp', text: original.toString('latin1') }] };
+  const source = { path, name: path };
+  const library = { items: [{ path, name: path, source }] };
+  edits.resetBuffers(document);
+  const edited = (p) => (edits.hasBuffer(p) ? edits.fileText(p) : null);
+  // nothing edited: the bytes read from the disk, Latin-1 and the line ends as they are
+  const [entry] = libraryFiles(library, source, document, edited, edits.changes(false), () => new Uint8Array(original));
+  assert.deepEqual(Buffer.from(await entry.read()), original);
+  // one value edited: that line changes, every line keeps its own end
+  edits.setText('gain.sp', edits.textOf('gain.sp').replace('1k', '2k'));
+  assert.equal(edits.dirty()[0].text, document.files[0].text.replace('1k', '2k'));
+  const [changed] = libraryFiles(library, source, document, edited, edits.changes(false), () => new Uint8Array(original));
+  assert.equal(await changed.read(), document.files[0].text.replace('1k', '2k'));
 });
 
 test('readZip inflates deflated entries written by another tool and refuses a damaged archive', async () => {

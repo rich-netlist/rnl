@@ -169,6 +169,22 @@ test('Download Project keeps the bytes of files with a BOM or in Latin-1', async
   expect(out.manifest.entry).toBe('current.sp');
 });
 
+test('a project whose file has % in its name is downloaded and opened again', async ({ page }) => {
+  await start(page);
+  await page.locator('#file-input').setInputFiles({ name: 'gain%20.sp', mimeType: 'text/plain', buffer: Buffer.from('* gain\nR1 a 0 1k\n.end\n') });
+  await expect.poll(() => page.evaluate(() => window.viewer.doc?.path)).toBe('/gain%20.sp');
+  await ready(page);
+  const out = await project(page);
+  // the manifest and the archive name the file the same, encoded once
+  expect(out.manifest.entry).toBe('gain%2520.sp');
+  expect(Object.keys(out.files)).toContain('gain%2520.sp');
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
+  await choose(page, 'open-project', 'project-input', out.saved);
+  await ready(page);
+  expect(await page.evaluate(() => window.viewer.doc.files[0].text)).toBe('* gain\nR1 a 0 1k\n.end\n');
+  expect(await page.evaluate(() => window.viewer.doc.diagnostics.filter((d) => d.severity === 'error').length)).toBe(0);
+});
+
 test('Download Project keeps edited files after Apply removes their include', async ({ page }) => {
   await start(page);
   await page.locator('#file-input').setInputFiles([
