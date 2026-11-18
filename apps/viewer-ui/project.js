@@ -18,7 +18,7 @@ import { shell } from "./shell.js";
 import { sourcePath } from "./source-path.js";
 import { current, doc } from "./state.js";
 import { load } from "./util.js";
-import { archiveNames, libraryZip, readZip } from "./zip.js";
+import { archiveNames, libraryZip, projectPaths, readZip } from "./zip.js";
 
 const encoder = new TextEncoder();
 let busy = false;
@@ -123,8 +123,11 @@ function projectContents() {
       entries.push({ name: `${dir}/${rest}`, path, read: () => shell.readFile(path) });
     }
   });
-  const final = archiveNames([PROJECT_MANIFEST, ...entries.map((e) => e.name)]).slice(1);
-  entries.forEach((e, k) => { e.name = final[k]; });
+  // each file has its name in the archive, portable, and its path in the project, which the manifest lists and the
+  // netlists include: its own where it can (`gain%20.inc`), though the archive's escapes it (`gain%2520.inc`)
+  const members = archiveNames([PROJECT_MANIFEST, ...entries.map((e) => e.name)]).slice(1);
+  const final = projectPaths(entries.map((e) => e.name), members);
+  entries.forEach((e, k) => { e.name = final[k]; e.member = members[k]; });
   const formats = {};
   for (const e of entries) {
     const name = chosenFormat(e.path, e.url);
@@ -146,14 +149,14 @@ function projectContents() {
 async function projectZip(contents) {
   const files = [];
   for (const e of contents.entries) {
-    try { files.push({ path: e.name, bytes: await bytesOf(await e.read()), url: e.url }); }
+    try { files.push({ path: e.name, member: e.member, bytes: await bytesOf(await e.read()), url: e.url }); }
     catch (error) { throw new Error(`${e.path}: ${error.message || error}`); }
   }
   const manifest = await writeManifest({ archive: true, entry: contents.entry, files, pool: contents.pool, formats: contents.formats,
     level: contents.level, paths: contents.paths, settings: contents.settings, display: contents.display });
   const json = `${JSON.stringify(manifest, null, 2)}\n`;
   // (the names are those of the manifest, made once by archiveNames: the archive writes them as they are)
-  return libraryZip([{ path: PROJECT_MANIFEST, read: () => json }, ...files.map((f) => ({ path: f.path, read: () => f.bytes }))], { named: true });
+  return libraryZip([{ path: PROJECT_MANIFEST, read: () => json }, ...files.map((f) => ({ path: f.member, read: () => f.bytes }))], { named: true });
 }
 
 /**

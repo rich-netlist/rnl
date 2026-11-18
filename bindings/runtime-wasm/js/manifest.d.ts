@@ -38,8 +38,9 @@ export interface Manifest {
   /**
    * Each file by its relative path, with the SHA-256 and size of its bytes. A file with a `url` is
    * fetched from there (in an archive, the archive's copy is read and `url` says where it was from).
+   * `member` is the file's name in the archive when that is not its path.
    */
-  files: { path: string; sha256: string; size: number; url?: string }[];
+  files: { path: string; sha256: string; size: number; url?: string; member?: string }[];
   /** Files of `files`, in the order a bare include and a package by name look for them: a build's `pool`. */
   pool?: string[];
   /** The parse format chosen for some files, by path: a build's `formats`. */
@@ -140,7 +141,7 @@ export declare function readManifest(url: string, options?: ReadOptions): Promis
 
 /** Write the manifest of `files`, with their SHA-256 and sizes; checked as a reader checks it. */
 export declare function writeManifest(options: {
-  files: { path: string; bytes: Uint8Array; url?: string }[];
+  files: { path: string; bytes: Uint8Array; url?: string; member?: string }[];
   entry: string;
   pool?: string[];
   formats?: Record<string, string>;

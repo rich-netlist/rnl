@@ -50,6 +50,31 @@ export function archiveNames(paths) {
   });
 }
 
+/** A path relative and `/`-separated, a virtual root made a directory, as archivePath makes it, but no part escaped. */
+function plainPath(path) {
+  path = path.replace(/^<bundled>\//, "standard-packages/").replace(/^<temporary>\//, "temporary/");
+  return path.replaceAll("\\", "/").split("/").filter(p => p && p !== ".").join("/");
+}
+
+/**
+ * The paths the files at `paths` have in a project: those its manifest lists them by, and its netlists include them by.
+ * Each is the file's own path, relative and `/`-separated, where a manifest takes it (no `..`, not like an address);
+ * else its name in the archive, of `names` (archiveNames), which may have a part escaped (`%` as `%25`) to be portable.
+ * When two of them would be one, even but for case, or a file's path a directory of another's, all are the names.
+ */
+export function projectPaths(paths, names) {
+  const out = paths.map(plainPath).map((path, k) =>
+    path && !/^[a-z][a-z0-9+.-]*:/i.test(path) && !path.split("/").includes("..") ? path : names[k]);
+  const files = new Set(), directories = new Set();
+  for (const path of out) {
+    const key = path.toLowerCase();
+    if (files.has(key)) return names;
+    files.add(key);
+    for (let at = key.indexOf("/"); at >= 0; at = key.indexOf("/", at + 1)) directories.add(key.slice(0, at));
+  }
+  return out.some(path => directories.has(path.toLowerCase())) ? names : out;
+}
+
 /**
  * Entries have { path, read }, whose reader returns a string, Blob or Uint8Array. Their paths are made names in the
  * archive (`archiveNames`); with `named`, they are such names already, made once (a project's, which its manifest

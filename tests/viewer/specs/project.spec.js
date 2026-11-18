@@ -175,14 +175,36 @@ test('a project whose file has % in its name is downloaded and opened again', as
   await expect.poll(() => page.evaluate(() => window.viewer.doc?.path)).toBe('/gain%20.sp');
   await ready(page);
   const out = await project(page);
-  // the manifest and the archive name the file the same, encoded once
-  expect(out.manifest.entry).toBe('gain%2520.sp');
+  // the manifest lists the file by its own path, and its name in the archive, escaped once to be portable
+  expect(out.manifest.entry).toBe('gain%20.sp');
+  expect(out.manifest.files.map((f) => [f.path, f.member])).toEqual([['gain%20.sp', 'gain%2520.sp']]);
   expect(Object.keys(out.files)).toContain('gain%2520.sp');
   await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
   await choose(page, 'open-project', 'project-input', out.saved);
   await ready(page);
   expect(await page.evaluate(() => window.viewer.doc.files[0].text)).toBe('* gain\nR1 a 0 1k\n.end\n');
   expect(await page.evaluate(() => window.viewer.doc.diagnostics.filter((d) => d.severity === 'error').length)).toBe(0);
+});
+
+test('a file included by a name with % in it is included again when the project is opened', async ({ page }) => {
+  await start(page);
+  await page.locator('#file-input').setInputFiles([
+    { name: 'top.sp', mimeType: 'text/plain', buffer: Buffer.from('* top\n.include "gain%20.inc"\nX1 a b gain\n.end\n') },
+    { name: 'gain%20.inc', mimeType: 'text/plain', buffer: Buffer.from('.subckt gain a b\nR1 a b 1k\n.ends\n') },
+  ]);
+  await ready(page);
+  const errors = () => page.evaluate(() => window.viewer.doc.diagnostics.filter((d) => d.severity === 'error').map((d) => d.message));
+  expect(await errors()).toEqual([]);
+  const out = await project(page);
+  expect(out.manifest.entry).toBe('top.sp');
+  expect(out.manifest.files.find((f) => f.path === 'gain%20.inc')?.member).toBe('gain%2520.inc');
+  expect(content(out.files, 'gain%2520.inc')).toBe('.subckt gain a b\nR1 a b 1k\n.ends\n');
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
+  await choose(page, 'open-project', 'project-input', out.saved);
+  await ready(page);
+  // the netlist's include finds the file by the path it gives
+  expect(await page.evaluate(() => window.viewer.doc.files.map((f) => f.path.split('/').pop()))).toEqual(['top.sp', 'gain%20.inc']);
+  expect(await errors()).toEqual([]);
 });
 
 test('Download Project keeps edited files after Apply removes their include', async ({ page }) => {
