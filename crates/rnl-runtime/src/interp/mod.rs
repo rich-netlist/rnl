@@ -734,6 +734,7 @@ impl<'p> Interp<'p> {
                 && self.units[w.u].level != Some(lv)
                 && self.generation_rule(&w.m.m, w.u)
                 && !self.scoped_selection(&w.m.m, w.u)
+                && !self.stays_in_its_level(&w.m.m, w.u)
             {
                 let at = w.m.m.segments.first().map(|sg| sg.start).unwrap_or(w.m.m.start);
                 let loc = self.rec_loc(w.m.rec, at);
@@ -818,6 +819,52 @@ impl<'p> Interp<'p> {
             .iter()
             .filter_map(|sg| sg.call.as_ref())
             .any(|c| matches!(self.kw(&c.kw, u).as_str(), "AS" | "ATTACH"))
+    }
+
+    /// Whether a rule has a selection written in it and none of its selections writes
+    /// `recursive=true`: it takes effect in its own level alone, and reaches no level below
+    /// whatever sets it uses (10.1).
+    fn stays_in_its_level(&self, m: &crate::syntax::Member, u: UnitId) -> bool {
+        use crate::syntax::{ObjExpr, Value};
+        fn visit(it: &Interp<'_>, m: &crate::syntax::Member, u: UnitId, written: &mut bool) -> bool {
+            for seg in &m.segments {
+                if let Some(call) = &seg.call {
+                    let keyword = it.kw(&call.kw, u);
+                    if matches!(keyword.as_str(), "DEFINE" | "DEFINE-SYMBOL" | "DEFINE-STYLE" | "USE-PACKAGE") {
+                        return true;
+                    }
+                    if keyword.starts_with("SELECT-") {
+                        *written = true;
+                        let recursive = call.params.as_ref().is_some_and(|params| {
+                            params.named.iter().any(|param| {
+                                let name = if param.quoted { param.name.clone() } else { it.word(&param.name, u) };
+                                name == "recursive"
+                                    && match &param.value {
+                                        Value::Bool(value) => *value,
+                                        Value::Word(word) => it.word(word, u) == "true",
+                                        // a hole may be true: the rule may reach below
+                                        Value::Hole(_) => true,
+                                        _ => false,
+                                    }
+                            })
+                        });
+                        if recursive {
+                            return false;
+                        }
+                    }
+                }
+                for arg in &seg.args {
+                    if let ObjExpr::Set(set) = &arg.obj {
+                        if !set.members.iter().all(|member| visit(it, member, u, written)) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            true
+        }
+        let mut written = false;
+        visit(self, m, u, &mut written) && written
     }
 
     fn scoped_selection(&self, m: &crate::syntax::Member, u: UnitId) -> bool {

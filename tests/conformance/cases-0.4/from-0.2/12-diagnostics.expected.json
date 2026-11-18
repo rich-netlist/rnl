@@ -2260,14 +2260,6 @@
       "col": 5
     },
     {
-      "severity": "warning",
-      "code": "RNL2900",
-      "name": "rule-uses-own-level-objects",
-      "file": "12-diagnostics.sp",
-      "line": 51,
-      "col": 5
-    },
-    {
       "severity": "hint",
       "code": "RNL9404",
       "name": "unplaced-objects",
