@@ -237,7 +237,7 @@
   @ALIAS("$电源符号", "$SUPPLY_SYMBOL");
   @ALIAS("$偏置符号", "$BIAS_SYMBOL");
   @ALIAS("$端口符号", "$IO_PORT_SYMBOL");
-  @ALIAS("$网名标签符号", "$NET_LABEL_SYMBOL");
+  @ALIAS("$网络标签符号", "$NET_LABEL_SYMBOL");
   @ALIAS("$箭头符号", "$ARROW_SYMBOL");
   @ALIAS("$无连接符号", "$NO_CONNECT_SYMBOL");
   @ALIAS("$交汇点符号", "$JUNCTION_SYMBOL");
@@ -247,13 +247,13 @@
   @ALIAS("$接地补位集", "$GROUND_FILL_SET");
   @ALIAS("$电源补位集", "$SUPPLY_FILL_SET");
   @ALIAS("$偏置补位集", "$BIAS_FILL_SET");
-  @ALIAS("$网名标签补位集", "$LABEL_FILL_SET");
+  @ALIAS("$网络标签补位集", "$LABEL_FILL_SET");
   @ALIAS("$端口补位集", "$PORT_FILL_SET");
   @ALIAS("$地", "$GROUND");
   @ALIAS("$电源", "$SUPPLY");
   @ALIAS("$偏置", "$BIAS");
   @ALIAS("$端口", "$IO_PORT");
-  @ALIAS("$网名标签", "$NET_LABEL");
+  @ALIAS("$网络标签", "$NET_LABEL");
   @ALIAS("$无连接", "$NO_CONNECT");
   @ALIAS("$交汇点", "$JUNCTION");
   @ALIAS("$电流箭头", "$CURRENT_ARROW");
@@ -266,7 +266,7 @@
   @ALIAS("$电源桩", "$SUPPLY_STUB");
   @ALIAS("$偏置桩", "$BIAS_STUB");
   @ALIAS("$端口桩", "$IO_PORT_STUB");
-  @ALIAS("$网名标签桩", "$NET_LABEL_STUB");
+  @ALIAS("$网络标签桩", "$NET_LABEL_STUB");
   @ALIAS("$二极管", "$DIODE");
   @ALIAS("$齐纳二极管", "$ZENER_DIODE");
   @ALIAS("$发光二极管", "$LED");
