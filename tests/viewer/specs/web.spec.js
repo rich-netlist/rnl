@@ -112,7 +112,7 @@ test("the web core supplies semantic lines and the actual parent symbol", async 
   await page.locator('#tab-netlist').click();
   await page.locator('#rnl-only').check();
   await page.locator('#semantics-only').check();
-  expect(await page.locator('#source .file:not([hidden]) .ln').evaluateAll(es => es.map(e => Number(e.dataset.line)))).toEqual([12, 31]);
+  expect(await page.locator('#source .file:not([hidden]) .ln').evaluateAll(es => es.map(e => Number(e.dataset.line)))).toEqual([14, 33]);
   await page.evaluate(async () => {
     const index = window.viewer.doc.objects.findIndex(o => o.kind === 'instance' && o.name === 'Xparent');
     await (await import('./subcircuits.js')).descend(index);
@@ -120,7 +120,7 @@ test("the web core supplies semantic lines and the actual parent symbol", async 
   await page.locator('#tab-symbol').click();
   await expect(page.locator('.symbol-bounds')).toHaveText('Box = [-4, -2, 4, 2]');
   await expect(page.locator('.symbol-definition')).toContainText('width=8');
-  await expect(page.locator('.symbol-source-lines')).toHaveText('Lines 21–26');
+  await expect(page.locator('.symbol-source-lines')).toHaveText('Lines 23–28');
   await page.locator('#symbol-pins').uncheck();
   await expect(page.locator('.symbol-pin-marks')).toBeHidden();
 });
@@ -706,15 +706,16 @@ async function showsDocument(page, doc) {
   await page.locator("#tab-netlist").click();
 }
 
-/** Netlists of the samples, by their paths under samples/ and tests/conformance/. */
+/** Netlists of the samples, by their paths under samples/; build.mjs copies cases-0.4/from-0.2 as samples/cases and equivalence-0.4 as samples/equivalence. */
 const SAMPLES = ["cases/04-hierarchy.sp", "cases/01-rc-lowpass.sp", "cases/12-diagnostics.sp", "equivalence/inverter-chain.scs"];
+const corpus = (file) => `tests/conformance/${file.replace(/^cases\//, "cases-0.4/from-0.2/").replace(/^equivalence\//, "equivalence-0.4/")}`;
 
 for (const file of SAMPLES) {
   test(`?url=samples/${file} opens it as rnl view does`, async ({ page }) => {
     await start(page, `?url=samples/${file}`);
     const doc = await shown(page);
     expect(doc.path).toBe(`/samples/${file}`);
-    sameAsRnl(doc, `tests/conformance/${file}`);
+    sameAsRnl(doc, corpus(file));
     await showsDocument(page, doc);
     await page.locator("#tab-files").click();
     await expect(page.locator("#pool-list .pool-row.current")).toHaveAttribute("data-path", `/samples/${file}`);
@@ -1154,7 +1155,8 @@ test("Save before Apply retains a newly typed USE-PACKAGE through repeated edit 
 
 async function mockPackageCatalog(page, versions = ['0.1'], names = ['offer-test']) {
   const packages = names.flatMap(name => versions.map(version => {
-    const text = `@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="${name}", version="${version}") }\n`;
+    // (a package of 0.4 with nothing but its header is an alias package, which USE-PACKAGE does not load: 16.5)
+    const text = `@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="${name}", version="${version}") }\n@RNL { $mock = @DEFINE-STYLE(linewidth=1) {} }\n`;
     const relative = `mock/${name}-${version}.rnl`;
     return {name,version,path:relative,url:relative,kind:'extension',summary:{en:'Test package',zh:'测试包'},
       sha256:createHash('sha256').update(text).digest('hex'),text};
@@ -1280,7 +1282,7 @@ test("Include File resolves a package with a different filename and Exclude remo
   await page.locator("#tab-files").click();
   expect(await page.locator("#pool-list .pool-row").count()).toBe(1);
   const d = await opened(page, () => page.locator("#include-input").setInputFiles({ name: "custom.rnl", mimeType: "text/plain", buffer: Buffer.from(
-    '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme", version="1.0") }\n') }));
+    '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme", version="1.0") }\n@RNL { $acme = @DEFINE-STYLE(linewidth=1) {} }\n') }));
   expect(d.diagnostics.some((d) => d.message.includes("acme 1.0 cannot be found"))).toBe(false);
   const excluded = await opened(page, () => page.getByRole("button", { name: "Exclude custom.rnl", exact: true }).click());
   expect(excluded.diagnostics.some((d) => d.message.includes("acme 1.0 cannot be found"))).toBe(true);
@@ -1415,7 +1417,7 @@ async function pasteText(page, text) {
 test("opened web files join Files once; Exclude keeps the root open and removes package lookup", async ({ page }) => {
   await start(page);
   const pkg = { name: "custom.rnl", mimeType: "text/plain", buffer: Buffer.from(
-    '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme-open", version="1.0") }\n') };
+    '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme-open", version="1.0") }\n@RNL { $acme = @DEFINE-STYLE(linewidth=1) {} }\n') };
   const top = { name: "top.sp", mimeType: "text/plain", buffer: Buffer.from(
     '* top\n* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4"); @USE-PACKAGE(name="acme-open", version="1.0") }\nR1 a 0 1k\n.end\n') };
   await opened(page, () => page.locator("#file-input").setInputFiles(pkg));
@@ -1435,7 +1437,7 @@ test("opened web files join Files once; Exclude keeps the root open and removes 
 
 test("temporary package is absent from include and USE-PACKAGE lookup; applied text survives switching", async ({ page }) => {
   await start(page);
-  const pkg = '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme-temp", version="1.0") }\n';
+  const pkg = '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme-temp", version="1.0") }\n@RNL { $acme = @DEFINE-STYLE(linewidth=1) {} }\n';
   await pasteText(page, pkg);
   await expect(page.locator(".pool-temporary.current")).toHaveAttribute("aria-current", "true");
   await expect(page.locator("#pool-list .pool-row")).toHaveCount(0);
@@ -1686,7 +1688,7 @@ test("the Solve view lists the constraints of a netlist before any solve; a deve
   await expect(page.locator('#menubar .menu-item[data-id="toggle-layout"]')).toHaveCount(1);
   await page.keyboard.press("7");
   await expect(page.locator("#pane-solve")).toBeVisible();
-  await expect(page.locator("#constraints-list li.constraint")).toHaveCount(18, { timeout: 30000 });
+  await expect(page.locator("#constraints-list li.constraint")).toHaveCount(22, { timeout: 30000 });
   await expect(page.locator("#constraints-list .st")).toHaveCount(0);
   expect(sent).toEqual([]);
   // the same site served with the rnl the tests built (serve.mjs --rnl), on a port of its own
@@ -1709,8 +1711,8 @@ test("the Solve view lists the constraints of a netlist before any solve; a deve
     expect(posts[0].config).toBe("");
     await expect(page.locator("#solve-views")).toBeVisible();
     const rows = page.locator("#constraints-list li.constraint");
-    expect(await rows.count()).toBe(18);
-    await expect(page.locator("#constraints-count")).toHaveText("18 constraints");
+    expect(await rows.count()).toBe(22);
+    await expect(page.locator("#constraints-count")).toHaveText("22 constraints");
     // and each says what became of it
     await expect(rows.first().locator(".st")).toHaveText(/^[✓✗?!]$/);
     // a click on a row lights up what it acts on in the drawing, and a second click ends it

@@ -6,7 +6,8 @@ import { test, expect } from '@playwright/test';
 
 test.skip(!process.env.RNL_WEB_URL, 'the web site is not built');
 
-// a subcircuit and a top level of three resistors in a row, placed, which three constraints name in different orders
+// a subcircuit and a top level of three resistors in a row, placed, which three constraints name in different orders,
+// and a fourth resistor placed where the first is
 const NETLIST = `* A row of resistors with constraints
 * @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4") }
 .subckt cell input output
@@ -16,13 +17,14 @@ Rinside input output 1k
 R1 a b 1k
 R2 b c 2k
 R3 c d 3k
+R4 a b 4k
 X1 d e cell
 * @RNL {
-*   #R1 @PLACE(0, 0); #R2 @PLACE(9, 0); #R3 @PLACE(18, 0); #X1 @PLACE(27, 0);
+*   #R1 @PLACE(0, 0); #R2 @PLACE(9, 0); #R3 @PLACE(18, 0); #R4 @PLACE(0, 0); #X1 @PLACE(27, 0);
 *   {#R1 #R2 #R3} @ALIGN("y");
 *   {#R3 #R1 #R2} @ORDER("left-to-right");
 *   #R1 #R2 @DISTANCE("left-to-right", min=2, max=4);
-*   {#R2 #R3 #R2} @ALIGN("y");
+*   {#R1 #R3 #R4} @ALIGN("y");
 *   {#R3:n #R1:n} @ALIGN("x")
 * }
 .end
@@ -100,8 +102,9 @@ test("a number is at the centre of its object's box, and two numbers at one plac
     expect(m.at[0] * one.scale + one.view[0]).toBeCloseTo(cx, 0);
     expect(m.at[1] * one.scale + one.view[1]).toBeCloseTo(cy, 0);
   });
-  // an object listed twice: both numbers, in a row, not on each other
-  await row(page, /ALIGN y \{#R2 #R3 #R2\}/).click();
+  // two objects at one place: both numbers, in a row, not on each other (an object listed twice, which 0.3 drew so,
+  // leaves 0.4's list: a combination that takes one object twice is left out, 14.1)
+  await row(page, /ALIGN y \{#R1 #R3 #R4\}/).click();
   const two = (await marks()).marks;
   expect(two.map((m) => m.text)).toEqual(['1', '2', '3']);
   const same = two.filter((m) => m.text !== '2');

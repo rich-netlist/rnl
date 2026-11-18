@@ -770,10 +770,13 @@ async function drive(app, port, profile, t0, session) {
   const pasted = await page.evaluate(`({ files: window.viewer.doc.files.length, missing: window.viewer.doc.missing })`);
   same(pasted, { files: 1, missing: ["/04-hierarchy-lib.inc"] }, "the clipboard's netlist, alone");
   console.log("File > Load from Clipboard drew the netlist that the clipboard held, alone");
-  await page.evaluate(`import('./pool.js').then(p => p.toggleAutoInclude(true))`);
-  check(await page.evaluate(`window.viewer.doc.files.length === 2 && window.viewer.doc.files.some(f => f.name.endsWith('04-hierarchy-lib.inc')) &&
-    window.viewer.doc.diagnostics.some(d => d.severity === 'warning' && d.message.includes('added by Auto Include'))`),
-  "clipboard Auto Include did not resolve the library subcircuit");
+  // (turning Auto Include on does nothing while the page is still loading, as it may be after the clipboard's
+  // netlist is drawn: it is asked again until the library subcircuit is resolved)
+  await until("clipboard Auto Include resolving the library subcircuit", () => page.evaluate(`(async () => {
+    await (await import('./pool.js')).toggleAutoInclude(true);
+    return window.viewer.doc.files.length === 2 && window.viewer.doc.files.some(f => f.name.endsWith('04-hierarchy-lib.inc')) &&
+      window.viewer.doc.diagnostics.some(d => d.severity === 'warning' && d.message.includes('added by Auto Include'));
+  })()`), 20_000);
 
   // a netlist with nothing placed: its Document carries no drawing of the objects that have no
   // position, the app keeps them from the build, and the Not drawn list asks for those of its rows
@@ -939,7 +942,8 @@ async function filePoolSmoke(page) {
   const pkg = path.join(parts, "renamed.rnl");
   const inc = path.join(parts, "part.inc");
   fs.writeFileSync(top, '* top\n* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="acme", version="1.0") }\n.include "part.inc"\n.end\n');
-  fs.writeFileSync(pkg, '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme", version="1.0") }\n');
+  // (a package of 0.4 with nothing but its header is an alias package, which USE-PACKAGE does not load: 16.5)
+  fs.writeFileSync(pkg, '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme", version="1.0") }\n@RNL { $acme = @DEFINE-STYLE(linewidth=1) {} }\n');
   fs.writeFileSync(inc, "Rpool a 0 1k\n");
   const slashed = (p) => p.replaceAll("\\", "/");
   await page.evaluate(`(async () => {
