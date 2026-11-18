@@ -4,7 +4,7 @@ Skill packages for AI agents, in the [Agent Skills](https://agentskills.io/speci
 
 | Path | Content |
 | --- | --- |
-| [`rnl/`](rnl/SKILL.md) | The RNL skill: reading, writing, checking and drawing RNL 0.3. `SKILL.md` is what the agent reads first; `references/` holds the short guide to the language, the reference to the standard packages and the notes on the tools; `examples/` holds netlists that read without errors; `LICENSE.md` and `LICENSES/` the terms. |
+| [`rnl/`](rnl/SKILL.md) | The RNL skill: reading, writing, checking and drawing RNL 0.4. `SKILL.md` is what the agent reads first; `references/` holds the short guide to the language, the reference to the standard packages and the notes on the tools; `examples/` holds netlists that read without errors; `LICENSE.md` and `LICENSES/` the terms. |
 
 ## Companion: export from Virtuoso
 
@@ -35,8 +35,8 @@ The package is in English only: its files, the guide and the reference to the pa
 | File of `skills/rnl/` | Source |
 | --- | --- |
 | `SKILL.md`, `references/tools.md`, `examples/*`, `LICENSE.md` | Written by hand. |
-| `references/language.md` | A copy of [`spec/rnl-0.3-guide.md`](../spec/rnl-0.3-guide.md), the short guide to the language, which the page of the standard ([`scripts/spec`](../scripts/spec/README.md)) also shows, with a line that it is not the standard. The Chinese version of the guide, `spec/rnl-0.3-guide.zh.md`, is only on the Chinese page of the standard: the package is in English. |
-| `references/packages.md` | Written from the package files in [`libraries/`](../libraries/README.md), from `rnl catalog` and from what the gallery says each package is for ([`site/src/assets/gallery.js`](../site/src/assets/gallery.js)), so that it is in step with them. |
+| `references/language.md` | A copy of [`spec/rnl-0.4-guide.md`](../spec/rnl-0.4-guide.md), the short guide to the language, which the page of the standard ([`scripts/spec`](../scripts/spec/README.md)) also shows, with a line that it is not the standard. The package is in English. |
+| `references/packages.md` | Written from the package files of the series 0.4 in [`libraries/`](../libraries/README.md), what each says it is for in its opening comment, and `rnl catalog --all-versions`, so that it is in step with them. Public packages of the lock are listed too when they are written in 0.4. |
 | `LICENSES/` | Copies of the licence texts in [`LICENSES/`](../LICENSES) that the package's files are under. |
 
 ```bash
