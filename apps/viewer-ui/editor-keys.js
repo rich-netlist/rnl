@@ -40,7 +40,8 @@ const lineEnd = (text, at) => {
 /**
  * What a key does in a text box holding `text`, with the selection `start`..`end`, in a file of `format`:
  * `{ from, to, insert, start, end }`, the text from `from` to `to` replaced by `insert` and the selection
- * that follows; null when the key does what it does in any text box. `key` is the KeyboardEvent's, and
+ * that follows; `{ none: true }` when the key is taken but changes nothing, as Shift+Tab with no indent
+ * to take out, which keeps the focus; null when the key does what it does in any text box. `key` is the KeyboardEvent's, and
  * `shift` and `other` (Ctrl, Alt or Meta held) its modifiers; `escaped` is true when the key before was
  * Esc, after which Tab moves the focus as usual.
  */
@@ -68,7 +69,8 @@ function insertIndent(start, end) {
 /**
  * Tab over several lines, and Shift+Tab: each line of the selection indented, or outdented, by the
  * spaces of an indent at most. A comment's indent is the space after its marker, of which an outdent
- * leaves one; any other line's is the space it begins with. An empty line is left as it is.
+ * leaves one; any other line's is the space it begins with. An empty line is left as it is. With
+ * nothing to indent or outdent, `{ none: true }`: the key changes nothing, and the focus stays.
  */
 function indentLines(text, start, end, outdent, format) {
   const from = lineStart(text, start);
@@ -89,7 +91,7 @@ function indentLines(text, start, end, outdent, format) {
     }
     at += line.length + 1;
   }
-  if (!edits.length) return null;
+  if (!edits.length) return { none: true };
   let insert = "";
   let k = from;
   for (const e of edits) {

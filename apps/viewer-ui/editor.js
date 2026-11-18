@@ -153,7 +153,7 @@ function makeEditor(path, name) {
     });
     if (!edit) return;
     ev.preventDefault();
-    typeInto(area, edit);
+    if (!edit.none) typeInto(area, edit);
   });
   return e;
 }

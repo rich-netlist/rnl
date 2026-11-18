@@ -54,6 +54,10 @@ test("Tab indents and Shift+Tab outdents in the text box, which keeps the focus;
   expect(await area(page).inputValue()).toBe("* a note\nR1 a b 1k\n.end\n");
   expect(await kept(page)).toBe("* a note\nR1 a b 1k\n.end\n");
   await expect(area(page)).toBeFocused();
+  // with nothing left to outdent, Shift+Tab changes nothing and keeps the focus too
+  await page.keyboard.press("Shift+Tab");
+  expect(await area(page).inputValue()).toBe("* a note\nR1 a b 1k\n.end\n");
+  await expect(area(page)).toBeFocused();
   // the keyboard's way out
   await page.keyboard.press("Escape");
   await page.keyboard.press("Tab");
