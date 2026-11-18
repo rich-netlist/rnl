@@ -58,20 +58,17 @@ jobs:
         run: |
           "ARTIFACT=$env:RUNNER_TEMP/solver-performance-artifact" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "FIXTURES=$env:RUNNER_TEMP/solver-fixtures" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - name: Extract pinned packages and generate frozen inputs
+      - name: Copy the reviewed cases and generate the scale families
         shell: python
         run: |
-          import json, os, subprocess, sys
-          manifest = json.load(open('harness/tests/performance/manifest.json', encoding='utf-8'))
-          for source in ('historical_source', 'library_source'):
-              subprocess.run(['git', '-C', 'harness', 'fetch', '--no-tags', 'origin', manifest[source]['commit']], check=True)
+          import os, subprocess, sys
           subprocess.run([sys.executable, 'harness/scripts/solver-performance/prepare_inputs.py', '--output', os.environ['FIXTURES']], check=True)
       - name: Verify policies
         shell: pwsh
         run: |
           python harness/scripts/solver-performance/test_benchmark.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Verify frozen fixture bytes
+      - name: Verify fixture bytes
         shell: pwsh
         run: |
           python harness/scripts/solver-performance/benchmark.py --fixtures $env:FIXTURES
@@ -81,7 +78,7 @@ jobs:
         run: |
           python harness/scripts/solver-performance/test_benchmark.py --owned-helper-fixture "$env:ARTIFACT/helper-fixture"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Keep the frozen fixture manifest
+      - name: Keep the fixture manifest
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "$env:ARTIFACT/fixtures" | Out-Null
@@ -113,10 +110,10 @@ jobs:
             ${{ runner.temp }}/solver-performance-artifact/**/build-resources.json
           if-no-files-found: error
           retention-days: 14
-      - name: Measure baseline defaults, off and diagnostic on once
+      - name: Measure the baseline within the manifest's work, off and diagnostic on once
         shell: pwsh
         run: python harness/scripts/solver-performance/benchmark.py --fixtures $env:FIXTURES --executable "$env:ARTIFACT/baseline/bin/rnl.exe" --build-info "$env:ARTIFACT/baseline/build-info.json" --output "$env:ARTIFACT/baseline/runs" --execute
-      - name: Measure candidate defaults on the same runner
+      - name: Measure the candidate within the same work on the same runner
         if: inputs.candidate_sha != ''
         shell: pwsh
         run: python harness/scripts/solver-performance/benchmark.py --fixtures $env:FIXTURES --executable "$env:ARTIFACT/candidate/bin/rnl.exe" --build-info "$env:ARTIFACT/candidate/build-info.json" --output "$env:ARTIFACT/candidate/runs" --execute
