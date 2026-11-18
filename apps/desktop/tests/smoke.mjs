@@ -1004,7 +1004,7 @@ async function filePoolSmoke(page) {
   })()`);
   await until("the native missing-package hint", () => page.evaluate(`
     document.querySelector('.package-hint .msg')?.textContent === 'Look for it in Help › Public Packages.'
-      && window.viewer.doc.diagnostics.some(d => d.message.includes('package analog-canvas-extensions 0.1 cannot be found'))`));
+      && window.viewer.doc.diagnostics.some(d => d.message.includes('package analog-canvas-extensions 0.7 cannot be found'))`));
   same(await page.evaluate(`document.querySelectorAll('[data-group="builtin"] .pool-open').length`), 25,
     "the native built-in library contains both standard series");
   check(await page.evaluate(`Array.from(document.querySelectorAll('[data-group="builtin"] .pool-open')).every(b => /^0\\.[23]\\/rnl-(std|zh)/.test(b.textContent))`),

@@ -1319,7 +1319,7 @@ test("a missing published Canvas package offers Include and rebuilds; other vers
   await start(page);
   const source = fs.readFileSync(path.join(root, "tests/viewer/inputs/missing-canvas-package.sp"));
   const before = await opened(page, () => page.locator("#file-input").setInputFiles({ name: "canvas.sp", mimeType: "text/plain", buffer: source }));
-  expect(before.diagnostics.some(d => d.message.includes("package analog-canvas-extensions 0.1 cannot be found"))).toBe(true);
+  expect(before.diagnostics.some(d => d.message.includes("package analog-canvas-extensions 0.7 cannot be found"))).toBe(true);
   await expect(page.locator(".package-hint")).toContainText("This package is published.");
   const prompt = page.getByRole('dialog', { name: 'Public Packages Found' });
   await expect(prompt).toBeVisible();
@@ -1332,7 +1332,7 @@ test("a missing published Canvas package offers Include and rebuilds; other vers
   expect(after.diagnostics.filter(d => d.severity === "error")).toEqual([]);
   await expect(page.locator(".package-hint")).toHaveCount(0);
   await page.locator("#tab-files").click();
-  await expect(page.getByRole("button", { name: "Exclude analog-canvas-extensions 0.1", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Exclude analog-canvas-extensions 0.7", exact: true })).toBeVisible();
   const builtin = page.locator('[data-group="builtin"]');
   await builtin.locator(".lib-toggle").click();
   await expect(builtin.locator(".pool-row")).toHaveCount(25);
@@ -1341,7 +1341,7 @@ test("a missing published Canvas package offers Include and rebuilds; other vers
   if (process.env.RNL_PACKAGE_SCREENSHOTS && info.project.name === "chromium") {
     await page.screenshot({ path: path.join(process.env.RNL_PACKAGE_SCREENSHOTS, "web-library-standard-builtins.png") });
   }
-  await opened(page, () => page.locator("#file-input").setInputFiles({ name: "canvas-newer.sp", mimeType: "text/plain", buffer: Buffer.from(source.toString().replace('version="0.1"', 'version="99.0"')) }));
+  await opened(page, () => page.locator("#file-input").setInputFiles({ name: "canvas-newer.sp", mimeType: "text/plain", buffer: Buffer.from(source.toString().replace('version="0.7"', 'version="99.0"')) }));
   await expect(page.locator(".package-hint")).toContainText("Look for it in File › Include Public Package...");
   await expect(page.locator(".package-hint button")).toHaveCount(0);
 });

@@ -86,7 +86,7 @@ test("the shared API advertises optional fields and correlates explicit package 
   expect((await messages(page, "ready"))[0].features).toEqual(expect.arrayContaining(["requestId", "packages"]));
   await send(page, { type: "open", requestId: "canvas", name: "canvas.sp",
     text: fs.readFileSync(new URL("../inputs/missing-canvas-package.sp", import.meta.url), "utf8"),
-    packages: [{ name: "analog-canvas-extensions", version: "0.1" }] });
+    packages: [{ name: "analog-canvas-extensions", version: "0.7" }] });
   expect(await waitMessage(page, "loaded")).toMatchObject({ requestId: "canvas", errors: 0 });
 });
 
