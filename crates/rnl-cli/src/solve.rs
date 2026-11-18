@@ -978,6 +978,30 @@ fn pass(
             junction_seconds = Some(completion.elapsed.as_secs_f64());
             numbered = Some((completion.record.clone(), completion.numbered));
             written.record = completion.record;
+        } else if p.version == "0.4" && report_available && !written.record.is_empty() {
+            // no dots to place: the record still has to read back as it was solved
+            let both = Layered { layers: vec![&memory, &files] };
+            let original_text = text_of(&r, &both, &host.file, &path)?;
+            let context = crate::junction_completion_driver::Context {
+                entry: &entry,
+                dialect: options.dialect.as_deref(),
+                formats: &options.formats,
+                files: &both,
+                runtime: &runtime,
+                original: &r,
+                problem: p,
+                original_text: &original_text,
+                host_path: &path,
+                kept: &solved.report.kept,
+                solution: &solved.solution,
+                tolerance: runtime.tolerance.min(options.solver.for_problem(p).0.tolerance),
+                on_interpret: None,
+            };
+            if let Err(why) = crate::junction_completion_driver::reads_back(&context, &written) {
+                if why.ends_with(crate::junction_completion_driver::LOST) {
+                    return Err(format!("the result of {title} does not read back as it was solved: {why}"));
+                }
+            }
         }
         watch(Mark::Stage("write"));
         // a file of 0.2 that the record is written into is raised to 0.3 (16.1): the file level of
@@ -1233,6 +1257,10 @@ pub fn write_with_encoding(run: &SolveRun, target: &Target, encoding: crate::cod
             return out;
         }
     };
+    if let Err(e) = overwrites_no_input(run, target, &to) {
+        out.error = Some(e);
+        return out;
+    }
     let make_parent = |path: &Path| -> Result<(), String> {
         match path.parent().filter(|p| !p.as_os_str().is_empty()) {
             Some(parent) => {
@@ -1242,8 +1270,7 @@ pub fn write_with_encoding(run: &SolveRun, target: &Target, encoding: crate::cod
         }
     };
     for (bytes, path) in encoded.iter().zip(to) {
-        let done = make_parent(&path)
-            .and_then(|()| std::fs::write(&path, bytes).map_err(|e| format!("cannot write {}: {e}", path.display())));
+        let done = make_parent(&path).and_then(|()| write_whole(&path, bytes));
         if let Err(e) = done {
             out.error = Some(e);
             return out;
@@ -1278,6 +1305,69 @@ pub fn write_with_encoding(run: &SolveRun, target: &Target, encoding: crate::cod
         out.copied.push(copy);
     }
     out
+}
+
+/// The file a path names, to tell whether two paths name one file: its canonical path, None when
+/// it does not exist (it is then no input).
+fn existing(path: &Path) -> Option<PathBuf> {
+    std::fs::canonicalize(path).ok()
+}
+
+/// Refuses, before anything is written, a destination that is another input of the run: a file
+/// written or copied over a file that the run reads and has not yet written or copied would lose
+/// that input, such as `-o lib` for an entry beside a `lib/` that holds a file of its name. A file
+/// written over itself (`-o` its own directory) is no other input.
+fn overwrites_no_input(run: &SolveRun, target: &Target, written: &[PathBuf]) -> Result<(), String> {
+    let mut inputs: Vec<(PathBuf, &str)> = Vec::new();
+    for path in run.files.iter().map(|f| f.path.as_str()).chain(run.read.iter().map(String::as_str)) {
+        if let Some(key) = existing(Path::new(path)) {
+            inputs.push((key, path));
+        }
+    }
+    let mut pairs: Vec<(&str, PathBuf)> =
+        run.files.iter().map(|f| f.path.as_str()).zip(written.iter().cloned()).collect();
+    if let Target::Dir(dir) = target {
+        let base = dirname(&normalize(&run.entry));
+        for path in run.read.iter().filter(|p| !run.files.iter().any(|f| f.path == **p)) {
+            if let Some(rel) = name_in(path, &base) {
+                pairs.push((path.as_str(), dir.join(rel)));
+            }
+        }
+    }
+    for (source, destination) in pairs {
+        let Some(key) = existing(&destination) else { continue };
+        let own = existing(Path::new(source));
+        if let Some((_, input)) = inputs.iter().find(|(k, _)| *k == key && own.as_ref() != Some(k)) {
+            return Err(format!(
+                "{} would be written over {input}, another file the document reads; nothing was written: write the output to another directory",
+                destination.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Writes `bytes` to `path` whole or not at all: into a new file beside it, then put in its place,
+/// so that a write that fails part way, such as on a full disk, leaves the file as it was.
+fn write_whole(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    use std::io::Write;
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let temporary = path.with_file_name(format!(".{name}.{}.rnl-write", std::process::id()));
+    let result = (|| -> std::io::Result<()> {
+        let mut file = std::fs::File::create(&temporary)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        drop(file);
+        // the file it replaces keeps its permissions
+        if let Ok(meta) = std::fs::metadata(path) {
+            std::fs::set_permissions(&temporary, meta.permissions())?;
+        }
+        std::fs::rename(&temporary, path)
+    })();
+    result.map_err(|e| {
+        let _ = std::fs::remove_file(&temporary);
+        format!("cannot write {}: {e}", path.display())
+    })
 }
 
 /// A point of a fact, by its object's name when it has one, such as `%t` for a text named so, else

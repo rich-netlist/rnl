@@ -172,6 +172,10 @@ impl Edit {
 /// where the reading found them. Of two changes at one place, the one given first ends up first.
 fn apply(text: &str, marker: &str, edits: Vec<Edit>) -> String {
     let mut edits: Vec<(usize, Edit)> = edits.into_iter().enumerate().collect();
+    // a record that two readings of a file read, such as a library section selected twice, is one
+    // text: it is removed once, or the second removal would cut what the first left in its place
+    let mut removed = std::collections::HashSet::new();
+    edits.retain(|(_, e)| !matches!(e, Edit::Remove(a, b) if !removed.insert((*a, *b))));
     edits.sort_by(|(i, a), (j, b)| b.at().cmp(&a.at()).then(j.cmp(i)));
     let mut lines = Lines::new(text);
     for (_, e) in edits {

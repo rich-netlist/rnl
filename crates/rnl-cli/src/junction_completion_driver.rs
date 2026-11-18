@@ -130,6 +130,17 @@ fn lost(p: &LevelProblem, read: &Interpretation, auxiliary: &[bool]) -> Option<S
     Some(format!("{said} {verb} {LOST}"))
 }
 
+/// Whether the document read with the record as it is written makes the objects the solve read:
+/// [`LOST`] when it does not. A level with dots to place has this checked with the dots
+/// ([`complete_what_can_be_by`]); one without has only this, since what the record writes, such as a
+/// wire, may change what a rule selects when the document is read again.
+pub fn reads_back(ctx: &Context<'_>, written: &Written) -> Result<(), String> {
+    let finisher = finisher(ctx);
+    let (read, _) = read(ctx, &finisher, &written.record)?;
+    let auxiliary = crate::junction_completion_problem::auxiliary(ctx.problem);
+    lost(ctx.problem, &read, &auxiliary.points).map_or(Ok(()), Err)
+}
+
 fn line_mapping(ctx: &Context<'_>, new_read: &Interpretation, record: &str) -> Result<Vec<Option<u32>>, String> {
     let old_level = ctx.original.doc.levels.get(ctx.problem.level).ok_or("old level missing")?;
     let new_level = new_read.doc.levels.get(ctx.problem.level).ok_or("new level missing")?;
