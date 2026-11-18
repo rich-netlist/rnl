@@ -5,7 +5,9 @@
 //   node site/gallery/build.mjs [--core DIR] [--out DIR] [--libraries DIR] [--spec DIR] [--frozen DIR] [--drafts]
 //
 // --core is the built binding, bindings/runtime-wasm/dist/ by default (node bindings/runtime-wasm/
-// build.mjs, or node apps/web/build.mjs, writes it); --out is the built site, site/dist/ by default;
+// build.mjs, or node apps/web/build.mjs, writes it), or the folder that the environment variable RNL_GALLERY_CORE
+// names when it is set, such as the npm package @rich-netlist/runtime of a release (the Pages workflow draws with
+// the core of the last release of the 0.5 line that way); --out is the built site, site/dist/ by default;
 // --libraries is the directory of the package files, libraries/ by default.
 // A standard series is shown when the standard of the same number is released, which its folder in spec/
 // says by a file RELEASED (scripts/spec/README.md): libraries/standard/0.4/ is left out until
@@ -37,7 +39,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
 const usage = "usage: node site/gallery/build.mjs [--core DIR] [--out DIR] [--libraries DIR] [--spec DIR] [--frozen DIR] [--drafts]";
 
-let coreDir = join(root, "bindings", "runtime-wasm", "dist");
+let coreDir = process.env.RNL_GALLERY_CORE || join(root, "bindings", "runtime-wasm", "dist");
 let out = join(root, "site", "dist");
 let libraries = join(root, "libraries");
 let specDir = null;
