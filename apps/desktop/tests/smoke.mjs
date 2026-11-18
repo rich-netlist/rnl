@@ -885,6 +885,19 @@ async function newWindowSmoke(app, page, at) {
 
 /** Exercise the real desktop shell and native core; replace only the OS chooser's selection. */
 /**
+ * The eda-style a file of the public-packages smoke uses: the one the build bundles, by its lock file
+ * (bundledPackages), with the header of the language its own VERSION says; for a build without the
+ * packages, eda-style 0.2 of 0.4, which it cannot find.
+ */
+function edaStyle(info) {
+  const bundled = info.packages.find((p) => p.name === "eda-style");
+  const version = bundled?.version ?? "0.2";
+  const language = bundled ? /@VERSION\("([^"]+)"\)/.exec(fs.readFileSync(bundled.path, "utf8"))?.[1] ?? "0.3" : "0.4";
+  return { bundled: Boolean(bundled), label: `eda-style ${version}`,
+    header: `* @RNL(type="header") { @VERSION("${language}"); @USE-PACKAGE(name="eda-style", version="${version}") }` };
+}
+
+/**
  * The public packages: the app that bundles them finds eda-style, a file that uses it, without a network,
  * and shows them in the Library and in Help > Public Packages; the app that does not reports the package
  * missing with a hint to Help > Public Packages, and bundles nothing. Neither downloads anything.
@@ -892,7 +905,6 @@ async function newWindowSmoke(app, page, at) {
 async function publicPackagesSmoke(page, mode) {
   const work = path.dirname(netlist);
   const top = path.join(work, "use-eda-style.sp");
-  fs.writeFileSync(top, ["* a file that uses a public package", '* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="eda-style", version="0.1") }', "R1 a 0 1k", ".end", ""].join("\n"));
   const info = await page.evaluate(`(async () => {
     const { shell } = await import('./shell.js');
     window.fetched = [];
@@ -900,6 +912,8 @@ async function publicPackagesSmoke(page, mode) {
     window.fetch = (...args) => { window.fetched.push(String(args[0]?.url ?? args[0])); return original.apply(window, args); };
     return await shell.bundledPackages();
   })()`);
+  const style = edaStyle(info);
+  fs.writeFileSync(top, ["* a file that uses a public package", style.header, "R1 a 0 1k", ".end", ""].join("\n"));
   await page.evaluate(`(async () => {
     const { openSource } = await import('./open.js');
     await openSource({ path: ${JSON.stringify(top)}, name: 'use-eda-style.sp' }, false);
@@ -918,14 +932,14 @@ async function publicPackagesSmoke(page, mode) {
   if (mode === "with") {
     check(info.bundled, `the build with the public packages bundles none: ${JSON.stringify(info)}`);
     const names = info.packages.map((p) => `${p.name} ${p.version}`);
-    check(names.includes("eda-style 0.1"), `the bundled packages are ${names.join(", ")}`);
-    check(!missing, "eda-style 0.1 is bundled, and was reported missing");
+    check(style.bundled, `the bundled packages are ${names.join(", ")}, without eda-style`);
+    check(!missing, `${style.label} is bundled, and was reported missing`);
     same(group, names, "the Library's group of the bundled packages");
     check(dialog.includes(`This build bundles ${names.join(", ")}.`), `Help > Public Packages: ${dialog}`);
     console.log(`The public packages are bundled and found without a network: ${names.join(", ")}`);
   } else {
     check(!info.bundled && info.packages.length === 0, `the build without the public packages bundles ${JSON.stringify(info)}`);
-    check(missing, "eda-style 0.1 is not bundled, and was not reported missing");
+    check(missing, `${style.label} is not bundled, and was not reported missing`);
     same(group, null, "the Library's group of the bundled packages");
     const hint = await page.evaluate(`document.querySelector('.package-hint .msg')?.textContent`);
     same(hint, "Look for it in Help › Public Packages.", "the hint of the missing package");

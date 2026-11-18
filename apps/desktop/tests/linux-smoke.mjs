@@ -188,20 +188,25 @@ try {
     await execute('window.viewer.command("language-en");');
     await execute('return new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))));');
     const top = path.join(temp, "use-eda-style.sp");
-    fs.writeFileSync(top, ["* a file that uses a public package", '* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="eda-style", version="0.1") }', "R1 a 0 1k", ".end", ""].join("\n"));
     const info = await execute("return import('./shell.js').then((m) => m.shell.bundledPackages());");
+    // eda-style as the build bundles it, in the language of its own VERSION; for a build without the
+    // packages, eda-style 0.2 of 0.4, which it cannot find
+    const bundled = info.packages.find((p) => p.name === "eda-style");
+    const version = bundled?.version ?? "0.2";
+    const language = bundled ? /@VERSION\("([^"]+)"\)/.exec(fs.readFileSync(bundled.path, "utf8"))?.[1] ?? "0.3" : "0.4";
+    fs.writeFileSync(top, ["* a file that uses a public package", `* @RNL(type="header") { @VERSION("${language}"); @USE-PACKAGE(name="eda-style", version="${version}") }`, "R1 a 0 1k", ".end", ""].join("\n"));
     await execute(`return import('./open.js').then((o) => o.openSource({ path: ${JSON.stringify(top)}, name: 'use-eda-style.sp' }, false));`);
     const missing = await execute("return window.viewer.doc.diagnostics.some((d) => d.message.includes('eda-style') && d.message.includes('cannot be found'));");
     const names = info.packages.map((p) => `${p.name} ${p.version}`);
     if (expectPackages === "with") {
-      assert.ok(info.bundled && names.includes("eda-style 0.1"), `bundled: ${JSON.stringify(info)}`);
-      assert.equal(missing, false, "eda-style 0.1 is bundled, and was reported missing");
+      assert.ok(info.bundled && bundled, `bundled: ${JSON.stringify(info)}`);
+      assert.equal(missing, false, `eda-style ${version} is bundled, and was reported missing`);
       await execute("document.getElementById('tab-files').click();");
       assert.deepEqual(await execute("const g = document.querySelector('[data-group=\"public\"]'); return g ? [...g.querySelectorAll('.pool-open')].map((b) => b.textContent) : null;"), names);
       console.log(`${path.basename(exe)}: the public packages are bundled and found without a network: ${names.join(", ")}`);
     } else {
       assert.ok(!info.bundled && info.packages.length === 0, `bundled: ${JSON.stringify(info)}`);
-      assert.equal(missing, true, "eda-style 0.1 is not bundled, and was not reported missing");
+      assert.equal(missing, true, `eda-style ${version} is not bundled, and was not reported missing`);
       await execute("const head = document.getElementById('problems-head'); if (head.getAttribute('aria-expanded') === 'false') head.click();");
       assert.equal(await execute("return document.querySelector('.package-hint .msg')?.textContent;"), "Look for it in Help › Public Packages.");
       console.log(`${path.basename(exe)}: the public packages are not bundled; the package is reported missing, with the hint to Help > Public Packages`);

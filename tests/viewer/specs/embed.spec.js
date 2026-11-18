@@ -528,11 +528,18 @@ test("public packages: failed catalogs preserve built-ins and altered package by
 test("public packages: legacy URLs and embedded USE-PACKAGE resolve through the catalog", async ({ page }) => {
   test.skip(!publicPackagesAvailable(), "Run python scripts/packages.py download");
   await page.route("https://rich-netlist.github.io/rnl-packages/**", route => route.abort());
+  // the old address, libraries/NAME/NAME.rnl, is the path the catalog gives a package's first version: the locked
+  // eda-symbol stands at it here, whichever version the lock has
+  const catalog = JSON.parse(fs.readFileSync(path.join(process.env.RNL_PACKAGE_FIXTURE, 'catalog.json'), 'utf8'));
+  const symbol = catalog.packages.find(pkg => pkg.name === 'eda-symbol');
+  catalog.packages = catalog.packages.map(pkg => pkg === symbol ? { ...pkg, path: 'eda-symbol/eda-symbol.rnl', url: 'packages/eda-symbol/eda-symbol.rnl' } : pkg);
+  await page.route('**/public-packages/catalog.json', route => route.fulfill({ json: catalog }));
+  await page.route('**/public-packages/packages/eda-symbol/eda-symbol.rnl', route => route.fulfill({ body: publicPackageText('eda-symbol', symbol.version) }));
   await page.goto(`${base}/?url=libraries/eda-symbol/eda-symbol.rnl`);
   await page.waitForFunction(() => window.viewer?.doc && !document.body.classList.contains('busy'));
   const doc = await page.evaluate(() => window.viewer.doc);
   expect(doc.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
-  expect(doc.files[0].text).toContain('@PACKAGE(name="eda-symbol", version="0.1")');
+  expect(doc.files[0].text).toContain(`@PACKAGE(name="eda-symbol", version="${symbol.version}")`);
   const frame = await start(page);
   const source = fs.readFileSync(new URL('../inputs/missing-canvas-package.sp', import.meta.url), 'utf8');
   await send(page, { type: 'open', text: source, name: 'canvas.sp' });
@@ -604,15 +611,19 @@ test("public packages: only the local library root maps, and missing includes re
 test("public packages: versions coexist at their canonical catalog paths", async ({ page }) => {
   test.skip(!publicPackagesAvailable(), "Run python scripts/packages.py download");
   const catalog = JSON.parse(fs.readFileSync(path.join(process.env.RNL_PACKAGE_FIXTURE, 'catalog.json'), 'utf8'));
+  // the locked eda-symbol, and a later version made of it, 9.9, which no catalog has
   const previous = catalog.packages.find(pkg => pkg.name === 'eda-symbol');
-  const bytes = publicPackageText('eda-symbol').replace('@PACKAGE(name="eda-symbol", version="0.1")', '@PACKAGE(name="eda-symbol", version="0.2")');
-  const next = { ...previous, version: '0.2', path: 'eda-symbol/0.2/eda-symbol.rnl',
-    url: 'packages/eda-symbol/0.2/eda-symbol.rnl', sha256: createHash('sha256').update(bytes).digest('hex') };
+  const text = publicPackageText('eda-symbol', previous.version);
+  const bytes = text.replace(`@PACKAGE(name="eda-symbol", version="${previous.version}")`, '@PACKAGE(name="eda-symbol", version="9.9")');
+  expect(bytes).not.toBe(text);
+  const language = /@VERSION\("([^"]+)"\)/.exec(text)?.[1] ?? '0.3';
+  const next = { ...previous, version: '9.9', path: 'eda-symbol/9.9/eda-symbol.rnl',
+    url: 'packages/eda-symbol/9.9/eda-symbol.rnl', sha256: createHash('sha256').update(bytes).digest('hex') };
   catalog.packages.push(next);
   await page.route('**/public-packages/catalog.json', route => route.fulfill({ json: catalog }));
-  await page.route('**/public-packages/packages/eda-symbol/0.2/eda-symbol.rnl', route => route.fulfill({ body: bytes }));
+  await page.route('**/public-packages/packages/eda-symbol/9.9/eda-symbol.rnl', route => route.fulfill({ body: bytes }));
   const frame = await start(page);
-  const result = await frame.evaluate(async () => {
+  const result = await frame.evaluate(async ([language, version]) => {
     const { default: shell } = await import('./shells/web.js');
     const packages = (await shell.publicPackages()).filter(pkg => pkg.name === 'eda-symbol');
     const items = [];
@@ -621,10 +632,11 @@ test("public packages: versions coexist at their canonical catalog paths", async
       items.push(...await shell.includePackage({ ...pkg, path: 'eda-symbol/eda-symbol.rnl' }));
     }
     shell.setPool(items);
-    const doc = await shell.build({ name: 'versions.sp', text: '* versions\n* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="eda-symbol", version="0.1"); @USE-PACKAGE(name="eda-symbol", version="0.2") }\nR1 a 0 1k\n.end\n' });
+    const header = `@VERSION("${language}"); @USE-PACKAGE(name="eda-symbol", version="${version}"); @USE-PACKAGE(name="eda-symbol", version="9.9")`;
+    const doc = await shell.build({ name: 'versions.sp', text: `* versions\n* @RNL(type="header") { ${header} }\nR1 a 0 1k\n.end\n` });
     return { paths: items.map(item => item.path), errors: doc.diagnostics.filter(d => d.severity === 'error') };
-  });
-  expect(result.paths).toEqual(['/library/eda-symbol/eda-symbol.rnl', '/library/eda-symbol/0.2/eda-symbol.rnl']);
+  }, [language, previous.version]);
+  expect(result.paths).toEqual([`/library/${previous.path}`, '/library/eda-symbol/9.9/eda-symbol.rnl']);
   expect(result.errors).toEqual([]);
 });
 
