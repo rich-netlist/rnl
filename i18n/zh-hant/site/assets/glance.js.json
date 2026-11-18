@@ -49,7 +49,7 @@
   "A bundle: several instances drawn as one symbol, such as a group XI<3:0>; each of its pins stands for the members’ terminals of that name.": "疊畫（bundle）：將多個實例合併繪製為單一符號，例如 XI<3:0> 群組；其每支接腳代表各成員的同名端子。",
   "A definition: roles, parameters and a body, applied with AS or ATTACH. With an empty body it only records what something is.": "一般定義：包含角色、參數與定義本體，透過 AS 或 ATTACH 套用。若定義本體為空，則僅記錄「是什麼」。",
   "Applies a definition to objects that together form it, such as a differential pair or a mirrored pair. Makes a usage, which can be named and selected.": "將定義套用至共同構成該結構的物件，例如差動對或鏡像對。會產生一個可命名及篩選的用例物件。",
-  "Applies a definition written first, adding it onto objects, such as a ground, a port tag, a junction dot or a no-connect mark.": "將寫在前面的定義套用至後方的物件上，例如接地、連接埠標籤、交接圓點或未連接標記。",
+  "Applies a definition written first, adding it onto objects, such as a ground, a port tag, a junction dot or a no-connect mark.": "將寫在前面的定義套用至後方的物件上，例如接地、連接埠標記、交接圓點或未連接標記。",
   "The current direction at a terminal: in, out or unspecified; it affects only the drawing, with no circuit analysis.": "端子上的電流方向：in、out 或 unspecified；僅影響圖面繪製，不進行電路分析。",
   "Selects instances by name, model or type; from a net, it selects the instances with a pin on it.": "依名稱、模型或類型篩選實例；若範圍指定為網路，則篩選出在該網路上有接腳的實例。",
   "Selects terminals by name, by net, or by whether they are wired.": "依名稱、所接網路或是否已連線來篩選端子。",
