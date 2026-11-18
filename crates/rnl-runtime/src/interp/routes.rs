@@ -741,9 +741,6 @@ impl Interp<'_> {
     /// RNL9403 tells of that.
     pub(super) fn note_routes_without_a_tree(&mut self, scene: SceneId) {
         let level = self.scenes[scene].level;
-        if !self.follows_0_4(self.level_unit[level]) {
-            return;
-        }
         let requests = self.scenes[scene].routing_requests.clone();
         let file = self.doc.levels[level].file.clone();
         let by_net = self.routing_net_pins(scene);
