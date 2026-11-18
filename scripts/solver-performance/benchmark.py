@@ -1,7 +1,10 @@
-"""Collect a bounded optimized CLI baseline. No build, solver-option override or retries.
+"""Collect a bounded optimized CLI baseline of the language 0.4, within a fixed work. No build or retries.
 
-Only --execute starts a native command. A successful collection is not performance acceptance.
-Windows owned-Job execution includes CreateProcess setup and complete CLI writeback in the cap.
+Every solve runs with the options of the manifest's `solve`: a fixed work (`limit="work"`) and no
+time limit of the resolution, so that a run writes the same drawing on every machine and its time
+measures how fast the command does that work. Only --execute starts a native command. A
+successful collection is not performance acceptance. Windows owned-Job execution includes
+CreateProcess setup and complete CLI writeback in the cap.
 """
 import argparse
 import csv
@@ -17,10 +20,12 @@ import re
 import time
 from datetime import datetime, timezone
 import windows_process as native
+from prepare_inputs import FAMILIES, REPRESENTATIVES, SIZES
 
-STAGES = ('resolve', 'structure', 'search', 'coords', 'route', 'score')
+# The exclusive stages of a level's profile (rnl solve --profile), the lines layout's among them.
+STAGES = ('resolve', 'structure', 'search', 'tree', 'place', 'lines', 'coords', 'route', 'score')
 RECORD = re.compile(r'@RNL\s*\([^)]*\btype\s*=\s*"generated"[^)]*\bhash\s*=\s*"([^"]+)"', re.S)
-FAMILIES = ('chain', 'diffmirror', 'star', 'disjunctions')
+REPLAY = 'replay options: '
 GIB = 1024**3
 
 
@@ -50,18 +55,33 @@ def finite(value):
 
 def verify_fixtures(root):
     manifest = load(root / 'manifest.json')
-    if len(manifest['representative']) != 11 or len(manifest['synthetic']) != 40 or len(manifest['library']) != 25:
-        raise RuntimeError('Expected the frozen 11 representative / 40 synthetic / 25 library files')
-    if len({p['sha256'] for p in manifest['representative']}) != 11:
+    if manifest.get('schema_version') != 2 or manifest.get('language') != '0.4':
+        raise RuntimeError('Expected the fixtures of schema 2, for the language 0.4')
+    if len(manifest['representative']) != REPRESENTATIVES or len(manifest['synthetic']) != len(FAMILIES)*len(SIZES) or 'library' in manifest:
+        raise RuntimeError(f'Expected {REPRESENTATIVES} representative and {len(FAMILIES)*len(SIZES)} synthetic files, and no packages')
+    if len({p['sha256'] for p in manifest['representative']}) != REPRESENTATIVES:
         raise RuntimeError('Representative inputs are not SHA-distinct')
-    for item in manifest['representative'] + manifest['synthetic'] + manifest['library']:
-        path = root / item.get('input', item.get('path'))
+    for item in manifest['representative'] + manifest['synthetic']:
+        path = root / item['input']
         if not path.resolve().is_relative_to(root.resolve()) or sha(path) != item['sha256']:
-            raise RuntimeError('Frozen fixture bytes differ: ' + str(path))
+            raise RuntimeError('Fixture bytes differ: ' + str(path))
     for family in FAMILIES:
-        if [p['n'] for p in manifest['synthetic'] if p['family'] == family] != [2**n for n in range(1, 11)]:
+        if [p['n'] for p in manifest['synthetic'] if p['family'] == family] != list(SIZES):
             raise RuntimeError('Synthetic queue changed')
+    solve = manifest['solve']
+    if f'work={solve["work"]}' not in solve['solver_config'] or 'limit="work"' not in solve['solver_config'] or solve['solver_options'] != 'time_limit=none':
+        raise RuntimeError('The solve of the manifest is not a fixed work without a time limit')
     return manifest
+
+
+def solve_arguments(manifest):
+    solve = manifest['solve']
+    return ['--solver-options', solve['solver_options'], '--solver-config', solve['solver_config']]
+
+
+def requested_run(manifest):
+    """The run a profile's requested options name: the fixed work of the manifest."""
+    return f'run=work:{manifest["solve"]["work"]}'
 
 
 def resource_sample():
@@ -110,13 +130,17 @@ def guard(path, minimum_free_gib):
 
 def normalize_options(value):
     # Main's sig2 formatter is legacy text; S2's sig3 formatter is structured JSON.
-    # Preserve every main field and its canonical order rather than translating it.
+    # Preserve every main field and its canonical order rather than translating it. The six fields
+    # of 0.3 come first; a level of 0.4 adds its own after them (run, report_hints, tree_work, ...).
     if isinstance(value,str) and value.startswith('tolerance='):
         fields = value.split(';')
         keys = ('tolerance','grid','objectives','beam','budget','time_limit')
-        if len(fields)!=len(keys) or any(part.partition('=')[0]!=key for part,key in zip(fields,keys)) or any(c.isspace() for c in value):
+        if len(fields)<len(keys) or any(part.partition('=')[0]!=key for part,key in zip(fields,keys)) or any(c.isspace() for c in value):
             raise ValueError('invalid legacy canonical field order/completeness')
-        settings = dict(part.split('=',1) for part in fields)
+        extra = [part.partition('=') for part in fields[len(keys):]]
+        if any(not re.fullmatch(r'[a-z_][a-z0-9_]*',key) or not sep or not rest for key,sep,rest in extra) or len({key for key,_,_ in extra})!=len(extra) or any(key in keys for key,_,_ in extra):
+            raise ValueError('invalid legacy canonical added field')
+        settings = dict(part.split('=',1) for part in fields[:len(keys)])
         for name,allow_none,strict_positive in (('tolerance',False,False),('grid',True,True),('time_limit',True,False)):
             number=settings[name]
             if allow_none and number=='none':
@@ -142,16 +166,23 @@ def normalize_options(value):
 
 
 def stdout_options(stdout):
-    lines = [line.removeprefix('solver options: ') for line in stdout.splitlines() if line.startswith('solver options: ')]
-    if len(lines) != 1:
-        return lines, None, ['expected exactly one canonical solver options line']
+    """The replay options `rnl solve` prints for each level it solves, in its order."""
+    lines = [line.strip().removeprefix(REPLAY) for line in stdout.splitlines() if line.strip().startswith(REPLAY)]
+    if not lines:
+        return lines, None, ['expected the replay options of each level solved']
     try:
-        return lines, normalize_options(lines[0]), []
+        return lines, [normalize_options(line) for line in lines], []
     except (ValueError, TypeError) as error:
         return lines, None, [str(error)]
 
 
-def complete_profile_errors(profile, command_seconds=None, expected_options=None):
+def problem_part(signature):
+    """A level's hash without the digest of its options: a profile hashes the options asked for,
+    the record those of the replay, which name the work taken."""
+    return signature.rpartition('.')[0] if isinstance(signature, str) and '.' in signature else signature
+
+
+def complete_profile_errors(profile, command_seconds=None, expected_run=None):
     errors = []
     if not isinstance(profile, dict) or profile.get('schema_version') != 1:
         return ['missing or unsupported profile schema']
@@ -181,8 +212,8 @@ def complete_profile_errors(profile, command_seconds=None, expected_options=None
             errors.append('missing level problem hash')
         try:
             canonical = normalize_options(level.get('options_canonical'))
-            if expected_options is not None and canonical != expected_options:
-                errors.append('profile options differ from stdout defaults')
+            if expected_run is not None and expected_run not in canonical.split(';'):
+                errors.append('profile options do not ask for the fixed work of the manifest')
         except (ValueError, TypeError) as error:
             errors.append('invalid profile options: ' + str(error))
     if finite(profile.get('solver_total_seconds')) and not math.isclose(sum(totals), profile['solver_total_seconds'], rel_tol=1e-8, abs_tol=1e-6):
@@ -203,7 +234,7 @@ def outputs(folder):
             for p in sorted(folder.rglob('*')) if p.is_file()]
 
 
-def classify(native_metrics, exit_code, mode, profile, solved, validated_options=None, profile_errors=None):
+def classify(native_metrics, exit_code, mode, profile, solved, validated_options=None, profile_errors=None, expected_run=None):
     raw = native_metrics['execution_status']
     if raw in ('TIMEOUT', 'LATE_RETURN'):
         return 'TIMEOUT'
@@ -213,13 +244,13 @@ def classify(native_metrics, exit_code, mode, profile, solved, validated_options
         return 'NATIVE_TIME_ERROR'
     if not solved or not any(p['record_hashes'] for p in solved):
         return 'OUTPUT_ERROR'
-    if validated_options is None:
+    if validated_options is None or len(validated_options) != sum(len(p['record_hashes']) for p in solved):
         return 'OPTIONS_ERROR'
     if mode == 'on':
-        errors = profile_errors if profile_errors is not None else complete_profile_errors(profile, native_metrics.get('command_seconds'), validated_options)
+        errors = profile_errors if profile_errors is not None else complete_profile_errors(profile, native_metrics.get('command_seconds'), expected_run)
         if errors:
             return 'PROFILE_ERROR'
-        if sorted(p['problem_hash'] for p in profile['levels']) != sorted(h for p in solved for h in p['record_hashes']):
+        if sorted(problem_part(p['problem_hash']) for p in profile['levels']) != sorted(problem_part(h) for p in solved for h in p['record_hashes']):
             return 'PROFILE_HASH_ERROR'
     return 'COMPLETE'
 
@@ -232,8 +263,14 @@ def scale_stop(off, n):
     return 'QUEUE_GUARD_REACHED_BELOW_10S' if n == 1024 else None
 
 
-def profile_cap(item, off):
-    return 120 if item.get('family') and off['status'] == 'TIMEOUT' else 10 if item.get('family') else item['profile_cap_seconds']
+def off_cap(item, caps):
+    return caps['synthetic_off_seconds'] if item.get('family') else caps['representative_seconds']
+
+
+def profile_cap(item, off, caps):
+    if not item.get('family'):
+        return caps['representative_seconds']
+    return caps['synthetic_profile_after_timeout_seconds'] if off['status'] == 'TIMEOUT' else caps['synthetic_profile_seconds']
 
 
 def measure(item, mode, cap, args, build):
@@ -241,7 +278,7 @@ def measure(item, mode, cap, args, build):
     folder = args.output / ('representative' if 'case_id' in item else 'synthetic') / label.replace('/', '__') / mode
     folder.mkdir(parents=True, exist_ok=False)
     guard(folder / 'resources.json', args.minimum_free_gib)
-    command = [str(args.executable), 'solve', str(args.fixtures / item['input']), '-o', str(folder / 'solved'), '--package-dir', str(args.fixtures / 'library')]
+    command = [str(args.executable), 'solve', str(args.fixtures / item['input']), '-o', str(folder / 'solved')] + args.solve
     if mode == 'on':
         command += ['--profile', str(folder / 'profile.json')]
     env = dict(os.environ); env.pop('RNL_SOLVER_CONFIG', None)
@@ -265,7 +302,7 @@ def measure(item, mode, cap, args, build):
     solved = outputs(folder / 'solved')
     stdout = (folder / 'stdout.txt').read_text(encoding='utf-8-sig', errors='replace')
     option_lines, canonical, option_errors = stdout_options(stdout)
-    profile_errors = complete_profile_errors(profile, metrics.get('command_seconds'), canonical) if mode == 'on' else []
+    profile_errors = complete_profile_errors(profile, metrics.get('command_seconds'), args.run) if mode == 'on' else []
     status = classify(metrics, result.returncode, mode, profile, solved, canonical, profile_errors)
     if status == 'PROFILE_HASH_ERROR':
         profile_errors.append('profile problem hashes differ from generated record hashes')
@@ -273,7 +310,7 @@ def measure(item, mode, cap, args, build):
            'build':build, 'native':metrics, 'output_files':solved, 'solved_directory':str(folder/'solved'),
            'measurement_path':str(folder/'measurement.json'), 'options_canonical_from_stdout':option_lines,
            'validated_options_canonical':canonical, 'options_validation_errors':option_errors,
-           'off_10s_performance_pass':status == 'COMPLETE' and metrics.get('command_seconds', math.inf) <= 10 if mode == 'off' else None,
+           'off_10s_performance_pass':status == 'COMPLETE' and metrics.get('command_seconds', math.inf) <= args.within if mode == 'off' else None,
            'profile_parse_error':parse_error, 'profile_validation_errors':profile_errors,
            'profile_validation_scope':'Full completion requirements; expected partials are nonterminal and remain TIMEOUT, never COMPLETE.',
            'cli_elapsed_seconds':profile.get('cli_elapsed_seconds') if isinstance(profile, dict) else None,
@@ -312,10 +349,10 @@ def pair(off, on):
 
 
 def collect_scale_point(item, args, build, rows):
-    off = measure(item,'off',10,args,build); rows.append(off)
+    off = measure(item,'off',off_cap(item,args.caps),args,build); rows.append(off)
     if off['status'] not in ('COMPLETE','TIMEOUT'):
         return pair(off,None), scale_stop(off,item['n'])
-    on = measure(item,'on',profile_cap(item,off),args,build); rows.append(on)
+    on = measure(item,'on',profile_cap(item,off,args.caps),args,build); rows.append(on)
     return pair(off,on), scale_stop(off,item['n'])
 
 
@@ -324,7 +361,7 @@ def collection_summary(build, rows, pairs, stops, complete, error):
     paired_keys = {json.dumps(p['item'],sort_keys=True) for p in pairs if p['on_status'] != 'NOT_RUN'}
     return {'generated_utc':utc(),'build':build,'pairs':pairs,'stops':stops,
         'collection_complete':complete,'collection_error':error,'measurements':len(rows),
-        'observed_representative_off_runs':sum('case_id' in r['item'] for r in off_rows),'expected_representative_off_runs':11,
+        'observed_representative_off_runs':sum('case_id' in r['item'] for r in off_rows),'expected_representative_off_runs':REPRESENTATIVES,
         'observed_off_measurements':[{'item':r['item'],'status':r['status'],'off_10s_performance_pass':r['off_10s_performance_pass'],'measurement_path':r['measurement_path'],'resource_pressure_observed':r['resource_pressure_observed']} for r in off_rows],
         'unpaired_off_measurements':[{'item':r['item'],'status':r['status'],'measurement_path':r['measurement_path']} for r in off_rows if json.dumps(r['item'],sort_keys=True) not in paired_keys],
         'representative_off_10s_failures':sum(r['off_10s_performance_pass'] is False for r in off_rows if 'case_id' in r['item']),
@@ -343,8 +380,11 @@ def main():
     args = parser.parse_args()
     args.fixtures = args.fixtures.resolve()
     manifest = verify_fixtures(args.fixtures)
+    args.solve, args.run, args.caps = solve_arguments(manifest), requested_run(manifest), manifest['caps']
+    args.within = args.caps['within_seconds']
     if not args.execute:
-        print('Verified frozen fixtures; dry run only: 11 off/on pairs; 4 adaptive families; off cap10s; no native execution')
+        print(f'Verified fixtures of 0.4; dry run only: {REPRESENTATIVES} off/on pairs within {manifest["solve"]["work"]} work; '
+              f'{len(FAMILIES)} adaptive families; off cap {args.caps["representative_seconds"]}s and {args.caps["synthetic_off_seconds"]}s; no native execution')
         return
     if not args.executable or not args.build_info or not args.output:
         parser.error('--execute requires executable, build-info and a new output directory')
@@ -367,8 +407,8 @@ def main():
         save(args.output/'summary.json',collection_summary(build,rows,pairs,stops,collection_complete,collection_error))
     try:
         for item in manifest['representative']:
-            off = measure(item, 'off', 10, args, build); rows.append(off)
-            on = measure(item, 'on', profile_cap(item, off), args, build); rows.append(on)
+            off = measure(item, 'off', off_cap(item, args.caps), args, build); rows.append(off)
+            on = measure(item, 'on', profile_cap(item, off, args.caps), args, build); rows.append(on)
             pairs.append(pair(off, on)); persist()
         for family in FAMILIES:
             for item in (p for p in manifest['synthetic'] if p['family'] == family):
