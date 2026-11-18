@@ -1138,3 +1138,75 @@ fn a_bus_pin_takes_a_rail_stub_only_when_all_its_nets_are_of_that_rail() {
     let ground = read04("R1 a b 1k\nR2 b 0 1k\nR3 c 0 1k\n", "{#R2 #R3} @BUNDLE;");
     assert_eq!((stubs(&ground, "$NET_LABEL_STUB"), stubs(&ground, "$GROUND_STUB")), (3, 1));
 }
+
+/// A transmission gate and an inverter side by side, with what `extra` adds to their record.
+fn complementary_pairs(extra: &str) -> String {
+    format!(
+        r#"* own points of the complementary pairs
+* @RNL(type="header") {{ @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4") }}
+.model nch nmos level=1
+.model pch pmos level=1
+.subckt cell a b c vdd vss
+MP1 a c b vdd pch
+MN1 a c b vss nch
+MP2 c b vdd vdd pch
+MN2 c b vss vss nch
+* @RNL {{
+*   %tg = #MP1(pmos) #MN1(nmos) @AS $TRANSMISSION_GATE;
+*   %inv = #MP2(pmos) #MN2(nmos) @AS $CMOS_INVERTER;
+*   {{%tg %inv}} @ORDER("left-to-right");{extra}
+* }}
+.ends
+.end
+"#
+    )
+}
+
+/// The record that a solve within a fixed work writes into the level `cell` of
+/// [`complementary_pairs`]; the solve reports no error.
+fn solved_pairs(extra: &str) -> String {
+    let files = MemoryProvider::new().with("t.sp", &complementary_pairs(extra));
+    let mut options =
+        rnl_cli::solve::SolveOptions { solver: rnl_solver::SolverOptions::without_time_limit(), ..Default::default() };
+    options.solver.run_limit = Some(rnl_solver::RunLimit::Work(100_000_000));
+    options.solver.safety_seconds = None;
+    let run = rnl_cli::solve::solve(Path::new("t.sp"), &files, &options).unwrap();
+    assert_eq!(rnl_cli::solve::errors(&run), 0, "{:?}", rnl_cli::solve::lines(&run, true));
+    run.levels.iter().find(|l| l.record.contains("%tg @PLACE")).expect("the level cell").record.clone()
+}
+
+/// The coordinates that a solved record places `name` at.
+fn placed(record: &str, name: &str) -> (f64, f64) {
+    let at = format!("{name} @PLACE(");
+    let line = record.lines().find(|l| l.trim_start_matches(['*', ' ']).starts_with(&at)).expect(name);
+    let (x, rest) = line.split_once(&at).unwrap().1.split_once(", ").unwrap();
+    (x.parse().unwrap(), rest.split_once(')').unwrap().0.parse().unwrap())
+}
+
+/// A transmission gate and an inverter put their own point midway between their two
+/// transistors, the PMOS above (libraries/standard/0.4, rnl-std-semantics).
+#[test]
+fn a_transmission_gate_and_an_inverter_hold_their_own_point_midway() {
+    let record = solved_pairs("");
+    for (usage, pmos, nmos) in [("%tg", "#MP1", "#MN1"), ("%inv", "#MP2", "#MN2")] {
+        let (u, p, n) = (placed(&record, usage), placed(&record, pmos), placed(&record, nmos));
+        assert_eq!(u, ((p.0 + n.0) / 2., (p.1 + n.1) / 2.), "{usage} midway between {pmos} and {nmos}:\n{record}");
+        assert!(p.1 > n.1, "{pmos} above {nmos}:\n{record}");
+    }
+}
+
+/// Their facts are low: a file that stacks the NMOS above the PMOS checks with no violation, and
+/// the solve follows the file.
+#[test]
+fn a_file_may_stack_the_nmos_above_the_pmos_against_the_low_facts() {
+    let extra = "\n*   {#MN1 #MP1} @ORDER(\"top-to-bottom\"); {#MN2 #MP2} @ORDER(\"top-to-bottom\");";
+    let r = read(&MemoryProvider::new().with("t.sp", &complementary_pairs(extra)), &Options::default());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    for severity in [Severity::Warning, Severity::Violation] {
+        assert!(by_severity(&r, severity).is_empty(), "{:?}", by_severity(&r, severity));
+    }
+    let record = solved_pairs(extra);
+    for (pmos, nmos) in [("#MP1", "#MN1"), ("#MP2", "#MN2")] {
+        assert!(placed(&record, nmos).1 > placed(&record, pmos).1, "{nmos} above {pmos}:\n{record}");
+    }
+}
