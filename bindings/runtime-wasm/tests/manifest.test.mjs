@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test } from "node:test";
-import { checkManifest, loadManifest, ManifestError, MANIFEST_LIMITS, readManifest, writeManifest } from "../js/manifest.js";
+import { checkManifest, loadManifest, ManifestError, MANIFEST_LIMITS, readManifest, webLink, writeManifest } from "../js/manifest.js";
 
 const BASE = "https://raw.githubusercontent.com/someone/design/0123456789abcdef0123456789abcdef01234567/examples/amp/";
 const sha = (text) => createHash("sha256").update(text).digest("hex");
@@ -62,6 +62,18 @@ test("a manifest gives every file under its id, its pool in order, entry and lev
   assert.ok(!calls.some((url) => url.startsWith(BASE) && url.includes(".packages")));
   assert.deepEqual(progress[0], [0, 5]);
   assert.deepEqual(progress.at(-1), [5, 5]);
+});
+
+test("a source's address is kept only when it is an https one, as webLink says", async () => {
+  for (const url of ["javascript:alert(1)", "data:text/html,x", "http://example.org/x", "not an address"]) {
+    assert.equal(webLink(url), null, url);
+    const source = { repo: "someone/design", commit: "0123456789abcdef0123456789abcdef01234567", url };
+    const read = await readManifest("https://example.test/m.json", { fetch: server(manifest({ source })).fetch });
+    assert.deepEqual(read.source, { repo: source.repo, commit: source.commit });
+  }
+  assert.equal(webLink("https://example.org/x"), "https://example.org/x");
+  const read = await readManifest("https://example.test/m.json", { fetch: server(manifest()).fetch });
+  assert.equal(read.source.url, manifest().source.url);
 });
 
 test("a file whose bytes do not match its SHA-256 or size stops the reading and is named", async () => {

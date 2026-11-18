@@ -129,6 +129,12 @@ export declare function loadManifest(
   options?: ReadOptions & { readFile?: (path: string) => Promise<Uint8Array | null> | Uint8Array | null },
 ): Promise<ManifestRead>;
 
+/**
+ * `url` when it is an https address, which a page may link: the only addresses a manifest's author and source link to;
+ * null for anything else, such as a javascript: or data: address. `loadManifest` keeps a source's url only when it is one.
+ */
+export declare function webLink(url: unknown): string | null;
+
 /** Read the manifest at `url` and its files, each checked against its SHA-256. */
 export declare function readManifest(url: string, options?: ReadOptions): Promise<ManifestRead>;
 
