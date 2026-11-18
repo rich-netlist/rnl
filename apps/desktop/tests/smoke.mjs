@@ -417,6 +417,9 @@ async function drive(app, port, profile, t0, session) {
   });
   console.log(`drawn ${s.level} in ${Date.now() - t0} ms, at ${s.zoom}`);
   await page.evaluate(`window.viewer.command('language-en')`);
+  // the netlists opened below with components not drawn ask nothing: Solve > Ask to Solve on Open off
+  // (the page's tests test the question)
+  await page.evaluate(`import('./util.js').then((u) => u.save('solve-on-open', false))`);
   same(s.level, TOP, "the level drawn");
   await until("the window's title", () => windowTitle(app.pid) === `${TOP} - RNL Viewer`, 10_000);
   await until("painted tab, source and schematic pixels", async () => {
