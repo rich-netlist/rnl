@@ -10,10 +10,10 @@ M6 bias bias 0 0 nch w=8u l=1u
 Ib vdd bias 20u
 CL out 0 1p
 Vdd vdd 0 1.8
-* @RNL(type="header") { @VERSION("0.3")}
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")}
 * @RNL {
 *   &vdd @ADD-TO $SUPPLY_NET_SET;
-*   %dp = #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR;
-*   %cm = {#M3}(ref) {#M4}(out) @AS $CURRENT_MIRROR
+*   %dp = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;
+*   %cm = #M3(ref) #M4(out) @AS $CURRENT_MIRROR_P
 * }
 .end

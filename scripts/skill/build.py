@@ -3,9 +3,9 @@
 whole and that every example in it reads, and its published forms on the project site.
 
 The package is a folder in the Agent Skills format (SKILL.md and the files it points to) that teaches an
-agent to read and write RNL 0.3. Its short guide to the language is spec/rnl-0.3-guide.md and
-spec/rnl-0.3-guide.zh.md, copied; its reference to the standard packages is written from the package files
-in libraries/ and from `rnl catalog`; the rest is written by hand. Standard library only; the checks need
+agent to read and write RNL 0.4. Its short guide to the language is spec/rnl-0.4-guide.md, copied; its
+reference to the standard packages is written from the package files in libraries/standard/0.4 and from
+`rnl catalog --all-versions`; the rest is written by hand. Standard library only; the checks need
 the `rnl` command, which is built with `cargo build -p rnl-cli`."""
 
 from __future__ import annotations
@@ -28,28 +28,30 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 SKILL = ROOT / "skills" / "rnl"
 SPEC = ROOT / "spec"
-SERIES = "0.3"
+SERIES = "0.4"
 SITE_URL = "https://rich-netlist.github.io/rnl/"
 GITHUB = "https://github.com/rich-netlist/rnl"
 
 # the short guide to the language: its source, and where the skill keeps its copy. The package is in English
-# only; the Chinese guide, spec/rnl-0.3-guide.zh.md, is for the Chinese page of the standard.
-GUIDE = (SPEC / "rnl-0.3-guide.md", "references/language.md")
+# only.
+GUIDE = (SPEC / f"rnl-{SERIES}-guide.md", "references/language.md")
 GUIDE_NOTE = (f"> The short guide to the language RNL {SERIES}, for reading and writing RNL files. It is not the standard, "
               f"which prevails where the two differ: {SITE_URL}en/spec/{SERIES}/. Licence: CC-BY-4.0, see `LICENSE.md`.")
 LICENSE_TEXTS = ("MIT", "CC-BY-4.0", "CC0-1.0")  # the licences of what the package holds, copied to LICENSES/
-GALLERY_JS = ROOT / "site" / "src" / "assets" / "gallery.js"  # what each package is for, in English
 SITE_SRC = ROOT / "site" / "src"
-# the package files the reference is written from: the series, and the packages outside it that the
-# catalog lists with it
+# the package files the reference is written from: the series, and the public packages of the lock written
+# in the same language version, which the catalog lists with it
 sys.path.insert(0, str(ROOT / "scripts"))
-from packages import require as require_public_package
+from packages import locks as public_package_locks, require as require_public_package
 LIBRARIES = [ROOT / "libraries" / "standard" / SERIES]
 ALLOWED_FRONT = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
-SUMMARY_LINE = re.compile(r"^\s*'([\w-]+(?: [\d.]+)?)':\s*'<en>(.*?)</en>'", re.M)
 FENCE = re.compile(r"^(```+)([^\n]*)\n(.*?)^\1[ \t]*$", re.M | re.S)
-RULE = re.compile(r'#\s*@SELECT-INSTANCE\((\w+)="([^"]*)"\)\s*=>\s*@SET-SYMBOL\s+(\$\w+)')
-ALIAS = re.compile(r'@ALIAS\("([^"]+)",\s*"([^"]+)"\)')
+RULE = re.compile(r'#\s*@SELECT-INSTANCE\((\w+)="([^"]*)"(?:,\s*recursive=true)?\)\s*=>\s*@SET-SYMBOL\s+(\$\w+)')
+# a rule that picks instances by a terminal on a net of a set, such as the bulk of a MOSFET on a ground net
+NET_RULE = re.compile(r'(\$\w+)\s*@SELECT-TERMINAL\((\w+)="([^"]*)",\s*terminal="(\w+)"(?:,\s*recursive=true)?\)\s*=>'
+                      r'\s*@SELECT-INSTANCE\((?:recursive=true)?\)\s*=>\s*@SET-SYMBOL\s+(\$\w+)')
+ALIAS = re.compile(r'@ALIAS\(')
+HEADER_COMMENT = re.compile(r"\A\s*/\*(.*?)\*/", re.S)
 PACKAGE = re.compile(r'@PACKAGE\(name="([^"]+)",\s*version="([^"]+)"\)')
 COUNTS = re.compile(r"(\d+) errors?, (\d+) violations?, (\d+) warnings?, (\d+) hints?")
 
@@ -80,10 +82,22 @@ def run_rnl(rnl: Path, *args: str) -> subprocess.CompletedProcess:
 
 # --- reading the package files ----------------------------------------------------------------------
 
+def public_packages() -> list[Path]:
+    """The folders of the locked public packages written in the language of the series, which the reference lists
+    with it; a package of another language version cannot be used by a file of this one (16.1)."""
+    found = []
+    for entry in public_package_locks():
+        folder = require_public_package(entry["name"])
+        text = read(folder / f"{entry['name']}.rnl")
+        if re.search(rf'@VERSION\("{re.escape(SERIES)}"\)', text):
+            found.append(folder)
+    return found
+
+
 def package_files() -> dict[tuple[str, str], tuple[Path, str]]:
     """{(name, version): (file, text)} of every package file of the series and of the packages listed with it."""
     found = {}
-    for d in [*LIBRARIES, require_public_package("analog-canvas-extensions")]:
+    for d in [*LIBRARIES, *public_packages()]:
         for f in sorted(d.glob("*.rnl")):
             text = read(f)
             m = PACKAGE.search(text)
@@ -115,22 +129,152 @@ def definitions_comments(text: str) -> dict[str, str]:
             for m in re.finditer(r"^\s*(\$\w+)\s*=\s*@DEFINE\(", text, re.M)}
 
 
-def symbols_in(text: str) -> set[str]:
-    return set(re.findall(r"^\s*(\$\w+)\s*=\s*@DEFINE-SYMBOL\(", text, re.M))
+def _close(text: str, i: int) -> int:
+    """The index of the bracket that closes the one at text[i], past strings and comments."""
+    pairs = {"(": ")", "[": "]", "{": "}"}
+    stack, j = [pairs[text[i]]], i + 1
+    while j < len(text):
+        c = text[j]
+        if c == '"':
+            j += 1
+            while j < len(text) and text[j] != '"':
+                j += 2 if text[j] == "\\" else 1
+        elif text.startswith("/*", j):
+            j = text.index("*/", j) + 1
+        elif c in pairs:
+            stack.append(pairs[c])
+        elif c == stack[-1]:
+            stack.pop()
+            if not stack:
+                return j
+        j += 1
+    raise ValueError("unclosed bracket")
 
 
-def summaries() -> dict[str, str]:
-    """What each package is for, in English, from the gallery's table: {'rnl-std-fill': …, 'rnl-std-fill 0.3': …}."""
-    result = {m.group(1): re.sub(r"\s+", " ", m.group(2)).replace("’", "'") for m in SUMMARY_LINE.finditer(read(GALLERY_JS))}
-    catalog = json.loads(read(ROOT / ".rnl-packages" / "catalog.json"))
-    # The lock may hold several versions of a package; the skill describes the first, which it reads.
-    first = {}
-    for p in json.loads(read(ROOT / "packages.lock.json"))["packages"]:
-        first.setdefault(p["name"], p["version"])
-    for p in catalog["packages"]:
-        if first.get(p["name"], p["version"]) == p["version"]:
-            result[p["name"]] = re.sub(r"\s+", " ", p["summary"]["en"]).replace("’", "'")
+def _statements(body: str) -> list[str]:
+    """The statements of a definition body, comments and strings left out."""
+    out, cur, j = [], [], 0
+    while j < len(body):
+        c = body[j]
+        if c == '"':
+            k = j + 1
+            while k < len(body) and body[k] != '"':
+                k += 2 if body[k] == "\\" else 1
+            cur.append('""')
+            j = k + 1
+            continue
+        if body.startswith("/*", j):
+            j = body.index("*/", j) + 2
+            continue
+        if c == ";":
+            out.append("".join(cur))
+            cur = []
+        else:
+            cur.append(c)
+        j += 1
+    out.append("".join(cur))
+    return [s.strip() for s in out if s.strip()]
+
+
+def _items(args: str) -> list[tuple[set[str], str | None]]:
+    """The objects before @AS: for each, the roles of the definition it holds and the role it fills, if named."""
+    items, j = [], 0
+    while j < len(args):
+        if args[j] == "{":
+            k = _close(args, j)
+        elif args[j] == "?":
+            k = j + 1
+            while k < len(args) and (args[k].isalnum() or args[k] == "_"):
+                k += 1
+            if k < len(args) and args[k] == "{":
+                k = _close(args, k) + 1
+            k -= 1
+        else:
+            j += 1
+            continue
+        text = args[j:k + 1]
+        role = None
+        rest = args[k + 1:]
+        m = re.match(r"\(([A-Za-z_]\w*)\)", rest)
+        if m:
+            role = m.group(1)
+            k += len(m.group(0))
+        items.append((set(re.findall(r"\?([A-Za-z_]\w*)", text)), role))
+        j = k + 1
+    return items
+
+
+def definition_groups(texts: list[str]) -> dict[str, str]:
+    """{definition: what it groups} for the definitions of the package texts, read from their bodies: a GROUP
+    of its own, `yes: role, role`; a group made by a definition it applies with AS, `via $X: role, role`, for
+    the roles that fill the grouped roles of $X; nothing when it makes no group."""
+    defs = {}
+    for text in texts:
+        for m in re.finditer(r"(\$[A-Z0-9_]+)\s*=\s*@DEFINE\(", text):
+            i = m.end() - 1
+            j = _close(text, i)
+            rm = re.search(r"roles\s*=\s*\[", text[i:j])
+            roles = []
+            if rm:
+                a = i + rm.end() - 1
+                roles = [r if isinstance(r, str) else r[0] for r in json.loads(text[a:_close(text, a) + 1])]
+            b = text.index("{", j)
+            defs[m.group(1)] = ([r.strip("{}") for r in roles], _statements(text[b + 1:_close(text, b)]))
+    memo: dict[str, list[tuple[str, frozenset]]] = {}
+
+    def groups(name: str, seen=()) -> list[tuple[str, frozenset]]:
+        if name in memo:
+            return memo[name]
+        roles, stmts = defs[name]
+        out = []
+        for s in stmts:
+            if re.search(r"@GROUP\b", s):
+                got = frozenset(re.findall(r"\?([A-Za-z_]\w*)", s.split("@GROUP")[0])) & set(roles)
+                if got:
+                    out.append((name, got))
+            m = re.match(r"(.*?)@AS(?:\([^)]*\))?\s+(\$[A-Z0-9_]+)\b", s, re.S)
+            if m and m.group(2) in defs and m.group(2) not in seen:
+                inner_roles = defs[m.group(2)][0]
+                filled = []  # (roles of this definition, the role of the inner one it fills)
+                for n, (held, role) in enumerate(_items(m.group(1))):
+                    filled.append((held, role or (inner_roles[n] if n < len(inner_roles) else None)))
+                for writer, grouped in groups(m.group(2), seen + (name,)):
+                    got = frozenset().union(*[held for held, role in filled if role in grouped]) & set(roles)
+                    if got:
+                        out.append((writer, got))
+        uniq = []
+        for g in out:
+            if g not in uniq:
+                uniq.append(g)
+        memo[name] = uniq
+        return uniq
+
+    result = {}
+    for name, (roles, _) in defs.items():
+        parts = []
+        found = groups(name)
+        # a group inside another of the same definition, such as the amplifier inside a degenerated one, is not listed
+        found = [(w, g) for w, g in found if not any(g < h for _, h in found)]
+        for writer, got in found:
+            listed = ", ".join(r for r in roles if r in got)
+            parts.append(f"yes: {listed}" if writer == name else f"via {writer}: {listed}")
+        result[name] = "; ".join(parts)
     return result
+
+
+def symbols_in(text: str) -> set[str]:
+    return set(re.findall(r"^\s*(\$\w+)\s*=\s*@DEFINE-SYMBOL\b", text, re.M))
+
+
+def summary(text: str) -> str:
+    """What a package is for: the first sentence of its opening comment that is not the one naming it, such as
+    "rnl-std-fill 0.4, a package of the standard series 0.4 (16.3)."."""
+    m = HEADER_COMMENT.match(text)
+    body = " ".join(m.group(1).split()) if m else ""
+    for sentence in re.split(r"(?<=\.)\s+(?=[A-Z0-9`$])", body):
+        if not re.match(r"[\w-]+ [\d.]+, (a|an|the) ", sentence):
+            return table_cell(sentence)
+    return ""
 
 
 # --- the reference to the packages ------------------------------------------------------------------
@@ -145,24 +289,23 @@ def role_text(role) -> str:
 
 
 def packages_md(rnl: Path) -> str:
-    r = run_rnl(rnl, "catalog", "--path", str(require_public_package("analog-canvas-extensions")))
+    args = ["catalog", "--all-versions"]
+    for folder in public_packages():
+        args += ["--path", str(folder)]
+    r = run_rnl(rnl, *args)
     if r.returncode != 0:
         raise Failed(f"rnl catalog:\n{r.stderr or r.stdout}")
     cat = json.loads(r.stdout)
     files = package_files()
-    brief = summaries()
 
     def wanted(x: dict) -> bool:  # packages name themselves "name", what they hold name them "package"
-        return x["version"] == SERIES or x.get("package", x.get("name")) == "analog-canvas-extensions"
+        return (x.get("package", x.get("name")), x["version"]) in files
 
     pkgs = sorted((p for p in cat["packages"] if wanted(p)), key=lambda p: p["name"])
-    # The standard catalog plus the explicitly supplied public extension must match this checkout.
+    # The catalog of the series plus the public packages of its language must match this checkout.
     errors = []
-    for p in pkgs:
-        if (p["name"], p["version"]) not in files:
-            errors.append(f"the catalog lists {p['name']} {p['version']}, which has no package file in libraries/")
     for key in files:
-        if key[0] not in {p["name"] for p in pkgs}:
+        if key not in {(p["name"], p["version"]) for p in pkgs}:
             errors.append(f"{key[0]} {key[1]} has a package file, but the catalog does not list it: rebuild rnl")
     syms = [s for s in cat["symbols"] if wanted(s)]
     for (name, version), (_, text) in files.items():
@@ -176,20 +319,24 @@ def packages_md(rnl: Path) -> str:
     out = [
         f"# The standard packages, series {SERIES}",
         "",
-        f"<!-- Generated by scripts/skill/build.py from libraries/ and `rnl catalog`. Edit those, not this file. -->",
+        "<!-- Generated by scripts/skill/build.py from libraries/ and `rnl catalog`. Edit those, not this file. -->",
         "",
         f"What a file of RNL {SERIES} can name without writing it: the definitions its statements fill (`@AS $NAME`), "
-        "the symbols its instances are drawn with, and the sets it edits. The package `rnl-std` is used at the root "
-        "of every file implicitly; the others are used by naming them in the header record. A name that is not in the "
-        "packages in use is an error, and `rnl check` suggests the closest one. This reference is written from the "
-        f"package files of the series {SERIES} and from the catalog of the `rnl` command, and is in step with them.",
+        "the symbols its instances are drawn with, and the sets it edits. No package is used by itself: a file names "
+        f"the collection `rnl-std-all` in its header record, or the packages it wants one by one, and a file of {SERIES} "
+        f"uses only packages of {SERIES}. A name that is not in the packages in use is an error, and `rnl check` "
+        f"suggests the closest one. This reference is written from the package files of the series {SERIES} and from "
+        "the catalog of the `rnl` command, and is in step with them.",
         "",
-        "Using a package other than `rnl-std`, in the header record (the standard 16.2, 16.3, 16.5):",
+        "The header record of a file that uses the whole series, the optional `rnl-std-no-labels` and the Chinese "
+        "aliases (the standard 2.8, 16.2, 16.3, 16.5):",
         "",
         "```rnl",
         "@RNL(type=\"header\") {",
         f"  @VERSION(\"{SERIES}\");",
-        f"  @USE-PACKAGE(name=\"rnl-std-full\", version=\"{SERIES}\")",
+        f"  @USE-PACKAGE(name=\"rnl-std-all\", version=\"{SERIES}\");",
+        f"  @USE-PACKAGE(name=\"rnl-std-no-labels\", version=\"{SERIES}\");",
+        f"  @USE-ALIASES(name=\"alias-zh\", version=\"{SERIES}\")",
         "}",
         "```",
         "",
@@ -199,72 +346,87 @@ def packages_md(rnl: Path) -> str:
         "| --- | --- | --- |",
     ]
     for p in pkgs:
-        name = f"`{p['name']}` {p['version']}" + (" (implicit)" if p["implicit"] else "")
-        what = brief.get(f"{p['name']} {p['version']}") or brief.get(p["name"]) or ""
+        name = f"`{p['name']}` {p['version']}"
+        what = summary(files[p["name"], p["version"]][1])
         if not what:
-            errors.append(f"{p['name']}: no line in SUMMARY of {GALLERY_JS.relative_to(ROOT)}")
+            errors.append(f"{p['name']}: its package file opens with no comment that says what it is for")
         refs = ", ".join(f"`{x}`" for x in p["references"]) or "–"
         out.append(f"| {name} | {refs} | {what} |")
     if errors:
         raise Failed("\n".join(errors))
 
     out += ["", "## Definitions", "",
-            "A definition is used as `#A(role) #B(role) @AS $DEFINITION` (the standard 9.5). A role in braces, such as "
-            "`{tail}`, is a set: it takes any number of objects, none included. A role has a kind, "
-            "which says what may fill it; parameters have defaults.", ""]
+            "A definition is used as `#A(role) #B(role) @AS $DEFINITION` or `$DEFINITION @ATTACH #A(role) …` (the "
+            "standard 9.4, 9.5). A role in braces, such as `{members}`, is a set: it takes any number of objects, none "
+            "included. A role has a kind, which says what may fill it; parameters have defaults. Group is read from the "
+            "body of the definition: *yes* with the roles whose members it makes one group, *via* `$X` with the roles "
+            "it passes to a definition `$X` that makes the group, and – when it makes none (the standard 11.5; see "
+            "Groups in good-drawings.md).", ""]
+    grouping = definition_groups([text for _, text in files.values()])
     for p in pkgs:
         defs = [d for d in cat["definitions"] if d["package"] == p["name"] and d["version"] == p["version"]]
         if not defs:
             continue
         comments = definitions_comments(files[p["name"], p["version"]][1])
-        out += [f"### {p['name']}", "", "| Definition | Roles | Parameters (defaults) | Symbol | Comment before it in the file |", "| --- | --- | --- | --- | --- |"]
+        out += [f"### {p['name']}", "",
+                "| Definition | Roles | Parameters (defaults) | Symbol | Group | Comment before it in the file |",
+                "| --- | --- | --- | --- | --- | --- |"]
         for d in defs:
             roles = ", ".join(role_text(x) for x in d["roles"]) or "–"
             params = ", ".join(f"`{k}` = `{json.dumps(v)}`" for k, v in d["parameters"]) or "–"
             sym = f"`{d['symbol']}`" if d["symbol"] else "–"
-            out.append(f"| `{d['definition']}` | {roles} | {params} | {sym} | {comments.get(d['definition'], '')} |")
+            grouped = grouping.get(d["definition"], "")
+            grouped = re.sub(r"via (\$[A-Z0-9_]+)", lambda m: f"via `{m.group(1)}`", grouped) or "–"
+            out.append(f"| `{d['definition']}` | {roles} | {params} | {sym} | {grouped} | {comments.get(d['definition'], '')} |")
         out.append("")
 
     out += ["## Symbols", "",
             "A symbol is chosen by the rules of the next section, or by `@SET-SYMBOL $NAME` on an object or a set. Pins "
-            "are listed by terminal number with the direction a wire leaves in. The standard symbols are drawn in "
-            "grid steps, y up.", ""]
+            "are listed by terminal with the direction a wire leaves in. The standard symbols are drawn in grid steps, "
+            "y up.", ""]
     for p in pkgs:
         mine = [s for s in syms if s["package"] == p["name"] and s["version"] == p["version"]]
         if not mine:
             continue
         out += [f"### {p['name']}", "", "| Symbol | Pins | Labels | Definition |", "| --- | --- | --- | --- |"]
         for s in sorted(mine, key=lambda s: s["symbol"]):
-            pins = " ".join(f"{x['terminal']}:{x['direction']}" for x in sorted(s["pins"], key=lambda x: x["terminal"])) or "–"
+            pins = " ".join(f"{x['terminal']}:{x['direction']}"
+                            for x in sorted(s["pins"], key=lambda x: str(x["terminal"]))) or "–"
             labels = ", ".join(x["key"] for x in s["labels"]) or "–"
-            out.append(f"| `{s['symbol']}` | {pins} | {labels} | {('`' + s['definition'] + '`') if s['definition'] else '–'} |")
+            out.append(f"| `{s['symbol']}` | {pins} | {labels} | "
+                       f"{('`' + s['definition'] + '`') if s['definition'] else '–'} |")
         out.append("")
 
     out += ["## Which symbol an instance gets", "",
-            "The rules of `rnl-std-spice` and `rnl-std-spectre` give an instance its symbol; the narrow rules (by model type) "
-            "come later than the broad ones and win. A file of SPICE uses the first, a file of Spectre the second (16.3).", ""]
+            "The rules of `rnl-std-spice` and `rnl-std-spectre` give an instance its symbol; `rnl-std-all` brings in the "
+            "first for the sections in SPICE and the second for those in Spectre, through a header record for each "
+            "language (2.8, 16.3). The narrow rules come later than the broad ones and win.", ""]
     for pkg, intro in (("rnl-std-spice", "SPICE, by the first letter of the instance's name, then by the type of its `.model`"),
                        ("rnl-std-spectre", "Spectre, by master (primitives), then by the type of the model card")):
         text = files[pkg, SERIES][1]
         rules = RULE.findall(text)
-        if len(rules) != text.count("@SELECT-INSTANCE"):
+        by_net = NET_RULE.findall(text)
+        if len(rules) + len(by_net) != text.count("@SELECT-INSTANCE"):
             raise Failed(f"{pkg}: a rule in a shape that the generator does not read")
         out += [f"### {pkg}: {intro}", "", "| Selector | Symbol |", "| --- | --- |"]
         out += [f"| `{k}=\"{v}\"` | `{sym}` |" for k, v, sym in rules]
+        out += [f"| `{k}=\"{v}\"` with its terminal `{t}` on a net of `{net_set}` | `{sym}` |"
+                for net_set, k, v, t, sym in by_net]
         out.append("")
 
     out += ["## Sets", "",
-            "The sets that `rnl-std-fill` decides the automatic fill by; a file adds to them or takes from them with "
-            "`@ADD-TO` and `@REMOVE-FROM`.", "", "| Set | Package |", "| --- | --- |"]
-    out += [f"| `{s['set']}` | `{s['package']}` |" for s in cat["sets"] if s["version"] == SERIES]
+            "The sets of the packages; the fill of `rnl-std-fill` is decided by them. A file adds to them or takes "
+            "from them with `@ADD-TO` and `@REMOVE-FROM`.", "", "| Set | Package |", "| --- | --- |"]
+    out += [f"| `{s['set']}` | `{s['package']}` |" for s in cat["sets"] if wanted(s)]
     out.append("")
 
-    aliases = len(ALIAS.findall(files["rnl-zh", SERIES][1]))
-    out += [f"## Chinese aliases", "",
-            f"`rnl-zh` {SERIES} gives Chinese spellings of the keywords, of the names above and of the parameters and roles "
-            f"of their definitions: {aliases} aliases, listed in `libraries/standard/0.3/rnl-zh.rnl` of the repository. A file "
-            f"loads it with `@USE-ALIASES(name=\"rnl-zh\", version=\"{SERIES}\")` in the header record. Each alias reads as "
-            "the standard word it stands for (16.5), so a file may mix both spellings, and the standard spellings keep working.", ""]
+    aliases = len(ALIAS.findall(files["alias-zh", SERIES][1]))
+    out += ["## Chinese aliases", "",
+            f"`alias-zh` {SERIES} gives Chinese spellings of the keywords, of the names above and of the parameters and "
+            f"roles of their definitions: {aliases} aliases, listed in `libraries/standard/{SERIES}/alias-zh.rnl` of the "
+            f"repository. A file loads it with `@USE-ALIASES(name=\"alias-zh\", version=\"{SERIES}\")` in the header "
+            "record. Each alias reads as the standard word it stands for (16.5), so a file may mix both spellings, and "
+            "the standard spellings keep working.", ""]
     return "\n".join(out).rstrip() + "\n"
 
 
@@ -349,8 +511,17 @@ def check_links() -> list[str]:
     return errors
 
 
+# Whether the site's texts (agents.html, llms.txt) are those of this package. While the site publishes the skill of
+# the released core it is pinned to (pages.yml), its texts name that package's files, and this is False; the change
+# that publishes this package sets it to True with the texts.
+SITE_TEXTS_OF_THIS_PACKAGE = False
+
+
 def check_site_texts() -> list[str]:
     """The pages and the llms.txt of the site name every file of the package, so they cannot fall behind it."""
+    if not SITE_TEXTS_OF_THIS_PACKAGE:
+        print("site texts not checked: the site publishes the skill of its pinned core")
+        return []
     errors = []
     for name in ("agents.html", "llms.txt"):
         text = read(SITE_SRC / name)
@@ -361,12 +532,13 @@ def check_site_texts() -> list[str]:
 
 def netlists() -> list[tuple[str, str, str, bool]]:
     """(where, file name, text, errors expected) of every netlist in the package: the code blocks marked `spice`
-    or `spectre` in its Markdown files, and the files of examples/. A block marked `error` is expected to fail."""
+    or `spectre` in its Markdown files, and the files of examples/. A block marked `error` is expected to fail;
+    one marked `fragment` is part of a file and is not checked."""
     found = []
     for md in sorted(SKILL.rglob("*.md")):
         for i, m in enumerate(FENCE.finditer(read(md)), 1):
             words = m.group(2).split()
-            if words and words[0] in ("spice", "spectre"):
+            if words and words[0] in ("spice", "spectre") and "fragment" not in words:
                 ext = ".scs" if words[0] == "spectre" else ".sp"
                 line = read(md)[:m.start()].count("\n") + 2
                 found.append((f"{md.relative_to(SKILL).as_posix()}:{line}", f"block{i}{ext}", m.group(3), "error" in words))
@@ -422,7 +594,7 @@ def git_commit() -> str:
 
 def git_time() -> int:
     r = subprocess.run(["git", "-C", str(ROOT), "log", "-1", "--format=%ct", "--", "skills/rnl",
-                        "spec/rnl-0.3-guide.md", "spec/rnl-0.3-guide.zh.md"], capture_output=True, text=True)
+                        f"spec/rnl-{SERIES}-guide.md"], capture_output=True, text=True)
     # Preserve the previously published zip for unchanged skill files when build plumbing changes.
     return max(1792412288, int(r.stdout.strip())) if r.returncode == 0 and r.stdout.strip() else 1792412288
 

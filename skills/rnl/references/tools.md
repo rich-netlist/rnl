@@ -42,19 +42,19 @@ approved core/Viewer releases; no release is implied by the source changes.
 
 ## Reading the standard source
 
-The full normative Markdown is `spec/rnl-0.3.md` in the RNL repository. Read that
+The full normative Markdown is `spec/rnl-0.4.md` in the RNL repository. Read that
 file directly when a checkout is available. For a standalone skill installation,
-fetch [the raw English text](https://raw.githubusercontent.com/rich-netlist/rnl/main/spec/rnl-0.3.md)
-or [its Chinese translation](https://raw.githubusercontent.com/rich-netlist/rnl/main/spec/rnl-0.3.zh.md).
-English prevails. These are the complete texts assembled from `spec/0.3/en/` and
-`spec/0.3/zh/`; the bundled `language.md` is only a short guide. Search the full
+fetch [the raw English text](https://raw.githubusercontent.com/rich-netlist/rnl/main/spec/rnl-0.4.md)
+or [its Chinese translation](https://raw.githubusercontent.com/rich-netlist/rnl/main/spec/rnl-0.4.zh.md).
+English prevails. These are the complete texts assembled from `spec/0.4/en/` and
+`spec/0.4/zh/`; the bundled `language.md` is only a short guide. Search the full
 text for the relevant section or keyword, then read it in context.
 
 If raw.githubusercontent.com is unavailable, GitHub's contents API can return
 the Markdown directly, without reading an HTML page:
 
 ```sh
-gh api 'repos/rich-netlist/rnl/contents/spec/rnl-0.3.md?ref=main' -H 'Accept: application/vnd.github.raw+json'
+gh api 'repos/rich-netlist/rnl/contents/spec/rnl-0.4.md?ref=main' -H 'Accept: application/vnd.github.raw+json'
 ```
 
 For a specified revision, replace `main` with that tag/commit in the raw URL or
@@ -150,21 +150,50 @@ rnl replace-records FILE --level TITLE --records RECORDS --in-place
 rnl problem | solve | snapshot | write | ...   what a solver reads, solving, the editor interface
 ```
 
-FILE is a SPICE netlist, a Spectre netlist (`.scs`) or a package file (`.rnl`). Options worth knowing: `--package-dir DIR` looks for packages in DIR as well (repeatable), `--no-std` does not use the standard package, `--std-version V` reads a file with the series V (`0.2` to read a file of 0.3 with the series 0.2), `--dialect spice|spectre` instead of guessing from the file.
+FILE is a SPICE netlist, a Spectre netlist (`.scs`) or a package file (`.rnl`). Options worth knowing: `--package-dir DIR` looks for packages in DIR as well (repeatable), `--path DIR` looks for packages and included files there, `--dialect spice|spectre` instead of guessing from the file.
 
 `rnl check` prints one line per diagnostic, `error`, `violation`, `warning` or `hint`, with the file and line and its kind (a number and a short name), and ends with a count. It exits with 1 only when there are errors or violations; read the warnings as well. For the example in `SKILL.md`:
 
 ```text
-hint ota5t.sp:3: RNL9404 unplaced-objects: ota5t: 9 objects have no position and are left to a solver; they are not drawn: #M1, #M2, %g0, a usage of $IO_PORT, ...
-status ota5t: 9 without a position; constraints: 2 unsolved
-0 errors, 0 violations, 0 warnings, 1 hints
+hint ota5t.sp:4: RNL9404 unplaced-objects: ota5t: 8 objects have no position and are left to a solver; they are not drawn: #M1, #M2, %g0, %l, %l, %l, %l, %l
+status ota5t: 8 without a position; constraints: 21 unsolved
+0 errors, 0 violations, 0 warnings, 1 hint
 ```
 
 The hint is expected for a file without positions. Without a solver, `render` draws only what has coordinates; `examples/ota5t-placed.sp` gives every object a position and is drawn completely. `rnl catalog` prints what [packages.md](packages.md) lists, from the packages the command bundles.
 
-`rnl solve FILE -o DIR` places what has no position and writes the answer back as `type="generated"` records, in files under DIR. It is a first solver: its result can differ from one run to the next when it hits its time limit, and a person should look at it before keeping it.
+`rnl groups circuit.sp` prints the tree of groups of each level, the one the solver lays out: the level, `(level)`, then each group under the smallest group that holds it. Each line names the group (a group a structure makes goes by its usage and definition, `%dp · $DIFFERENTIAL_PAIR_N`), lists the devices it holds directly, those in no group under it, counts its virtual parts (ports, grounds, supplies, dots; `--all` names them too), and ends with its number of devices and, in brackets, where the file writes it. Groups that are not blocks follow under `outside the tree:`, such as one that `CROSSES` another. Run it after writing the constraints: a level or group that holds many devices directly is a place to add a group ([good-drawings.md](good-drawings.md#groups)); `rnl check` gives the hint `crowded-node` where one holds more than 20. `--level TITLE` shows one level, `--json` gives the tree as JSON.
+
+```text
+$ rnl groups amp.sp --level amp
+amp · language 0.4 · 4 groups
+  (level) · #M8 #CL + 21 virtual · 2 devices
+    %ota · #M3 #M4 · 2 devices (written at amp.sp:17)
+      %dp · $DIFFERENTIAL_PAIR_N · #M1 #M2 #M5 · 3 devices (applied at amp.sp:16)
+    %out · $TRANSCONDUCTOR_Z_AMPLIFIER · #M6 #M7 · 2 devices (applied at amp.sp:18)
+    %port_column · 5 virtual · 0 devices (made by a rule of rnl-std-fill)
+```
+
+`rnl solve FILE -o DIR` places what has no position and writes the answer back as `type="generated"` records, in files under DIR. It is a first solver: its result can differ from one run to the next when it hits its time limit, and a person should look at it before keeping it. The next solve replaces those records as a whole; to keep part of a result, copy it into a record of your own ([good-drawings.md](good-drawings.md#fine-tuning-a-solved-drawing)).
+
+The solver's settings go in `--solver-config` as named parameters, such as `--solver-config 'limit="time",seconds=30'`, in a `@SOLVER-CONFIG(...)` statement of the file, or in the viewer under Solve > Settings; `rnl solver-defaults` lists them with their defaults. Two of them change how the default layout ranks the drawings it makes: `lines_order`, the order of what it compares after the rules (such as `crossings_and_bends`, `length`, `symbol_lines` and `area`; an item left out does not count), and `virtual_weight`, from 0 to 1 (0.5 by default), what a row or column counts when only virtual parts take it: the objects that are not in the netlist, such as supply and ground symbols and port tags; one that an instance of the netlist or a bundle takes counts 1.
 
 `rnl solve` and `rnl strip-generated` write each file in the encoding it was read in: UTF-8, or Latin-1 for a file that is not valid UTF-8. If the written text needs a character Latin-1 cannot hold, they write nothing and name the character; add `--encoding utf8` to write UTF-8 instead.
+
+### Moving a file of 0.3 to 0.4
+
+The core reads only the language 0.4 from 0.6.0 on. A file of 0.3 (its header record says `@VERSION("0.3")`, or it has none and was written for 0.3) is moved once, with `rnl upgrade` of the last core release 0.5.x, which is kept for this; download it from the [releases](https://github.com/rich-netlist/rnl/releases) by its tag `core-v0.5.x`.
+
+```sh
+rnl upgrade old.sp                              # preview: what it would change, nothing written
+rnl upgrade old.sp -o upgraded --report up.json # write the file of 0.4 under upgraded/, with a report
+rnl upgrade old.sp --approximate -o upgraded    # also make the choices that need a guess, such as _N or _P
+```
+
+- It writes the header record of 0.4 with `@USE-PACKAGE(name="rnl-std-all", version="0.4")`, renames what the series renamed, and writes rules that keep the fill of 0.3 where 0.4 fills differently.
+- What it cannot decide alone, it leaves as it was, with a `/* rnl upgrade: … */` comment before the statement, such as `$DIFFERENTIAL_PAIR`, which 0.4 splits into `$DIFFERENTIAL_PAIR_N` and `$DIFFERENTIAL_PAIR_P` with the roles `left`, `right` and `tail`. Rewrite those statements by hand with [packages.md](packages.md), then delete the comments.
+- The compatibility rules it writes are long. When a person or an agent maintains the file, it is often clearer to write the header record and the structures again in 0.4 and drop those rules; check the drawing after either way.
+- Check the result with a current core, until it has no errors, violations or warnings. The renames of the series are listed in `libraries/standard/README.md` of the repository.
 
 ## The npm package `@rich-netlist/runtime`
 
@@ -197,7 +226,7 @@ const errors = document.diagnostics.filter((d) => d.severity === "error").length
 process.exit(errors || document.failed ? 1 : 0);
 ```
 
-`build` takes `files`, the texts of the workspace by path, with the entry among them: put the files a netlist includes there too, under the paths it includes them by. `core.catalog({ catalog: {} })` lists the symbols, definitions and sets of the packages; `core.snapshot(...)` gives the model by ids an editor can write back. The package bundles the standard packages, series 0.2 and 0.3, so a netlist that names them needs no package files. Its README, with the requests and the settings a Vite frontend needs: <https://github.com/rich-netlist/rnl/tree/main/packages/runtime#readme>.
+`build` takes `files`, the texts of the workspace by path, with the entry among them: put the files a netlist includes there too, under the paths it includes them by. `core.catalog({ catalog: {} })` lists the symbols, definitions and sets of the packages; `core.snapshot(...)` gives the model by ids an editor can write back. The package bundles the standard packages of the series 0.4, so a netlist that names them needs no package files. Its README, with the requests and the settings a Vite frontend needs: <https://github.com/rich-netlist/rnl/tree/main/packages/runtime#readme>.
 
 ## The web viewer
 
