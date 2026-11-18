@@ -182,8 +182,7 @@ Complete files that follow these points; each checks without errors and solves.
 | File | What it shows |
 | --- | --- |
 | [solver-cs-amp.sp](../examples/solver-cs-amp.sp) | A common-source stage: one column for the DC path, the load capacitor and the output port to its right, the output net routed |
-| [ota5t.sp](../examples/ota5t.sp) | A five-transistor OTA with its bias mirror: the bias diode and the two branches in three columns, the pair and its load wired, both inputs alike |
+| [two-stage-amp.sp](../examples/two-stage-amp.sp) | A two-stage op-amp, a five-transistor OTA and a common-source stage: the bias diode, the two branches of the first stage and the second stage in four columns, the pair and its load wired, the gates of each mirror facing each other, both inputs alike, the signal nets routed, the bias of the second stage left to its name |
 | [solver-cascode-mirror.sp](../examples/solver-cascode-mirror.sp) | A cascode current mirror: two columns of three; only the tops of the columns aligned by hand |
-| [solver-miller-ota.sp](../examples/solver-miller-ota.sp) | A two-stage Miller op-amp: a sideways compensation network between the stages, the signal nets routed, the bias net left to its name |
 | [solver-pi-follower.sp](../examples/solver-pi-follower.sp) | A pi filter and a source follower: a signal path from left to right through series parts |
 | [solver-sampler-inverter.sp](../examples/solver-sampler-inverter.sp) | A transmission-gate sampler and an inverter: switches turned sideways by one pin direction, no CURRENT |
