@@ -18,6 +18,8 @@ on:
       - "libraries/**"
       - "tests/**"
       - "!tests/viewer/**"
+      # the inputs the tests of rnl-view and of the WebAssembly binding read
+      - "tests/viewer/inputs/**"
       - "scripts/fonts.py"
       - "scripts/solver-performance/**"
       - ".github/workflows/solver-performance.yml"
@@ -39,6 +41,8 @@ on:
       - "libraries/**"
       - "tests/**"
       - "!tests/viewer/**"
+      # the inputs the tests of rnl-view and of the WebAssembly binding read
+      - "tests/viewer/inputs/**"
       - "scripts/fonts.py"
       - "scripts/solver-performance/**"
       - ".github/workflows/solver-performance.yml"

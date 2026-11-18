@@ -371,7 +371,7 @@ mod tests {
         let text = include_str!("../../../../tests/viewer/inputs/symbol-inspector.sp");
         let d = build("a.sp", &MemoryProvider::new().with("a.sp", text), &BuildOptions::default()).unwrap();
         assert!(d.diagnostics.iter().all(|d| d.severity != "error"), "{:?}", d.diagnostics);
-        assert_eq!(d.files[0].semantics, [12, 31]);
+        assert_eq!(d.files[0].semantics, [14, 33]);
         let root = &d.levels[0];
         let leaf = &d.levels[1];
         let child = |name| root.children.iter().find(|c| c.instance == name).unwrap().symbol.unwrap();
@@ -381,7 +381,7 @@ mod tests {
         assert_eq!(d.symbols.len(), 3, "shared symbols are carried once");
         let own = &d.symbols[child("Xown")];
         assert_eq!(own.bbox, [-2.0, -1.0, 2.0, 1.0]);
-        assert_eq!(own.first_line, 5);
+        assert_eq!(own.first_line, 7);
         assert!(own.source.starts_with("%own = @DEFINE-SYMBOL"), "{}", own.source);
         assert!(own.source.ends_with('}'));
         assert_eq!(own.pins[0].name.as_deref(), Some("p"));
@@ -389,12 +389,12 @@ mod tests {
         assert!(own.svg.contains("data-id=\"symbol-label\""));
         let parent = &d.symbols[child("Xparent")];
         assert_eq!(parent.bbox, [-4.0, -2.0, 4.0, 2.0]);
-        assert_eq!(parent.first_line, 21);
+        assert_eq!(parent.first_line, 23);
         assert!(parent.source.contains("width=8"));
         let package = &d.symbols[child("Xpackage")];
-        assert_eq!(package.origin, "Package rnl-std-basic 0.3");
+        assert_eq!(package.origin, "Package rnl-std-basic 0.4");
         assert!(package.source.starts_with("$RESISTOR = @DEFINE-SYMBOL"));
-        assert_eq!(package.first_line, 15);
+        assert_eq!(package.first_line, 21);
         assert!(!package.source.contains("$VARIABLE_RESISTOR"));
     }
 
