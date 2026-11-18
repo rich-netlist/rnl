@@ -1,7 +1,7 @@
 //! Isolated interpretation of candidate generated records. This module never calls a solver.
 use crate::junction_completion::{self, Axis, Point, Suggestion};
 use crate::junction_completion_problem::{
-    added_fact_indices, rebased_reference, suggestions, validate_interpreted_trial, TrialValidation,
+    added_fact_indices, rebased_reference, suggestions, validate_interpreted_trial, MovedTail, TrialValidation,
 };
 use rnl_runtime::{
     problem::{LevelProblem, PointRef, Position, Reference, Slot},
@@ -141,7 +141,11 @@ pub fn reads_back(ctx: &Context<'_>, written: &Written) -> Result<(), String> {
     lost(ctx.problem, &read, &auxiliary.points).map_or(Ok(()), Err)
 }
 
-fn line_mapping(ctx: &Context<'_>, new_read: &Interpretation, record: &str) -> Result<Vec<Option<u32>>, String> {
+fn line_mapping(
+    ctx: &Context<'_>,
+    new_read: &Interpretation,
+    record: &str,
+) -> Result<(Vec<Option<u32>>, Vec<MovedTail>), String> {
     let old_level = ctx.original.doc.levels.get(ctx.problem.level).ok_or("old level missing")?;
     let new_level = new_read.doc.levels.get(ctx.problem.level).ok_or("new level missing")?;
     let generated_ranges = |level: &rnl_runtime::host::Level| -> Vec<(u32, u32)> {
@@ -189,7 +193,38 @@ fn line_mapping(ctx: &Context<'_>, new_read: &Interpretation, record: &str) -> R
     );
     let kept = |line: u32, ranges: &[(u32, u32)]| !ranges.iter().any(|&(start, end)| start <= line && line <= end);
     let old: Vec<_> = ctx.original_text.lines().enumerate().filter(|(i, _)| kept(*i as u32 + 1, &old_ranges)).collect();
-    let new: Vec<_> = new_text.lines().enumerate().filter(|(i, _)| kept(*i as u32 + 1, &new_ranges)).collect();
+    let mut new: Vec<_> = new_text.lines().enumerate().filter(|(i, _)| kept(*i as u32 + 1, &new_ranges)).collect();
+    // What follows an old generated record on its last line stays where the record was, on a line
+    // of its own, behind an empty record when it is formal tokens (2.4): such a line is new, and
+    // what is on it is the old text, moved.
+    let mut moved = Vec::new();
+    if new.len() > old.len() {
+        let extra = new.len() - old.len();
+        let at = old.iter().zip(&new).take_while(|((_, a), (_, b))| a == b).count();
+        let old_lines: Vec<&str> = ctx.original_text.lines().collect();
+        let tail_of = |&(index, line): &(usize, &str)| -> Option<MovedTail> {
+            let body = line.trim_start().trim_start_matches(['*', '/']).trim_start();
+            let rest = body.strip_prefix("@RNL").map(str::trim_start).and_then(|r| r.strip_prefix("{}"));
+            let tail = rest.unwrap_or(body).trim();
+            if tail.is_empty() {
+                return None;
+            }
+            let start = line.len() - line.trim_start().len() + line.trim_start().find(tail)?;
+            old_ranges.iter().find_map(|&(_, end)| {
+                let old_line = old_lines.get(end as usize - 1)?.trim_end();
+                let from = old_line.strip_suffix(tail)?;
+                Some(MovedTail {
+                    from: (end, from.chars().count() as u32 + 1),
+                    to: (index as u32 + 1, line[..start].chars().count() as u32 + 1),
+                })
+            })
+        };
+        let tails: Option<Vec<_>> = new[at..at + extra].iter().map(tail_of).collect();
+        if let Some(tails) = tails {
+            moved = tails;
+            new.drain(at..at + extra);
+        }
+    }
     if old.len() != new.len() {
         return Err("cannot map lines outside generated record edits".into());
     }
@@ -200,7 +235,7 @@ fn line_mapping(ctx: &Context<'_>, new_read: &Interpretation, record: &str) -> R
         }
         map[old_index + 1] = Some(new_index as u32 + 1);
     }
-    Ok(map)
+    Ok((map, moved))
 }
 
 fn named_point(problem: &LevelProblem, name: &str) -> Option<Point> {
@@ -395,7 +430,7 @@ fn complete_within(
     if let Some(why) = lost(ctx.problem, &before, &auxiliary.points) {
         return Err(why);
     }
-    let line_map = line_mapping(ctx, &before, record)?;
+    let (line_map, moved) = line_mapping(ctx, &before, record)?;
     let problem = before.problems.iter().find(|p| p.level == ctx.problem.level).ok_or("trial problem missing")?;
     // The writer omits coordinates already supplied by following text or a symbol.
     // Compare their interpreted positions, using the same generated-reference mapping
@@ -528,6 +563,7 @@ fn complete_within(
             original_problem: ctx.problem,
             host_file: &ctx.original.doc.levels[ctx.problem.level].file,
             line_map: &line_map,
+            moved: &moved,
             kept: ctx.kept,
             before: &before,
             after: &after,

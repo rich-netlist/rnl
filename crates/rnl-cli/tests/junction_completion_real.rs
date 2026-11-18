@@ -52,6 +52,47 @@ fn run(body: &str) -> Result<String, String> {
 }
 
 #[test]
+fn a_statement_written_wrong_and_tokens_after_the_old_record_keep_the_dot() {
+    // the DISTANCE fails as it did before the dot, and `#R1 @PLACE(0, 0)` after the old generated
+    // record stays behind an empty record of its own when the record is written anew: the error
+    // it makes is the same, moved with it
+    let text = "* junction\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @SOLVER-CONFIG(junction=\"$DOT\") }\nR1 a 0 1k\n\
+                * @RNL { $DOT = @DEFINE(roles=[[\"p\",\"point\"]]) { {? ?p} @ALIGN(\"x\"); {? ?p} @ALIGN(\"y\") }; %p=(3,4);\n\
+                *   #R1 #R1 @DISTANCE(\"bottom-to-top\", min=3, max=1) }\n\
+                * @RNL(type=\"generated\") {\n*   #R1 @PLACE(0, 0)\n* } #R1 @PLACE(0, 0)\n.end\n";
+    let files = MemoryProvider::new().with("main.sp", text);
+    let opts = Options { std: false, problems: true, generated: false, ..Default::default() };
+    let interpreted = interpret_file(Path::new("main.sp"), None, &files, &opts).unwrap();
+    let codes: Vec<_> = interpreted.diagnostics().iter().map(|d| d.code.name().to_string()).collect();
+    assert!(codes.iter().any(|c| c == "record-tokens-after-record"), "{codes:?}");
+    let p = &interpreted.problems[0];
+    let written = write_record(
+        p,
+        &Solution { branches: vec![Branch { at: (0., 0.), junction: true }], ..Default::default() },
+        "test",
+        "test",
+    );
+    let formats = BTreeMap::new();
+    let ctx = Context {
+        entry: "main.sp",
+        dialect: None,
+        formats: &formats,
+        files: &files,
+        runtime: &opts,
+        original: &interpreted,
+        problem: p,
+        original_text: text,
+        host_path: "main.sp",
+        kept: &[],
+        solution: &Solution::default(),
+        tolerance: opts.tolerance,
+        on_interpret: None,
+    };
+    let result = complete_record(&ctx, &written).unwrap().record;
+    assert!(result.contains("$DOT @ATTACH %rt1 => @PLACE(0, 0)"), "{result}");
+}
+
+#[test]
 fn real_interpreter_aligns_standard_shape_dot() {
     let result =
         run(r#"$DOT = @DEFINE(roles=[["p","point"]]) { {? ?p} @ALIGN("x"); {? ?p} @ALIGN("y") }; %p=(3,4)"#).unwrap();

@@ -190,6 +190,33 @@ fn equivalent_source(
     mapped == Some(b.line)
 }
 
+/// The text after an old generated record on its last line, which the writer moves to a line of
+/// its own: the line and column it started at, and those it starts at in the written text, 1-based.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MovedTail {
+    pub from: (u32, u32),
+    pub to: (u32, u32),
+}
+
+/// A diagnostic location of the text before writing, `a`, and one after, `b`, at the same source:
+/// through the line map, or with the text after a record that moved to a line of its own.
+fn same_diagnostic_source(
+    a: Option<&rnl_runtime::diag::Loc>,
+    b: Option<&rnl_runtime::diag::Loc>,
+    host_file: &str,
+    line_map: &[Option<u32>],
+    moved: &[MovedTail],
+) -> bool {
+    if let (Some(a), Some(b)) = (a, b) {
+        if a.file == host_file && b.file == host_file {
+            if let Some(m) = moved.iter().find(|m| m.from.0 == a.line && m.from.1 <= a.col) {
+                return b.line == m.to.0 && b.col == a.col - m.from.1 + m.to.1;
+            }
+        }
+    }
+    equivalent_source(a, b, host_file, line_map)
+}
+
 /// What of `p` only helps the solve: the points that the record does not write
 /// ([`rnl_runtime::solution::auxiliary_points`]), the usages whose own point is one, with the usages
 /// made in their bodies, and the facts made in their bodies or on such a point. The document read
@@ -569,6 +596,8 @@ pub struct TrialValidation<'a> {
     pub original_problem: &'a LevelProblem,
     pub host_file: &'a str,
     pub line_map: &'a [Option<u32>],
+    /// The text after old generated records that the writer moved to lines of their own.
+    pub moved: &'a [MovedTail],
     pub kept: &'a [usize],
     pub before: &'a rnl_runtime::Interpretation,
     pub after: &'a rnl_runtime::Interpretation,
@@ -586,6 +615,7 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), Stri
         original_problem,
         host_file,
         line_map,
+        moved,
         kept,
         before,
         after,
@@ -691,7 +721,7 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), Stri
                     && old.origin == d.origin
                     && old.in_package == d.in_package
                     && old.cause == d.cause
-                    && equivalent_source(old.loc.as_ref(), d.loc.as_ref(), host_file, line_map);
+                    && same_diagnostic_source(old.loc.as_ref(), d.loc.as_ref(), host_file, line_map, moved);
                 if same {
                     matched[i] = true;
                 }
@@ -761,13 +791,15 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), Stri
         }
         // Added/changed facts were independently checked against the actual drawing above.
         // A label alone is not a unique identity: different constraints can share it.
-        let unchanged_pending = matches!(constraint.status.as_str(), "unsolved" | "dropped" | "needs-solver")
-            && left.constraints.get(index).is_some_and(|old| {
-                old.status == constraint.status
-                    && old.label == constraint.label
-                    && old.kind == constraint.kind
-                    && old.priority == constraint.priority
-            });
+        // A statement that failed before, such as one written wrong, and fails the same is unchanged too.
+        let unchanged_pending =
+            matches!(constraint.status.as_str(), "unsolved" | "dropped" | "needs-solver" | "failed")
+                && left.constraints.get(index).is_some_and(|old| {
+                    old.status == constraint.status
+                        && old.label == constraint.label
+                        && old.kind == constraint.kind
+                        && old.priority == constraint.priority
+                });
         if !unchanged_pending {
             return Err(format!(
                 "constraint outcome requires general resolution: index {index}, status {}, previous {:?}",
