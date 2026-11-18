@@ -51,7 +51,7 @@ test("Help > Public Packages names the bundled packages, where they come from an
   expect(text).toContain(`This build bundles ${BUNDLED.join(", ")}.`);
   expect(text).toContain("found without a network");
   expect(text).toContain("The bundled packages are under CC0-1.0, as rnl-packages declares");
-  expect(text).toContain("A download without them is on the release page.");
+  expect(text).toContain("A download without them is on the release page, next to this one.");
   expect(text).toContain("The packages come from the rnl-packages site.");
   expect(text).toContain("add the folder to the PATH in the Library");
   expect(text).toContain("The desktop viewer never downloads packages itself.");

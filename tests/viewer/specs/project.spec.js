@@ -79,7 +79,7 @@ test('the File menu offers the project and manifest commands, in both languages,
   await expect(page.locator('[data-id="open-project"]')).toHaveText(zhMenu('Open Projec&t...'));
   await expect(page.locator('[data-id="load-manifest"]')).toHaveText(zhMenu('Load &Manifest...'));
   await expect(page.locator('[data-id="save-project"]')).toHaveText(zhMenu('Download Pro&ject...'));
-  await expect(page.locator('[data-id="download-manifest"]')).toHaveText(zhMenu('Download Ma&nifest...'));
+  await expect(page.locator('[data-id="download-manifest"]')).toHaveText(zhMenu('Do&wnload Manifest...'));
   if (process.env.RNL_REVIEW_DIR && test.info().project.name === 'chromium') {
     await page.screenshot({ path: path.join(process.env.RNL_REVIEW_DIR, 'project-menu-zh.png') });
   }
