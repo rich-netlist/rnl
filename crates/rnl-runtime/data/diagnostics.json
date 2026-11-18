@@ -1,5 +1,5 @@
 {
- "about": "The kinds of diagnostics of the toolkit: each with its number, RNL and four digits, and its short name, which are kept from one version to the next and never given to another kind; the severity and the message it is given with, as the code writes it; and the sections of the standard it is about. The thousands give the domain: 0 to 6 the domains of the standard, 7 the geometry hints, 8 the tools, 9 the kinds of the implementation of the domains 0 to 6 (9D00, D the domain). A kind of the versions 0.2 and 0.3 alone has no number.",
+ "about": "The kinds of diagnostics of the toolkit: each with its number, RNL and four digits, and its short name, which are kept from one version to the next and never given to another kind; the severity and the message it is given with, as the code writes it; and the sections of the standard it is about. The thousands give the domain: 0 to 6 the domains of the standard, 7 the geometry hints, 8 the tools, 9 the kinds of the implementation of the domains 0 to 6 (9D00, D the domain). A kind of the versions 0.2 and 0.3 alone has no number. A kind that the toolkit no longer gives is listed among the retired, with the last core that gave it: its number and name are given to no other kind.",
  "kinds": [
   {
    "number": "RNL3418",
@@ -4200,13 +4200,6 @@
    "sections": []
   },
   {
-   "number": "RNL8111",
-   "name": "solve-preview-notice",
-   "severity": "hint",
-   "message": "note: the solver is a preview, and its layouts may be poor; for comparison, have the model write the exact RNL placement directly",
-   "sections": []
-  },
-  {
    "number": "RNL8112",
    "name": "solve-route-not-auto",
    "severity": "hint",
@@ -5270,6 +5263,13 @@
    "sections": [
     "13.5"
    ]
+  }
+ ],
+ "retired": [
+  {
+   "number": "RNL8111",
+   "name": "solve-preview-notice",
+   "last": "0.5.7"
   }
  ]
 }

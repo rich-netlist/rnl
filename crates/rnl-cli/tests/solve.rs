@@ -2194,27 +2194,24 @@ fn in_a_spice_section_of_a_spectre_file_a_record_is_carried_by_a_star() {
 }
 
 #[test]
-fn solve_and_preview_say_on_the_standard_error_that_the_solver_is_a_preview() {
-    let text = "the solver is a preview, and its layouts may be poor; for comparison, have the model write the exact RNL placement directly";
-    let kind = rnl_runtime::diag::codes::SOLVE_PREVIEW_NOTICE;
-    assert_eq!(rnl_cli::SOLVER_PREVIEW_NOTICE, format!("hint: {kind}: {text}"));
-    let notice = format!("{}\n", rnl_cli::SOLVER_PREVIEW_NOTICE);
+fn solve_and_preview_print_nothing_on_the_standard_error_when_they_have_nothing_to_report() {
+    // since core 0.6.0 neither says that the solver is a preview (RNL8111 is retired)
     let f = path_str(&case("T2b-common-source-dragged"));
     let dir = scratch("preview-notice");
     let out = path_str(&dir.join("out"));
     let work = format!("limit=\"work\",work={WORK_04},safety_seconds=3600");
     let (code, stdout, stderr) = rnl(&["solve", &f, "-o", &out, "--solver-config", &work]);
     assert_eq!(code, 0, "{stdout}{stderr}");
-    assert_eq!(stderr, notice);
+    assert_eq!(stderr, "");
     // the standard output and the file written are as they were
     assert!(stdout.starts_with("level "), "{stdout}");
-    assert!(!stdout.contains(rnl_cli::SOLVER_PREVIEW_NOTICE), "{stdout}");
+    assert!(!stdout.contains("RNL8111") && !stdout.contains("preview-notice"), "{stdout}");
     let snapshot = std::fs::read(solver_dir().join("solved/T2b-common-source-dragged.sp")).unwrap();
     assert!(std::fs::read(dir.join("out").join("T2b-common-source-dragged.sp")).unwrap() == snapshot);
     // the preview's JSON is the whole of its standard output
     let (code, stdout, stderr) = rnl(&["preview", &f, "--solver-config", &work]);
     assert_eq!(code, 0, "{stderr}");
-    assert_eq!(stderr, notice);
+    assert_eq!(stderr, "");
     let v: serde_json::Value = serde_json::from_str(&stdout).unwrap();
     assert!(v.get("document").is_some() && v.get("report").is_some(), "{v}");
 }
