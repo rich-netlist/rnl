@@ -51,7 +51,7 @@ pub const READ_VERSIONS: [&str; 1] = ["0.4"];
 pub const DEFAULT_VERSION: &str = "0.4";
 
 /// The versions that the cores of 0.5.x read and this one does not: a file of one of them is
-/// written in 0.4 by `rnl upgrade` of core 0.5.6 (`core-v0.5.6`), the last core that reads them.
+/// written in 0.4 by `rnl upgrade` of core 0.5.7 (`core-v0.5.7`), the last core that reads them.
 pub const EARLIER_VERSIONS: [&str; 2] = ["0.2", "0.3"];
 
 /// The error of a file whose version this implementation does not read (16.1): none of its RNL is
@@ -63,7 +63,7 @@ pub fn unsupported_version(version: &str) -> String {
     );
     if EARLIER_VERSIONS.contains(&version) {
         message.push_str(&format!(
-            "; core 0.5.6 reads {version}, and its `rnl upgrade` writes the file in {DEFAULT_VERSION}"
+            "; core 0.5.7 reads {version}, and its `rnl upgrade` writes the file in {DEFAULT_VERSION}"
         ));
     }
     message

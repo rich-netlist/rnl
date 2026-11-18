@@ -266,9 +266,9 @@ const COMMANDS: [&str; 16] = [
 ];
 
 /// What `rnl upgrade` says: the command that wrote a file of 0.2 or 0.3 in 0.4 is a command of the
-/// cores of 0.5.x, the last of which is 0.5.6, and not of this one, which reads only 0.4 (16.1).
+/// cores of 0.5.x, the last of which is 0.5.7, and not of this one, which reads only 0.4 (16.1).
 const UPGRADE_GONE: &str = "rnl upgrade is not a command of this core, which reads only the language 0.4: \
-     core 0.5.6, the last core that reads 0.2 and 0.3, has it, and writes a file of 0.2 or 0.3 in 0.4";
+     core 0.5.7, the last core that reads 0.2 and 0.3, has it, and writes a file of 0.2 or 0.3 in 0.4";
 
 fn parse_args() -> Result<Args, Said> {
     let mut it = std::env::args().skip(1);

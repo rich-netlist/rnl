@@ -115,7 +115,7 @@ fn write_in(request: &WriteRequest, files: Option<&dyn rnl_runtime::source::Prov
         return Err(Refusal::new(
             codes::EDIT_FIELD_INVALID,
             format!(
-                "unsupported output language version `{version}`: this writer writes only {VERSION}; core 0.5.6 \
+                "unsupported output language version `{version}`: this writer writes only {VERSION}; core 0.5.7 \
                  writes 0.3"
             ),
         ));

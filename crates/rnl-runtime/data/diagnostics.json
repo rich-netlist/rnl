@@ -1040,7 +1040,7 @@
    "number": "RNL2102",
    "name": "version-unsupported",
    "severity": "error",
-   "message": "unsupported version {version}: no RNL of this file is interpreted (16.1; this implementation reads {versions})[; core 0.5.6 reads {version}, and its `rnl upgrade` writes the file in 0.4]",
+   "message": "unsupported version {version}: no RNL of this file is interpreted (16.1; this implementation reads {versions})[; core 0.5.7 reads {version}, and its `rnl upgrade` writes the file in 0.4]",
    "sections": [
     "16.1"
    ]
@@ -4077,7 +4077,7 @@
    "number": "RNL8032",
    "name": "cli-unknown-command",
    "severity": "error",
-   "message": "[unknown command {command}\n{usage} | rnl upgrade is not a command of this core, which reads only the language 0.4: core 0.5.6, the last core that reads 0.2 and 0.3, has it, and writes a file of 0.2 or 0.3 in 0.4]",
+   "message": "[unknown command {command}\n{usage} | rnl upgrade is not a command of this core, which reads only the language 0.4: core 0.5.7, the last core that reads 0.2 and 0.3, has it, and writes a file of 0.2 or 0.3 in 0.4]",
    "sections": []
   },
   {
