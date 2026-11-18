@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { commentOf, editKey } from '../viewer-ui/editor-keys.js';
 
-// the text with the edit made, and the selection after it, written as | (caret) or [ ] (selection)
+// the text with the edit made, and the selection after it, written as | (caret) or [ ] (selection); the text as it was
+// for a key taken that changes nothing; null for a key left to the text box
 function press(marked, key, options = {}) {
   const caret = marked.indexOf('|');
   const start = caret >= 0 ? caret : marked.indexOf('[');
@@ -10,6 +11,7 @@ function press(marked, key, options = {}) {
   const text = marked.replace(/[|[\]]/g, '');
   const edit = editKey({ text, start, end, key, format: 'spice', ...options });
   if (!edit) return null;
+  if (edit.none) return marked;
   const after = text.slice(0, edit.from) + edit.insert + text.slice(edit.to);
   return edit.start === edit.end
     ? after.slice(0, edit.start) + '|' + after.slice(edit.start)
@@ -62,7 +64,10 @@ test('Shift+Tab outdents each line of the selection, and keeps one space after a
   assert.equal(press(' R1 a| b 1k', 'Tab', { shift: true }), 'R1 a| b 1k');
   assert.equal(press('*   #R1| @PLACE(0, 0)', 'Tab', { shift: true }), '* #R1| @PLACE(0, 0)');
   assert.equal(press('*  #R1| @PLACE(0, 0)', 'Tab', { shift: true }), '* #R1| @PLACE(0, 0)');
-  assert.equal(press('* #R1| @PLACE(0, 0)', 'Tab', { shift: true }), null);
+  // nothing to take out: the key is taken, and changes nothing, so that the focus stays
+  assert.equal(press('* #R1| @PLACE(0, 0)', 'Tab', { shift: true }), '* #R1| @PLACE(0, 0)');
+  assert.equal(press('R1 a| b 1k', 'Tab', { shift: true }), 'R1 a| b 1k');
+  assert.equal(press('[R1 a b 1k\n\n]', 'Tab', { shift: true }), '[R1 a b 1k\n\n]');
   assert.equal(press('[  R1 a b 1k\n*     x\n]', 'Tab', { shift: true }), '[R1 a b 1k\n*   x\n]');
   // a caret in the space taken out goes to where it was
   assert.equal(press(' | R1 a b 1k', 'Tab', { shift: true }), '|R1 a b 1k');
