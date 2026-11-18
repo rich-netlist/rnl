@@ -32,7 +32,7 @@ The points below say what to write. Complete files that follow them are in [the 
   %dp = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;
   ```
 
-- **Mark signal flow only where it is clear.** Write `$SIGNAL_FLOW` only for a clean signal path you are sure of. Leave it out where the signal takes several paths, where there is feedback, or where much of the circuit works both ways; how many members the path has does not decide it.
+- **Mark signal flow only where it is clear.** Write `$SIGNAL_FLOW` only for a clean signal path you are sure of (or `$POWER_FLOW` for a power circuit). Leave it out where the signal takes several paths, where there is feedback, or where much of the circuit works both ways; how many members the path has does not decide it.
 
 - **Do not repeat what a structure draws.** A pair aligns and mirrors its halves, a mirror aligns its devices, a transmission gate stacks its two transistors. An ALIGN or ORIENT that says the same again adds nothing, and one that differs fights the structure.
 
@@ -98,6 +98,14 @@ The solver draws only the wires that WIRE, ROUTE-NET and ROUTE-OBJECT ask for an
   {%dp %load} @ROUTE-OBJECT; &out @ROUTE-NET;
   ```
 
+- **Or wire every net at once.** Where most nets read well as wires, as in a circuit of a few blocks, route all the nets of the level. The fill still keeps the ground, supply and bias nets unrouted at high, so they keep their symbols; put a bias net in `$BIAS_NET_SET` for that. A net that should stay a label, such as a clock, is left out with an UNROUTE-NET at high, which wins over the ROUTE-NET wherever it is written.
+
+  ```rnl
+  &clk @UNROUTE-NET(priority="high"); /* the clock stays a label */
+  %routed_nets = # @SELECT-NET; /* every net of this level, not the levels below */
+  %routed_nets @ROUTE-NET;
+  ```
+
 - **Symmetric structures are wired symmetrically.** If one side of a differential pair is wired, the other side is wired too, even when that wire crosses another.
 
   ```rnl
@@ -111,7 +119,7 @@ The solver draws only the wires that WIRE, ROUTE-NET and ROUTE-OBJECT ask for an
   &out @WIRE(mode="manhattan45") {#M2:d #R2:1}; /* across, a 45° diagonal, across */
   ```
 
-- A ROUTE-OBJECT over structures also covers their rail pins, and the standard package keeps supplies and grounds unrouted at high, so they still get symbols; the hint RNL9403 on a rail says so and is expected. To wire a rail, write `&vss @ROUTE-NET(priority="high");`.
+- A ROUTE-OBJECT over structures, or a ROUTE-NET over every net, also covers the rail pins, and the standard package keeps supplies and grounds unrouted at high, so they still get symbols; the hint RNL9403 on a rail says so and is expected. To wire a rail, write `&vss @ROUTE-NET(priority="high");`.
 
 ## Orientation
 
