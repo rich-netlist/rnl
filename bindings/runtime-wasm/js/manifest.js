@@ -11,7 +11,9 @@
 //
 // Each file is taken from its `url`, or from the archive the manifest is in, or from `base` joined
 // with its path, and its bytes are checked against their SHA-256 and size before they are decoded.
-// In an archive the archive's copy wins over the `url`, which then only says where the file was from.
+// In an archive the archive's copy wins over the `url`, which then only says where the file was from. A
+// file's `member` is its name in the archive when that is not its path, which an archive's portable names
+// may escape (a project's `gain%20.inc`, which its netlist includes by that path, is `gain%2520.inc` there).
 //
 // The module imports nothing, so that the desktop viewer, which has no WebAssembly core, can use it:
 // apps/viewer-ui/manifest.js is a copy of it, which a test keeps the same.
@@ -189,10 +191,12 @@ export function checkManifest(manifest, { archive = false, limits = {} } = {}) {
       throw new ManifestError(`${path} has a url that is not an https address: ${JSON.stringify(file.url)}`, path);
     }
     if (!archive && file.url === undefined && base === undefined) throw new ManifestError(`Entry ${path} has no "url" field and the manifest has no "base" URL.`, path);
-    return { path, sha256: file.sha256.toLowerCase(), size: file.size, ...(file.url !== undefined && { url: file.url }) };
+    const member = file.member === undefined ? undefined : relativePath(file.member, `The name in the archive of ${path}`);
+    return { path, sha256: file.sha256.toLowerCase(), size: file.size, ...(file.url !== undefined && { url: file.url }), ...(member !== undefined && { member }) };
   });
   const listed = new Set(files.map((file) => file.path));
   if (listed.size !== files.length) throw new ManifestError("The manifest lists a file twice.");
+  if (new Set(files.map((file) => file.member ?? file.path)).size !== files.length) throw new ManifestError("The manifest names a file of the archive twice.");
   const bytes = files.reduce((sum, file) => sum + file.size, 0);
   const total = archive ? limit.projectBytes : limit.bytes;
   if (bytes > total) throw new ManifestError(`The manifest's files hold ${bytes} bytes, more than ${total}.`);
@@ -302,8 +306,8 @@ export async function loadManifest(json, { fetch = globalThis.fetch, readFile, o
       const url = file.url ?? (manifest.base === undefined ? null : new URL(file.path, manifest.base).href);
       urls[root + file.path] = url;
       if (readFile) {
-        data = await readFile(file.path);
-        if (data == null) throw new ManifestError(`${file.path} is not in the archive.`, file.path);
+        data = await readFile(file.member ?? file.path);
+        if (data == null) throw new ManifestError(`${file.member ?? file.path} is not in the archive.`, file.path);
       } else {
         data = await fetched(fetch, url, { name: file.path, signal: stop.signal });
       }
@@ -373,6 +377,7 @@ export async function readManifest(url, options = {}) {
 export async function writeManifest({ files, entry, pool = [], formats = {}, level, paths = [], settings = {}, display = {}, archive = false, ...rest }) {
   const listed = await Promise.all(files.map(async (file) => ({
     path: file.path, sha256: await sha256Hex(file.bytes), size: file.bytes.length, ...(file.url !== undefined && { url: file.url }),
+    ...(file.member !== undefined && file.member !== file.path && { member: file.member }),
   })));
   const manifest = {
     format: MANIFEST_FORMAT,

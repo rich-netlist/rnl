@@ -159,6 +159,25 @@ test("a project's manifest reads its files from the archive, with their formats,
   await assert.rejects(loadManifest(json, { readFile: async (path) => archive[path] ?? null }), (error) => error.file === "lib/pdk.rnl" && /not in the archive/.test(error.message));
 });
 
+test("a file whose name in the archive is not its path is read by that name, and keeps its path", async () => {
+  const encode = (text) => new TextEncoder().encode(text);
+  const top = encode('.include "gain%20.inc"\n.end\n'), gain = encode("R1 a 0 1k\n");
+  const written = await writeManifest({ archive: true, entry: "top.sp", files: [
+    { path: "top.sp", member: "top.sp", bytes: top },
+    { path: "gain%20.inc", member: "gain%2520.inc", bytes: gain },
+  ] });
+  // a name that is the path is not written again
+  assert.deepEqual(written.files.map((file) => [file.path, file.member]), [["top.sp", undefined], ["gain%20.inc", "gain%2520.inc"]]);
+  const archive = { "top.sp": top, "gain%2520.inc": gain };
+  const read = await loadManifest(written, { readFile: async (name) => archive[name] ?? null, root: "/p/" });
+  assert.deepEqual(Object.keys(read.files), ["/p/top.sp", "/p/gain%20.inc"]);
+  delete archive["gain%2520.inc"];
+  await assert.rejects(loadManifest(written, { readFile: async (name) => archive[name] ?? null }), (error) => error.file === "gain%20.inc" && /gain%2520\.inc is not in the archive/.test(error.message));
+  // a name is a relative path, and names one file
+  assert.throws(() => checkManifest({ ...written, files: [written.files[0], { ...written.files[1], member: "../gain.inc" }] }, { archive: true }), /must be a relative path/);
+  assert.throws(() => checkManifest({ ...written, files: [written.files[0], { ...written.files[1], member: "top.sp" }] }, { archive: true }), /names a file of the archive twice/);
+});
+
 test("writeManifest gives a manifest that reads back to the same files", async () => {
   const encode = (text) => new TextEncoder().encode(text);
   const written = await writeManifest({ archive: true, entry: "top.scs", level: "(top)", pool: ["models/nmos.lib"], formats: { "top.scs": "spectre" },
