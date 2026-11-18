@@ -359,11 +359,72 @@ mod tests {
     use super::*;
     use crate::{BuildOptions, MemoryProvider};
 
+    /// Shared inspection overlay geometry, including declaration ports. R5 has no CURRENT, so that
+    /// neither of its nets has a current that goes one way (15.2).
+    const USAGE_CURRENT: &str = r#"* Shared inspection overlay geometry, including declaration ports
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-basic", version="0.4"); @USE-PACKAGE(name="rnl-std-spice", version="0.4") }
+.subckt cell input output
+Rinside input output 1k
+* @RNL {
+*   #Rinside @PLACE(0, 0);
+*   #:input @CURRENT("in"); #:output @CURRENT("out");
+*   %input = $IO_PORT @ATTACH &input => @PLACE(-7, 4);
+*   %output = $IO_PORT @ATTACH &output => @PLACE(7, -4) => @ORIENT("R180");
+*   #Rinside:1 @CURRENT("in"); #Rinside:2 @CURRENT("out")
+* }
+.ends cell
+R1 a b 1k
+R2 b c 2k
+R3 c d 3k
+R4 d e 4k
+X1 a e cell
+R5 a b 5k
+* @RNL {
+*   $PAIR = @DEFINE(roles=["left", "right"]) {};
+*   $SET = @DEFINE(roles=["{members}"]) {};
+*   $NEST = @DEFINE(roles=[["inner", "usage"]]) {};
+*   #R1 @PLACE(0, 0); #R2 @PLACE(9, 0) => @ORIENT("R90");
+*   #R3 @PLACE(20, 0) => @ORIENT("MX"); #R4 @PLACE(30, 0) => @ORIENT("R270");
+*   #X1 @PLACE(40, 0); #R5 @PLACE(4, 10) => @ORIENT("R90");
+*   %pair = #R1(left) #R2(right) @AS $PAIR;
+*   %nested = %pair @AS $NEST;
+*   %spread = {#R1 #R3} @AS $SET;
+*   %ground = $GROUND @ATTACH #R1:2::net => @PLACE(0, -2);
+*   #R1:1 @CURRENT("in"); #R1:2 @CURRENT("out");
+*   #R2:1 @CURRENT("out"); #R3:1 @CURRENT("in"); #R4:1 @CURRENT("out");
+*   #R2:2 @CURRENT("in") => @CURRENT("unspecified");
+*   #X1:1 @CURRENT("in"); #X1:2 @CURRENT("out")
+* }
+.end
+"#;
+
+    /// Independent virtual symbols sharing a net.
+    const VIRTUAL_SELECTION: &str = r#"* Independent virtual symbols sharing a net
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-basic", version="0.4"); @USE-PACKAGE(name="rnl-std-spice", version="0.4") }
+.subckt cell a b
+Rinside a b 1k
+.ends
+R1 rail out 1k
+R2 inp out 2k
+X1 out rail cell
+* @RNL {
+*   #R1 @PLACE(0, 0); #R2 @PLACE(14, 0); #X1 @PLACE(22, 0);
+*   %ground = $GROUND @ATTACH &rail; %ground @PLACE(-8, -4);
+*   %ground2 = $GROUND @ATTACH &rail; %ground2 @PLACE(-2, -4);
+*   %supply = $SUPPLY @ATTACH &rail; %supply @PLACE(8, 6);
+*   %port = $NET_LABEL @ATTACH &inp; %port @PLACE(10, 6);
+*   %junction = $JUNCTION @ATTACH (4, -5); %junction @PLACE(4, -5);
+*   &rail @WIRE {%ground:p (-8, 3) #R1:1 (8, 3) %supply:p};
+*   &rail @WIRE {%ground2:p (-2, 3)};
+*   &inp @WIRE {%port:p #R2:1}
+* }
+.end
+"#;
+
     fn document() -> crate::Document {
-        let source = include_str!("../../../tests/viewer/inputs/usage-current.sp");
         let doc = crate::build(
             "usage-current.sp",
-            &MemoryProvider::new().with("usage-current.sp", source),
+            &MemoryProvider::new().with("usage-current.sp", USAGE_CURRENT),
             &BuildOptions::default(),
         )
         .unwrap();
@@ -445,10 +506,9 @@ mod tests {
 
     #[test]
     fn virtual_frames_ignore_other_symbols_on_the_attached_net() {
-        let source = include_str!("../../../tests/viewer/inputs/virtual-selection.sp");
         let d = crate::build(
             "virtual-selection.sp",
-            &MemoryProvider::new().with("virtual-selection.sp", source),
+            &MemoryProvider::new().with("virtual-selection.sp", VIRTUAL_SELECTION),
             &BuildOptions::default(),
         )
         .unwrap();
