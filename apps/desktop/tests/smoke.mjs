@@ -1015,7 +1015,11 @@ async function filePoolSmoke(page) {
   same(await page.evaluate(`document.querySelectorAll('#pool-list .pool-row').length`), 1, "only the initially opened file joins the new session");
   console.log("The native file pool resolves packages/includes, opens and excludes files; PATH persists and built-ins are read-only");
   // Exercise the new diagnostic in the real native shell, including its actual built-in catalog.
-  const optional = fs.readFileSync(path.join(root, "tests/viewer/inputs/missing-canvas-package.sp"), "utf8");
+  // (in a version no build bundles, 9.9: a build with the public packages bundles the catalog's latest
+  // analog-canvas-extensions, which may be the fixture's own 0.7)
+  const optional = fs.readFileSync(path.join(root, "tests/viewer/inputs/missing-canvas-package.sp"), "utf8")
+    .replace('name="analog-canvas-extensions", version="0.7"', 'name="analog-canvas-extensions", version="9.9"');
+  if (!optional.includes('version="9.9"')) throw new Error("missing-canvas-package.sp no longer uses analog-canvas-extensions 0.7");
   await page.evaluate(`(async () => {
     await (await import('./open.js')).openSource({ name: 'canvas.sp', text: ${JSON.stringify(optional)} }, false);
     const head = document.getElementById('problems-head');
@@ -1023,7 +1027,7 @@ async function filePoolSmoke(page) {
   })()`);
   await until("the native missing-package hint", () => page.evaluate(`
     document.querySelector('.package-hint .msg')?.textContent === 'Look for it in Help › Public Packages.'
-      && window.viewer.doc.diagnostics.some(d => d.message.includes('package analog-canvas-extensions 0.7 cannot be found'))`));
+      && window.viewer.doc.diagnostics.some(d => d.message.includes('package analog-canvas-extensions 9.9 cannot be found'))`));
   same(await page.evaluate(`document.querySelectorAll('[data-group="builtin"] .pool-open').length`), 25,
     "the native built-in library contains both standard series");
   check(await page.evaluate(`Array.from(document.querySelectorAll('[data-group="builtin"] .pool-open')).every(b => /^0\\.[23]\\/rnl-(std|zh)/.test(b.textContent))`),
