@@ -11,17 +11,19 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-/** A tree with the package rnl-std-style in the standard series 0.3 and a draft of 0.4, and the groups build.mjs shows of it. */
+/** A tree with the package rnl-std-style in the standard series 0.3 and a draft of 0.4, and the groups build.mjs shows of it.
+ *  Both are the package file of the series 0.4, written in the language 0.4 that the core reads; only the version of the
+ *  package and the directory tell the series apart. */
 function shown(released, flags) {
   const dir = mkdtempSync(join(tmpdir(), "rnl-gallery-released-"));
   try {
-    const style = readFileSync(join(root, "libraries", "standard", "0.3", "rnl-std-style.rnl"), "utf8");
+    const style = readFileSync(join(root, "libraries", "standard", "0.4", "rnl-std-style.rnl"), "utf8");
     for (const v of ["0.3", "0.4"]) {
       mkdirSync(join(dir, "libraries", "standard", v), { recursive: true });
-      writeFileSync(join(dir, "libraries", "standard", v, "rnl-std-style.rnl"), style.replaceAll("0.3", v));
+      writeFileSync(join(dir, "libraries", "standard", v, "rnl-std-style.rnl"), style.replace('version="0.4"', `version="${v}"`));
     }
     mkdirSync(join(dir, "libraries", "extension"), { recursive: true });
-    writeFileSync(join(dir, "libraries", "extension", "rnl-x.rnl"), style.replaceAll("0.3", "0.4").replaceAll("rnl-std-style", "rnl-x"));
+    writeFileSync(join(dir, "libraries", "extension", "rnl-x.rnl"), style.replaceAll("rnl-std-style", "rnl-x"));
     for (const v of released) {
       mkdirSync(join(dir, "spec", v), { recursive: true });
       writeFileSync(join(dir, "spec", v, "RELEASED"), "released\n");

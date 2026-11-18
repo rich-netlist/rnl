@@ -1,5 +1,5 @@
 //! The packages bundled with the core: every `.rnl` file in a version directory of
-//! `libraries/standard`, such as `0.2/rnl-std.rnl`, named by its path there. The list
+//! `libraries/standard`, such as `0.4/rnl-std-basic.rnl`, named by its path there. The list
 //! follows the directories, so a new version of the standard series, or a new package in one, is
 //! bundled by adding its files.
 

@@ -382,8 +382,7 @@ fn structured_math_preserves_roots_scripts_fractions_and_upright_runs() {
     for source in [r"\(g_m=2\mathrm{V}\)", r"\(\sqrt{x^2+\frac{a}{b}}\)", r"\textbf{\(\sqrt{x_1}\)}"] {
         let lines: Vec<_> = markup::parse_with_name_formats(source, true).iter().map(|l| ours(l)).collect();
         let content = crate::ops::TextContent::Lines(lines.clone());
-        form::check_math_content(&content, "0.4").unwrap();
-        assert!(form::check_math_content(&content, "0.3").unwrap_err().contains("language_version 0.4"));
+        form::check_math_content(&content).unwrap();
         assert!(markup::problems_with_name_formats(&form::markup(&lines), true).is_empty());
     }
 }
@@ -392,7 +391,7 @@ fn structured_math_preserves_roots_scripts_fractions_and_upright_runs() {
 fn structured_math_refuses_to_drop_literal_spaces_or_styles() {
     let input = markup::expand_math(r"\(\sqrt{${value}}\)", |_| "A B".into());
     let lines = markup::parse_with_name_formats(&input, true).iter().map(|l| ours(l)).collect();
-    let error = form::check_math_content(&crate::ops::TextContent::Lines(lines), "0.4").unwrap_err();
+    let error = form::check_math_content(&crate::ops::TextContent::Lines(lines)).unwrap_err();
     assert!(error.contains("original markup"));
 }
 
@@ -405,7 +404,6 @@ fn structured_math_json_requires_draft_output_and_writes_a_formula() {
         ]}
     ]]}]);
     let mut req = request("spice", "\nR1 a b 1k\n", ops);
-    assert!(write(&req).unwrap_err().contains("language_version 0.4"));
     req.language_version = Some("0.4".into());
     let written = write(&req).unwrap();
     assert!(written.contains(r"\(\sqrt{x^{\mathrm{2}}}\)"), "{written}");
@@ -1088,7 +1086,6 @@ fn independent_pin_names_bus_shape_and_unbound_pins_round_trip_in_0_4() {
         {"level":"file","op":"set","object":"#R1","symbol":"$S"}
     ]);
     let mut req = request("spice", "* pins\nR1 a b 1k\n.end\n", ops);
-    assert!(write(&req).unwrap_err().contains("language_version 0.4"));
     req.language_version = Some("0.4".into());
     let out = write(&req).unwrap();
     assert!(out.contains("@VERSION(\"0.4\")"), "{out}");
@@ -1180,7 +1177,6 @@ fn fixed_rotation_round_trips_explicit_false_over_a_symbol_label() {
     for fixed in [true, false] {
         let ops = json!([{"level":"file", "op":"add-text", "attach":"#R1", "key":"name", "markup":"new", "fix_rotate":fixed}]);
         let mut req = request("spice", net, ops.clone());
-        assert!(write(&req).unwrap_err().contains("language_version 0.4"));
         req.language_version = Some("0.4".into());
         let out = write(&req).unwrap();
         assert!(out.contains(&format!("fix_rotate={fixed}")), "{out}");
@@ -1294,7 +1290,6 @@ fn terminals_need_the_language_0_4_a_symbol_and_pairs() {
     };
     let mut req = request("spice", CALL, set(json!({"terminals": [[1, "d"]]})));
     assert!(write(&req).unwrap_err().contains("terminals"), "released output refuses it");
-    assert!(write(&req).unwrap_err().contains("language_version 0.4"));
     req.language_version = Some("0.4".into());
     assert!(write(&req).is_ok());
     // an empty list is no terminals
@@ -1351,7 +1346,6 @@ C1 a b 1n
          "action": {"op": "add-text", "markup": "x", "key": "value", "halign": "end", "offset": [1, -2], "size": 1.5}}
     ]);
     let mut req = request("spice", net, ops);
-    assert!(write(&req).unwrap_err().contains("language_version 0.4"));
     req.language_version = Some("0.4".into());
     let out = write(&req).unwrap();
     assert!(out.contains("# @SELECT-INSTANCE(name=\"R*\") => @TEXT(\"\", key=\"name\")"), "{out}");
@@ -1423,10 +1417,6 @@ fn a_rule_of_the_file_sets_the_symbol_of_the_dots_of_a_subcircuit_as_well() {
     assert_eq!(junction.definition, "$JUNCTION", "{out}");
     let symbol = junction.symbol.as_deref().expect("the dot's symbol");
     assert!(symbol.contains("大点"), "the dot of the subcircuit is drawn with the rule's symbol: {symbol}");
-    // the language 0.3 has no rules
-    let mut old = request("spice", RC, json!([ops[2].clone()]));
-    old.language_version = None;
-    assert!(write(&old).unwrap_err().contains("language_version 0.4"));
 }
 
 #[test]
@@ -1550,7 +1540,6 @@ fn an_annotation_is_written_at_a_point_or_on_an_object_and_reads_back() {
         {"level": "file", "op": "add-annotation", "attach": "#R1", "source": "$ARROW", "rotate": 0, "mirror": false},
     ]);
     let mut req = request("spice", net, ops);
-    assert!(write(&req).unwrap_err().contains("(add-annotation): requires language_version 0.4"));
     req.language_version = Some("0.4".into());
     let out = write(&req).unwrap();
     assert!(
@@ -1624,7 +1613,6 @@ fn a_device_is_declared_in_the_header_and_reads_back() {
         {"op": "declare-device", "level": "file", "name": "X2", "terminals": ["p", "n"]},
     ]);
     let mut req = request("spice", net, ops);
-    assert!(write(&req).unwrap_err().contains("(declare-device): requires language_version 0.4"));
     req.language_version = Some("0.4".into());
     let out = write(&req).unwrap();
     let header = r#"@RNL(type="header") {
@@ -1674,4 +1662,16 @@ fn a_device_that_says_nothing_or_names_a_terminal_twice_is_refused() {
     assert!(why(json!({"model": "cell", "terminals": ["d", "D"]})).contains("names `D` twice"));
     let spectre = device(json!({"model": "cell", "terminals": ["d", "D"]}));
     assert!(refused("spectre", spectre).is_none());
+}
+
+#[test]
+fn the_writer_writes_only_0_4() {
+    let mut req = request("spice", RC, json!([]));
+    assert!(write(&req).unwrap().contains("@VERSION(\"0.4\")"));
+    for version in ["0.2", "0.3", "0.5"] {
+        req.language_version = Some(version.into());
+        let refused = write(&req).unwrap_err();
+        assert!(refused.contains(&format!("unsupported output language version `{version}`")), "{refused}");
+        assert!(refused.contains("this writer writes only 0.4"), "{refused}");
+    }
 }

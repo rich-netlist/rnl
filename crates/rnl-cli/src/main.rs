@@ -53,11 +53,11 @@ options:
                       path, or one a link leads out to, is not found (preview only; a server's solve)
   --package-dir DIR   look for packages in DIR as well (16.2), its .rnl files; repeatable
   --no-std            do not use the standard package at the root (16.3)
-  --include-std       add the standard package to a draft 0.4 file (off by default)
-  --std-version V     use version V of the file language's standard collection at the root
-                      to read a file of 0.3 with the series 0.2; a version pinned in a header
-                      record still comes first (16.3), and V not found is an error only for the
-                      files that do not pin one. rnl solve does not take it
+  --include-std       add the standard package to a main file that has no USE-PACKAGE of it (off
+                      by default)
+  --std-version V     use version V of the standard package that --include-std adds; a version
+                      pinned in a header record still comes first (16.3), and V not found is an
+                      error only for the files that do not pin one. rnl solve does not take it
   --no-generated      read the netlist without its type=\"generated\" records, as a solver does (2.8)
   --dialect NAME      the format of FILE, spice, spectre, rnl or text, instead of guessing from it
   --format PATH=NAME  read the file PATH with the format NAME, spice, spectre, rnl or text; repeatable.
@@ -360,7 +360,7 @@ fn parse_args() -> Result<Args, Said> {
                 include_std = true;
             }
             "--std-version" => {
-                std_version = Some(it.next().ok_or_else(|| needs("--std-version needs a version, such as 0.2"))?)
+                std_version = Some(it.next().ok_or_else(|| needs("--std-version needs a version, such as 0.4"))?)
             }
             "--no-generated" => generated = false,
             "--dialect" => {

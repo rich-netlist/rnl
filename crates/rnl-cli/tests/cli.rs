@@ -186,11 +186,11 @@ fn a_main_file_without_a_header_record_reads_in_0_4() {
 
 #[test]
 fn strip_generated_reads_the_bundled_packages_too() {
-    let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join("strip-generated-rnl-std-symbols.rnl");
-    let (code, _) = rnl(&["strip-generated", "<bundled>/0.2/rnl-std-symbols.rnl", "-o", &out.to_string_lossy()]);
+    let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join("strip-generated-rnl-std-basic.rnl");
+    let (code, _) = rnl(&["strip-generated", "<bundled>/0.4/rnl-std-basic.rnl", "-o", &out.to_string_lossy()]);
     assert_eq!(code, 0);
     // the standard package has no generated records, so it comes out as it is
-    let std = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../libraries/standard/0.2/rnl-std-symbols.rnl");
+    let std = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../libraries/standard/0.4/rnl-std-basic.rnl");
     assert_eq!(std::fs::read_to_string(out).unwrap(), std::fs::read_to_string(std).unwrap());
 }
 

@@ -257,10 +257,6 @@ pub fn parse(k: usize, value: &Value) -> Result<LevelOp, String> {
 
 /// Read an op, retaining its diagnostic kind independently of its message.
 pub fn parse_diagnosed(k: usize, value: &Value) -> Result<LevelOp, Refusal> {
-    parse_for_language(k, value, false)
-}
-
-pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Result<LevelOp, Refusal> {
     let fail = |code, op: &str, why: String| Refusal::new(code, format!("op {k} ({op}): {why}"));
     let Some(obj) = value.as_object() else {
         return Err(Refusal::new(codes::EDIT_OP_NOT_OBJECT, format!("op {k}: not an object")));
@@ -327,7 +323,7 @@ pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Resul
             let op = Op::Set {
                 object: r.string("object")?,
                 symbol: r.opt_string("symbol")?,
-                terminals: r.symbol_terminals(modern)?,
+                terminals: r.symbol_terminals()?,
                 style: r.style()?,
                 at: r.opt_point("at")?,
                 orient: r.opt_string("orient")?,
@@ -349,7 +345,7 @@ pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Resul
             attach: r.attach()?,
             params: r.params()?,
             symbol: r.opt_string("symbol")?,
-            terminals: r.symbol_terminals(modern)?,
+            terminals: r.symbol_terminals()?,
             style: r.style()?,
             at: r.opt_point("at")?,
             orient: r.opt_string("orient")?,
@@ -365,9 +361,6 @@ pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Resul
             layer: r.layer()?,
         },
         "add-annotation" => {
-            if !modern {
-                return Err(fail(codes::EDIT_FIELD_INVALID, kind, "requires language_version 0.4".into()));
-            }
             let source = r.string("source")?;
             if !(dollar_name(&source) || percent_name(&source)) {
                 return Err(r.fail("source", "is not a symbol or a definition `$NAME`, or a usage `%NAME`"));
@@ -404,9 +397,6 @@ pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Resul
             }
         }
         "declare-device" => {
-            if !modern {
-                return Err(fail(codes::EDIT_FIELD_INVALID, kind, "requires language_version 0.4".into()));
-            }
             // a value with a line break would end the comment that carries the header
             let one = |f: &str| -> Result<Option<String>, Refusal> {
                 match r.opt_string(f)? {
@@ -491,7 +481,7 @@ pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Resul
         }
         "add-wire" => Op::AddWire {
             name: r.opt_string("name")?,
-            nets: if modern && obj.get("nets").and_then(Value::as_array).is_some_and(Vec::is_empty) {
+            nets: if obj.get("nets").and_then(Value::as_array).is_some_and(Vec::is_empty) {
                 Vec::new()
             } else {
                 r.strings("nets")?
@@ -541,11 +531,8 @@ pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Resul
             }
         }
         "add-rule" => {
-            if !modern {
-                return Err(fail(codes::EDIT_FIELD_INVALID, kind, "requires language_version 0.4".into()));
-            }
             let (select, definition, params) = r.select()?;
-            let action = r.rule_action(modern)?;
+            let action = r.rule_action()?;
             if definition.is_some() && select != "usage" {
                 return Err(r.fail("select", "names a `definition` only for the kind usage"));
             }
@@ -646,7 +633,7 @@ impl Reader<'_> {
 
     /// The action of a rule: one `add-text` that says what the text is and how it is drawn, and
     /// has no place of its own: it goes on what the rule selects.
-    fn rule_action(&self, modern: bool) -> Result<RuleAction, Refusal> {
+    fn rule_action(&self) -> Result<RuleAction, Refusal> {
         let action = match self.obj.get("action") {
             None | Some(Value::Null) => {
                 return Err(Refusal::new(
@@ -673,7 +660,7 @@ impl Reader<'_> {
         let mut text = action.clone();
         text.insert("level".into(), Value::String("file".into()));
         text.insert("at".into(), Value::Array(vec![Value::from(0), Value::from(0)]));
-        let read = parse_for_language(self.k, &Value::Object(text), modern).map_err(|e| {
+        let read = parse_diagnosed(self.k, &Value::Object(text)).map_err(|e| {
             let prefix = format!("op {} (add-text): ", self.k);
             let rest = e.message.strip_prefix(&prefix).unwrap_or(&e.message).to_string();
             Refusal { message: format!("op {} ({}): action: {rest}", self.k, self.kind), ..e }
@@ -800,8 +787,8 @@ impl Reader<'_> {
 
     /// `terminals` of `set` and `add-usage`: pairs of a host terminal (a number from 1, or a name)
     /// and the symbol's terminal name it stands for. They bind the pins of the object's symbol, so
-    /// they need a `symbol`, and the language 0.4.
-    fn symbol_terminals(&self, modern: bool) -> Result<Vec<(TermKey, String)>, Refusal> {
+    /// they need a `symbol`.
+    fn symbol_terminals(&self) -> Result<Vec<(TermKey, String)>, Refusal> {
         let items = match self.obj.get("terminals") {
             None | Some(Value::Null) => return Ok(Vec::new()),
             Some(Value::Array(items)) => items,
@@ -809,9 +796,6 @@ impl Reader<'_> {
         };
         if items.is_empty() {
             return Ok(Vec::new());
-        }
-        if !modern {
-            return Err(self.fail("terminals", "requires language_version 0.4"));
         }
         if !self.obj.get("symbol").is_some_and(Value::is_string) {
             return Err(self.fail("terminals", "needs a `symbol`, whose pins it binds"));

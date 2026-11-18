@@ -72,7 +72,7 @@ pub struct Request {
     #[serde(default)]
     pub include_std: bool,
     /// The version of the standard package at the root, whatever the files' language version, such
-    /// as "0.2" ([`rnl_runtime::Options::std_version`]); by the language version when not given.
+    /// as "0.4" ([`rnl_runtime::Options::std_version`]); by the language version when not given.
     #[serde(default)]
     pub std_version: Option<String>,
     /// Write each level's SVG; true when not given.
