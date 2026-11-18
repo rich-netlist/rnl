@@ -466,11 +466,10 @@ fn a_route_net_with_fewer_than_two_points_before_generation_is_warned() {
         "{warned:?}"
     );
     assert!(warned[1].starts_with("ROUTE-NET on y does nothing") && !warned[1].contains("IO_PORT"), "{warned:?}");
-    // over a set or by a rule, only a port net is warned
-    let warned = read("# @SELECT-NET => @ROUTE-NET");
-    assert_eq!(warned.len(), 1, "{warned:?}");
-    assert!(warned[0].starts_with("ROUTE-NET on in does nothing"), "{warned:?}");
-    assert!(read("{&x &y} @ROUTE-NET").is_empty());
+    // a request over a set or by a rule leaves its one-pin nets by design, port nets too
+    assert!(read("# @SELECT-NET => @ROUTE-NET").is_empty());
+    assert!(read("%nets = # @SELECT-NET; %nets @ROUTE-NET").is_empty());
+    assert!(read("{&in &y} @ROUTE-NET").is_empty());
     // a request in a definition's body, or disabled, is not warned
     assert!(read("$D = @DEFINE(roles=[[\"p\", \"pin\"]]) { ?p::net @ROUTE-NET }; #R3:2 @AS $D").is_empty());
     assert!(read("&y @ROUTE-NET(priority=\"disabled\")").is_empty());

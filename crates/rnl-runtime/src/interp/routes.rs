@@ -734,10 +734,11 @@ impl Interp<'_> {
     /// A ROUTE-NET written in a level's own statements whose net has fewer than two pins and no
     /// written wire in the snapshot that generation reads does nothing (13.7): its tree is fixed
     /// before generation (8.2), and what generation adds, such as the port tag of the standard fill,
-    /// does not join it. Warned when the statement names the net itself, or when the net is a port
-    /// of the level; a request over a set or made by a rule, such as `# @SELECT-NET => @ROUTE-NET`,
-    /// is not warned of its other nets, which may have one pin each by design. A net whose pins an
-    /// UNROUTE takes out is not this case: RNL9403 tells of that.
+    /// does not join it. Warned only when the statement names the net itself: a request over a set
+    /// or made by a rule, such as `%nets = # @SELECT-NET; %nets @ROUTE-NET`, routes what has two
+    /// points and leaves the rest, such as a rail that reaches one drawn pin, by design. On a port
+    /// net it suggests writing the port. A net whose pins an UNROUTE takes out is not this case:
+    /// RNL9403 tells of that.
     pub(super) fn note_routes_without_a_tree(&mut self, scene: SceneId) {
         let level = self.scenes[scene].level;
         if !self.follows_0_4(self.level_unit[level]) {
@@ -748,7 +749,7 @@ impl Interp<'_> {
         let by_net = self.routing_net_pins(scene);
         let wired: HashSet<ObjId> = self.routing_wire_pieces(scene, true).iter().map(|piece| piece.net).collect();
         for request in &requests {
-            if !request.spec.net || !request.spec.join || !request.chain.is_empty() {
+            if !request.spec.net || !request.spec.join || !request.direct || !request.chain.is_empty() {
                 continue;
             }
             let authored = request
@@ -775,9 +776,6 @@ impl Interp<'_> {
             let ObjData::Net { key, .. } = self.o(net) else { continue };
             let key = key.clone();
             let port = self.doc.levels[level].ports.iter().any(|p| self.doc.net_key_in(level, p, &file) == key);
-            if !request.direct && !port {
-                continue;
-            }
             let shown = self.net_display(net);
             let advice = if port {
                 format!(
