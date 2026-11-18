@@ -35,7 +35,7 @@ test.describe("on a phone", () => {
     await fingers.tap(await viewer.where("X2"));
     await viewer.selected(`instance X2 in ${TOP}`);
     // the netlist follows, as for a click
-    expect(await viewer.markedLines()).toEqual([50]);
+    expect(await viewer.markedLines()).toEqual([54]);
     await fingers.tap(await viewer.empty());
     await viewer.selected(null);
   });

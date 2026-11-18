@@ -794,6 +794,8 @@ test("a netlist served at the root of its server is named after the server", asy
 });
 
 test("files set on the file input open as with Open, and the page asks which is the netlist", async ({ page }) => {
+  // three netlists of 0.4 opened, each compared with a debug build of rnl: near 30 s in Chromium on a runner
+  test.setTimeout(90000);
   await start(page);
   const cases = (...names) => names.map((name) => path.join(root, "tests", "conformance", "cases-0.4", "from-0.2", name));
   // a netlist and its include: the include is mostly included, so the netlist opens

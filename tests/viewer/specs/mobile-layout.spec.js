@@ -237,8 +237,8 @@ test.describe("on a phone held upright", () => {
     await page.locator("#show-in-netlist").tap();
     await expect(page.locator("#page-panel")).toHaveAttribute("aria-selected", "true");
     await expect(page.locator("#pane-netlist")).toBeVisible();
-    expect(await viewer.markedLines()).toEqual([50]);
-    await expect.poll(() => viewer.within(viewer.line(50))).toBe(true);
+    expect(await viewer.markedLines()).toEqual([54]);
+    await expect.poll(() => viewer.within(viewer.line(54))).toBe(true);
   });
 
   test("Show in Drawing shows what the netlist has selected, on the drawing's page", async ({ page, viewer, fingers }) => {

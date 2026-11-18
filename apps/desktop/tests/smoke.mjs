@@ -771,11 +771,12 @@ async function drive(app, port, profile, t0, session) {
   same(pasted, { files: 1, missing: ["/04-hierarchy-lib.inc"] }, "the clipboard's netlist, alone");
   console.log("File > Load from Clipboard drew the netlist that the clipboard held, alone");
   // (turning Auto Include on does nothing while the page is still loading, as it may be after the clipboard's
-  // netlist is drawn: it is asked again until the library subcircuit is resolved)
+  // netlist is drawn: it is asked again until the library subcircuit is resolved). A netlist of 0.4 is told so
+  // with a hint, "subcircuit rdiv was added from … by Auto Include"; 0.3's was a warning in other words.
   await until("clipboard Auto Include resolving the library subcircuit", () => page.evaluate(`(async () => {
     await (await import('./pool.js')).toggleAutoInclude(true);
     return window.viewer.doc.files.length === 2 && window.viewer.doc.files.some(f => f.name.endsWith('04-hierarchy-lib.inc')) &&
-      window.viewer.doc.diagnostics.some(d => d.severity === 'warning' && d.message.includes('added by Auto Include'));
+      window.viewer.doc.diagnostics.some(d => d.severity === 'hint' && d.message.startsWith('subcircuit rdiv was added from') && d.message.endsWith('by Auto Include'));
   })()`), 20_000);
 
   // a netlist with nothing placed: its Document carries no drawing of the objects that have no
@@ -1177,7 +1178,8 @@ async function autoIncludeSmoke(page, work, parts, pkg) {
   })()`);
   check(await page.evaluate(`Array.from(document.querySelectorAll('[data-group^="path:"] .pool-row')).some(r => r.dataset.path.endsWith('cell.NETLIST'))`), "PATH did not list netlists alongside packages");
   same(await page.evaluate("window.viewer.doc.files.length"), 2, "Auto Include defaults on");
-  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.severity === 'warning' && d.message.includes('cell.NETLIST') && d.message.includes('added by Auto Include'))`), "the automatic include warning is missing");
+  // (the netlist is of 0.4: Auto Include says what it added with a hint)
+  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.severity === 'hint' && d.message.includes('cell.NETLIST') && d.message.endsWith('by Auto Include'))`), "the automatic include hint is missing");
   same(await page.evaluate("window.viewer.doc.files[0].text"), body, "Auto Include altered the source");
   check(await page.evaluate("document.getElementById('auto-include').checked && window.viewer.checked('toggle-auto-include')"), "Auto Include controls disagree");
   const solved = await page.evaluate(`(async () => {
@@ -1194,7 +1196,7 @@ async function autoIncludeSmoke(page, work, parts, pkg) {
   fs.writeFileSync(cell, ".subckt replacement p n\nR2 p n 2k\n.ends\n");
   fs.writeFileSync(top, body.replace("X1 a 0 cell", "X1 a 0 replacement"));
   await page.evaluate("window.viewer.command('reload-library')");
-  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.message.includes('replacement') && d.message.includes('added by Auto Include'))`), "Reload Library retained stale definitions");
+  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.message.includes('replacement') && d.message.endsWith('by Auto Include'))`), "Reload Library retained stale definitions");
   fs.writeFileSync(pkg, fs.readFileSync(pkg, "utf8").replace('version="1.0"', 'version="2.0"'));
   await page.evaluate("window.viewer.command('reload-library')");
   check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.message.includes('acme 1.0 cannot be found'))`), "Reload Library did not reread packages");
