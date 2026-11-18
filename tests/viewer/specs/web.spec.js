@@ -12,9 +12,15 @@ import os from "node:os";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { PICK, root, UNCALLED } from "../fixtures.js";
-import { publicPackageDir, publicPackagesAvailable } from "../../../scripts/packages.mjs";
+import { packageLocks, publicPackageDir, publicPackagesAvailable, publicPackageText } from "../../../scripts/packages.mjs";
 import { zh } from "../zh.js";
 const hasPublicPackages = publicPackagesAvailable();
+/** A public package as packages.lock.json locks it, its first version: that version, and the language of its own VERSION. */
+const locked = (name) => {
+  const { version } = packageLocks.find((p) => p.name === name);
+  const language = hasPublicPackages ? /@VERSION\("([^"]+)"\)/.exec(publicPackageText(name, version))?.[1] ?? "0.3" : "0.3";
+  return { version, language };
+};
 test.beforeEach(async ({ page }) => {
   await page.route("https://rich-netlist.github.io/rnl-packages/**", route => route.abort());
 });
@@ -1302,9 +1308,10 @@ test("the web library adds SKY130 without duplicating built-ins, which open read
   await expect(dialog.locator(".dialog-option")).not.toContainText(["rnl-std-basic"]);
   await dialog.locator("input[type=search]").fill("sky130");
   await dialog.locator("input[type=search]").press("Enter");
-  await expect(page.getByRole("button", { name: "Exclude pdk-sky130 0.1", exact: true })).toBeVisible();
+  const sky = locked("pdk-sky130");
+  await expect(page.getByRole("button", { name: `Exclude pdk-sky130 ${sky.version}`, exact: true })).toBeVisible();
   await page.locator("#file-input").setInputFiles({ name: "sky.sp", mimeType: "text/plain", buffer: Buffer.from(
-    '* sky\n* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="pdk-sky130", version="0.1") }\nXM1 d g 0 0 sky130_fd_pr__nfet_01v8\n.end\n') });
+    `* sky\n* @RNL(type="header") { @VERSION("${sky.language}"); @USE-PACKAGE(name="pdk-sky130", version="${sky.version}") }\nXM1 d g 0 0 sky130_fd_pr__nfet_01v8\n.end\n`) });
   const doc = await shown(page);
   expect(doc.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
   await page.locator("#tab-files").click();
@@ -1356,9 +1363,9 @@ test("independent public EDA packages draw their gallery and custom terminal mar
   await start(page);
   const { packages: index } = await (await page.request.get(`${process.env.RNL_WEB_URL}/public-packages/catalog.json`)).json();
   for (const name of ["eda-style", "eda-symbol"]) {
-    expect(index.filter((p) => p.name === name)).toMatchObject([
-      { version: "0.1", path: `${name}/${name}.rnl` },
-    ]);
+    const entries = index.filter((p) => p.name === name);
+    expect(entries.map((p) => p.version)).toEqual(packageLocks.filter((p) => p.name === name).map((p) => p.version));
+    for (const p of entries) expect(p.path).toMatch(new RegExp(`^${name}/(?:${p.version.replace(".", "\\.")}/)?${name}\\.rnl$`));
   }
   expect(index.every((p) => p.path.endsWith(".rnl"))).toBe(true);
   const bundled = await (await page.request.get(`${process.env.RNL_WEB_URL}/libraries/bundled.json`)).json();
@@ -1368,10 +1375,11 @@ test("independent public EDA packages draw their gallery and custom terminal mar
     await page.locator("#include-library").click();
     const dialog = page.locator("dialog.dialog");
     await dialog.locator("input[type=search]").fill(name);
-    await dialog.getByRole("option", { name: new RegExp(`^${name} 0\\.1 —`) }).dblclick();
-    await expect(page.getByRole("button", { name: `Exclude ${name} 0.1`, exact: true })).toBeVisible();
+    const { version } = locked(name);
+    await dialog.getByRole("option", { name: new RegExp(`^${name} ${version.replace(".", "\\.")} —`) }).dblclick();
+    await expect(page.getByRole("button", { name: `Exclude ${name} ${version}`, exact: true })).toBeVisible();
     if (name === "eda-style") {
-      await expect(page.getByRole("button", { name: "Exclude eda-symbol 0.1", exact: true })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: `Exclude eda-symbol ${locked("eda-symbol").version}`, exact: true })).toHaveCount(0);
     }
   }
   const doc = await opened(page, () => page.locator("#file-input").setInputFiles(path.join(publicPackageDir("eda-style"), "eda-style-gallery.scs")));

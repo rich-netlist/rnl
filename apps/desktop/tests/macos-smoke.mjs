@@ -28,7 +28,13 @@ if(packagesAt>=0) {
   const mode=process.argv[packagesAt+1], folder=path.join(app,'Contents/Resources/public-packages');
   assert.ok(mode==='with'||mode==='without','--packages takes with or without.');
   if(mode==='without') assert.ok(!fs.existsSync(folder),'The app without the public packages has them.');
-  else for(const file of ['public-packages.json','eda-style/0.1/eda-style.rnl','LICENSES/MIT.txt']) assert.ok(fs.existsSync(path.join(folder,file)),`${file} is not among the app's public packages.`);
+  else {
+    // eda-style in the version the folder's lock file says
+    assert.ok(fs.existsSync(path.join(folder,'public-packages.json')),'public-packages.json is not among the app\'s public packages.');
+    const style=JSON.parse(fs.readFileSync(path.join(folder,'public-packages.json'),'utf8')).packages.find(p=>p.name==='eda-style');
+    assert.ok(style,'eda-style is not in the lock file of the app\'s public packages.');
+    for(const file of [`eda-style/${style.version}/eda-style.rnl`,'LICENSES/MIT.txt']) assert.ok(fs.existsSync(path.join(folder,file)),`${file} is not among the app's public packages.`);
+  }
 }
 const osa=script=>execFileSync('osascript',['-e',script],{encoding:'utf8',timeout:15000});
 const key=(key,modifiers='')=>osa(`tell application "System Events"

@@ -227,7 +227,11 @@ function checkPackages(dir) {
   if (!packages) return;
   const folder = path.join(dir, "public-packages");
   if (packages === "without") return same(fs.existsSync(folder), false, "the public packages in an installation made without them");
-  for (const file of ["public-packages.json", "eda-style/0.1/eda-style.rnl", "LICENSES/MIT.txt"]) {
+  check(fs.existsSync(path.join(folder, "public-packages.json")), "public-packages.json is not among the installed public packages.");
+  // eda-style in the version the folder's lock file says
+  const style = JSON.parse(fs.readFileSync(path.join(folder, "public-packages.json"), "utf8")).packages.find((p) => p.name === "eda-style");
+  check(style, "eda-style is not in the lock file of the installed public packages.");
+  for (const file of [`eda-style/${style.version}/eda-style.rnl`, "LICENSES/MIT.txt"]) {
     check(fs.existsSync(path.join(folder, file)), `${file} is not among the installed public packages.`);
   }
 }
