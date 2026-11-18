@@ -16,6 +16,22 @@ export function modal() {
   return shown > 0;
 }
 
+let turn = Promise.resolve(); // the last question asked in turn, answered or not
+
+/**
+ * Ask `ask`, a question that an opening asks of its own accord, such as whether to solve the netlist
+ * opened or to apply a project's display settings, after those asked in turn before it are done: one
+ * at a time, so that none finds the dialog of another shown and gives up. What `ask` gives, given.
+ * @template T
+ * @param {() => Promise<T> | T} ask
+ * @returns {Promise<T>}
+ */
+export function inTurn(ask) {
+  const asked = turn.then(ask, ask);
+  turn = asked.catch(() => {});
+  return asked;
+}
+
 /**
  * Ask for one of `items`, each `{ label, value }`, listed in the order given. With `filter`, a box
  * above the list keeps the items whose label has its text, whatever the case. Enter or a double
