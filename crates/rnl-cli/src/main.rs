@@ -52,6 +52,8 @@ A file whose suffix marks a hardware description language (.va, .vams, .v, .vh, 
 .vhdl) is not a netlist: its format is text, and it is not read, unless a format is set for it.
 options:
   --path DIR          search packages and bare include filenames here; repeatable
+  --confine DIR       read files only within the folder DIR: one outside it, as an include by an absolute
+                      path, or one a link leads out to, is not found (preview only; a server's solve)
   --package-dir DIR   look for packages in DIR as well (16.2), its .rnl files; repeatable
   --no-std            do not use the standard package at the root (16.3)
   --include-std       add the standard package to a draft 0.4 file (off by default)
@@ -156,6 +158,8 @@ struct Args {
     out: Option<PathBuf>,
     package_dirs: Vec<PathBuf>,
     search_paths: Vec<PathBuf>,
+    /// `--confine`: the one folder files are read from.
+    confine: Option<PathBuf>,
     std: bool,
     include_std: bool,
     std_version: Option<String>,
@@ -291,6 +295,7 @@ fn parse_args() -> Result<Args, Said> {
     let mut out = None;
     let mut package_dirs = Vec::new();
     let mut search_paths = Vec::new();
+    let mut confine = None;
     let mut std = true;
     let mut include_std = false;
     let mut std_version = None;
@@ -350,6 +355,9 @@ fn parse_args() -> Result<Args, Said> {
                 let dir = PathBuf::from(it.next().ok_or_else(|| needs("--path needs a directory"))?);
                 package_dirs.push(dir.clone());
                 search_paths.push(dir);
+            }
+            "--confine" => {
+                confine = Some(PathBuf::from(it.next().ok_or_else(|| needs("--confine needs a directory"))?))
             }
             "--no-std" => {
                 std = false;
@@ -449,6 +457,7 @@ fn parse_args() -> Result<Args, Said> {
             "--in-place" => &["solve", "upgrade", "replace-records"],
             "--solver-options" | "--solver-config" => &["problem", "solve", "preview"],
             "--progress=json" | "--respace" | "--timeall" => &["solve", "preview"],
+            "--confine" => &["preview"],
             "--progress" | "--check" | "--external-solver" | "--external-arg" | "--external-timeout" => &["solve"],
             "--previous" | "--solver-input" => &["problem"],
             "--png" | "--scale" | "--net-names" => &["render"],
@@ -543,6 +552,7 @@ fn parse_args() -> Result<Args, Said> {
         out,
         package_dirs,
         search_paths,
+        confine,
         std,
         include_std,
         std_version,
@@ -710,6 +720,12 @@ fn diagnostic_summary(
 
 fn run(args: &Args) -> Result<ExitCode, Said> {
     let provider = FsProvider::new(&args.package_dirs).with_search_paths(&args.search_paths);
+    let provider = match &args.confine {
+        Some(dir) => provider
+            .confined_to(dir)
+            .map_err(|e| Said::new(codes::CLI_CANNOT_RESOLVE_PATH, format!("--confine {}: {e}", dir.display())))?,
+        None => provider,
+    };
     check_formats(args, &provider)?;
     match args.command.as_str() {
         "solver-defaults" => {

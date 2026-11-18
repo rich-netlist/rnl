@@ -33,6 +33,8 @@ own; catalog takes none. A package file is one of the format rnl: a .rnl file, o
 suffix whose first record, at the start of a line, is a header record with @PACKAGE.
 options:
   --path DIR          search packages and bare include filenames here; repeatable
+  --confine DIR       read files only within the folder DIR: one outside it, as an include by an absolute
+                      path, or one a link leads out to, is not found (preview only; a server's solve)
   --package-dir DIR   look for packages in DIR as well (16.2), its .rnl files; repeatable
   --no-std            do not use the standard package at the root (16.3)
   --std-version V     use version V of the file language's standard collection at the root
