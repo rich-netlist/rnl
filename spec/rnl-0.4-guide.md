@@ -423,16 +423,16 @@ Draws, for the structures of rnl-std-semantics: *meaning only* places and routes
 |`$RESET_SWITCH(device: instance)`|meaning only||A precharge, equalization or reset transistor.|
 |`$GROUND_SWITCH(device: instance)`|meaning only||A low-side switch connected to a ground net.|
 |`$POWER_SWITCH(device: instance)`|meaning only||A high-side switch connected to a supply net.|
-|`$TRANSMISSION_GATE(pmos: instance/usage, nmos: instance/usage)`|places, routes; own point in x|yes: pmos, nmos|A CMOS transmission gate, the PMOS above the NMOS.|
-|`$TRANSMISSION_GATE_HORIZONTAL(pmos: instance/usage, nmos: instance/usage)`|places, routes; own point in y|yes: pmos, nmos|A CMOS transmission gate drawn side by side, the PMOS on the left.|
+|`$TRANSMISSION_GATE(pmos: instance/usage, nmos: instance/usage)`|places, routes; own point at the centre|yes: pmos, nmos|A CMOS transmission gate, the PMOS above the NMOS.|
+|`$TRANSMISSION_GATE_HORIZONTAL(pmos: instance/usage, nmos: instance/usage)`|places, routes; own point at the centre|yes: pmos, nmos|A CMOS transmission gate drawn side by side, the PMOS on the left.|
 |`$MULTI_POLE_SWITCH({throws}: instance/usage)`|routes|yes: throws|A switch of several throws that share one pole.|
 |`$BOOTSTRAPPED_SWITCH(device: instance/usage)`|meaning only||A bootstrapped sampling switch.|
 |`$SC_SAMPLER({switch}: instance/usage, {capacitor}: instance/usage)`|routes||A switched-capacitor sampler: sampling switches with sampling capacitors.|
 |`$CHARGE_SHARING(a: instance/usage, switch: instance/usage, b: instance/usage)`|routes||A charge-sharing network: two capacitors or capacitor banks that share charge through a switch.|
 |`$CHOPPER({straight}: instance/usage, {crossed}: instance/usage)`|routes||A chopper: a bridge of four switches that reverses the polarity of a signal.|
 |`$FLYING_CAPACITOR(capacitor: instance/usage)`|meaning only||A flying capacitor switched between clock phases.|
-|`$CMOS_INVERTER(pmos: instance, nmos: instance)`|places, routes; own point in x|via `$CMOS_GATE`: pmos, nmos|A CMOS inverter, the PMOS above the NMOS.|
-|`$CMOS_INVERTER_HORIZONTAL(pmos: instance, nmos: instance)`|places, routes; own point in y|via `$CMOS_GATE`: pmos, nmos|A CMOS inverter drawn side by side, the PMOS on the left.|
+|`$CMOS_INVERTER(pmos: instance, nmos: instance)`|places, routes; own point at the centre|via `$CMOS_GATE`: pmos, nmos|A CMOS inverter, the PMOS above the NMOS.|
+|`$CMOS_INVERTER_HORIZONTAL(pmos: instance, nmos: instance)`|places, routes; own point at the centre|via `$CMOS_GATE`: pmos, nmos|A CMOS inverter drawn side by side, the PMOS on the left.|
 |`$CMOS_GATE({pullup}: instance/usage, {pulldown}: instance/usage)`|routes|yes: pullup, pulldown|A static CMOS logic gate: a pull-up network and a pull-down network meeting in series at the output.|
 |`$LATCH({members}: instance/usage)`|routes|yes: members|A latch: a bistable core with the devices around it.|
 |`$INVERTER_LATCH(a: instance/usage, b: instance/usage)`|routes|via `$LATCH`: a, b|A latch of two cross-coupled inverters.|

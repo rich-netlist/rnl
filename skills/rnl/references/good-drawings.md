@@ -52,7 +52,7 @@ The points below say what to write. Complete files that follow them are in [the 
   {%dp::position #X1} @ALIGN("y");
   ```
 
-  This puts X1 at the height of the centre of the pair; `{%dp #X1} @ALIGN("y")` would put the three transistors of the pair at X1's height. A structure of two sides mirrored about an axis, such as a differential pair or `$MIRRORED_LAYOUT`, has its point at the centre between the sides; a row or a column, such as `$BRANCH`, a current mirror or an inverter, ties it only on its line (the column *Draws* says where). Every other structure leaves it free, and a constraint on its `::position` changes nothing drawn.
+  This puts X1 at the height of the centre of the pair; `{%dp #X1} @ALIGN("y")` would put the three transistors of the pair at X1's height. A structure of two sides mirrored about an axis, such as a differential pair or `$MIRRORED_LAYOUT`, has its point at the centre between the sides, and a transmission gate or an inverter has it midway between its two transistors; a row or a column, such as `$BRANCH` or a current mirror, ties it only on its line (the column *Draws* says where). Every other structure leaves it free, and a constraint on its `::position` changes nothing drawn.
 
 - **Inputs on the left, outputs on the right.** Input ports or input components usually go leftmost, output ports or load components rightmost. This is a habit, not a rule: change it where the drawing reads better.
 

@@ -1129,11 +1129,13 @@
 
   /* A CMOS transmission gate, the PMOS above the NMOS.
      Places and routes; a group: applies $PARALLEL to ?pmos and ?nmos, aligns them in one column with
-     ?pmos above ?nmos, and asserts complementary polarities. */
+     ?pmos above ?nmos, puts the usage's own point midway between ?pmos and ?nmos, and asserts
+     complementary polarities. */
   $TRANSMISSION_GATE = @DEFINE(
       roles=[["pmos", ["instance", "usage"]], ["nmos", ["instance", "usage"]]]) {
     {?pmos ?nmos} @AS $PARALLEL;
     {?pmos::position ?nmos::position ?} @ALIGN("x", priority="low");
+    {?pmos::position ? ?nmos::position} @DISTRIBUTE("top-to-bottom", priority="low");
     {?pmos ?nmos} @ORDER("top-to-bottom", priority="low");
     {?pmos ?nmos} @GROUP;
     ?pmos @SELECT-INSTANCE(type="*")
@@ -1144,11 +1146,13 @@
 
   /* A CMOS transmission gate drawn side by side, the PMOS on the left.
      Places and routes; a group: applies $PARALLEL to ?pmos and ?nmos, aligns them in one row with
-     ?pmos on the left, and asserts complementary polarities. */
+     ?pmos on the left, puts the usage's own point midway between ?pmos and ?nmos, and asserts
+     complementary polarities. */
   $TRANSMISSION_GATE_HORIZONTAL = @DEFINE(
       roles=[["pmos", ["instance", "usage"]], ["nmos", ["instance", "usage"]]]) {
     {?pmos ?nmos} @AS $PARALLEL;
     {?pmos::position ?nmos::position ?} @ALIGN("y", priority="low");
+    {?pmos::position ? ?nmos::position} @DISTRIBUTE("left-to-right", priority="low");
     {?pmos ?nmos} @ORDER("left-to-right", priority="low");
     {?pmos ?nmos} @GROUP;
     ?pmos @SELECT-INSTANCE(type="*")
@@ -1221,19 +1225,22 @@
      ============================================================================================== */
 
   /* A CMOS inverter, the PMOS above the NMOS.
-     Places and routes; a group: specializes $CMOS_GATE and places ?pmos above ?nmos in one column. */
+     Places and routes; a group: specializes $CMOS_GATE, places ?pmos above ?nmos in one column and
+     puts the usage's own point midway between them. */
   $CMOS_INVERTER = @DEFINE(roles=[["pmos", "instance"], ["nmos", "instance"]]) {
     ?pmos(pullup) ?nmos(pulldown) @AS $CMOS_GATE;
     {?pmos ?nmos ?} @ALIGN("x", priority="low");
+    {?pmos::position ? ?nmos::position} @DISTRIBUTE("top-to-bottom", priority="low");
     {?pmos ?nmos} @ORDER("top-to-bottom", priority="low");
   };
 
   /* A CMOS inverter drawn side by side, the PMOS on the left.
-     Places and routes; a group: specializes $CMOS_GATE and places ?pmos to the left of ?nmos in one
-     row. */
+     Places and routes; a group: specializes $CMOS_GATE, places ?pmos to the left of ?nmos in one
+     row and puts the usage's own point midway between them. */
   $CMOS_INVERTER_HORIZONTAL = @DEFINE(roles=[["pmos", "instance"], ["nmos", "instance"]]) {
     ?pmos(pullup) ?nmos(pulldown) @AS $CMOS_GATE;
     {?pmos ?nmos ?} @ALIGN("y", priority="low");
+    {?pmos::position ? ?nmos::position} @DISTRIBUTE("left-to-right", priority="low");
     {?pmos ?nmos} @ORDER("left-to-right", priority="low");
   };
 
