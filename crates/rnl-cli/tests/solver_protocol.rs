@@ -157,6 +157,36 @@ fn absent_external_report_does_not_claim_zero_facts_or_work() {
 }
 
 #[test]
+fn a_result_without_a_report_that_loses_pin_texts_is_not_written() {
+    // the report of facts is optional in the protocol; whether the record reads back with the
+    // objects it was solved with does not depend on it, and a level without dots is checked too
+    use rnl_cli::solve::{solve_using, BackendResult, SolveOptions};
+    let file = InputFile::new("0.4");
+    let source = "* pin notes\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nR1 a 0 1k\nR2 a 0 2k\n* @RNL {\n\
+                  * $S = @DEFINE-SYMBOL { (-1,0) @PIN(terminal=1); (1,0) @PIN(terminal=2); (-0.5,-0.5) (0.5,0.5) @RECTANGLE };\n\
+                  * {#R1 #R2} @SET-SYMBOL $S => @ORIENT(\"R0\"); #R1 @PLACE(0,0); #R2 @PLACE(5,0);\n\
+                  * $D= @DEFINE(roles=[[\"p\",\"pin\"]]) { ?p::net @ROUTE-NET };\n\
+                  * # @SELECT-PIN(wired=false) => @AS $D;\n\
+                  * #R1 @SELECT-PIN(wired=false) => @TEXT(\"NOTE\", key=\"k\")\n* }\n.end\n";
+    std::fs::write(&file.0, source).unwrap();
+    let result = solve_using(
+        &file.0,
+        &FsProvider::new(&[]),
+        &SolveOptions { std: false, ..Default::default() },
+        &|_| true,
+        &|p, options| {
+            let mut solved = rnl_solver::solve(p, options);
+            let canonical = solved.report.canonical_options.take();
+            solved.report = Default::default();
+            solved.report.canonical_options = canonical;
+            Ok(BackendResult { solved, author: "third-party 1".into(), report_available: false })
+        },
+    );
+    assert!(matches!(&result, Err(e) if e.contains("does not read back as it was solved")), "{:?}", result.err());
+    assert_eq!(std::fs::read_to_string(&file.0).unwrap(), source);
+}
+
+#[test]
 fn later_backend_failure_discards_earlier_in_memory_writebacks() {
     use rnl_cli::solve::{solve_using, BackendResult, SolveOptions};
     let file = InputFile::new("0.4");
