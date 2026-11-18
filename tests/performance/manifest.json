@@ -38,8 +38,8 @@
       "case_id": "reviewed-0.4/ctle-rc-degenerated.scs",
       "source": "tests/integration/solver-0.4/ctle-rc-degenerated.scs",
       "input": "inputs/representative/reviewed-0.4/ctle-rc-degenerated.scs",
-      "sha256": "03aa3efd7c10a31840dea1b3a7081299bd7832ebe920fd8106f0018bafafafc3",
-      "bytes": 4886
+      "sha256": "9e57b59c0424ad6089899f892027d61cb575fbbba4435f08c0179ff5a0c1953b",
+      "bytes": 5042
     },
     {
       "case_id": "reviewed-0.4/diff-pair-resistive.sp",

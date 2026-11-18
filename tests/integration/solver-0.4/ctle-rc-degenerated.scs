@@ -51,6 +51,9 @@ MT2 (s2 vb vss vss) nch w=30u l=0.3u
 //   %tails_mirrored = #MT1 #MT2 @ORIENT-RELATION("MY");
 //   %mt1_gate_left = #MT1:g @ORIENT("left");
 //
+//   /* the two output ports are mirror images of each other, like the input ports */
+//   %out_ports_mirrored = %p_outn %p_outp @ORIENT-RELATION("MY");
+//
 //   /* the block symbol drawn for the instances of ctle */
 //   $CTLE_SYM = @DEFINE-SYMBOL(box=[-5, -3, 5, 3]) {
 //     (-5, 1) @PIN(terminal="inp", direction="left");
