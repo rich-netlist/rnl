@@ -952,6 +952,20 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
             let main = doc.main().file.clone();
             let cannot = || Said::new(codes::VIEW_CANNOT_READ, format!("cannot read {}", args.file.display()));
             let text = doc.source(&main).ok_or_else(cannot)?;
+            // a main file, or a section of it, of a version this reading does not interpret is kept
+            // as it is (16.1): its records are not this reading's to remove, and nothing is written
+            let reading = rnl_view::interpret_with(&read, args.dialect.as_deref(), &formats, &files, &options(args))?;
+            let in_main = |d: &&rnl_runtime::diag::Diag| {
+                d.code == codes::VERSION_UNSUPPORTED
+                    && d.loc.as_ref().is_some_and(|l| l.file == reading.doc.main().file)
+            };
+            let unsupported: Vec<_> = reading.diagnostics().into_iter().filter(in_main).collect();
+            if !unsupported.is_empty() {
+                for d in &unsupported {
+                    eprintln!("{}", reading.sink.render(d));
+                }
+                return Ok(ExitCode::from(1));
+            }
             let stripped = rnl_runtime::writeback::strip_generated(&doc, &main, text);
             let bytes = encode(original.as_deref(), &stripped, args.encoding)
                 .map_err(|e| Said::new(codes::CODEC_LATIN1_UNREPRESENTABLE, format!("{}: {e}", args.file.display())))?;

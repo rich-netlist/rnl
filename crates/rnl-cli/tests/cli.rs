@@ -185,6 +185,27 @@ fn strip_generated_reads_the_bundled_packages_too() {
 }
 
 #[test]
+fn strip_generated_keeps_a_file_of_a_version_not_read() {
+    // a main file of 0.3 is kept as it is (16.1): its generated record stays, and nothing is written
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR"));
+    let (f, out) = (dir.join("strip-generated-0.3.sp"), dir.join("strip-generated-0.3-out.sp"));
+    let text = "* old deck\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n\
+                * @RNL(type=\"generated\") { #R1 @PLACE(2,3) }\n.end\n";
+    std::fs::write(&f, text).unwrap();
+    let _ = std::fs::remove_file(&out);
+    let run = Command::new(env!("CARGO_BIN_EXE_rnl"))
+        .args(["strip-generated", &f.to_string_lossy(), "-o", &out.to_string_lossy()])
+        .output()
+        .unwrap();
+    let said = String::from_utf8_lossy(&run.stderr);
+    assert_eq!(run.status.code(), Some(1), "{said}");
+    // the error is at the version declared, on the standard error
+    assert!(said.contains("strip-generated-0.3.sp:2:25: RNL2102 version-unsupported"), "{said}");
+    assert!(!out.exists());
+    assert_eq!(std::fs::read_to_string(&f).unwrap(), text);
+}
+
+#[test]
 fn catalog_prints_the_packages_the_core_has() {
     let json = |out: &str| -> serde_json::Value { serde_json::from_str(out).unwrap() };
     let (code, out) = rnl(&["catalog"]);
