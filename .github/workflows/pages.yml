@@ -95,8 +95,9 @@ env:
   FROZEN_VIEWER_TAG: viewer-v0.5.3
   # The last release of the 0.5 line of the core, which reads 0.2, 0.3 and 0.4. Until the site moves to the language
   # 0.4, the site is built with it, not with main, whose core reads 0.4 only: the web viewer at viewer/ is built at
-  # this tag (so it no longer changes with every merge into main), the site's example netlists and the logo are
-  # checked with its command line, and the gallery draws its symbols with its npm package @rich-netlist/runtime.
+  # this tag (so it no longer changes with every merge into main), the skill package for agents and llms.txt are
+  # published as they are there, the site's example netlists and the logo are checked with its command line, and
+  # the gallery draws its symbols with its npm package @rich-netlist/runtime.
   # Moving to a newer release of the 0.5 line is this line alone.
   LAST_05_RELEASE: core-v0.5.6
 
@@ -152,12 +153,18 @@ jobs:
           python3 -m unittest discover -s scripts/spec -p 'test_build.py'
           python3 scripts/spec/build.py --site site/dist
 
+      # The tag LAST_05_RELEASE, checked out beside the workspace: the skill package and the web viewer below are
+      # published as they are there, until the site moves to the language 0.4.
+      - name: Check out the tag of the last release of the 0.5 line
+        run: git worktree add --detach "$RUNNER_TEMP/release-0.5" "refs/tags/$LAST_05_RELEASE"
       # The RNL skill package, for agents: site/dist/skill/rnl-skill.zip, the files of the package as plain
       # text under site/dist/skill/rnl/, a manifest and the hashes, and the plain-text entry that agents look
       # for, site/dist/llms.txt, in English only, which the page for agents,
-      # agents.html, links. The package is checked by skill.yml.
+      # agents.html, links. Both are the tag's, built by the tag's own script, so that the package of the
+      # language 0.3 stays published while main's skills/rnl moves on; main's package is checked by skill.yml.
       - name: Build the skill package for agents
-        run: python3 scripts/skill/build.py --site site/dist
+        working-directory: ${{ runner.temp }}/release-0.5
+        run: python3 scripts/skill/build.py --site "$GITHUB_WORKSPACE/site/dist"
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -191,21 +198,19 @@ jobs:
 
       # The web viewer at viewer/, one copy for every language: the core as WebAssembly, the page of
       # apps/viewer-ui with its web fonts, and the conformance corpus as samples, as they are at the tag
-      # LAST_05_RELEASE. The tag is checked out beside the workspace and built there with its own scripts, fonts
-      # and WebAssembly cache, as the frozen viewer below is; main's web viewer is tested by web.yml.
+      # LAST_05_RELEASE, built in the tag's checkout above with its own scripts, fonts and WebAssembly cache,
+      # as the frozen viewer below is; main's web viewer is tested by web.yml.
       - name: Install Rust with the WebAssembly target
         id: rust
         run: |
           rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
           echo "version=$(rustc --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
-      - name: Check out the tag of the web viewer
-        run: git worktree add --detach "$RUNNER_TEMP/viewer" "refs/tags/$LAST_05_RELEASE"
       # Writing the web fonts from the pinned fonts takes scripts/fonts.py a minute or two, and what it
       # writes changes only with the tag, so it is kept between runs.
       - id: fonts
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ runner.temp }}/viewer/apps/viewer-ui/fonts/
+          path: ${{ runner.temp }}/release-0.5/apps/viewer-ui/fonts/
           key: web-fonts-viewer-${{ env.LAST_05_RELEASE }}
       - if: steps.fonts.outputs.cache-hit != 'true'
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
@@ -214,7 +219,7 @@ jobs:
       # downloads the pinned fonts and writes apps/viewer-ui/fonts/, the drawing's web fonts
       - name: Write the web fonts
         if: steps.fonts.outputs.cache-hit != 'true'
-        working-directory: ${{ runner.temp }}/viewer
+        working-directory: ${{ runner.temp }}/release-0.5
         run: pip install fonttools brotli && python scripts/fonts.py web
       # the crates the core depends on, and what was built of them for WebAssembly
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -228,7 +233,7 @@ jobs:
       # writes apps/web/dist/, including libraries/*.rnl, index.json and bundled.json,
       # and puts it at site/dist/viewer/, where the pages of every language link
       - name: Build the web viewer, with samples and the package library
-        working-directory: ${{ runner.temp }}/viewer
+        working-directory: ${{ runner.temp }}/release-0.5
         env:
           CARGO_TARGET_DIR: ${{ runner.temp }}/viewer-target
         run: |
