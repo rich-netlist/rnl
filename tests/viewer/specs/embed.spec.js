@@ -473,7 +473,7 @@ test("demo switches all four published examples in its existing iframe", async (
   await screenshot(page, "demo-before.png", browserName);
   for (const name of ["Two-stage buffer", "Line styles", "Five-transistor OTA"]) {
     await page.getByRole("button", { name, exact: true }).click();
-    const sample = name === "Two-stage buffer" ? "04-hierarchy.sp" : name === "Line styles" ? "17-line-styles.sp" : "ota5t.sp";
+    const sample = name === "Two-stage buffer" ? "04-hierarchy.sp" : name === "Line styles" ? "17-line-styles.sp" : "03-five-transistor-ota.sp";
     await expect(page.locator("#events")).toContainText(sample);
     await expect(frame.locator("#canvas > svg")).toBeVisible();
   }

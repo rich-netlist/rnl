@@ -70,7 +70,7 @@ test.describe("the objects not drawn", () => {
     await show(page);
     const nets = (name) =>
       rows(page).filter({ has: page.locator(".name", { hasText: new RegExp(`^${name}$`) }) }).locator(".thumb svg text").allTextContents();
-    expect((await nets("M1")).sort()).toEqual(["0", "d", "g", "s"]);
+    expect((await nets("M1")).sort()).toEqual(["d", "g", "s"]);
     expect((await nets("C1")).sort()).toEqual(["0", "a"]);
     const thumb = rows(page).first().locator(".thumb svg");
     await expect(thumb).toBeVisible();
@@ -225,7 +225,7 @@ test.describe("the drawings of the objects not drawn", () => {
     // each is drawn with its own symbol and nets
     const nets = (name) =>
       rows(page).filter({ has: page.locator(".name", { hasText: new RegExp(`^${name}$`) }) }).locator(".thumb svg text").allTextContents();
-    expect((await nets("M1")).sort()).toEqual(["0", "d", "g", "s"]);
+    expect((await nets("M1")).sort()).toEqual(["d", "g", "s"]);
     expect((await nets("C1")).sort()).toEqual(["0", "a"]);
   });
 
@@ -281,8 +281,8 @@ test.describe("the drawings of the objects not drawn", () => {
       window.fakeShell.releaseDrawings();
     });
     const m1 = rows(page).first().locator(".thumb svg text");
-    await expect(m1).toHaveCount(4);
-    expect((await m1.allTextContents()).sort()).toEqual(["0", "d", "g", "s"]);
+    await expect(m1).toHaveCount(3);
+    expect((await m1.allTextContents()).sort()).toEqual(["d", "g", "s"]);
     expect((await asked(viewer)).length).toBe(2);
     await page.locator("#unplaced-search").fill("rn5");
     await expect(rows(page).locator(".thumb svg")).toHaveCount(10);

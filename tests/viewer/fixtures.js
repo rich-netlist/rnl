@@ -30,7 +30,7 @@ export const FILES = {
   "ota-nested-usages": "tests/viewer/inputs/ota-nested-usages.sp",
   "duplicate-usages-04": "tests/viewer/inputs/duplicate-usages-04.sp",
   "usage-deep": "tests/viewer/inputs/usage-deep.sp",
-  "usage-ota5t": "site/examples/ota5t.sp",
+  "usage-ota5t": "tests/viewer/inputs/usage-ota5t.sp",
   "package-pkg": "tests/viewer/inputs/acme.pkg",
   "wire-labels": "tests/viewer/inputs/wire-labels.sp",
   "flylines": "tests/viewer/inputs/flylines.sp",
@@ -130,6 +130,9 @@ export const EDITED = {
  */
 export const UNPLACED = [
   "* objects without a position",
+  // of 0.4 with the standard series, without the labels its fill puts on unwired pins or ports on the rails
+  '* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4") }',
+  '* @RNL { # @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; $SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_SET; $GROUND_NET_SET @REMOVE-FROM $PORT_FILL_SET }',
   ".subckt cell p q", "R1 p q 1k", ".ends",
   "R1 in a 1k", "C1 a 0 1p", "M1 d g s 0 nmos", "X1 a b cell",
   ...Array.from({ length: 60 }, (_, k) => `Rn${String(k + 1).padStart(2, "0")} n${k + 1} 0 2k`),

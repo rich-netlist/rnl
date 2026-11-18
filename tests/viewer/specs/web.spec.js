@@ -145,7 +145,7 @@ test("Auto Include resolves indexed library subcircuits, warns on conflicts and 
   const imported = await page.evaluate(() => window.viewer.doc);
   expect(imported.files).toHaveLength(2);
   expect(imported.files[0].text).toBe("* top\nX1 a 0 cell\n.end\n");
-  expect(imported.diagnostics.some((d) => d.severity === "warning" && d.message.includes("cell") && d.message.includes("added by Auto Include"))).toBe(true);
+  expect(imported.diagnostics.some((d) => d.severity === "hint" && d.message.startsWith("subcircuit cell was added from") && d.message.endsWith("cell.inc by Auto Include"))).toBe(true);
   const conflict = await opened(page, () => page.locator("#include-input").setInputFiles({ name: "duplicate.inc", mimeType: "text/plain", buffer: Buffer.from(cell) }));
   expect(conflict.files).toHaveLength(1);
   expect(conflict.diagnostics.some((d) => d.message.includes("times in the Library"))).toBe(true);
@@ -294,7 +294,7 @@ test("Auto Include imports the actual nested definition without pulling its test
     expect(on.files.some(f => f.path.endsWith('tb.scs'))).toBe(false);
     expect(on.objects.find(o => o.name === 'X1').opens).not.toBeNull();
     expect(on.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
-    expect(on.diagnostics.some(d => d.message.includes('cells/cell.scs') && d.message.includes('added by Auto Include'))).toBe(true);
+    expect(on.diagnostics.some(d => d.message.includes('cells/cell.scs') && d.message.includes('by Auto Include'))).toBe(true);
     expect(off.files).toHaveLength(1);
     expect(off.objects.find(o => o.name === 'X1').opens).toBeNull();
   }
@@ -421,7 +421,7 @@ for (const method of ['descend', 'tree', 'index', 'source', 'include']) {
     await page.locator('#tab-netlist').click();
     const auto = await opened(page, () => page.locator('#auto-include').check());
     expect(auto.objects.find(o => o.name === 'Xleaf').opens).not.toBeNull();
-    expect(auto.diagnostics.some(d => d.message.includes('added by Auto Include'))).toBe(true);
+    expect(auto.diagnostics.some(d => d.message.includes('by Auto Include'))).toBe(true);
     await opened(page, () => descendNamed(page, 'Xleaf'));
     expect(await visitTitles(page)).toEqual(['visit-top.sp','cell','leaf']);
     await expect(page.locator('#pool-list .pool-row')).toHaveCount(3);
@@ -1029,7 +1029,7 @@ test("File > Load from Clipboard opens the text alone, as rnl view reads it in a
 });
 
 test("the Not drawn list asks the core for the drawings of its rows, which the Document does not carry", async ({ page }) => {
-  const text = "* none placed\nR1 a b 1k\nC1 b 0 1p\nM1 d g s 0 nmos\n.model nmos nmos\n.end\n";
+  const text = '* none placed\n* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4") }\nR1 a b 1k\nC1 b 0 1p\nM1 d g s 0 nmos\n.model nmos nmos\n.end\n';
   await start(page);
   await page.evaluate((t) => {
     navigator.clipboard.readText = async () => t;
@@ -1046,9 +1046,9 @@ test("the Not drawn list asks the core for the drawings of its rows, which the D
   const rows = page.locator("#unplaced-list .unplaced-row");
   await expect(rows).toHaveCount(listed.length);
   await expect(rows.locator(".thumb svg")).toHaveCount(listed.length);
-  // each is drawn with its own symbol and the nets at its pins
+  // each is drawn with its own symbol and the nets at its pins: the three of the standard $NMOS
   const nets = rows.filter({ has: page.locator(".name", { hasText: /^M1$/ }) }).locator(".thumb svg text");
-  expect((await nets.allTextContents()).sort()).toEqual(["0", "d", "g", "s"]);
+  expect((await nets.allTextContents()).sort()).toEqual(["d", "g", "s"]);
 });
 
 test("the core's labels are clicked and marked, the pointer shows names, and a click on two objects lists them", async ({ page }) => {
