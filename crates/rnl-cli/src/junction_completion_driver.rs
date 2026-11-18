@@ -193,47 +193,62 @@ fn line_mapping(
     );
     let kept = |line: u32, ranges: &[(u32, u32)]| !ranges.iter().any(|&(start, end)| start <= line && line <= end);
     let old: Vec<_> = ctx.original_text.lines().enumerate().filter(|(i, _)| kept(*i as u32 + 1, &old_ranges)).collect();
-    let mut new: Vec<_> = new_text.lines().enumerate().filter(|(i, _)| kept(*i as u32 + 1, &new_ranges)).collect();
+    let new: Vec<_> = new_text.lines().enumerate().filter(|(i, _)| kept(*i as u32 + 1, &new_ranges)).collect();
     // What follows an old generated record on its last line stays where the record was, on a line
     // of its own, behind an empty record when it is formal tokens (2.4): such a line is new, and
-    // what is on it is the old text, moved.
-    let mut moved = Vec::new();
-    if new.len() > old.len() {
-        let extra = new.len() - old.len();
-        let at = old.iter().zip(&new).take_while(|((_, a), (_, b))| a == b).count();
-        let old_lines: Vec<&str> = ctx.original_text.lines().collect();
-        let tail_of = |&(index, line): &(usize, &str)| -> Option<MovedTail> {
-            let body = line.trim_start().trim_start_matches(['*', '/']).trim_start();
-            let rest = body.strip_prefix("@RNL").map(str::trim_start).and_then(|r| r.strip_prefix("{}"));
-            let tail = rest.unwrap_or(body).trim();
-            if tail.is_empty() {
-                return None;
-            }
-            let start = line.len() - line.trim_start().len() + line.trim_start().find(tail)?;
-            old_ranges.iter().find_map(|&(_, end)| {
-                let old_line = old_lines.get(end as usize - 1)?.trim_end();
-                let from = old_line.strip_suffix(tail)?;
-                Some(MovedTail {
-                    from: (end, from.chars().count() as u32 + 1),
-                    to: (index as u32 + 1, line[..start].chars().count() as u32 + 1),
-                })
-            })
-        };
-        let tails: Option<Vec<_>> = new[at..at + extra].iter().map(tail_of).collect();
-        if let Some(tails) = tails {
-            moved = tails;
-            new.drain(at..at + extra);
+    // what is on it is the old text, moved. Each old record has at most one such line, between the
+    // kept lines around it; several records may each have theirs.
+    let old_lines: Vec<&str> = ctx.original_text.lines().collect();
+    let tail_of = |index: usize, line: &str, end: u32| -> Option<MovedTail> {
+        let body = line.trim_start().trim_start_matches(['*', '/']).trim_start();
+        let rest = body.strip_prefix("@RNL").map(str::trim_start).and_then(|r| r.strip_prefix("{}"));
+        let tail = rest.unwrap_or(body).trim();
+        if tail.is_empty() {
+            return None;
         }
-    }
-    if old.len() != new.len() {
-        return Err("cannot map lines outside generated record edits".into());
-    }
-    let mut map = vec![None; ctx.original_text.lines().count() + 1];
-    for ((old_index, old_line), (new_index, new_line)) in old.into_iter().zip(new) {
-        if old_line != new_line {
+        let start = line.len() - line.trim_start().len() + line.trim_start().find(tail)?;
+        let old_line = old_lines.get(end as usize - 1)?.trim_end();
+        let from = old_line.strip_suffix(tail)?;
+        Some(MovedTail {
+            from: (end, from.chars().count() as u32 + 1),
+            to: (index as u32 + 1, line[..start].chars().count() as u32 + 1),
+        })
+    };
+    let mut moved = Vec::new();
+    let mut used = vec![false; old_ranges.len()];
+    let mut map = vec![None; old_lines.len() + 1];
+    let (mut i, mut j) = (0, 0);
+    while j < new.len() {
+        let (new_index, new_line) = new[j];
+        // the old records a moved tail may come from lie between the kept old lines i - 1 and i
+        let after = if i == 0 { 0 } else { old[i - 1].0 as u32 + 1 };
+        let before = old.get(i).map_or(u32::MAX, |&(k, _)| k as u32 + 1);
+        let tail = old_ranges
+            .iter()
+            .enumerate()
+            .filter(|&(r, &(_, end))| !used[r] && after < end && end < before)
+            .find_map(|(r, &(_, end))| tail_of(new_index, new_line, end).map(|t| (r, t)));
+        let same = old.get(i).is_some_and(|&(_, line)| line == new_line);
+        // a line that reads as both is the moved tail when the next line is the kept old one
+        let take_tail = tail.is_some() && (!same || new.get(j + 1).map(|n| n.1) == old.get(i).map(|o| o.1));
+        if let (true, Some((r, t))) = (take_tail, tail) {
+            used[r] = true;
+            moved.push(t);
+            j += 1;
+            continue;
+        }
+        if i == old.len() {
+            return Err("cannot map lines outside generated record edits".into());
+        }
+        if !same {
             return Err("non-generated line moved or changed during writeback".into());
         }
-        map[old_index + 1] = Some(new_index as u32 + 1);
+        map[old[i].0 + 1] = Some(new_index as u32 + 1);
+        i += 1;
+        j += 1;
+    }
+    if i != old.len() {
+        return Err("cannot map lines outside generated record edits".into());
     }
     Ok((map, moved))
 }

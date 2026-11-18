@@ -46,6 +46,47 @@ pub fn write(path: &Path, bytes: &[u8]) -> Result<()> {
     write_in_place(&at, bytes)
 }
 
+/// Replace the contents of the file at `path` as a file of its folder alone, as opening a project does (project.rs), or make
+/// it: where the file has other names (hard links), which may be anywhere, a new file with the new bytes takes this name and
+/// the others keep the old file, which `write` would change for all of them. Else as `write`, which on Windows replaces a
+/// file by a rename too, unless a program holds it open.
+pub fn write_own(path: &Path, bytes: &[u8]) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if let Ok(old) = std::fs::symlink_metadata(path) {
+            if old.is_file() && old.nlink() > 1 {
+                // (a rename would replace a file the user may only read, as a write would not)
+                std::fs::OpenOptions::new().write(true).open(path)?;
+                return replace_name(path, bytes, &old);
+            }
+        }
+    }
+    write(path, bytes)
+}
+
+/// Give the name `at` a new file with `bytes` and the mode the old one has, by a rename in its folder.
+#[cfg(unix)]
+fn replace_name(at: &Path, bytes: &[u8], old: &std::fs::Metadata) -> Result<()> {
+    let dir = at.parent().ok_or_else(|| Error::new(ErrorKind::InvalidInput, "it is in no folder"))?;
+    let (temp, mut file) = create_temp(dir)?;
+    let done = (|| -> Result<()> {
+        file.set_permissions(old.permissions())?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        std::fs::rename(&temp, at)?;
+        if let Ok(folder) = std::fs::File::open(dir) {
+            let _ = folder.sync_all();
+        }
+        Ok(())
+    })();
+    drop(file);
+    if done.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    done
+}
+
 /// A name for the new file, in the folder of the file, that is not there: made by the call that fails if it is.
 fn temp_name(dir: &Path, attempt: u32) -> PathBuf {
     static COUNT: AtomicU64 = AtomicU64::new(0);

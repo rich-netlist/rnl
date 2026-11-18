@@ -83,7 +83,7 @@ A definition is used as `#A(role) #B(role) @AS $DEFINITION` or `$DEFINITION @ATT
 | `$NET_LABEL` | `p` (net/pin) | – | `$NET_LABEL_SYMBOL` | – | A net label: the name of a net on a short lead, drawn at a point of its own; given a bus pin, such as a pin of a bundle (11.8), it keeps the pin and is one label on all its nets, showing their names (13.6). |
 | `$NO_CONNECT` | `t` (terminal/pin) | – | `$NO_CONNECT_SYMBOL` | – | A no-connect mark on a terminal or pin left unconnected on purpose; a terminal is kept as itself so a mark on a bus bit records which bit is open (12.6). |
 | `$JUNCTION` | `p` (point/terminal) | – | `$JUNCTION_SYMBOL` | – | A junction dot on a point or a terminal. |
-| `$CURRENT_ARROW` | `p` (terminal/point) | – | – | – | A current arrow on a terminal or a point. |
+| `$CURRENT_ARROW` | `p` (terminal/point) | – | `$ARROW_SYMBOL` | – | A current arrow on a terminal or a point. |
 | `$ARROW` | `at` (point) | – | `$ARROW_SYMBOL` | – | An arrow head drawn on a point in a symbol or in the scene (9.2.7). |
 | `$SPDT_SWITCH` | `at` (point) | – | `$SPDT_SWITCH_SYMBOL` | – | A single-pole double-throw switch drawn as a figure on a point, with no netlist line. |
 | `$FIGURE` | `at` (point) | – | – | – | A figure drawn at a point with no netlist line, given a symbol of its own with SET-SYMBOL. |
@@ -239,11 +239,11 @@ A symbol is chosen by the rules of the next section, or by `@SET-SYMBOL $NAME` o
 | Symbol | Pins | Labels | Definition |
 | --- | --- | --- | --- |
 | `$ADC` | in:left out:right | label, name | – |
-| `$ADDER_SYMBOL` | in1:left in2:down out:right | name, value | – |
+| `$ADDER_SYMBOL` | in1:left in2:down out:right | name, value | `$ADDER` |
 | `$AND_2INPUT` | a:left b:left y:right | name | – |
 | `$AND_3INPUT` | a:left b:left c:left y:right | name | – |
 | `$AND_4INPUT` | a:left b:left c:left d:left y:right | name | – |
-| `$ARROW_SYMBOL` | – | – | – |
+| `$ARROW_SYMBOL` | – | – | `$CURRENT_ARROW` |
 | `$BANDPASS_FILTER` | 1:left 2:right | name | – |
 | `$BANDSTOP_FILTER` | 1:left 2:right | name | – |
 | `$BATTERY` | n:down p:up | name, value | – |
@@ -268,32 +268,32 @@ A symbol is chosen by the rules of the next section, or by `@SET-SYMBOL $NAME` o
 | `$DIFFERENTIAL_TRANSCONDUCTOR` | inn:left inp:left out:right | value, name | – |
 | `$DIFFERENTIATOR` | 1:left 2:right | label, name | – |
 | `$DIODE` | a:up k:down | name, model | – |
-| `$DISCRETE_TIME_INTEGRATOR_SYMBOL` | in:left out:right | label, name | – |
+| `$DISCRETE_TIME_INTEGRATOR_SYMBOL` | in:left out:right | label, name | `$DISCRETE_TIME_INTEGRATOR` |
 | `$DIVIDER` | 1:left 2:left 3:right | value, name | – |
 | `$D_FLIP_FLOP` | ck:left d:left q:right qb:right | name, value | – |
 | `$D_FLIP_FLOP_Q_ONLY` | ck:left d:left q:right | name, value | – |
 | `$D_FLIP_FLOP_WITH_RESET` | ck:left d:left q:right qb:right rst:down | name, value | – |
 | `$EGND` | 1:up | name | – |
 | `$EXTERNALLY_CONTROLLED_SWITCH` | cp:left n:down p:up | name, value | – |
-| `$GROUND_SYMBOL` | p:up | – | – |
+| `$GROUND_SYMBOL` | p:up | – | `$GROUND` |
 | `$HIGHPASS_FILTER` | 1:left 2:right | name | – |
 | `$IDEAL_BALUN` | 1:right 2:down 3:left 4:down | name | – |
 | `$INDUCTOR` | n:down p:up | name, value | – |
-| `$INTEGRATOR_SYMBOL` | in:left out:right | name | – |
+| `$INTEGRATOR_SYMBOL` | in:left out:right | name | `$INTEGRATOR` |
 | `$INVERTER` | a:left y:right | name | – |
-| `$IO_PORT_SYMBOL` | p:right | netname | – |
+| `$IO_PORT_SYMBOL` | p:right | netname | `$IO_PORT` |
 | `$IPIN` | p:right | netname | – |
 | `$IPROBE` | 1:down 2:down | name, value | – |
 | `$IPULSE` | n:down p:up | name, value | – |
 | `$IPWL` | n:down p:up | name, value | – |
 | `$ISIN` | n:down p:up | name, value | – |
 | `$JK_FF` | 1:left 2:left 3:left 4:right 5:right | name, value | – |
-| `$JUNCTION_SYMBOL` | – | – | – |
+| `$JUNCTION_SYMBOL` | – | – | `$JUNCTION` |
 | `$LIMITING_DIFFAMP` | 1:left 2:left 3:right | name, value | – |
 | `$LOWPASS_FILTER` | 1:left 2:right | name | – |
 | `$MIXER` | 1:left 2:down 3:right | name | – |
 | `$MULTIPLEXER` | 1:left 2:left 3:left 4:up 5:down 6:right | value, name | – |
-| `$MULTIPLIER_SYMBOL` | in1:left in2:down out:right | name, value | – |
+| `$MULTIPLIER_SYMBOL` | in1:left in2:down out:right | name, value | `$MULTIPLIER` |
 | `$NAMED_GROUND_SYMBOL` | p:up | netname | – |
 | `$NAND_2INPUT` | a:left b:left y:right | name | – |
 | `$NAND_3INPUT` | a:left b:left c:left y:right | name | – |
@@ -307,7 +307,7 @@ A symbol is chosen by the rules of the next section, or by `@SET-SYMBOL $NAME` o
 | `$NOR_2INPUT` | a:left b:left y:right | name | – |
 | `$NOR_3INPUT` | a:left b:left c:left y:right | name | – |
 | `$NOR_4INPUT` | a:left b:left c:left d:left y:right | name | – |
-| `$NO_CONNECT_SYMBOL` | – | – | – |
+| `$NO_CONNECT_SYMBOL` | – | – | `$NO_CONNECT` |
 | `$NPN` | b:left c:up e:down | name, model | – |
 | `$NPN4` | b:left c:up e:down s:right | name, model | – |
 | `$ON_PAGE_CONN` | 1:up | name | – |
@@ -326,7 +326,7 @@ A symbol is chosen by the rules of the next section, or by `@SET-SYMBOL $NAME` o
 | `$PNP` | b:left c:down e:up | name, model | – |
 | `$PWR` | 1:down | name | – |
 | `$QUADRATURE` | 1:up 2:down | name | – |
-| `$QUANTIZER_SYMBOL` | in:left out:right | name, value | – |
+| `$QUANTIZER_SYMBOL` | in:left out:right | name, value | `$QUANTIZER` |
 | `$RC_LINE` | a:left b:right ref:down | name, value | – |
 | `$RESISTOR` | n:down p:up | name, value | – |
 | `$RF_PORT` | n:down p:up | name, value | – |
@@ -335,16 +335,16 @@ A symbol is chosen by the rules of the next section, or by `@SET-SYMBOL $NAME` o
 | `$SP2TSWITCH` | 1:left 2:right 3:right | name, value | – |
 | `$SP3TSWITCH` | 1:left 2:right 3:right 4:right | name, value | – |
 | `$SP4TSWITCH` | 1:left 2:right 3:right 4:right 5:right | name, value | – |
-| `$SPDT_SWITCH_SYMBOL` | – | – | – |
+| `$SPDT_SWITCH_SYMBOL` | – | – | `$SPDT_SWITCH` |
 | `$SUBTRACTOR` | 1:left 2:left 3:right | value, name | – |
-| `$SUPPLY_SYMBOL` | p:down | netname | – |
+| `$SUPPLY_SYMBOL` | p:down | netname | `$SUPPLY` |
 | `$SWITCH` | n:right p:left | name, value | – |
 | `$THYRISTOR` | 1:up 2:down 3:left | name, value | – |
 | `$TRANSCONDUCTOR` | in:left out:right | label, name | – |
 | `$TRANSFORMER` | n1:down n2:down p1:up p2:up | name, value | – |
 | `$TRANSMISSION_LINE` | n1:down n2:down p1:left p2:right | name, value | – |
 | `$T_COIL` | n1:left n2:right tap:down | name | – |
-| `$UNIT_DELAY_SYMBOL` | in:left out:right | label, name | – |
+| `$UNIT_DELAY_SYMBOL` | in:left out:right | label, name | `$UNIT_DELAY` |
 | `$VARIABLE_CAPACITOR` | n:down p:up | name, value | – |
 | `$VARIABLE_GAIN_AMPLIFIER` | 1:left 2:left 3:up 4:down 5:right | value, name | – |
 | `$VARIABLE_INDUCTOR` | n:down p:up | name, value | – |
