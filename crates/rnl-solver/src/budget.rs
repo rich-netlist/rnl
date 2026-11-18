@@ -694,8 +694,13 @@ mod tests {
     /// holds: 65,536 pins squared is 2^32, not `u32::MAX`.
     #[test]
     fn a_product_of_counts_is_charged_in_u64() {
+        // the same on any target
         assert_eq!(product(65_536, 65_536), 1u64 << 32);
-        assert_eq!(product(usize::MAX, usize::MAX), u64::MAX);
+        // the largest counts saturate where u64 does: on a 64-bit target, but not on a 32-bit one,
+        // whose largest count squared fits
+        let max = usize::MAX as u64;
+        let squared = if max > u64::from(u32::MAX) { u64::MAX } else { max * max };
+        assert_eq!(product(usize::MAX, usize::MAX), squared);
         let weight = Step::Structure.weight();
         let big = product(65_536, 65_536);
         let ((), report) =
