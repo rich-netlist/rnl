@@ -13,14 +13,14 @@
         { "id": "load-manifest", "label": "Load &Manifest...", "platforms": ["web"] },
         { "id": "load-clipboard", "label": "Load from &Clipboard...", "keys": ["Ctrl+Shift+V"] },
         { "id": "reload", "label": "&Reload", "keys": ["F5"] },
-        { "id": "reload-library", "label": "Reload &Library" },
-        { "id": "toggle-auto-include", "label": "&Auto Include", "check": true },
-        { "id": "memory-cache", "label": "Memory &Cache...", "platforms": ["desktop"] },
+        { "id": "reload-library", "label": "Reload Li&brary" },
+        { "id": "toggle-auto-include", "label": "Auto Includ&e", "check": true },
+        { "id": "memory-cache", "label": "Memory Cac&he...", "platforms": ["desktop"] },
         "-",
         { "id": "save", "label": "&Save", "keys": ["Ctrl+S"], "platforms": ["desktop"], "with": "overwrites" },
         { "id": "save", "label": "&Download File", "keys": ["Ctrl+S"], "platforms": ["web"], "unless": "overwrites" },
         { "id": "save-project", "label": "Download Pro&ject...", "platforms": ["web"] },
-        { "id": "download-manifest", "label": "Download Ma&nifest...", "platforms": ["web"] },
+        { "id": "download-manifest", "label": "Do&wnload Manifest...", "platforms": ["web"] },
         { "id": "save-as", "label": "Save &As...", "platforms": ["desktop"], "with": "overwrites" },
         { "id": "save-utf8", "label": "Save Changes Using UTF-8", "platforms": ["desktop"], "with": "overwrites" },
         { "id": "save-as-utf8", "label": "Save As UTF-8...", "platforms": ["desktop"], "with": "overwrites" },
@@ -33,7 +33,7 @@
           ]
         },
         "-",
-        { "id": "file-associations", "label": "File &Associations...", "platforms": ["desktop"], "windowsOnly": true },
+        { "id": "file-associations", "label": "Fi&le Associations...", "platforms": ["desktop"], "windowsOnly": true },
         { "id": "exit", "label": "E&xit", "platforms": ["desktop"] }
       ]
     },
@@ -108,7 +108,7 @@
             { "id": "panel-unplaced", "label": "Not &Drawn", "keys": ["6"], "page": true, "check": true },
             { "id": "panel-solve", "label": "S&olve", "keys": ["7"], "page": true, "check": true },
             "-",
-            { "id": "panel-hide", "label": "&Hide" }
+            { "id": "panel-hide", "label": "H&ide" }
           ]
         }
       ]
@@ -123,7 +123,7 @@
         { "id": "solve-close", "label": "&Close Preview", "platforms": ["desktop"], "with": "solve" },
         { "id": "toggle-solve-on-open", "label": "As&k to Solve on Open", "check": true, "platforms": ["desktop"], "with": "solve" },
         "-",
-        { "id": "solve-save", "label": "Save Solved &Copy As...", "keys": ["Ctrl+Shift+S"], "platforms": ["desktop"] },
+        { "id": "solve-save", "label": "Save Solved Cop&y As...", "keys": ["Ctrl+Shift+S"], "platforms": ["desktop"] },
         { "id": "solve-save-utf8", "label": "Save Solved Copy As UTF-8...", "platforms": ["desktop"] },
         "-",
         { "id": "toggle-layout", "label": "Show &Layout Table", "check": true, "page": true },

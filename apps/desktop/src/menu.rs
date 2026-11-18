@@ -526,7 +526,7 @@ mod tests {
             check(&format!("panel-{id}"), &text, None)
         })
         .collect();
-        entries.extend([Shown::Separator, item("panel-hide", "&Hide", None)]);
+        entries.extend([Shown::Separator, item("panel-hide", "H&ide", None)]);
         Shown::Submenu("Side P&anels".into(), entries)
     }
 
@@ -592,7 +592,7 @@ mod tests {
                 item("solve-close", "&Close Preview", None),
                 check("toggle-solve-on-open", "As&k to Solve on Open", None),
                 Shown::Separator,
-                keyed("solve-save", "Save Solved &Copy As...", "Ctrl+Shift+S", "CmdOrCtrl+Shift+S"),
+                keyed("solve-save", "Save Solved Cop&y As...", "Ctrl+Shift+S", "CmdOrCtrl+Shift+S"),
                 item("solve-save-utf8", "Save Solved Copy As UTF-8...", None),
                 Shown::Separator,
                 check("toggle-layout", "Show &Layout Table", None),
@@ -635,9 +635,9 @@ mod tests {
                     item("open-project", "Open Projec&t...", None),
                     item("load-clipboard", "Load from &Clipboard...\tCtrl+Shift+V", None),
                     item("reload", "&Reload\tF5", None),
-                    item("reload-library", "Reload &Library", None),
-                    check("toggle-auto-include", "&Auto Include", None),
-                    item("memory-cache", "Memory &Cache...", None),
+                    item("reload-library", "Reload Li&brary", None),
+                    check("toggle-auto-include", "Auto Includ&e", None),
+                    item("memory-cache", "Memory Cac&he...", None),
                     Shown::Separator,
                     item("save", "&Save\tCtrl+S", None),
                     item("save-as", "Save &As...", None),
@@ -649,7 +649,7 @@ mod tests {
                         vec![item("export-svg", "Export &SVG...", None), item("export-png", "Export &PNG...", None)],
                     ),
                     Shown::Separator,
-                    item("file-associations", "File &Associations...", None),
+                    item("file-associations", "Fi&le Associations...", None),
                     item("exit", "E&xit", None),
                 ],
             ),
@@ -700,9 +700,9 @@ mod tests {
                     item("open-project", "Open Projec&t...", None),
                     item("load-clipboard", "Load from &Clipboard...", Some("CmdOrCtrl+Shift+V")),
                     item("reload", "&Reload", Some("F5")),
-                    item("reload-library", "Reload &Library", None),
-                    check("toggle-auto-include", "&Auto Include", None),
-                    item("memory-cache", "Memory &Cache...", None),
+                    item("reload-library", "Reload Li&brary", None),
+                    check("toggle-auto-include", "Auto Includ&e", None),
+                    item("memory-cache", "Memory Cac&he...", None),
                     Shown::Separator,
                     item("save", "&Save", Some("CmdOrCtrl+S")),
                     item("save-as", "Save &As...", None),

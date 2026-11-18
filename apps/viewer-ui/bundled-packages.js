@@ -32,7 +32,7 @@ export async function bundledPackagesHelp() {
     // what rnl-packages declares in its REUSE.toml, which the build carries beside the packages (LICENSES/)
     ...(bundled.bundled ? [m("The bundled packages are under CC0-1.0, as rnl-packages declares; their licences are in the LICENSES folder beside them.")] : []),
     bundled.bundled
-      ? linked(m("They are the latest versions when this release was made, and change only with a new release of the viewer. A download without them is on the "), m("release page"), RELEASES, ".")
+      ? linked(m("They are the latest versions when this release was made, and change only with a new release of the viewer. A download without them is on the "), m("release page"), RELEASES, m(", next to this one."))
       : linked(m("A download with the public packages bundled is on the "), m("release page"), RELEASES, m(", next to this one.")),
     linked(m("The packages come from the "), m("rnl-packages site"), SITE,
       m(". To use one that this build does not have, download its folder and add the folder to the PATH in the Library; the PATH is searched before the bundled packages.")),

@@ -745,9 +745,12 @@ function fieldsOf(table) {
     if (hiddenSettings > 0) parts.push(hiddenSettings === 1 ? m("1 setting") : m`${hiddenSettings} settings`);
     if (hiddenObjectives > 0) parts.push(hiddenObjectives === 1 ? m("1 objective") : m`${hiddenObjectives} objectives`);
     const kept = keeping === 0 ? "" : ` ${keeping === 1 ? m("1 of the settings keeps a value you set.") : m`${keeping} of the settings keep values you set.`}`;
+    const what = parts.join(m(" and "));
+    // (one setting or objective is, more are)
+    const one = hiddenSettings + hiddenObjectives === 1;
     setText(otherText, showOther
-      ? m`${parts.join(m(" and "))} of other layouts are shown greyed.${kept}`
-      : m`${parts.join(m(" and "))} of other layouts are hidden.${kept}`);
+      ? (one ? m`${what} of other layouts is shown greyed.${kept}` : m`${what} of other layouts are shown greyed.${kept}`)
+      : (one ? m`${what} of other layouts is hidden.${kept}` : m`${what} of other layouts are hidden.${kept}`));
   }
   el.addEventListener("input", refresh);
   el.addEventListener("change", refresh);
