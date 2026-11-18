@@ -597,6 +597,17 @@ impl References {
         self.terminals.edit(source, record, member, index, readings)
     }
 
+    /// The terminal maps of instances whose terminals a DEVICE renames ([`super::terminals::Terminals::renamed_edits`]).
+    pub(super) fn renamed_terminal_edits(
+        &self,
+        doc: &rnl_runtime::host::HostDocument,
+        path: &str,
+        source: &str,
+        notices: &mut Vec<super::Unconverted>,
+    ) -> Vec<Edit> {
+        self.terminals.renamed_edits(doc, path, source, notices)
+    }
+
     pub(super) fn opamp02_orient(
         &self,
         path: &str,

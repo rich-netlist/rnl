@@ -88,9 +88,9 @@ type Site = (String, u32, u32);
 
 #[derive(Default)]
 pub(super) struct Turned {
-    /// By the level's title and the object's id: the frame of an instance drawn with a symbol that
-    /// 0.4 turns or moves.
-    pub objects: BTreeMap<(String, String), Frame>,
+    /// By the level's file and title and the object's id: the frame of an instance drawn with a
+    /// symbol that 0.4 turns or moves.
+    pub objects: BTreeMap<(String, String, String), Frame>,
     /// By where an ORIENT is written: the turn of every object it orients, or None when they differ
     /// (or only some are turned).
     orients: BTreeMap<Site, Option<Orient>>,
@@ -141,7 +141,8 @@ impl Turned {
                     None
                 };
                 if let Some(frame) = frame {
-                    out.objects.insert((level.title.clone(), object.id.clone()), frame);
+                    let file = input.doc.levels[level.level].path.clone();
+                    out.objects.insert((file, level.title.clone(), object.id.clone()), frame);
                     by_level.entry(level.level).or_default().insert(object.id.clone(), frame);
                 }
             }

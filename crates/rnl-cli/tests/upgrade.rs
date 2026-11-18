@@ -247,3 +247,29 @@ fn a_change_of_the_default_look_does_not_fail_the_upgrade_but_a_real_difference_
     let output = run(&dir, &["real.sp", "--no-std", "-o", "real-out"]);
     assert_eq!(output.status.code(), Some(1), "{output:?}");
 }
+
+#[test]
+fn in_place_leaves_an_input_unchanged_when_the_upgrade_has_a_difference() {
+    let dir = scratch("in-place-difference");
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n* @RNL { $S = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1); (2, 0) @PIN(terminal=1) }; #R1 @SET-SYMBOL $S }\n.end\n";
+    std::fs::write(dir.join("real.sp"), source).unwrap();
+    let output = run(&dir, &["real.sp", "--no-std", "--in-place", "--report", "report.json"]);
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    assert_eq!(std::fs::read_to_string(dir.join("real.sp")).unwrap(), source);
+    assert!(String::from_utf8(output.stderr).unwrap().contains("-o DIR"));
+    assert!(String::from_utf8(output.stdout).unwrap().starts_with("0 files written"));
+    assert!(dir.join("report.json").exists());
+}
+
+#[test]
+fn an_absolute_entry_keeps_its_title_line_and_its_verilog_a_file() {
+    let dir = scratch("absolute-entry");
+    std::fs::write(dir.join("plain.sp"), "Rtitle data 0 1k\n.hdl model.va\nX1 a 0 model\n.end\n").unwrap();
+    std::fs::write(dir.join("model.va"), "module model(p,n);\ninout p,n;\nelectrical p,n;\nendmodule\n").unwrap();
+    let entry = dir.join("plain.sp");
+    let output = run(&dir, &[entry.to_str().unwrap(), "--no-std", "-o", "out"]);
+    assert!(output.status.success(), "{output:?}");
+    let written = std::fs::read_to_string(dir.join("out/plain.sp")).unwrap();
+    assert_eq!(written.lines().next(), Some("Rtitle data 0 1k"), "{written}");
+    assert_eq!(std::fs::read(dir.join("out/model.va")).unwrap(), std::fs::read(dir.join("model.va")).unwrap());
+}

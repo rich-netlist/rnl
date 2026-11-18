@@ -26,6 +26,15 @@ pub(super) struct Context {
     pub usage_names: BTreeSet<String>,
 }
 
+/// The name the document gives the file read from `path`, which the writeback functions take:
+/// relative to the directory of the main file when it is in it, while the upgrade keys its files by
+/// their paths. The two differ whenever the main file is given with a directory, such as an
+/// absolute path; a path compared with a name would miss the main file, whose first line is a
+/// title, and the header would go above that title.
+pub(super) fn document_name<'a>(doc: &'a HostDocument, path: &'a str) -> &'a str {
+    doc.levels.iter().find(|l| rnl_runtime::source::normalize(&l.path) == path).map_or(path, |l| l.file.as_str())
+}
+
 /// A usage named in the member list of an ALIGN, ORDER, DISTRIBUTE or DISTANCE counted by one
 /// point, its own; in 0.4 a usage without a symbol stands for its members there, and its point is
 /// `%u::position`, which is the same point for a usage with a symbol (6.5, 14.1). Statements at
@@ -361,7 +370,7 @@ pub(super) fn file(
             for (rule, reason) in reasons {
                 let at = member.text_start();
                 let location = record.loc(at);
-                let marker = carrier_at(doc, path, source, location.line);
+                let marker = carrier_at(doc, document_name(doc, path), source, location.line);
                 let eol = if source.contains("\r\n") { "\r\n" } else { "\n" };
                 let prefix = if marker.is_empty() { String::new() } else { format!("{marker} ") };
                 let replacement = format!("/* rnl upgrade: {reason} */{eol}{prefix}");
@@ -551,17 +560,18 @@ pub(super) fn file(
     if let (Some((record, _)), Some(seed)) = (header, context.sets.seed(path)) {
         let at = record.text.chars().count();
         let location = record.loc(at);
-        let marker = carrier_at(doc, path, source, location.line);
+        let marker = carrier_at(doc, document_name(doc, path), source, location.line);
         let eol = if source.contains("\r\n") { "\r\n" } else { "\n" };
         let prefix = if marker.is_empty() { String::new() } else { format!("{marker} ") };
         edits.push(record_edit(source, record, at..at, format!("{eol}{prefix}{seed}"), "explicit-fill-policy")?);
     }
     edits.extend(context.boxes.edits(doc, path, source, &mut report.notices));
+    edits.extend(context.references.renamed_terminal_edits(doc, path, source, &mut report.notices));
     let mut text = apply(source, &mut edits)?;
     report.changes.extend(edits.into_iter().filter(|e| !e.change.rule.starts_with("approximate-")).map(|e| e.change));
     if header.is_none() {
         let old = text.clone();
-        text = add_header(doc, path, &text, |_| {
+        text = add_header(doc, document_name(doc, path), &text, |_| {
             let header = format!("@RNL(type=\"header\") {{ {} }}", declarations.join("; "));
             context.sets.seed(path).map_or(header.clone(), |seed| format!("{header}\n{seed}"))
         });

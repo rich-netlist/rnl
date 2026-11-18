@@ -188,7 +188,13 @@ fn effective_version(doc: &HostDocument, level: usize) -> String {
 /// A record of the solver that matched its level keeps matching: the input digest of its `sig2`
 /// hash becomes that of the upgraded level, and the digest of the options stays. A hash that did not
 /// match before, or that is not a `sig2` hash, stays as written, so that a stale record is still stale.
-fn refresh_hashes(before: &Interpretation, after: &Interpretation, output: &mut BTreeMap<String, String>) {
+/// Only the `hash` value in the header of a record of the solver changes: the same text in a comment
+/// or anywhere else in the file stays as written.
+fn refresh_hashes(
+    before: &Interpretation,
+    after: &Interpretation,
+    output: &mut BTreeMap<String, String>,
+) -> Result<(), String> {
     use rnl_runtime::problem::{input_digest, same_input};
     // Equal levels (two identical subcircuits) write the same hash, so a hash is replaced
     // everywhere or nowhere: only if it matches every level that carries it, with one new digest.
@@ -216,13 +222,28 @@ fn refresh_hashes(before: &Interpretation, after: &Interpretation, output: &mut 
             }
         }
     }
-    for (old, new) in renames {
-        if let Some(new) = new {
-            for text in output.values_mut() {
-                *text = text.replace(&old, &new);
-            }
+    let mut edits: BTreeMap<String, Vec<edit::Edit>> = BTreeMap::new();
+    for record in after.doc.levels.iter().flat_map(|l| &l.records) {
+        if rnl_runtime::writeback::record_type(record) != "generated" {
+            continue;
         }
+        let Some(old) = rnl_runtime::writeback::field(record, "hash") else { continue };
+        let Some(Some(new)) = renames.get(&old) else { continue };
+        // the value as the header writes it, before the body of the record
+        let header = &record.text[..record.text.find('{').unwrap_or(record.text.len())];
+        let Some(at) = header.find(&format!("\"{old}\"")) else { continue };
+        let start = record.text[..at + 1].chars().count();
+        let Some(level) = after.doc.levels.iter().find(|l| l.file == record.file) else { continue };
+        let path = normalize(&level.path);
+        let Some(text) = output.get(&path) else { continue };
+        let refresh = edit::record_edit(text, record, start..start + old.chars().count(), new.clone(), "refresh-hash")?;
+        edits.entry(path).or_default().push(refresh);
     }
+    for (path, mut edits) in edits {
+        let text = output.get_mut(&path).expect("an edit is made only for an output file");
+        *text = edit::apply(text, &mut edits)?;
+    }
+    Ok(())
 }
 
 /// Read an input and prepare its upgrade. An error means no output should be written.
@@ -422,13 +443,23 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
         let current =
             rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, &provider, &target)?;
         let written = rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, files, &target)?;
-        refresh_hashes(&written, &current, &mut output);
+        refresh_hashes(&written, &current, &mut output)?;
     }
     let overlay = MemoryProvider { files: output.clone(), package_dirs: Vec::new() };
     let provider = Layered { layers: vec![&overlay, files] };
     let target_options = Options { std: false, generated: options.keep_generated, ..authored };
     let after =
         rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, &provider, &target_options)?;
+    // A file of 0.4 reads the Verilog-A files it brings in, one of an earlier version none (2.9): the
+    // upgraded group needs them beside it.
+    for level in &after.doc.levels {
+        if level.kind == LevelKind::File && after.doc.is_veriloga(&level.file) {
+            let path = normalize(&level.path);
+            if !read.contains(&path) && files.read(&path).is_some() {
+                read.push(path);
+            }
+        }
+    }
     report.diagnostics = diagnostics(&after);
     report.assertion_violations = report.diagnostics.iter().filter(|d| d.severity == "violation").cloned().collect();
     (report.differences, report.default_look_changes, report.rule_changes) =
