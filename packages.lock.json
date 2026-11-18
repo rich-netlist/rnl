@@ -18,8 +18,8 @@
     },
     {
       "name": "pdk-sky130",
-      "version": "0.2",
-      "sha256": "03250f49dd86fd3770c8661e05a2446c408e9c008a8845f62c7e1820cc5cf9c1"
+      "version": "0.3",
+      "sha256": "a163b798ddf6362477bf8722431a3c2e1854b7477cde0c2ecb82267ab995b34f"
     }
   ]
 }

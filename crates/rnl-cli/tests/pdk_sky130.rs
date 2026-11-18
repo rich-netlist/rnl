@@ -1,4 +1,4 @@
-//! The SkyWater SKY130 PDK symbol package `pdk-sky130` 0.2, written in the language 0.4:
+//! The SkyWater SKY130 PDK symbol package `pdk-sky130` 0.3, written in the language 0.4:
 //! terminal declarations (`@DEVICE`), multi-terminal symbols (`$SKY130_*`), and model-to-symbol
 //! rules (`@SELECT-INSTANCE`) for `sky130_fd_pr` in both SPICE and Spectre dialects, tested both
 //! without PDK model files and with stubbed `.subckt` / `subckt` definitions.
@@ -14,7 +14,7 @@ use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 
 fn pdk_dir() -> PathBuf {
-    public_packages::version_dir("pdk-sky130", "0.2")
+    public_packages::version_dir("pdk-sky130", "0.3")
 }
 
 fn package_file() -> PathBuf {
@@ -176,7 +176,7 @@ fn device_families_and_symbols_match_in_spice_and_spectre() {
     // every instance stands at one point, so the terminal names and the nets they reach are
     // checked with ASSERT-TERMINAL (15.3), not drawn as wires over one another
     let spice = r#"* All SKY130 device families in SPICE
-* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-PACKAGE(name="pdk-sky130", version="0.2") }
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-PACKAGE(name="pdk-sky130", version="0.3") }
 XM_N d g s 0 sky130_fd_pr__nfet_01v8 w=1 l=0.15
 XM_NVT d g s 0 sky130_fd_pr__nfet_05v0_nvt w=2 l=0.9
 XM_ND d g s 0 sky130_fd_pr__nfet_20v0 w=2 l=1
@@ -205,7 +205,7 @@ XL_IND a b ct 0 sky130_fd_pr__ind_03_90
 .end
 "#;
     let spectre = r#"// SKY130 device families in Spectre (no X prefix)
-// @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-PACKAGE(name="pdk-sky130", version="0.2") }
+// @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-PACKAGE(name="pdk-sky130", version="0.3") }
 M_N (d g s 0) sky130_fd_pr__nfet_01v8 w=1u l=0.15u
 M_P (d g s vdd) sky130_fd_pr__pfet_01v8_hvt w=2u l=0.15u
 Q_P (0 b e 0) sky130_fd_pr__pnp_05v5_W3p40L3p40
