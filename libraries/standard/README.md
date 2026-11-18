@@ -1,85 +1,12 @@
 # standard
 
-The standard packages of RNL, one directory for each version of the standard series: [`0.2/`](0.2/) holds those of RNL 0.2, [`0.3/`](0.3/) those of the series 0.3, and [`0.4/`](0.4/) those of the draft series 0.4. They are drafts: the language standard leaves the content of the standard package open, and names may change with it. Packages are found by the name and version their header record declares, not by file name (16.2), so the files of two versions can have the same names.
+The standard packages of RNL, the series 0.4 in [`0.4/`](0.4/), written in the language 0.4 and bundled with the core. They are drafts: the language standard leaves the content of the standard package open, and names may change with it. Packages are found by the name and version their header record declares, not by file name (16.2).
 
-A file of 0.2 or 0.3 uses the standard package `rnl-std` implicitly, the newest version the tool has of the series written in the language version of the file (16.3 of the language 0.3): a file of 0.2 uses the series 0.2 and a file of 0.3 the series 0.3. A file of 0.4 uses no package implicitly and names `@USE-PACKAGE(name="rnl-std-all", version="0.4")`, or the sub-packages it wants, in its header record (16.3). A version pinned in the header record of the file, or of a file that includes it, comes first, such as `@USE-PACKAGE(name="rnl-std", version="0.2")` in a file of 0.3 that keeps the names of 0.2. A reading can also ask for a version, whatever the language version: `rnl --std-version 0.2`, or `std_version` in a request to the WebAssembly core. Where the series 0.3 is in effect, a name that only the series 0.2 has, such as `$GND`, cannot be found, and the error says the name of the series 0.3, `$GROUND`, or the package that has it now.
+A file of 0.4 uses no package implicitly and names `@USE-PACKAGE(name="rnl-std-all", version="0.4")`, or the sub-packages it wants, in its header record (16.3); a reading can also add the collection, as `rnl --include-std` does. The series 0.2 and 0.3, for the files of the languages 0.2 and 0.3, are in the cores of 0.5.x, up to 0.5.7, whose `rnl upgrade` converts such files to 0.4 by the lists below.
 
-## 0.2
+## The series 0.4
 
-The standard package `rnl-std` 0.2 is a package collection (16.3): its file has only a header record that references other packages, and so does `rnl-std-core`. Used, a package brings in the packages it references first, each once (16.2), so `rnl-std` brings in seven packages and then itself:
-
-| Order | File | Package | Content |
-| --- | --- | --- | --- |
-| 1 | [`rnl-std-style.rnl`](0.2/rnl-std-style.rnl) | `rnl-std-style` | The styles `$base`, `$bus`, `$signal`, `$note` and `$grey`, and the default style rules. |
-| 2 | [`rnl-std-symbols.rnl`](0.2/rnl-std-symbols.rnl) | `rnl-std-symbols` | The symbols of instances, and the rules that give an instance its symbol by element letter, by Spectre master and by model type. |
-| 3 | [`rnl-std-virtual.rnl`](0.2/rnl-std-virtual.rnl) | `rnl-std-virtual` | The virtual elements (ground, supply, port, no-connect, junction, current arrow), their symbols and the rules that give them, and the stubs `$GND_STUB` and `$SUPPLY_STUB`. |
-| 4 | [`rnl-std-core.rnl`](0.2/rnl-std-core.rnl) | `rnl-std-core` | References 1 to 3: it draws the netlist and adds nothing. |
-| 5 | [`rnl-std-fill.rnl`](0.2/rnl-std-fill.rnl) | `rnl-std-fill` | References 3. The sets that decide where grounds, supplies and port tags are filled in, and the rules that fill them in. |
-| 6 | [`rnl-std-semantics.rnl`](0.2/rnl-std-semantics.rnl) | `rnl-std-semantics` | The semantic definitions, such as `$DIFFPAIR`: roles only, nothing drawn. |
-| 7 | [`rnl-std-layout.rnl`](0.2/rnl-std-layout.rnl) | `rnl-std-layout` | The layout definitions `$MIRROR_PAIR`, `$TAIL_CENTER` and `$FLOW`. |
-| 8 | [`rnl-std.rnl`](0.2/rnl-std.rnl) | `rnl-std` | References 4 to 7. Used implicitly at the root of every document. |
-| | [`rnl-zh.rnl`](0.2/rnl-zh.rnl) | `rnl-zh` | Chinese aliases of the standard words and of the standard package's names. A file loads it with `@USE-ALIASES(name="rnl-zh", version="0.2")` in its header record. |
-
-Together, in this order, the sub-packages hold the statements of the single file `rnl-std.rnl` of the RNL toolkit 0.1, the same 0.2: every rule, set edit and fill statement in its order there, and the definitions unchanged, so documents are drawn as before. The names do not repeat across the sub-packages, so a file need not know which one a name comes from.
-
-A file takes less of the standard package by dropping a sub-package with an empty inline package of its name in its header record, such as `@USE-PACKAGE(name="rnl-std-fill") {}` for no automatic fill, and more by writing packages of its own that reference the sub-packages they use (16.2, 16.3). Without the fill, the stubs can still be applied by hand. For the smallest collection only, it drops `rnl-std` with `@USE-PACKAGE(name="rnl-std") {}` and writes `@USE-PACKAGE(name="rnl-std-core", version="0.2")`.
-
-The core interface [`rnl-view`](../../crates/rnl-view/README.md) bundles every `.rnl` file of every version directory, so the `rnl` command and the viewers can use them without a package directory.
-
-## 0.3
-
-The series 0.3 is written in the language 0.3 ([standard 0.3](../../spec/rnl-0.3.md)); the toolkit reads it without any switch, and a file of 0.3, or a main file without a header record, which is read in 0.3 (16.1), uses this series implicitly. Every package is version 0.3, and a collection pins the versions of the packages it references (16.3). Its files were generated from the component definitions of Analog Canvas (9bbfd340b) and a list of its symbols, with parts written by hand; from here on they are edited here, and these files are the source. Each file's header comment says so.
-
-`rnl-std` 0.3 brings in eight packages and then itself, each once (16.2); a file of the language 0.3 does not use the rule package of the other dialect, `rnl-std-spectre` in a SPICE file and `rnl-std-spice` in a Spectre file (16.3), while a file of 0.2 that pins the series 0.3 uses both, SPICE's first:
-
-| Order | Package | References | Content |
-| --- | --- | --- | --- |
-| 1 | [`rnl-std-style`](0.3/rnl-std-style.rnl) | | The styles `$base`, `$bus`, `$signal`, `$note` and `$grey`, and the default style rules. Lines are 0.16 wide with butt caps and miter joins, as Analog Canvas draws them. |
-| 2 | [`rnl-std-basic`](0.3/rnl-std-basic.rnl) | | The symbols of passive parts, sources, switches and transmission lines, of the virtual parts and the marks; the definitions of the virtual parts (`$GROUND`, `$SUPPLY`, `$IO_PORT`, `$NO_CONNECT`, `$JUNCTION`, `$CURRENT_ARROW`, `$ARROW`), of the parts that are only drawn (`$SPDT_SWITCH`, `$FIGURE`), the stubs `$GROUND_STUB` and `$SUPPLY_STUB`, and the rules that draw the usages. |
-| 3 | [`rnl-std-semiconductors`](0.3/rnl-std-semiconductors.rnl) | | The symbols of diodes, MOS, BJT and JFET. |
-| 4 | [`rnl-std-spice`](0.3/rnl-std-spice.rnl) | 2, 3 | The symbols of SPICE's instances: by element letter, then by model type, the P variants last. |
-| 5 | [`rnl-std-spectre`](0.3/rnl-std-spectre.rnl) | 2, 3 | The symbols of Spectre's instances: by master, then by model type; never by name, which says nothing in Spectre. |
-| 6 | [`rnl-std-core`](0.3/rnl-std-core.rnl) | 1 to 5 | The smallest collection: it draws the netlist and adds nothing. |
-| 7 | [`rnl-std-fill`](0.3/rnl-std-fill.rnl) | 2 | The sets that decide where grounds, supplies and port tags are filled in, and the rules that fill them in. |
-| 8 | [`rnl-std-structures`](0.3/rnl-std-structures.rnl) | | The definitions of circuit structures and of layouts: `$DIFFERENTIAL_PAIR` (`in_p`, `in_n` and the set `tail`, which may be left empty), `$CURRENT_MIRROR` (the sets `ref` and `out`), `$MATCHED`, `$BRANCH`, `$CHAIN` (`source`, the set `chain`, `load`), `$CASCADE` (the sets `first`, `second`, `feedback` and `load`), `$SUPPLY_HIGH`, `$SUPPLY_LOW`, `$MIRRORED` and `$FLOW`. Some carry a default drawing in their bodies, whose constraints are all of priority low (14.8): the file's own facts come before them, `@PRIORITY("disabled")` on a usage turns them off for that usage, and a rule such as `# @SELECT-USAGE $DIFFERENTIAL_PAIR => @PRIORITY("disabled")` for every usage of a definition. |
-| 9 | [`rnl-std`](0.3/rnl-std.rnl) | 6 to 8 | Used implicitly at the root of every file of 0.3. |
-
-And outside `rnl-std`, for a file that names them in its header record:
-
-| Package | References | Content |
-| --- | --- | --- |
-| [`rnl-std-functional`](0.3/rnl-std-functional.rnl) | | Behavioral models: op-amps, comparators, amplifiers, transconductors, ADC, DAC. |
-| [`rnl-std-rf`](0.3/rnl-std-rf.rnl) | | The center-tap inductor and the T-coil. |
-| [`rnl-std-logic`](0.3/rnl-std-logic.rnl) | | Gates, buffer, inverter, D flip-flops, and the drawing-only `$DELAY_CELL`. The gates with four inputs have their inputs on integer points, the outer two reaching the input side drawn on to them. |
-| [`rnl-std-signal-flow`](0.3/rnl-std-signal-flow.rnl) | | Adder and multiplier, and the drawing-only `$INTEGRATOR`, `$DISCRETE_TIME_INTEGRATOR`, `$QUANTIZER` and `$UNIT_DELAY`. |
-| [`rnl-std-full`](0.3/rnl-std-full.rnl) | `rnl-std` and the four above | The fuller collection (16.3). Written in a header record beside the implicit `rnl-std`, it adds the four packages of fields, and nothing twice. |
-| [`rnl-zh`](0.3/rnl-zh.rnl) | | Chinese aliases of the standard words, as `rnl-zh` 0.2 has them, and of the names of the series 0.3 and of the roles, parameters and local names of its definitions, as the user settled them. A file loads it with `@USE-ALIASES(name="rnl-zh", version="0.3")` in its header record. Only `$NMOS`, `$PMOS`, `$NPN` and `$PNP` have no Chinese name. |
-| [`rnl-std-no-labels`](0.3/rnl-std-no-labels.rnl) | | Optional, in no collection: it empties the default labels of the standard symbols (name, value, model), for a file that writes all its labels itself, such as one an editor writes. A label the file writes with the same key comes later and shows again (13.3). |
-
-A package references what it names of the others and sees nothing else (16.2): the rule packages name the symbols of `rnl-std-basic` and `rnl-std-semiconductors`, and the fill the virtual parts and stubs of `rnl-std-basic`; nothing else names another package. The names do not repeat across the series.
-
-What the series 0.3 does otherwise than 0.2, beyond its names and drawings:
-
-- E, G and S are drawn with all four terminals (`$VCVS_4TERM`, `$VCCS_4TERM`, `$VOLTAGE_CONTROLLED_SWITCH`), W with `$SWITCH`; B, Spectre's `bsource`, is one symbol, `$BEHAVIORAL_SOURCE`, whether it writes `V=` or `I=`.
-- The controlled sources of two terminals, `$VCVS`, `$VCCS`, `$CCVS` and `$CCCS`, are Analog Canvas's diamonds, as the body of the four-terminal ones is; and the P type JFET, `$PJFET`, has its source up and its drain down, as `$PMOS` and `$PNP` have.
-- A transistor of SPICE (`M`, `Q`, `J`, `Z`) is drawn by the type of its model card alone, `nmos`, `pmos`, `npn`, `pnp`, `njf` and so on: its name says nothing of its polarity, so `rnl-std-spice` has no rule by the letter for them, as 0.2 has. One whose model card the netlist does not have is not drawn; it is listed with the objects not drawn, with the reason, and a warning names it.
-- The definitions of circuit structures and of layouts are one package, `rnl-std-structures`, where 0.2 has `rnl-std-semantics` and `rnl-std-layout`. A definition's default drawing is in its body, and every constraint in the body of a definition of the series is of priority low (14.8): the file's own facts come first, `@PRIORITY("disabled")` on a usage turns the drawing off for that usage, a rule `# @SELECT-USAGE $X => @PRIORITY("disabled")` for every usage of `$X`, and `@AS(priority="high")` puts it before the file's own facts.
-- `$MIRRORED`, `$MIRROR_PAIR` in 0.2, puts `a` on the left of `b`.
-- The members of a `$BRANCH` stand in one column; which is on top is the solver's, by the direction of the current. A `$CHAIN` runs from left to right: its source, the members of its chain in the order written, its load.
-- The roles of `$CASCADE` are sets: `first`, `second`, `feedback` and `load`.
-- A stub of ground or supply gives only its least distance from its pin, so that a solver may draw it longer, as when it lines up the grounds of parts of different lengths. Its constraints are low, and its symbol stands upright, R0, pointing away from the pin.
-- The fill puts no port tag on a ground or supply net, where the stubs stand already; the grounds of a ground net other than 0, such as `vss` added to `$GROUND_NET_SET`, are drawn with `$NAMED_GROUND_SYMBOL`, which shows the net's name under the ground.
-- A differential pair has the role `tail`, a set, which may be left empty: `#M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR`. `$DIFFERENTIAL_PAIR` puts the tail under the middle of the pair by a low DISTRIBUTE in its body (14.8), so a fact of the file's own about the tail comes first, and `@PRIORITY("disabled")` on the usage takes it away. `$DIFFPAIR_TAIL`, `$INPUT_STAGE` and `$TAIL_CENTER` of 0.2 have no counterpart.
-- The roles `ref` and `out` of `$CURRENT_MIRROR` are sets: a mirror is one usage, however many transistors it has, as `{#M3 #M9}(ref) {#M4 #M6}(out) @AS $CURRENT_MIRROR`.
-- The role `series` of `$CHAIN` is called `chain`.
-
-The names of 0.3 are those of the symbol list of the series, such as `$RESISTOR` and `$GROUND` where 0.2 has `$RES` and `$GND`; how a file moves from one to the other is in [Annex D of standard 0.3](../../spec/0.3/en/annex-d.md) ([Chinese](../../spec/0.3/zh/annex-d.md)).
-
-Every symbol writes its box (`box=[x1, y1, x2, y2]`): on any side that has pins, the box edge lies on the outermost pin of that side (`direction="left"` sets `x1`, `"down"` sets `y1`, `"right"` sets `x2`, `"up"` sets `y2`), while sides without pins (and symbols without pins) keep the view-box extent around the drawing. Because symbol boxes enter the solver's problem digest (`sig2:`), existing `@RNL(type="solver")` records written against earlier boxes will be flagged as not matching the current input (stale) until re-solved. Every symbol binds its pins by terminal number, so it fits any dialect. The drawings are converted from Analog Canvas's component definitions, whose copyright holder publishes them here under CC0-1.0, as the drawings of 0.2; the few that Analog Canvas has none of, such as the JFET, the transmission lines and the marks, are drawn by hand in its manner.
-
-## 0.4
-
-The series 0.4 is written in the language 0.4, whose text is still a draft, and is bundled so that the files of 0.4 can be read while the toolkit takes in the rules of 0.4 one by one. Every package is version 0.4. Its fifteen files hold one collection package, [`rnl-std-all`](0.4/rnl-std-all.rnl) (replacing `rnl-std`, `rnl-std-core` and `rnl-std-full`), [`rnl-std-semantics`](0.4/rnl-std-semantics.rnl) for circuit-structure and layout definitions (replacing `rnl-std-structures`), [`alias-zh`](0.4/alias-zh.rnl) for Chinese aliases (replacing `rnl-zh`), the optional [`rnl-std-no-labels`](0.4/rnl-std-no-labels.rnl) and [`rnl-std-45deg`](0.4/rnl-std-45deg.rnl) (45-degree symbols and diagonal arrow marks), and the ten sub-packages `rnl-std-all` brings in (`rnl-std-style`, `rnl-std-basic`, `rnl-std-semiconductors`, `rnl-std-spice` or `rnl-std-spectre` for the dialect, `rnl-std-fill`, `rnl-std-semantics`, `rnl-std-functional`, `rnl-std-rf`, `rnl-std-logic` and `rnl-std-signal-flow`). It has more structures than the series 0.3, and some names of 0.3 are gone or split, such as `$CHAIN`, `$DIFFERENTIAL_PAIR` into `$DIFFERENTIAL_PAIR_N` and `$DIFFERENTIAL_PAIR_P`, and `$CURRENT_MIRROR` into `$CURRENT_MIRROR_N` and `$CURRENT_MIRROR_P`; until the toolkit reads all of 0.4, a file that uses it gets the errors of the statements of 0.4 it does not read yet. A file of 0.4 uses no package implicitly and names `rnl-std-all` or individual sub-packages in its header record (16.3). 0.4 is newer than the toolkit's default version, 0.3, so the files of 0.2 and 0.3 do not find its packages without naming the version, `version="0.4"`, and the catalog keeps the series 0.3 (or 0.2) for shared package names unless it is asked for every version (16.2). The project site does not show it until the standard 0.4 is published.
+Every package of the series is version 0.4. Its files hold one collection package, [`rnl-std-all`](0.4/rnl-std-all.rnl) (replacing `rnl-std`, `rnl-std-core` and `rnl-std-full` of the series 0.3), [`rnl-std-semantics`](0.4/rnl-std-semantics.rnl) for circuit-structure and layout definitions (replacing `rnl-std-structures`), [`alias-zh`](0.4/alias-zh.rnl) for Chinese aliases (replacing `rnl-zh`), the optional [`rnl-std-no-labels`](0.4/rnl-std-no-labels.rnl), [`rnl-std-no-instance-labels`](0.4/rnl-std-no-instance-labels.rnl) and [`rnl-std-45deg`](0.4/rnl-std-45deg.rnl) (45-degree symbols and diagonal arrow marks), and the ten sub-packages `rnl-std-all` brings in (`rnl-std-style`, `rnl-std-basic`, `rnl-std-semiconductors`, `rnl-std-spice` or `rnl-std-spectre` for the dialect, `rnl-std-fill`, `rnl-std-semantics`, `rnl-std-functional`, `rnl-std-rf`, `rnl-std-logic` and `rnl-std-signal-flow`). It has more structures than the series 0.3, and some names of 0.3 are gone or split, such as `$CHAIN`, `$DIFFERENTIAL_PAIR` into `$DIFFERENTIAL_PAIR_N` and `$DIFFERENTIAL_PAIR_P`, and `$CURRENT_MIRROR` into `$CURRENT_MIRROR_N` and `$CURRENT_MIRROR_P`.
 
 **Names in the series 0.4.**
 
@@ -93,7 +20,7 @@ The series 0.4 is written in the language 0.4, whose text is still a draft, and 
 
 ### Renamed, merged, split and removed in 0.4
 
-`rnl upgrade`, which the core 0.5.x provides, rewrites files of 0.3 and 0.2 by this list. Where the table says *manual*, it reports the place and leaves the text as it was.
+`rnl upgrade` of core 0.5.7 rewrites files of 0.3 and 0.2 by this list. Where the table says *manual*, it reports the place and leaves the text as it was.
 
 #### Packages
 
@@ -173,19 +100,6 @@ Definitions and sets:
 | `$GND_FILL_SET` | `$GROUND_FILL_SET` |
 | `$LABEL_TERM_SET` | `$LABEL_FILL_SET` |
 | `$MIRROR_PAIR` | `$MIRRORED_LAYOUT` |
-
-## Symbols of 0.2
-
-| Symbol | For | Terminals (pin order) |
-| --- | --- | --- |
-| `$RES`, `$CAP`, `$IND` | R, C, L; Spectre `resistor`, `capacitor`, `inductor` | 1 at the top, 2 at the bottom |
-| `$VSRC`, `$ISRC` | V, I; Spectre `vsource`, `isource` | 1 (+) at the top; the current arrow points from 1 to 2 |
-| `$DIODE` | D; Spectre `diode` and diode models | anode at the top, cathode at the bottom |
-| `$VCVS`, `$VCCS` | E, G; Spectre `vcvs`, `vccs` | output 1, 2 up and down, control 3 (+), 4 (−) on the left |
-| `$NMOS4`, `$PMOS4` (and three-terminal `$NMOS`, `$PMOS`) | M by name, `nmos` and `pmos` model types | d g s b; NMOS drain up with the arrow out of the source, PMOS source up with the arrow into the source |
-| `$NPN`, `$PNP` | Q by name, `npn` and `pnp` model types | c b e; the emitter arrow points out for NPN, in for PNP |
-| `$OPAMP` | given by a rule or a statement | 1 (+) lower left, 2 (−) upper left, 3 output |
-| `$GROUND`, `$SUPPLY_BAR`, `$PORT_TAG`, `$NC_CROSS`, `$JUNCTION_DOT`, `$CURRENT_ARROW_SYM` | the virtual elements | one pin at the origin |
 
 Every symbol writes its box (`box=`): the extent of its graphics, which a viewer uses for selection and a solver for keeping symbols apart. Pins sit on integer points, so instances on integer points keep wires on the grid.
 

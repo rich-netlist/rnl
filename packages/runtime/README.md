@@ -6,7 +6,7 @@ The core of [RNL](https://github.com/rich-netlist/rnl), the Rich Netlist, as Web
 - the editor interface's snapshot;
 - the netlist with an edit's operations written into it.
 
-It is the same core as the `rnl` command and the desktop viewer, and gives the Documents they give. It bundles only the standard packages, the series 0.2 and 0.3 (including `rnl-zh`). Other packages must be supplied explicitly. Starting with the next npm version after 0.1.0-preview.14, optional package files are distributed by the [public package catalog](https://rich-netlist.github.io/rnl-packages/catalog.json), rather than the npm tarball. Published preview.14 is unchanged.
+It is the same core as the `rnl` command and the desktop viewer, and gives the Documents they give. It reads the language 0.4 alone, and bundles only the standard packages, the series 0.4 (including `alias-zh`); core 0.5.7 reads files of 0.2 and 0.3 and converts them to 0.4. Other packages must be supplied explicitly. Starting with the next npm version after 0.1.0-preview.14, optional package files are distributed by the [public package catalog](https://rich-netlist.github.io/rnl-packages/catalog.json), rather than the npm tarball. Published preview.14 is unchanged.
 
 ## Install
 
@@ -97,11 +97,11 @@ fixture uses its single `packages.lock.json` via `python scripts/packages.py dow
 ```js
 const catalog = await core.catalog({ catalog: {} });
 const resistor = catalog.symbols.find((s) => s.symbol === "$RESISTOR");
-// resistor.package is "rnl-std-basic", resistor.version "0.3", resistor.box [-1, -2.4, 1, 2.4], and
-// resistor.pins [{ terminal: 1, at: [0, 2], direction: "up" }, { terminal: 2, at: [0, -2], direction: "down" }]
+// resistor.package is "rnl-std-basic", resistor.version "0.4", resistor.box [-1, -2, 1, 2], and
+// resistor.pins [{ terminal: "p", at: [0, 2], direction: "up" }, { terminal: "n", at: [0, -2], direction: "down" }]
 ```
 
-Of each name only the newest version is listed, of the versions written in a language version not newer than the tool's default when it has one (the series 0.3, not the draft 0.4); `{ catalog: { packages: ["rnl-std-basic"], all_versions: true } }` keeps the packages of these names, every version of each. A symbol's `definition` names the definition whose usages a rule of the packages draws with it, such as `$GROUND` for `$GROUND_SYMBOL`.
+Of each name only the newest version is listed; `{ catalog: { packages: ["rnl-std-basic"], all_versions: true } }` keeps the packages of these names, every version of each. A symbol's `definition` names the definition whose usages a rule of the packages draws with it, such as `$GROUND` for `$GROUND_SYMBOL`.
 
 ## Replacing one level's records
 
