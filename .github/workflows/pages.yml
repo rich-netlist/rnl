@@ -96,8 +96,9 @@ env:
   # The last release of the 0.5 line of the core, which reads 0.2, 0.3 and 0.4. Until the site moves to the language
   # 0.4, the site is built with it, not with main, whose core reads 0.4 only: the web viewer at viewer/ is built at
   # this tag (so it no longer changes with every merge into main), the skill package for agents and llms.txt are
-  # published as they are there, the site's example netlists and the logo are checked with its command line, and
-  # the gallery draws its symbols with its npm package @rich-netlist/runtime.
+  # published as they are there, the site's example netlists and the logo are checked with its command line, the
+  # gallery draws its symbols with its npm package @rich-netlist/runtime, and the examples and the browser tests
+  # use the public packages of its packages.lock.json.
   # Moving to a newer release of the 0.5 line is this line alone.
   LAST_05_RELEASE: core-v0.5.6
 
@@ -123,6 +124,14 @@ jobs:
           # newest release, whose files the page of the tools links to
           fetch-depth: 0
           ref: ${{ github.event_name == 'schedule' && 'main' || github.ref }}
+
+      # The public packages that the site's examples and its browser tests use are those locked at LAST_05_RELEASE,
+      # as the examples are 0.3 until the site moves to the language 0.4: the tag's packages.lock.json replaces
+      # main's in this job's checkout, before anything reads it (scripts/packages.py and scripts/packages.mjs).
+      # The published gallery does not read the lock: it shows the newest version of each package in the online
+      # catalog (the last step before the upload).
+      - name: Use the package lock of the last release of the 0.5 line
+        run: git show "refs/tags/$LAST_05_RELEASE:packages.lock.json" > packages.lock.json
 
       # Writes site/dist/: the Chinese pages under zh/ and the English pages under en/, index.html, which
       # leads to either by the browser's language, and the old addresses of the Chinese pages, which lead

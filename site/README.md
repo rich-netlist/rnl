@@ -242,7 +242,7 @@ cp -r apps/web/dist site/dist/viewer
 python -m http.server --directory site/dist
 ```
 
-The gallery's data needs the core as WebAssembly too, as `node apps/web/build.mjs` or `node bindings/runtime-wasm/build.mjs` builds it into `bindings/runtime-wasm/dist/`, or the folder of an npm package `@rich-netlist/runtime` named by `RNL_GALLERY_CORE`, and Node 18 or later with nothing to install. Until the site moves to the language 0.4, `pages.yml` checks the examples and the logo and draws the gallery with the core of `LAST_05_RELEASE` (its command line as `RNL_BIN`, its npm package as `RNL_GALLERY_CORE`), since `main`'s core reads 0.4 only and the site's examples are 0.3. After `build.py`, which empties `site/dist/`:
+The gallery's data needs the core as WebAssembly too, as `node apps/web/build.mjs` or `node bindings/runtime-wasm/build.mjs` builds it into `bindings/runtime-wasm/dist/`, or the folder of an npm package `@rich-netlist/runtime` named by `RNL_GALLERY_CORE`, and Node 18 or later with nothing to install. Until the site moves to the language 0.4, `pages.yml` checks the examples and the logo and draws the gallery with the core of `LAST_05_RELEASE` (its command line as `RNL_BIN`, its npm package as `RNL_GALLERY_CORE`), since `main`'s core reads 0.4 only and the site's examples are 0.3; for the same reason it replaces `packages.lock.json` with that tag's before it downloads the public packages, so the examples and the browser tests use the packages of the 0.5 line. After `build.py`, which empties `site/dist/`:
 
 ```bash
 node site/gallery/build.mjs                   # write site/dist/gallery/
