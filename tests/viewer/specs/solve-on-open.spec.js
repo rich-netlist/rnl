@@ -58,6 +58,45 @@ test("Escape is Not now too", async ({ page, viewer }) => {
   expect(await viewer.calls("solve")).toEqual([]);
 });
 
+test("a question of the opening asked meanwhile, such as a project's display settings, waits for the answer", async ({ page }) => {
+  await open(page, "unplaced");
+  await expect(dialog(page)).toContainText("Solve the Netlist?");
+  // the project's display settings are offered while the question is shown
+  await page.evaluate(() => {
+    window.offered = import("./display.js").then((d) => d.offerDisplay({ background: "dark" }, "a project", [], () => true));
+  });
+  await page.waitForTimeout(300);
+  await expect(dialog(page)).toHaveCount(1);
+  await dialog(page).getByRole("button", { name: "Not now" }).click();
+  // then asked, not given up
+  await expect(dialog(page)).toContainText("Display Settings");
+  await dialog(page).getByRole("button", { name: "Don't Apply" }).click();
+  await page.evaluate(() => window.offered);
+  await expect(dialog(page)).toHaveCount(0);
+});
+
+test("Not now holds for the file at its address: a file of another site with the same path still asks", async ({ page }) => {
+  await open(page, "unplaced");
+  await dialog(page).getByRole("button", { name: "Not now" }).click();
+  await expect(dialog(page)).toHaveCount(0);
+  const ask = (url) => page.evaluate((url) => {
+    window.asked = import("./solve-on-open.js").then((s) => s.askToSolve(window.viewer.doc, { path: "/net.sp", name: "net.sp", url }));
+  }, url);
+  await ask("https://one.example/net.sp");
+  await expect(dialog(page)).toContainText("Solve the Netlist?");
+  await dialog(page).getByRole("button", { name: "Not now" }).click();
+  await page.evaluate(() => window.asked);
+  // the same path at another address asks
+  await ask("https://two.example/net.sp");
+  await expect(dialog(page)).toContainText("Solve the Netlist?");
+  await dialog(page).getByRole("button", { name: "Not now" }).click();
+  await page.evaluate(() => window.asked);
+  // and the first, answered, asks no more
+  await ask("https://one.example/net.sp");
+  await page.evaluate(() => window.asked);
+  await expect(dialog(page)).toHaveCount(0);
+});
+
 test("a netlist with every component placed asks nothing, nor a page without a solver", async ({ page }) => {
   await open(page, "edit");
   await page.waitForTimeout(300);
