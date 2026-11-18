@@ -87,7 +87,7 @@ def public_packages() -> list[Path]:
     with it; a package of another language version cannot be used by a file of this one (16.1)."""
     found = []
     for entry in public_package_locks():
-        folder = require_public_package(entry["name"])
+        folder = require_public_package(entry["name"], entry["version"])
         text = read(folder / f"{entry['name']}.rnl")
         if re.search(rf'@VERSION\("{re.escape(SERIES)}"\)', text):
             found.append(folder)
