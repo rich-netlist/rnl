@@ -32,7 +32,7 @@ The points below say what to write. Complete files that follow them are in [the 
   %dp = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;
   ```
 
-- **Mark signal flow only where it is clear.** Write `$SIGNAL_FLOW` only for a clean signal path you are sure of. Leave it out where the signal takes several paths, where there is feedback, or where much of the circuit works both ways; how many members the path has does not decide it.
+- **Mark signal flow only where it is clear.** Write `$SIGNAL_FLOW` only for a clean signal path you are sure of (or `$POWER_FLOW` for a power circuit). Leave it out where the signal takes several paths, where there is feedback, or where much of the circuit works both ways; how many members the path has does not decide it.
 
 - **Do not repeat what a structure draws.** A pair aligns and mirrors its halves, a mirror aligns its devices, a transmission gate stacks its two transistors. An ALIGN or ORIENT that says the same again adds nothing, and one that differs fights the structure.
 
@@ -98,6 +98,14 @@ The solver draws only the wires that WIRE, ROUTE-NET and ROUTE-OBJECT ask for an
   {%dp %load} @ROUTE-OBJECT; &out @ROUTE-NET;
   ```
 
+- **Or wire every net at once.** Where most nets read well as wires, as in a circuit of a few blocks, route all the nets of the level. The fill still keeps the ground, supply and bias nets unrouted at high, so they keep their symbols; put a bias net in `$BIAS_NET_SET` for that. A net that should stay a label, such as a clock, is left out with an UNROUTE-NET at high, which wins over the ROUTE-NET wherever it is written.
+
+  ```rnl
+  &clk @UNROUTE-NET(priority="high"); /* the clock stays a label */
+  %routed_nets = # @SELECT-NET; /* every net of this level, not the levels below */
+  %routed_nets @ROUTE-NET;
+  ```
+
 - **Symmetric structures are wired symmetrically.** If one side of a differential pair is wired, the other side is wired too, even when that wire crosses another.
 
   ```rnl
@@ -111,7 +119,7 @@ The solver draws only the wires that WIRE, ROUTE-NET and ROUTE-OBJECT ask for an
   &out @WIRE(mode="manhattan45") {#M2:d #R2:1}; /* across, a 45° diagonal, across */
   ```
 
-- A ROUTE-OBJECT over structures also covers their rail pins, and the standard package keeps supplies and grounds unrouted at high, so they still get symbols; the hint RNL9403 on a rail says so and is expected. To wire a rail, write `&vss @ROUTE-NET(priority="high");`.
+- A ROUTE-OBJECT over structures, or a ROUTE-NET over every net, also covers the rail pins, and the standard package keeps supplies and grounds unrouted at high, so they still get symbols; the hint RNL9403 on a rail says so and is expected. To wire a rail, write `&vss @ROUTE-NET(priority="high");`.
 
 ## Orientation
 
@@ -181,9 +189,8 @@ Complete files that follow these points; each checks without errors and solves.
 
 | File | What it shows |
 | --- | --- |
-| [solver-cs-amp.sp](../examples/solver-cs-amp.sp) | A common-source stage: one column for the DC path, the load capacitor and the output port to its right, the output net routed |
-| [ota5t.sp](../examples/ota5t.sp) | A five-transistor OTA with its bias mirror: the bias diode and the two branches in three columns, the pair and its load wired, both inputs alike |
-| [solver-cascode-mirror.sp](../examples/solver-cascode-mirror.sp) | A cascode current mirror: two columns of three; only the tops of the columns aligned by hand |
-| [solver-miller-ota.sp](../examples/solver-miller-ota.sp) | A two-stage Miller op-amp: a sideways compensation network between the stages, the signal nets routed, the bias net left to its name |
-| [solver-pi-follower.sp](../examples/solver-pi-follower.sp) | A pi filter and a source follower: a signal path from left to right through series parts |
-| [solver-sampler-inverter.sp](../examples/solver-sampler-inverter.sp) | A transmission-gate sampler and an inverter: switches turned sideways by one pin direction, no CURRENT |
+| [solver-cs-amp.sp](../examples/solver-cs-amp.sp) | A common-source stage: one column for the DC path; the input port, the stage, the load capacitor and the output port from left to right, the capacitor level with the transistor; every net routed |
+| [two-stage-amp.sp](../examples/two-stage-amp.sp) | A two-stage op-amp, a five-transistor OTA and a common-source stage: the bias diode, the two branches of the first stage, the second stage and the output port in one order; every net routed, the gates of each mirror facing each other, both inputs alike, the bias of the second stage left to its name |
+| [solver-cascode-mirror.sp](../examples/solver-cascode-mirror.sp) | A cascode current mirror: two columns of three and the output port, every net routed; nothing aligned by hand |
+| [solver-pi-follower.sp](../examples/solver-pi-follower.sp) | A pi filter and a source follower: a signal path from left to right, each block a group, every net routed |
+| [solver-sampler-inverter.sp](../examples/solver-sampler-inverter.sp) | A transmission-gate sampler and an inverter: the input port, the gate, the hold capacitor, the inverter and the output port from left to right, the ports level with the centres of the gate and the inverter, every net routed; no CURRENT |
