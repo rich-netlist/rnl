@@ -37,14 +37,24 @@ fn unlimited() -> SolveOptions {
 /// every run, as `--solver-config limit="work"` (17).
 const WORK_04: u64 = 100_000_000;
 
-/// The options a case written for the solver is solved with: [`unlimited`], and a file of 0.4
-/// within [`WORK_04`]. A file of 0.2 keeps the options of its snapshot.
-fn for_case(f: &Path) -> SolveOptions {
+/// The options of [`unlimited`] within `work`, and with no safety limit: a debug build on a slow
+/// machine may take longer than the default safety limit of 30 seconds to spend the work, and a
+/// level stopped by its safety limit is drawn as far as it got, not as its work replays.
+fn within_work(work: u64) -> SolveOptions {
     let mut options = unlimited();
-    if std::fs::read_to_string(f).is_ok_and(|t| t.contains("@VERSION(\"0.4\")")) {
-        options.solver.run_limit = Some(rnl_solver::RunLimit::Work(WORK_04));
-    }
+    options.solver.run_limit = Some(rnl_solver::RunLimit::Work(work));
+    options.solver.safety_seconds = None;
     options
+}
+
+/// The options a case written for the solver is solved with: [`unlimited`], and a file of 0.4
+/// [`within_work`] [`WORK_04`]. A file of 0.2 keeps the options of its snapshot.
+fn for_case(f: &Path) -> SolveOptions {
+    if std::fs::read_to_string(f).is_ok_and(|t| t.contains("@VERSION(\"0.4\")")) {
+        within_work(WORK_04)
+    } else {
+        unlimited()
+    }
 }
 
 /// A clock that advances one second each time it is read: a time limit is out at the same point
@@ -419,9 +429,7 @@ fn four_reviewed_cases_solved_are_their_snapshots() {
 #[ignore = "a release build solves the twelve in about a minute and a half; CI runs it with --release --ignored"]
 fn every_reviewed_case_is_laid_out_whole() {
     for name in REVIEWED {
-        let mut options = unlimited();
-        options.solver.run_limit = Some(rnl_solver::RunLimit::Work(REVIEWED_WORK));
-        check_reviewed(name, &options);
+        check_reviewed(name, &within_work(REVIEWED_WORK));
     }
 }
 
@@ -576,7 +584,8 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
     // the command asks for them with --report
     let t4 = path_str(&t4);
     let out = path_str(&scratch("t4-report"));
-    let work = format!("limit=\"work\",work={WORK_04}");
+    // no safety limit, which a debug build on a slow machine may reach before the work
+    let work = format!("limit=\"work\",work={WORK_04},safety_seconds=3600");
     let (code, stdout, _) =
         rnl(&["solve", &t4, "-o", &out, "--report", "--solver-options", "time_limit=none", "--solver-config", &work]);
     assert_eq!(code, 0, "{stdout}");

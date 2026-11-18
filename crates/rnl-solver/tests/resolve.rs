@@ -230,9 +230,15 @@ fn check_with(file: &str, p: &LevelProblem, options: &SolverOptions) -> Resolved
     pairs.sort_unstable();
     assert_eq!(named, pairs, "{what}: {:?}", r.statements);
     assert_eq!(r, resolve(p, &options), "{what}: not deterministic");
-    // a level of 0.4 within a fixed work: its lines layout searches on as long as nothing stops it
+    // a level of 0.4 within a fixed work: its lines layout searches on as long as nothing stops it;
+    // with no safety limit, which a debug build on a slow machine may reach before the work
     let solved = if p.version == "0.4" {
-        solve(p, &SolverOptions { run_limit: Some(rnl_solver::RunLimit::Work(100_000_000)), ..options.clone() })
+        let within = SolverOptions {
+            run_limit: Some(rnl_solver::RunLimit::Work(100_000_000)),
+            safety_seconds: None,
+            ..options.clone()
+        };
+        solve(p, &within)
     } else {
         solve(p, &options)
     };

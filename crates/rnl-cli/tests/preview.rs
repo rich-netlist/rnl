@@ -270,6 +270,8 @@ fn every_fact_kept_in_the_solver_cases_holds_on_the_drawing() {
         let mut options = unlimited();
         if std::fs::read_to_string(&case).is_ok_and(|t| t.contains("@VERSION(\"0.4\")")) {
             options.solver.run_limit = Some(rnl_solver::RunLimit::Work(100_000_000));
+            // no safety limit, which a debug build on a slow machine may reach before the work
+            options.solver.safety_seconds = None;
         }
         let shown = preview(&path(&case), &FsProvider::new(&[]), &options, &WallClock::new(), &|_| true).unwrap();
         for level in &shown.report.levels {
