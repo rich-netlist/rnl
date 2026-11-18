@@ -202,6 +202,23 @@ Q3  a b vss qnpn
 }
 
 #[test]
+fn the_catalog_links_the_definitions_and_symbols_of_0_4_rules() {
+    // the standard series 0.4 writes these rules `# @SELECT-USAGE(recursive=true) $GROUND => @SET-SYMBOL ...`
+    let all = rnl_view::catalog(
+        &MemoryProvider::default(),
+        &rnl_view::CatalogOptions { all_versions: true, ..Default::default() },
+    );
+    for (definition, symbol) in
+        [("$GROUND", "$GROUND_SYMBOL"), ("$SUPPLY", "$SUPPLY_SYMBOL"), ("$BIAS", "$BIAS_SYMBOL")]
+    {
+        let d = all.definitions.iter().find(|d| d.version == "0.4" && d.definition == definition).unwrap();
+        assert_eq!(d.symbol.as_deref(), Some(symbol), "{definition}");
+        let s = all.symbols.iter().find(|s| s.version == "0.4" && s.symbol == symbol).unwrap();
+        assert_eq!(s.definition.as_deref(), Some(definition), "{symbol}");
+    }
+}
+
+#[test]
 fn transformer_pins_follow_dotted_first_order() {
     let all = rnl_view::catalog(
         &MemoryProvider::default(),
