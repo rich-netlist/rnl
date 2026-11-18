@@ -10,9 +10,7 @@ use rnl_cli::interpret_file;
 use rnl_runtime::diag::Severity;
 use rnl_runtime::interp::unit::READ_VERSIONS;
 use rnl_runtime::source::MemoryProvider;
-use rnl_runtime::words::{
-    draft_0_4_header_fields, draft_header_fields, words, Literal, ParamSpec, ParamType, ParamsSpec, Positions, Takes,
-};
+use rnl_runtime::words::{words, Literal, ParamSpec, ParamType, ParamsSpec, Positions, Takes};
 use rnl_runtime::{Interpretation, Options};
 use serde_json::{json, Value};
 
@@ -195,8 +193,7 @@ fn compare(p: &Value, version: &str, pending: &[&str]) {
     // Exercise the marker as syntax, not a duplicated expected string.
     assert!(rnl_runtime::syntax::parse_record(&format!("{} {{}}", record["marker"].as_str().unwrap())).error.is_none());
     assert_eq!(record["section"], "2.8");
-    let draft = if version == "0.4" { draft_0_4_header_fields() } else { draft_header_fields() };
-    let headers: BTreeMap<_, _> = w.header_fields.iter().chain(draft).map(|f| (f.name.as_str(), f)).collect();
+    let headers: BTreeMap<_, _> = w.header_fields.iter().map(|f| (f.name.as_str(), f)).collect();
     if !pending("record") {
         assert_eq!(headers.len(), record_fields.len());
     }

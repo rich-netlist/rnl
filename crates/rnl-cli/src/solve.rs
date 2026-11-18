@@ -54,18 +54,6 @@
 //! interpret is not solved: none of the RNL of that file is read, and the file is kept as it is
 //! (16.1), so nothing is written into it. An explicitly supported include resumes interpretation.
 //!
-//! A tool writes only 0.3 (16.1): a file of 0.2 that `rnl solve` writes a record into is raised to
-//! 0.3, and its levels are solved again as they read in 0.3 ([`solve_with_clock`],
-//! [`VersionRaise`]). A file that only loses a record of the solver written there with scope= is
-//! written as it is otherwise and keeps its version, as `rnl strip-generated` only removes records.
-//! Its header record then says `@VERSION("0.3")`, followed by
-//! `@USE-PACKAGE(name="rnl-std", version="0.2")` unless the file, or a file that includes it, pins
-//! a version of the standard package, so that it keeps the standard series 0.2 it was read with,
-//! its names and its drawing (16.3). A name in it spelled like a word that 0.3 adds, `numbering`,
-//! gets a warning, as the raise may change its meaning, and the file is raised all the same. A
-//! file whose header record cannot say 0.3, such as a library section without one, stays at 0.2,
-//! with a warning, and its record lists what it cannot hold as unsolved.
-//!
 //! [`solve`] does the work without writing a file; [`write`] puts the texts where `-o DIR` or
 //! `--in-place` says, with the other files the document reads copied under `DIR`; [`lines`] is
 //! what the command prints of the levels.
@@ -76,15 +64,14 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use rnl_runtime::diag::{codes, Diag, Loc, Severity};
-use rnl_runtime::host::{file_name, LevelKind};
+use rnl_runtime::host::file_name;
 use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::interp::unit::{keeps_0_4, DEFAULT_VERSION};
 use rnl_runtime::problem::{sig2, FactKind, LevelProblem, PointRef, Reference};
 use rnl_runtime::solution::{write_record, Written};
 use rnl_runtime::source::{dirname, normalize, relative_to, Layered, MemoryProvider, Provider};
 use rnl_runtime::writeback::{
-    generated_files, move_header_for, pins_std, raise_version, record_line, remove_generated_with_header,
-    replace_generated_with_header, spelled_like_new_words, takes_version_of, PIN_STD_0_2,
+    generated_files, move_header_for, record_line, remove_generated_with_header, replace_generated_with_header,
 };
 use rnl_runtime::{Interpretation, Options};
 use rnl_solver::{Clock, Discarded, RunLimit, Solved, SolverOptions, Statement, StopReason, AUTHOR};
@@ -117,8 +104,7 @@ pub struct SolveOptions {
     /// of none, share, on the clock of the solve. Each has at most what is left of them shared
     /// evenly among those still to solve, itself among them, and only its seed once they are
     /// spent. A level of a limit of work, or of its seed, is solved as its limit says, its time
-    /// counted. A file of 0.2 raised to 0.3 is solved twice, each time within it; a respace does
-    /// not read it. None by default: each level has its own limit only.
+    /// counted. A respace does not read it. None by default: each level has its own limit only.
     pub total_seconds: Option<f64>,
 }
 
@@ -221,50 +207,8 @@ pub struct SolveRun {
     /// solved, the files it includes, the package files named by `path=` (16.2). Not the packages
     /// of the package directories, which a file reaches by name, nor the bundled ones.
     pub read: Vec<String>,
-    /// The errors of the document read as a solver reads it, before anything was written back
-    /// but the files raised to 0.3 ([`SolveRun::raised`]).
+    /// The errors of the document read as a solver reads it, before anything was written back.
     pub errors: usize,
-    /// The files of 0.2 that records are written into (16.1): raised, or kept at 0.2 when they
-    /// cannot be.
-    pub raised: Vec<VersionRaise>,
-}
-
-/// A file of 0.2 that `rnl solve` writes a record into: a tool writes only 0.3, so it raises the
-/// file to 0.3 (16.1), and solves its levels again as they read in 0.3.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct VersionRaise {
-    /// The path of the file, `/`-separated.
-    pub path: String,
-    /// The library section of the file that is raised, which is read as a file of its own (2.8);
-    /// None for the file read whole.
-    pub section: Option<String>,
-    /// Whether it is raised to 0.3; when not, it stays at 0.2 and [`VersionRaise::why`] says why.
-    pub raised: bool,
-    /// Whether its header record got `@USE-PACKAGE(name="rnl-std", version="0.2")`, which keeps
-    /// the standard series 0.2 it was read with (16.3): it does, unless it, or a file that includes
-    /// it, pins a version of the standard package already.
-    pub pinned: bool,
-    /// Why it is not raised: that its header record cannot be changed so.
-    pub why: Vec<String>,
-    /// The names in it spelled like a word that 0.3 adds, whose meaning the raise may change
-    /// (16.1, 16.5): a warning for each, and the file is raised all the same.
-    pub clashes: Vec<String>,
-    /// The files it includes that write no VERSION and take its version (16.1): raised, it has
-    /// them read in 0.3 too, and each gets a warning, with one for each name in it spelled like a
-    /// word that 0.3 adds. Their text is not changed.
-    pub followers: Vec<Follower>,
-}
-
-/// A file level that writes no VERSION and takes the version of a file raised to 0.3, which
-/// includes it (16.1): it reads in 0.3 with it ([`VersionRaise::followers`]).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Follower {
-    /// The path of its file, `/`-separated.
-    pub path: String,
-    /// Its library section, which is read as a file of its own (2.8); None for the file read whole.
-    pub section: Option<String>,
-    /// The names in it spelled like a word that 0.3 adds, as [`VersionRaise::clashes`].
-    pub clashes: Vec<String>,
 }
 
 /// Where [`write`] puts the files solved.
@@ -378,15 +322,6 @@ pub fn solve(file: &Path, files: &dyn Provider, options: &SolveOptions) -> Resul
 
 /// [`solve`], with the time limit of the resolution of each level measured on `clock` (the draft
 /// 0.3, 8.5): the limit of a level runs from the reading when its resolution begins.
-///
-/// A file of 0.2 that it writes a record into is raised to 0.3, as a tool writes only 0.3 (16.1): its header
-/// record says 0.3, with `@USE-PACKAGE(name="rnl-std", version="0.2")` unless it or a file that
-/// includes it pins a version of the standard package, so that it keeps the series 0.2 it was read
-/// with (16.3), and each name in it spelled like a word that 0.3 adds gets a warning
-/// ([`spelled_like_new_words`]). The levels are then solved again from the start, as they read
-/// with the files raised; a file whose header record cannot say 0.3 stays at 0.2, and its record
-/// lists what it cannot hold as unsolved. A library section is read as a file (2.8): of two
-/// sections of one file, only one written into is raised, and the text outside it stays as it is.
 pub fn solve_with_clock(
     file: &Path,
     files: &dyn Provider,
@@ -406,8 +341,6 @@ pub struct Progress {
     pub levels: usize,
     /// Its title: a subcircuit name, or the file name.
     pub title: String,
-    /// Whether this is the second pass, after files were raised to 0.3 (16.1).
-    pub again: bool,
 }
 
 /// What [`solve_watched`] fails with when its watcher stops it.
@@ -443,8 +376,7 @@ pub struct BackendResult {
 
 type Backend<'a> = dyn Fn(&LevelProblem, &SolverOptions) -> Result<BackendResult, String> + 'a;
 
-/// Solve through a caller-selected backend, preserving the normal in-memory writeback and
-/// version-raising passes. The backend must validate its complete response against `problem`
+/// Solve through a caller-selected backend, preserving the normal in-memory writeback. The backend must validate its complete response against `problem`
 /// before returning. No files are written by this function, including when a later level fails.
 /// The returned author is quoted by the runtime writer, never parsed as RNL code.
 pub fn solve_using(
@@ -639,88 +571,10 @@ pub(crate) fn solve_marked(
     skip: &Skip<'_>,
     backend: &Backend<'_>,
 ) -> Result<SolveRun, String> {
-    let total = options.total_seconds;
-    let (run, wants) = pass(file, files, options, total, clock, &[], watch, skip, backend)?;
-    if wants.is_empty() {
-        return Ok(run);
-    }
-    // the files as they were read, raised
-    let entry = path_str(file);
-    let original =
-        rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, files, &options.runtime())?;
-    let mut raised = Vec::new();
-    let mut texts: Vec<(String, String)> = Vec::new();
-    let mut paths: Vec<(&String, &String)> = Vec::new();
-    for (path, file, _) in &wants {
-        if !paths.contains(&(path, file)) {
-            paths.push((path, file));
-        }
-    }
-    for (path, file) in paths {
-        let text = text_of(&original, files, file, path)?;
-        // each file level of 0.2 of the file written into, a library section read as a file
-        // (2.8), raised in one pass over the text
-        let mut asked = Vec::new();
-        for (_, _, section) in wants.iter().filter(|(p, f, _)| p == path && f == file) {
-            let doc = &original.doc;
-            let Some(level) = (0..doc.levels.len()).find(|&l| {
-                let lv = &doc.levels[l];
-                lv.kind == LevelKind::File && lv.file == *file && lv.section == *section
-            }) else {
-                continue;
-            };
-            let clashes = spelled_like_new_words(doc, level, &original.imported_aliases);
-            asked.push((level, !pins_std(doc, level), section.clone(), clashes));
-        }
-        let all: Vec<(usize, bool)> = asked.iter().map(|(l, pin, _, _)| (*l, *pin)).collect();
-        let (out, done) = raise_version(&original.doc, &text, &all);
-        for ((level, pin, section, clashes), ok) in asked.into_iter().zip(done) {
-            let why = if ok { Vec::new() } else { vec!["its header record cannot say 0.3 so".to_string()] };
-            let followers = Vec::new();
-            let v =
-                VersionRaise { path: path.clone(), section, raised: ok, pinned: ok && pin, why, clashes, followers };
-            raised.push((level, v));
-        }
-        if out != text {
-            texts.push((path.clone(), out));
-        }
-    }
-    // the files read are those of the first pass: the second reads the files raised from memory
-    let read = run.read.clone();
-    let mut run =
-        if texts.is_empty() { run } else { pass(file, files, options, total, clock, &texts, watch, skip, backend)?.0 };
-    run.read = read;
-    // a file level that cannot say 0.3 itself, such as a library section without a header record,
-    // takes the version of the file that includes it (16.1): when that one is raised, it reads in
-    // 0.3 too, and the line of that file says so
-    let reads_0_3 = |level: usize| {
-        let doc = &original.doc;
-        let of = |l: usize| doc.file_level(l) == level;
-        run.levels.iter().any(|l| of(l.problem.level) && l.problem.follows_0_3())
-    };
-    // the files without a VERSION that take the version of one raised read in 0.3 with it (16.1)
-    let apart: Vec<usize> = raised.iter().filter(|(_, v)| v.raised).map(|(level, _)| *level).collect();
-    for (level, v) in raised.iter_mut().filter(|(_, v)| v.raised) {
-        let doc = &original.doc;
-        let follower = |l: usize| Follower {
-            path: normalize(&doc.levels[l].path),
-            section: doc.levels[l].section.clone(),
-            clashes: spelled_like_new_words(doc, l, &original.imported_aliases),
-        };
-        v.followers = takes_version_of(doc, *level, &apart).into_iter().map(follower).collect();
-    }
-    run.raised = raised.into_iter().filter(|(level, v)| v.raised || !reads_0_3(*level)).map(|(_, v)| v).collect();
-    Ok(run)
+    pass(file, files, options, options.total_seconds, clock, watch, skip, backend)
 }
 
-/// A file level of 0.2 that a record is written into, which is raised to 0.3 (16.1): the path and the name of its
-/// file in the document, and its library section, which is read as a file (2.8).
-type Want = (String, String, Option<String>);
-
-/// One pass of [`solve_with_clock`] over the levels, with the texts of the files `raised` over
-/// the files: the run, and the file levels of 0.2 whose records need 0.3, as the path and name of
-/// their file in the document and their library section; those only in the first pass, when
-/// nothing is raised.
+/// The solve of [`solve_marked`]: each level read, solved and written back.
 #[allow(clippy::too_many_arguments)]
 fn pass(
     file: &Path,
@@ -728,21 +582,16 @@ fn pass(
     options: &SolveOptions,
     total: Option<f64>,
     clock: &dyn Clock,
-    raised: &[(String, String)],
     watch: &dyn Fn(Mark<'_>) -> bool,
     skip: &Skip<'_>,
     backend: &Backend<'_>,
-) -> Result<(SolveRun, Vec<Want>), String> {
+) -> Result<SolveRun, String> {
     let entry = path_str(file);
-    // the whole file's time runs from the start of the pass: of a file raised, the second is kept
+    // the whole file's time runs from the start of the solve
     let total = total.map(|seconds| Total { seconds, begun: clock.elapsed(), clock });
     let runtime = options.runtime();
     let files = Noting::new(files);
     let mut memory = MemoryProvider::new();
-    for (path, text) in raised {
-        memory.insert(path, text);
-    }
-    let mut wants: Vec<Want> = Vec::new();
     let read = |memory: &MemoryProvider| -> Result<Interpretation, String> {
         let both = Layered { layers: vec![memory, &files] };
         rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, &both, &runtime)
@@ -836,7 +685,7 @@ fn pass(
     let count = targets.len();
     watch(Mark::Run { levels: count });
     for (k, (level, title)) in targets.into_iter().enumerate() {
-        let progress = Progress { level: k, levels: count, title: title.clone(), again: !raised.is_empty() };
+        let progress = Progress { level: k, levels: count, title: title.clone() };
         if !watch(Mark::Level(&progress)) {
             return Err(CANCELLED.to_string());
         }
@@ -1004,9 +853,6 @@ fn pass(
             }
         }
         watch(Mark::Stage("write"));
-        // a file of 0.2 that the record is written into is raised to 0.3 (16.1): the file level of
-        // the level, a library section read as a file (2.8)
-        let want: Want = (path.clone(), host.file.clone(), r.doc.levels[r.doc.file_level(p.level)].section.clone());
         let (record, texts) = {
             let both = Layered { layers: vec![&memory, &files] };
             let record = if let Some((_, finished)) = numbered.filter(|(record, _)| *record == written.record) {
@@ -1086,9 +932,6 @@ fn pass(
                     // record (2.8)
                     let out = replace_generated_with_header(&r.doc, p.level, &text, &record, &p.version);
                     texts.push((path.clone(), out));
-                    if p.version == "0.2" && raised.is_empty() && !wants.contains(&want) {
-                        wants.push(want);
-                    }
                     // a record of the solver for this level written with scope= in another file (2.6):
                     // removed, and nothing is written there, so that file keeps its version
                     for other in generated_files(&r.doc, p.level).into_iter().filter(|f| *f != host.file) {
@@ -1126,7 +969,7 @@ fn pass(
     }
     let packages: Vec<String> = files.files.package_files().iter().map(|p| normalize(p)).collect();
     let read: Vec<String> = files.read.take().into_iter().filter(|p| !packages.contains(p)).collect();
-    Ok((SolveRun { entry, levels, not_solved, files: solved_files, read, errors, raised: Vec::new() }, wants))
+    Ok(SolveRun { entry, levels, not_solved, files: solved_files, read, errors })
 }
 
 /// The text of a file as the reading `r` found it, which the positions of its records refer to; read
@@ -1488,7 +1331,7 @@ pub fn errors(run: &SolveRun) -> usize {
 /// What the command prints of the levels of a run, in the order of the document's levels: each
 /// level solved as [`report`] gives it, each level not solved in one line.
 pub fn lines(run: &SolveRun, all: bool) -> Vec<String> {
-    let mut out: Vec<String> = run.raised.iter().flat_map(raised).collect();
+    let mut out: Vec<String> = Vec::new();
     for k in 0..=run.levels.len() {
         for n in run.not_solved.iter().filter(|n| n.before == k) {
             out.push(not_solved(n));
@@ -1498,42 +1341,6 @@ pub fn lines(run: &SolveRun, all: bool) -> Vec<String> {
         }
     }
     out
-}
-
-/// The lines of a file of 0.2 that a record is written into: raised, with a warning for each name in it spelled like
-/// a word that 0.3 adds, or kept at 0.2 with a warning (16.1).
-pub fn raised(v: &VersionRaise) -> Vec<String> {
-    let named = |path: &str, section: &Option<String>| match section {
-        Some(s) => format!("{} ({s})", file_name(path)),
-        None => file_name(path).to_string(),
-    };
-    let name = named(&v.path, &v.section);
-    if v.raised {
-        let series = if v.pinned {
-            format!("its header record keeps the standard series 0.2 it was read with: {PIN_STD_0_2} (16.3)")
-        } else {
-            "the version of the standard package that it pins stays (16.3)".to_string()
-        };
-        let mut out = vec![format!("{name}: raised from 0.2 to 0.3, as a tool writes only 0.3 (16.1); {series}")];
-        out.extend(v.clashes.iter().map(|c| {
-            format!("warning: {name}: {c}, has the spelling of a word that 0.3 adds (2.8): raised to 0.3, it may mean something else (16.1)")
-        }));
-        for f in &v.followers {
-            let child = named(&f.path, &f.section);
-            out.push(format!(
-                "warning: {child}: it writes no VERSION and takes that of {name}: it reads in 0.3 too, its text unchanged (16.1); @VERSION(\"0.2\") written in its header record keeps it at 0.2"
-            ));
-            out.extend(f.clashes.iter().map(|c| {
-                format!("warning: {child}: {c}, has the spelling of a word that 0.3 adds (2.8): read in 0.3, it may mean something else (16.1)")
-            }));
-        }
-        out
-    } else {
-        vec![format!(
-            "warning: {name} stays at 0.2, so what only 0.3 can write is unsolved (16.1): {}",
-            v.why.join("; ")
-        )]
-    }
 }
 
 /// The line of a level that is not solved.

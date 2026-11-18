@@ -4974,37 +4974,9 @@
   },
   {
    "number": null,
-   "name": "cli-solve-raised",
-   "severity": "hint",
-   "message": "{file}: raised from 0.2 to 0.3, as a tool writes only 0.3 (16.1); {series}",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "cli-solve-raised-word-clash",
-   "severity": "warning",
-   "message": "warning: {file}: {name}, has the spelling of a word that 0.3 adds (2.8): {raised to|read in} 0.3, it may mean something else (16.1)",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "cli-solve-stays-0-2",
-   "severity": "warning",
-   "message": "warning: {file} stays at 0.2, so what only 0.3 can write is unsolved (16.1): {why}",
-   "sections": []
-  },
-  {
-   "number": null,
    "name": "constraint-dropped",
    "severity": "hint",
    "message": "{constraint} conflicts with fixed {coordinates|orientations} and is dropped in the order of 8.5 (8.5)",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "package-merged-in-0-3",
-   "severity": "warning",
-   "message": "{name} is no package of the standard series 0.3, which merged rnl-std-layout and rnl-std-semantics into rnl-std-structures: to turn the default drawing of a definition off, write a rule such as # @SELECT-USAGE $DIFFERENTIAL_PAIR => @PRIORITY(\"disabled\"); to do without the package and its definitions, write @USE-PACKAGE(name=\"rnl-std-structures\") {} (16.3)",
    "sections": []
   },
   {
@@ -5037,41 +5009,6 @@
   },
   {
    "number": null,
-   "name": "rename-name-left-out",
-   "severity": "error",
-   "message": "${name} cannot be found: {what to write instead}, or pin the series 0.2 with @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\") in the header record (16.3)",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "rename-name-moved",
-   "severity": "error",
-   "message": "${name} cannot be found: the standard series 0.3 has it in {package}, which rnl-std does not bring in: name {package} or rnl-std-full with @USE-PACKAGE in the header record, or pin the series 0.2 (16.3)",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "rename-name-renamed",
-   "severity": "error",
-   "message": "${name} cannot be found: the standard series 0.3 calls it ${new}; write that, or pin the series 0.2 with @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\") in the header record (16.3)",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "rename-role-renamed",
-   "severity": "error",
-   "message": "the ordinary definition {definition} has no role {role} (9.4); the standard series 0.3 calls it {new} (16.3)",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "rename-symbol-now-definition",
-   "severity": "error",
-   "message": "the last object of SET-SYMBOL must be a symbol, not ${name} (11.3): in the standard series 0.3 ${name} is a definition, and ${symbol} the symbol that the series 0.2 called ${name} (16.3)",
-   "sections": []
-  },
-  {
-   "number": null,
    "name": "unsolved-at-point",
    "severity": "warning",
    "message": "{decision}{label}: it is drawn at the point of its main object and has no position of its own (12.1)",
@@ -5096,41 +5033,6 @@
    "name": "unsolved-wire-through-centre",
    "severity": "warning",
    "message": "{decision}{label}: a point of it is the centre of a set, which this writer does not write (6.5)",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "upgrade-follower-reads-0-3",
-   "severity": "warning",
-   "message": "warning: {file}: it writes no VERSION and takes that of {raised_file}: it reads in 0.3 too, its text unchanged (16.1); @VERSION(\"0.2\") written in its header record keeps it at 0.2",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "upgrade-follower-word-clash",
-   "severity": "warning",
-   "message": "warning: {file}: {what}, `{name}`, line {line}, has the spelling of a word that 0.3 adds (2.8): read in 0.3, it may mean something else (16.1)",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "upgrade-raised",
-   "severity": "hint",
-   "message": "{file}[ ({section})]: raised from 0.2 to 0.3, as a tool writes only 0.3 (16.1); {its header record keeps the standard series 0.2 it was read with: @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\") (16.3)|the version of the standard package that it pins stays (16.3)}",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "upgrade-stays-0-2",
-   "severity": "warning",
-   "message": "warning: {file} stays at 0.2, so what only 0.3 can write is unsolved (16.1): its header record cannot say 0.3 so",
-   "sections": []
-  },
-  {
-   "number": null,
-   "name": "upgrade-word-clash",
-   "severity": "warning",
-   "message": "warning: {file}: {what}, `{name}`, line {line}, has the spelling of a word that 0.3 adds (2.8): raised to 0.3, it may mean something else (16.1)",
    "sections": []
   },
   {

@@ -25,7 +25,6 @@ fn run(files: Vec<SolvedFile>) -> SolveRun {
         levels: Vec::new(),
         not_solved: Vec::new(),
         errors: 0,
-        raised: Vec::new(),
     }
 }
 

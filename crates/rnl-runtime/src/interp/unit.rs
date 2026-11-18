@@ -58,8 +58,9 @@ pub const EARLIER_VERSIONS: [&str; 2] = ["0.2", "0.3"];
 /// interpreted. A file of 0.2 or 0.3 is told how to convert it.
 pub fn unsupported_version(version: &str) -> String {
     let reads = read_versions();
-    let mut message =
-        format!("unsupported version {version}: no RNL of this file is interpreted (16.1; this implementation reads {reads})");
+    let mut message = format!(
+        "unsupported version {version}: no RNL of this file is interpreted (16.1; this implementation reads {reads})"
+    );
     if EARLIER_VERSIONS.contains(&version) {
         message.push_str(&format!(
             "; core 0.5.6 reads {version}, and its `rnl upgrade` writes the file in {DEFAULT_VERSION}"
@@ -1201,18 +1202,10 @@ impl Interp<'_> {
                 &pkg,
             );
         }
-        // `numbering` is a field of the draft 0.3 only (2.8, 5.9)
-        let draft: &[crate::words::HeaderField] = if self.follows_0_4(u) {
-            crate::words::draft_0_4_header_fields()
-        } else if self.follows_0_3(u) {
-            crate::words::draft_header_fields()
-        } else {
-            &[]
-        };
         let (mut numbering_at, mut scope_at, mut language_value) = (None, None, None);
         for n in &params.named {
             let loc = self.recs[rec].loc(n.off);
-            let fields = || words().header_fields.iter().chain(draft);
+            let fields = || words().header_fields.iter();
             let Some(spec) = fields().find(|f| f.name == n.name) else {
                 let close = closest(&n.name, fields().map(|f| f.name.as_str()));
                 let hint = close.map(|c| format!(", did you mean {c}?")).unwrap_or_default();
@@ -1455,7 +1448,13 @@ impl Interp<'_> {
                     };
                     self.units[u].version = v.clone();
                     if version_key(v).0 < 0 || !READ_VERSIONS.contains(&v.as_str()) {
-                        self.diag_in(Severity::Error, codes::VERSION_UNSUPPORTED, unsupported_version(v), Some(loc), &pkg);
+                        self.diag_in(
+                            Severity::Error,
+                            codes::VERSION_UNSUPPORTED,
+                            unsupported_version(v),
+                            Some(loc),
+                            &pkg,
+                        );
                         self.units[u].ok = false;
                     }
                 }
@@ -2238,20 +2237,6 @@ impl Interp<'_> {
         if decl.pkg.is_none() {
             decl.pkg = self.resolve_package(&decl, loc.clone(), None, what);
         }
-        // a package of the series 0.2 that the series 0.3 merged into another: found among the
-        // series 0.2's, or written inline, it brings in nothing of the series 0.3 (16.3); one not
-        // found says so in its error
-        if decl.pkg.is_some() {
-            if let Some(merged) = self.merged_in_0_3(&decl) {
-                self.diag_in(
-                    Severity::Warning,
-                    codes::PACKAGE_MERGED_IN_0_3,
-                    format!("{merged} (16.3)"),
-                    Some(loc.clone()),
-                    &pkg,
-                );
-            }
-        }
         if let (Some(pk), None) = (decl.pkg, &body) {
             if is_alias_package(&self.units[pk])
                 && (self.follows_0_4(self.use_writer(&decl)) || self.units[pk].header_kws.iter().any(|k| k == "ALIAS"))
@@ -2440,15 +2425,11 @@ impl Interp<'_> {
             }
         }
         let Some((n, v, path)) = cand else {
-            let mut then = match what {
+            let then = match what {
                 "USE-ALIASES" => "; statements using its aliases fail".to_string(),
                 "reference" => format!(", and the statements of package {pkg} that use its names fail with it"),
                 _ => String::new(),
             };
-            // a package of the series 0.2 that the series 0.3 merged into another (16.3)
-            if let Some(merged) = (what != "USE-ALIASES").then(|| self.merged_in_0_3(decl)).flatten() {
-                then.push_str(&format!("; {merged}"));
-            }
             let ver = decl.version.as_ref().map(|v| format!(" {v}")).unwrap_or_default();
             self.diag_in(
                 Severity::Error,
@@ -2699,10 +2680,14 @@ impl Interp<'_> {
     }
 }
 
+/// The field of the record head that 0.3 added, `numbering` (2.8, 5.9): a standard word, which no
+/// alias may be spelled as (16.5), although the other fields of the record head are not.
+const ADDED_WORDS: [&str; 1] = ["numbering"];
+
 /// Is a word one that the language version `version` adds, `numbering` in 0.3 (16.1)? It is a
 /// standard word in a file of that version or a later one, which no alias may be spelled as (16.5).
 pub fn added_word(word: &str, version: &str) -> bool {
-    keeps_0_3(version) && crate::words::draft_header_fields().iter().any(|f| f.name == word)
+    keeps_0_3(version) && ADDED_WORDS.contains(&word)
 }
 
 /// Is an alias original a standard keyword (written with `@`) or a standard word (16.1, 16.5)?

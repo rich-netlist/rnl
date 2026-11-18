@@ -10,7 +10,7 @@ The language core of RNL 0.3, the language standard in [`spec/`](../../spec/READ
 | --- | --- |
 | `records` | Cutting records out of carrier lines: entries, braces, strings, the disabling `/* */` (2.3–2.5). |
 | `syntax` | The record parser and its syntax tree. |
-| `words` | The standard word list, read from [`data/words-0.2.json`](data/words-0.2.json): every keyword's signature, kind, attributes and style attributes (5.3). |
+| `words` | The standard word list, read from [`data/words.json`](data/words.json), that of the language 0.4: every keyword's signature, kind, attributes and style attributes (5.3). |
 | `host` | The host document that adapters fill in. |
 | `source` | The `Provider` trait through which the runtime asks for included files and packages, and an in-memory provider. |
 | `interp` | Interpretation: headers, aliases, packages, lazy name resolution, definitions, usages, selections, symbol and style queues, geometry facts and their priorities, constraint statuses. |

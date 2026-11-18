@@ -112,15 +112,6 @@ impl Lines {
         l.insert_str(at, s);
     }
 
-    /// Replace the characters of a line from `from` to `to`, 0-based, `to` not included, by `s`.
-    fn replace_in(&mut self, line: u32, from: usize, to: usize, s: &str) {
-        let Some(l) = self.lines.get_mut((line as usize).wrapping_sub(1)) else { return };
-        let end = Self::body(l).len();
-        let at = |col: usize| l.char_indices().nth(col).map_or(end, |(i, _)| i);
-        let (a, b) = (at(from), at(to));
-        l.replace_range(a..b.max(a), s);
-    }
-
     fn insert(&mut self, before_line: u32, new: &[String]) {
         // a line not there yet, such as line 2 of an empty text, has empty lines before it
         while self.lines.len() + 1 < before_line as usize {
@@ -151,9 +142,6 @@ enum Edit {
     Lines(u32, Vec<String>),
     /// Insert text into a line, 1-based, before a character, 0-based.
     Text(u32, usize, String),
-    /// Replace the characters of a line, 1-based, from one to another, 0-based, the second not
-    /// included, by text.
-    Replace(u32, usize, usize, String),
 }
 
 impl Edit {
@@ -163,7 +151,7 @@ impl Edit {
         match self {
             Edit::Remove(a, _) => (a.0, a.1 as usize),
             Edit::Lines(line, _) => (*line, 0),
-            Edit::Text(line, col, _) | Edit::Replace(line, col, _, _) => (*line, col + 1),
+            Edit::Text(line, col, _) => (*line, col + 1),
         }
     }
 }
@@ -183,7 +171,6 @@ fn apply(text: &str, marker: &str, edits: Vec<Edit>) -> String {
             Edit::Remove(a, b) => lines.remove(a, b, marker),
             Edit::Lines(before, new) => lines.insert(before, &new),
             Edit::Text(line, col, s) => lines.insert_in(line, col, &s),
-            Edit::Replace(line, from, to, s) => lines.replace_in(line, from, to, &s),
         }
     }
     lines.text()
@@ -841,75 +828,6 @@ pub fn add_header(doc: &HostDocument, file: &str, text: &str, record: impl FnOnc
     }
 }
 
-/// The USE-PACKAGE that keeps the standard series 0.2 in a file raised to 0.3 (16.3).
-pub const PIN_STD_0_2: &str = "@USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")";
-
-/// `text`, the text of one file, with the file levels `levels` that read it raised to the version
-/// 0.3 (16.1), each with whether it was: the VERSION of the header record of each says 0.3, and
-/// with its `pin`, [`PIN_STD_0_2`] follows it, so that it keeps the standard series 0.2 it was read
-/// with (16.3); a file level without a header record gets one that says so, where a new header
-/// goes ([`with_header`]). A library section is read as a file (2.8): two sections of one file are
-/// raised apart, and the text outside them stays as it is. One is not raised when it cannot be so:
-/// a package file, a header record that is not the first record of its file level, a VERSION on
-/// several lines or in a region written to be encrypted (2.2), or a library section that has no
-/// header record.
-pub fn raise_version(doc: &HostDocument, text: &str, levels: &[(LevelId, bool)]) -> (String, Vec<bool>) {
-    let mut edits: Vec<Edit> = Vec::new();
-    let mut raised = Vec::new();
-    for &(level, pin) in levels {
-        let edit = raise_edit(doc, level, text, pin);
-        raised.push(edit.is_some());
-        // a section read twice has one header record: it is raised once
-        edits.extend(edit.filter(|e| !edits.iter().any(|o| o.at() == e.at())));
-    }
-    if edits.is_empty() {
-        return (text.to_string(), raised);
-    }
-    let marker = levels.first().map_or("*", |&(l, _)| carrier(doc, &doc.levels[l].file, text));
-    (apply(text, marker, edits), raised)
-}
-
-/// The change that raises the file level `level` to 0.3 ([`raise_version`]), None when it cannot
-/// be raised.
-fn raise_edit(doc: &HostDocument, level: LevelId, text: &str, pin: bool) -> Option<Edit> {
-    let file = &doc.levels[level].file;
-    if doc.is_package(file) {
-        return None;
-    }
-    let pinned = if pin { format!("; {PIN_STD_0_2}") } else { String::new() };
-    let raised = format!("@VERSION(\"0.3\"){pinned}");
-    let marker = carrier(doc, file, text);
-    let edit = match first_header(doc, file, Some(level)) {
-        Some(header) => {
-            let ast = parse_record(&header.text);
-            let body = ast.body?;
-            let call = |m: &crate::syntax::Member| m.segments.first().and_then(|s| s.call.clone());
-            match body.members.iter().filter_map(|m| call(m)).find(|c| c.kw == "VERSION") {
-                Some(version) => {
-                    let (a, b) = (header.loc(version.start), header.loc(version.end.saturating_sub(1)));
-                    if a.line != b.line {
-                        return None;
-                    }
-                    Edit::Replace(a.line, a.col as usize - 1, b.col as usize, raised)
-                }
-                // right after the `{` of the body, as `with_header` writes VERSION there
-                None => {
-                    let sep = if body.members.is_empty() { "" } else { ";" };
-                    let at = header.loc(body.start);
-                    Edit::Text(at.line, at.col as usize, format!(" {raised}{sep}"))
-                }
-            }
-        }
-        None if headers_of(doc, file, Some(level)) => return None,
-        None if doc.levels[level].section.is_some() => return None,
-        None => new_header(doc, file, text, marker, |_| format!("@RNL(type=\"header\") {{ {raised}}}"))?.0,
-    };
-    if doc.unwritable_in(level, edit.at().0).is_some() {
-        return None;
-    }
-    Some(edit)
-}
-
 /// Whether a file has a header record anywhere, or the file level `at` has one: one that is not
 /// the first record is an error its author fixes, and a tool writes no other.
 fn headers_of(doc: &HostDocument, file: &str, at: Option<LevelId>) -> bool {
@@ -917,152 +835,6 @@ fn headers_of(doc: &HostDocument, file: &str, at: Option<LevelId>) -> bool {
     match at {
         Some(_) => file_records(doc, file, at).1.iter().map(|(_, r)| r).any(header),
         None => records_of(doc, file).iter().map(|(_, r)| r).any(header),
-    }
-}
-
-/// The file levels that take their language version from the file level `level` (16.1): the files
-/// it includes, and those they include in turn, whose header records write no VERSION, a library
-/// section read as a file among them (2.8), in the order of the document. Raising `level` to 0.3
-/// has them read in 0.3 with it. The file levels `apart`, raised on their own, are left out, and so
-/// are those that take their version from one of them.
-pub fn takes_version_of(doc: &HostDocument, level: LevelId, apart: &[LevelId]) -> Vec<LevelId> {
-    let mut out = Vec::new();
-    let mut todo: Vec<LevelId> = doc.levels[level].children.iter().rev().copied().collect();
-    while let Some(l) = todo.pop() {
-        let lv = &doc.levels[l];
-        if lv.kind == LevelKind::File {
-            if apart.contains(&l) || writes_version(doc, l) {
-                continue;
-            }
-            out.push(l);
-        }
-        todo.extend(lv.children.iter().rev().copied());
-    }
-    out
-}
-
-/// Whether the header record of the file level `level` writes a VERSION (16.1).
-fn writes_version(doc: &HostDocument, level: LevelId) -> bool {
-    let Some(header) = first_header(doc, &doc.levels[level].file, Some(level)) else { return false };
-    let Some(body) = parse_record(&header.text).body else { return false };
-    body.members.iter().filter_map(|m| m.segments.first().and_then(|s| s.call.as_ref())).any(|c| c.kw == "VERSION")
-}
-
-/// Whether the header record of the file level `level`, a library section read as a file (2.8),
-/// or that of a file level above it, which includes it, pins a version of the standard package,
-/// `@USE-PACKAGE(name="rnl-std", version="…")`, which then comes before the series that the
-/// version of the file implies (16.3).
-pub fn pins_std(doc: &HostDocument, level: LevelId) -> bool {
-    let mut files: Vec<LevelId> = Vec::new();
-    for l in std::iter::once(level).chain(doc.ancestors(level)).map(|l| doc.file_level(l)) {
-        if !files.contains(&l) {
-            files.push(l);
-        }
-    }
-    files.into_iter().filter_map(|l| first_header(doc, &doc.levels[l].file, Some(l))).any(|h| {
-        let Some(body) = parse_record(&h.text).body else { return false };
-        body.members.iter().filter_map(|m| m.segments.first().and_then(|s| s.call.as_ref())).any(|c| {
-            let named = |n: &str| c.params.as_ref().and_then(|p| p.named.iter().find(|x| x.name == n));
-            c.kw == "USE-PACKAGE"
-                && named("name").is_some_and(|n| n.value == Value::Str("rnl-std".into()))
-                && named("version").is_some()
-        })
-    })
-}
-
-/// The names in the text of the file level `level`, a library section read as a file (2.8), that
-/// have the spelling of a standard word that the version 0.3 adds, `numbering`, a field of the
-/// record head (2.8): keys of texts, role names, parameter names of definitions and of usages,
-/// sub-object names, aliases, those it imports from alias packages among `imported`
-/// ([`crate::Interpretation::imported_aliases`]), fields of record heads, and the parameters of
-/// the host's instances, each as what it is and where. Raising the file level to 0.3 may change
-/// their meaning, so a tool that raises it gives a warning for each (16.1, 16.5).
-pub fn spelled_like_new_words(doc: &HostDocument, level: LevelId, imported: &[crate::ImportedAlias]) -> Vec<String> {
-    let file = doc.levels[level].file.as_str();
-    let words: Vec<&str> = crate::words::draft_header_fields().iter().map(|f| f.name.as_str()).collect();
-    let mut found: Vec<(&'static str, String, crate::diag::Loc)> = Vec::new();
-    for (_, rec) in file_records(doc, file, Some(level)).1 {
-        let ast = parse_record(&rec.text);
-        let mut names: Vec<(&'static str, String, usize)> = Vec::new();
-        for n in ast.header.iter().flat_map(|h| &h.named) {
-            names.push(("a field of a record head", n.name.clone(), n.off));
-        }
-        if let Some(body) = &ast.body {
-            names_in(&body.members, &mut names);
-        }
-        found.extend(
-            names.into_iter().filter(|(_, n, _)| words.contains(&n.as_str())).map(|(w, n, o)| (w, n, rec.loc(o))),
-        );
-    }
-    for a in imported.iter().filter(|a| a.level == level && words.contains(&a.alias.as_str())) {
-        found.push(("an alias from an alias package", a.alias.clone(), a.loc.clone()));
-    }
-    for lv in &doc.levels {
-        for inst in lv.instances.iter().filter(|i| i.file == file && doc.file_level_of(i) == Some(level)) {
-            for (name, _) in inst.params.iter().filter(|(n, _)| words.contains(&n.as_str())) {
-                found.push(("a parameter of an instance", name.clone(), crate::diag::Loc::line(file, inst.line)));
-            }
-        }
-    }
-    found.sort_by_key(|(_, _, at)| (at.line, at.col));
-    found.dedup();
-    found.into_iter().map(|(what, name, at)| format!("{what}, `{name}`, line {}", at.line)).collect()
-}
-
-/// The names written in a record's members, their definition bodies included, as
-/// [`spelled_like_new_words`] takes them: what each is, the name, and its offset in the record.
-fn names_in(members: &[std::rc::Rc<crate::syntax::Member>], out: &mut Vec<(&'static str, String, usize)>) {
-    use crate::syntax::{ObjExpr, Sep};
-    // the names of `roles=` and `parameters=`: a string, or the first of a list
-    let listed = |v: &Value| -> Vec<String> {
-        let Value::Arr(items) = v else { return Vec::new() };
-        items
-            .iter()
-            .filter_map(|i| match i {
-                Value::Str(s) => Some(s.clone()),
-                Value::Arr(xs) => match xs.first() {
-                    Some(Value::Str(s)) => Some(s.clone()),
-                    _ => None,
-                },
-                _ => None,
-            })
-            .collect()
-    };
-    for m in members {
-        for s in &m.segments {
-            for a in &s.args {
-                if let Some(role) = &a.role {
-                    out.push(("a role name", role.clone(), a.start));
-                }
-                match &a.obj {
-                    ObjExpr::Ref(r) => out.extend(
-                        r.path
-                            .iter()
-                            .filter(|p| p.sep == Sep::Sub)
-                            .map(|p| ("a sub-object name", p.name.clone(), r.start)),
-                    ),
-                    ObjExpr::Set(set) => names_in(&set.members, out),
-                    ObjExpr::Point(_) => {}
-                }
-            }
-            let Some(call) = &s.call else { continue };
-            let Some(params) = &call.params else { continue };
-            for n in &params.named {
-                match (call.kw.as_str(), n.name.as_str(), &n.value) {
-                    (_, "key", Value::Str(k)) => out.push(("the key of a text", k.clone(), n.off)),
-                    ("DEFINE", "roles", v) => out.extend(listed(v).into_iter().map(|r| ("a role name", r, n.off))),
-                    ("DEFINE", "parameters", v) => {
-                        out.extend(listed(v).into_iter().map(|p| ("a parameter of a definition", p, n.off)))
-                    }
-                    _ => out.push(("a parameter name", n.name.clone(), n.off)),
-                }
-            }
-            if call.kw == "ALIAS" {
-                if let Some(Value::Str(alias)) = params.positional.first() {
-                    out.push(("an alias", alias.trim_start_matches('@').to_string(), params.start));
-                }
-            }
-        }
     }
 }
 
@@ -1230,7 +1002,6 @@ mod tests {
         assert_eq!(carrier(&d, "acme.pkg", package), "");
         assert_eq!(with_header(&d, "acme.pkg", package, "0.3"), package);
         assert_eq!(add_header(&d, "acme.pkg", package, |_| "@RNL {}".into()), package);
-        assert_eq!(raise_version(&d, package, &[(0, false)]), (package.to_string(), vec![false]));
     }
 
     fn doc(text: &str, file: &str, marker: &str) -> HostDocument {
@@ -1745,70 +1516,6 @@ mod tests {
         let with = "* t\n* @RNL(type=\"header\") {}\n.end\n";
         assert_eq!(add_header(&doc(with, "a.sp", "*"), "a.sp", with, record), with);
         assert_eq!(add_header(&as_package(&d, "p.rnl"), "p.rnl", "@RNL {}\n", record), "@RNL {}\n");
-    }
-
-    #[test]
-    fn a_file_raised_to_0_3_keeps_the_standard_series_it_was_read_with() {
-        // the VERSION of its header says 0.3, followed by the pin of the series 0.2 (16.1, 16.3)
-        let raise = |d: &HostDocument, text: &str, pin: bool| {
-            let (out, done) = raise_version(d, text, &[(0, pin)]);
-            done[0].then_some(out)
-        };
-        let net = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\"); @DEVICE(x) }\nR1 a b 1k\n.end\n";
-        let d = doc(net, "a.sp", "*");
-        assert!(!pins_std(&d, 0));
-        let raised = format!(
-            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); {PIN_STD_0_2}; @DEVICE(x) }}\nR1 a b 1k\n.end\n"
-        );
-        assert_eq!(raise(&d, net, true).as_deref(), Some(raised.as_str()));
-        // a pin of the standard package stays, the only one, in the file and for a file it includes
-        let pinned = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")}\n.end\n";
-        let mut d = doc(pinned, "a.sp", "*");
-        assert!(pins_std(&d, 0));
-        let out = raise(&d, pinned, false).unwrap();
-        assert_eq!(out, pinned.replacen("\"0.2\"", "\"0.3\"", 1));
-        let lib = d.add_level(Level::new(LevelKind::File, "lib.inc", "lib.inc", "lib.inc"), Some(0));
-        assert!(pins_std(&d, lib));
-        // a header without VERSION gets it after its `{`; a file without a header gets one
-        let pin = format!("{{ @VERSION(\"0.3\"); {PIN_STD_0_2}}}");
-        let bare = "* t\n* @RNL(type=\"header\") {}\n.end\n";
-        assert_eq!(raise(&doc(bare, "a.sp", "*"), bare, true), Some(bare.replace("{}", &pin)));
-        let none = "* t\nR1 a b 1k\n.end\n";
-        let out = raise(&doc(none, "a.sp", "*"), none, true);
-        assert_eq!(out, Some(format!("* t\n* @RNL(type=\"header\") {pin}\nR1 a b 1k\n.end\n")));
-        // a package file, a header that is not the first record, and one in a region written to be
-        // encrypted are not raised
-        let package = d.add_level(Level::new(LevelKind::File, "p.rnl", "p.rnl", "p.rnl"), Some(0));
-        let d = as_package(&d, "p.rnl");
-        assert_eq!(raise_version(&d, "@RNL {}\n", &[(package, true)]), ("@RNL {}\n".to_string(), vec![false]));
-        let late = "* t\n* @RNL {#R1}\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.end\n";
-        assert_eq!(raise(&doc(late, "a.sp", "*"), late, true), None);
-        let hidden = "* t\n.prot\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.unprot\n.end\n";
-        assert_eq!(raise(&doc(hidden, "a.sp", "*"), hidden, true), None);
-    }
-
-    #[test]
-    fn names_spelled_like_the_word_that_0_3_adds() {
-        // `numbering`, a field of the record head in 0.3 (2.8), would change the meaning of a name of
-        // that spelling (16.1, 16.5)
-        let net = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\"); @ALIAS(\"numbering\", \"axis\")}\nR1 a b 1k\n\
-                   * @RNL(numbering=\"x\") { #R1 @TEXT(\"a\", key=\"numbering\"); \
-                   $D = @DEFINE(roles=[\"numbering\"], parameters=[[\"numbering\", 1]]) {} }\n.end\n";
-        let d = doc(net, "a.sp", "*");
-        let mut found = spelled_like_new_words(&d, 0, &[]);
-        found.sort();
-        assert_eq!(
-            found,
-            [
-                "a field of a record head, `numbering`, line 4",
-                "a parameter of a definition, `numbering`, line 4",
-                "a role name, `numbering`, line 4",
-                "an alias, `numbering`, line 2",
-                "the key of a text, `numbering`, line 4",
-            ]
-        );
-        let plain = "* t\n* @RNL { #R1 @TEXT(\"numbering\", key=\"name\") }\n.end\n";
-        assert!(spelled_like_new_words(&doc(plain, "a.sp", "*"), 0, &[]).is_empty());
     }
 
     /// The document of `text` read again, with no standard package: what `replace_records` is given

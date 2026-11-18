@@ -49,7 +49,6 @@ mod table;
 /// The name of the standard package that the setting of 16.3 brings in at the root.
 pub use packages::{standard_package_name, STD_NAME};
 pub mod phases;
-mod renames;
 pub mod scene;
 mod selfcheck;
 mod standard;
@@ -187,8 +186,7 @@ pub struct Interpretation {
     /// file is checked on its own (2.7).
     pub unsupported: Vec<Option<(LevelId, String)>>,
     /// The aliases that the files import from alias packages and use, in the order the files are
-    /// read (16.5): a tool that raises a file to 0.3 warns of those spelled like a word that 0.3
-    /// adds, as of the aliases the file declares itself ([`crate::writeback::spelled_like_new_words`]).
+    /// read (16.5).
     pub imported_aliases: Vec<ImportedAlias>,
     /// The records of the solver to read again, differently (5.9).
     pub(crate) recheck: NumberRun,

@@ -47,7 +47,6 @@ pub enum Event {
     Level {
         level: usize,
         title: String,
-        again: bool,
         limit: &'static str,
         #[serde(skip_serializing_if = "Option::is_none")]
         seconds: Option<f64>,
@@ -108,7 +107,7 @@ struct State {
     /// When the solver's last stage or work was told.
     last: Option<f64>,
     /// The level about to be solved, until its problem is read.
-    pending: Option<(String, bool)>,
+    pending: Option<String>,
     cancelled: bool,
     /// Readings since the solve was cancelled.
     after: u64,
@@ -273,11 +272,11 @@ pub(crate) fn solve_progress_skipping(
                 s.level = p.level;
                 s.work = 0;
                 s.last = None;
-                s.pending = Some((p.title.clone(), p.again));
+                s.pending = Some(p.title.clone());
                 return !s.cancelled;
             }
             Mark::Problem(solver) => {
-                let Some((title, again)) = observer.state.borrow_mut().pending.take() else { return true };
+                let Some(title) = observer.state.borrow_mut().pending.take() else { return true };
                 let (limit, seconds, work) = limit_of(rnl_solver::run_limit(solver, clock));
                 let start = clock.elapsed();
                 let level = {
@@ -285,7 +284,7 @@ pub(crate) fn solve_progress_skipping(
                     s.start = start;
                     s.level
                 };
-                Event::Level { level, title, again, limit, seconds, work }
+                Event::Level { level, title, limit, seconds, work }
             }
             Mark::Stage(stage) => {
                 let s = observer.state.borrow();
@@ -325,11 +324,9 @@ pub(crate) fn solve_progress_skipping(
         return Err(crate::solve::CANCELLED.to_string());
     }
     if OWN_CLOCK_MISSING {
-        // a file raised to 0.3 is solved in two passes, and the run is the second's
         let solved_in = &observer.state.borrow().solved_in;
-        let levels = run.levels.len();
-        if solved_in.len() == levels || solved_in.len() == 2 * levels {
-            for (level, &seconds) in run.levels.iter_mut().zip(&solved_in[solved_in.len() - levels..]) {
+        if solved_in.len() == run.levels.len() {
+            for (level, &seconds) in run.levels.iter_mut().zip(solved_in) {
                 level.time = std::time::Duration::from_secs_f64(seconds);
             }
         }

@@ -2188,13 +2188,10 @@ impl Interp<'_> {
                     } else {
                         String::new()
                     };
-                    // a role of the standard series 0.2 that the series 0.3 renamed
-                    let names: Vec<&str> = d.roles.iter().map(|x| x.name.as_str()).collect();
-                    let renamed = self.role_renamed_in_0_3(&dlabel, &role, &names, ctx).unwrap_or_default();
                     return self.fail(
                         ctx,
                         codes::USAGE_UNKNOWN_ROLE,
-                        format!("the ordinary definition {dlabel} has no role {r}{more} (9.4){then}{renamed}"),
+                        format!("the ordinary definition {dlabel} has no role {r}{more} (9.4){then}"),
                         a.off,
                     );
                 }
@@ -4235,13 +4232,10 @@ impl Interp<'_> {
         let sym = self.anon_def(mapped["symbol"].obj);
         if !matches!(self.o(sym), ObjData::Symbol(_)) {
             let l = self.label(sym);
-            // a symbol of the standard series 0.2 whose name the series 0.3 gives to a definition
-            let why = l.strip_prefix('$').and_then(|n| self.no_longer_a_symbol(n, ctx));
-            let why = why.map(|w| format!(": {w}")).unwrap_or_default();
             return self.fail(
                 ctx,
                 codes::KEYWORD_SET_SYMBOL_NOT_A_SYMBOL,
-                format!("the last object of SET-SYMBOL must be a symbol, not {l} (11.3){why}"),
+                format!("the last object of SET-SYMBOL must be a symbol, not {l} (11.3)"),
                 mapped["symbol"].off,
             );
         }
