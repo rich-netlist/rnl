@@ -124,6 +124,18 @@ fn netname_and_transconductor_text_keys_follow_target_symbols() {
 }
 
 #[test]
+fn the_text_key_of_a_differential_transconductor_follows_its_symbol() {
+    // its g_m text is `formula` in the standard series 0.3 and `label` in 0.4, as on $TRANSCONDUCTOR
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std-full\", version=\"0.3\") }\n.subckt dgm inp inn out\n.ends\nX1 a b c dgm\nX2 a b d dgm\n* @RNL {\n*   {#X1 #X2} @SET-SYMBOL $DIFFERENTIAL_TRANSCONDUCTOR;\n*   #X1 @TEXT(\"Gm1\", key=\"formula\");\n*   #X2 @SET-SYMBOL $DIFFERENTIAL_TRANSCONDUCTOR => @TEXT(\"Gm2\", key=\"formula\")\n* }\n.end\n";
+    let r = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
+    let text = &r.files["t.sp"];
+    assert!(text.contains("#X1 @TEXT(\"Gm1\", key=\"label\")"), "{text}");
+    assert!(text.contains("@TEXT(\"Gm2\", key=\"label\")"), "{text}");
+    assert!(!text.contains("formula"), "{text}");
+    assert!(r.report.differences.is_empty(), "{:#?}", r.report.differences);
+}
+
+#[test]
 fn singleton_literal_groups_need_no_centre_decision() {
     for call in ["ALIGN(\"x\")", "ORDER(\"left-to-right\")"] {
         let r = convert(&format!("{{{{#R1}} {{#R2}}}} @{call}"), false);
