@@ -436,6 +436,7 @@ fn main() {
         .manage(session::Initial(Mutex::new(session)))
         .manage(Core::new())
         .manage(library::Library::default())
+        .manage(project::Choices::default())
         .manage(startup)
         .setup(|app| {
             public_packages::init(app.handle());
@@ -488,7 +489,8 @@ fn main() {
             export::save_image,
             project::read_bytes,
             project::encode_like,
-            project::write_bytes,
+            project::write_project_archive,
+            project::write_project_file,
             project::pick_project,
             project::pick_project_save,
             project::pick_project_folder,
