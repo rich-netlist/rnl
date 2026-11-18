@@ -1117,7 +1117,8 @@ impl Interp<'_> {
                             self.definition_error(r, ctx, codes::DEFINE_BODY_HOST_REF, "the body of an ordinary definition cannot reference host objects; they come in through roles (6.9)", r.start);
                             self.note_failed_at(ctx.rec, r.start, false);
                         }
-                        if r.prefix == '$' || r.prefix == '%' {
+                        // a number was reported above; it names nothing to look up
+                        if (r.prefix == '$' || r.prefix == '%') && r.number.is_none() {
                             let n = r.name.clone().unwrap_or_default();
                             let locally_bound = (r.prefix == '%' && locals.contains(&n))
                                 || nested_names.iter().any(|(prefix, name)| *prefix == r.prefix && name == &n);
