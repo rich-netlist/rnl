@@ -39,6 +39,7 @@ R2 b 0 1k
         original_problem: problem,
         host_file: "main.sp",
         line_map: &lines,
+        moved: &[],
         kept: &kept,
         before: &before,
         after: &before,
