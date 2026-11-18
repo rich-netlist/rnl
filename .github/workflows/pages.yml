@@ -95,12 +95,15 @@ env:
   FROZEN_VIEWER_TAG: viewer-v0.5.3
   # The last release of the 0.5 line of the core, which reads 0.2, 0.3 and 0.4. Until the site moves to the language
   # 0.4, the site is built with it, not with main, whose core reads 0.4 only: the web viewer at viewer/ is built at
-  # this tag (so it no longer changes with every merge into main), the skill package for agents and llms.txt are
-  # published as they are there, the site's example netlists and the logo are checked with its command line, the
-  # gallery draws its symbols with its npm package @rich-netlist/runtime, and the examples and the browser tests
-  # use the public packages of its packages.lock.json.
+  # this tag (so it no longer changes with every merge into main), the site's example netlists and the logo are
+  # checked with its command line, the gallery draws its symbols with its npm package @rich-netlist/runtime, and
+  # the examples and the browser tests use the public packages of its packages.lock.json.
   # Moving to a newer release of the 0.5 line is this line alone.
-  LAST_05_RELEASE: core-v0.5.6
+  LAST_05_RELEASE: core-v0.5.7
+  # The last release whose skill package for agents is the one of the language 0.3: the skill package and llms.txt
+  # are published as they are at this tag until the site moves to the language 0.4, so that they match the site's
+  # 0.3 examples and the downloads of the page for agents. Later releases of the 0.5 line carry the skill of 0.4.
+  SKILL_RELEASE: core-v0.5.6
 
 jobs:
   build:
@@ -162,17 +165,20 @@ jobs:
           python3 -m unittest discover -s scripts/spec -p 'test_build.py'
           python3 scripts/spec/build.py --site site/dist
 
-      # The tag LAST_05_RELEASE, checked out beside the workspace: the skill package and the web viewer below are
-      # published as they are there, until the site moves to the language 0.4.
-      - name: Check out the tag of the last release of the 0.5 line
-        run: git worktree add --detach "$RUNNER_TEMP/release-0.5" "refs/tags/$LAST_05_RELEASE"
+      # The tags LAST_05_RELEASE and SKILL_RELEASE, checked out beside the workspace: the web viewer below is
+      # published as it is at the first, the skill package as it is at the second, until the site moves to the
+      # language 0.4.
+      - name: Check out the tags of the last releases of the 0.5 line
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/release-0.5" "refs/tags/$LAST_05_RELEASE"
+          git worktree add --detach "$RUNNER_TEMP/skill-release" "refs/tags/$SKILL_RELEASE"
       # The RNL skill package, for agents: site/dist/skill/rnl-skill.zip, the files of the package as plain
       # text under site/dist/skill/rnl/, a manifest and the hashes, and the plain-text entry that agents look
       # for, site/dist/llms.txt, in English only, which the page for agents,
-      # agents.html, links. Both are the tag's, built by the tag's own script, so that the package of the
+      # agents.html, links. Both are SKILL_RELEASE's, built by the tag's own script, so that the package of the
       # language 0.3 stays published while main's skills/rnl moves on; main's package is checked by skill.yml.
       - name: Build the skill package for agents
-        working-directory: ${{ runner.temp }}/release-0.5
+        working-directory: ${{ runner.temp }}/skill-release
         run: python3 scripts/skill/build.py --site "$GITHUB_WORKSPACE/site/dist"
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
