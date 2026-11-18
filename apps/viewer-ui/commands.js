@@ -151,6 +151,7 @@ export function command(id, options = {}) {
       m("E or Enter: Open Subcircuit. Ctrl+E or Backspace: Up to Parent Level."),
       m("Shift+E or Shift+Enter: Open Subcircuit in New Window. Hold Shift during any circuit navigation to open its target in a new window."),
       m("Ctrl+Q: Edit Text (the physical Control key on macOS too). Ctrl+Enter: Apply and Exit Editing."),
+      m("In Edit Text: Enter in a comment begins the next line with its * or //, Shift+Enter does not. Tab indents and Shift+Tab outdents; Esc, then Tab, leaves the text."),
       m("Ctrl+F: Find in Netlist, including offscreen text. Enter / Shift+Enter: next / previous match."),
     ] }); break;
     case "solve": solve(); break;
