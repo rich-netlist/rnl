@@ -4,9 +4,8 @@ A frontend can follow a solve while it runs, as a stream of events. Every fronte
 same events:
 
 - **CLI:** `rnl solve FILE -o DIR --progress=json` writes one JSON object per line on standard
-  error. Standard error also carries the command's own text lines, such as the hint RNL8111 that
-  the solver is a preview, warnings on the command line, and the count of errors in the source,
-  which `rnl check` details: a reader takes the lines that parse as a JSON object and skips the
+  error. Standard error also carries the command's own text lines, such as warnings on the
+  command line and the count of errors in the source, which `rnl check` details: a reader takes the lines that parse as a JSON object and skips the
   others. The report stays on standard output. `--progress` without `=json` keeps the older
   text lines. `rnl preview FILE --progress=json` tells the same events, for the viewers' development
   server, and ends with `done` (no `written`: a preview writes nothing).

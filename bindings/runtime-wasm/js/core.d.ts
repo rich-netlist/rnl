@@ -9,9 +9,9 @@ import type { Snapshot } from "./snapshot.js";
 
 export type { Catalog, Document, FormatInfo, Snapshot, UnplacedDrawing };
 
-/** Error thrown by a draft 0.4 write request. Older requests keep ordinary Errors. */
+/** Error thrown when a write request is refused: the kind's number, `RNLnnnn`, and its name. */
 export interface EditError extends Error {
-  code: string | null;
+  code: string;
   diagnosticName: string;
   diagnostics: Diagnostic[];
 }
@@ -57,14 +57,13 @@ export interface Request {
    * its files with them too.
    */
   formats?: Record<string, string>;
-  /** Enable implicit standard packages for 0.2/0.3; false also disables include_std. Default true. */
+  /** Use the standard package at the root (16.3); false also disables include_std. Default true. */
   std?: boolean;
   /** Explicitly add the standard package to a 0.4 main file without its own reference. Default false. */
   include_std?: boolean;
   /**
-   * The version of the standard package at the root, whatever the files' language version, such
-   * as "0.2" to read a file of 0.3 with the series 0.2; a version pinned in a header record still
-   * comes first (16.3). By the language version when not given.
+   * The version of the standard package that include_std adds; a version pinned in a header record
+   * still comes first (16.3). By the language version when not given.
    */
   std_version?: string;
   /** Write each level's SVG; true when not given. */
@@ -324,7 +323,7 @@ export interface SymbolPin {
 export interface WriteRequest {
   overlays?: OverlayOptions;
   write: {
-    /** Explicit output language, "0.3" or "0.4". Omitted: the released writer default. */
+    /** The output language, which can only be "0.4"; omitted, 0.4 is written too. Another is refused. */
     language_version?: string;
     dialect: "spice" | "spectre";
     /** The netlist, without RNL records. */
@@ -464,7 +463,7 @@ export interface Core {
   build(request: Request | string): Document;
   /** Build the snapshot of a request with `parts`, as build builds the Document. */
   snapshot(request: Request | string): Snapshot;
-  /** Write the ops and build them. Draft 0.4 refusals throw EditError with a code and host diagnostics. */
+  /** Write the ops and build them. A refusal throws EditError with a code and host diagnostics. */
   write(request: WriteRequest | string): Written;
   /**
    * Replace the records of a level of a netlist that has records already, in the file that holds the
