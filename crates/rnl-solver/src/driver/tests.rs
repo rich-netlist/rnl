@@ -410,11 +410,11 @@ fn check_wires_boxes(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str, c
         );
     }
     // no T without a junction: a pin at which a wire routed ends ends no other wire of its net,
-    // routed or written, and a point ends fewer than three; the wire of length 0 from a branch
-    // point on it is the junction's
+    // routed or written, and a point ends fewer than three; a wire of length 0, from a branch point
+    // on a pin or from a point written there, is the junction's, or no wire at all: it ends nothing
     let mut ends: Vec<(&String, &PointRef, usize)> = Vec::new();
     for (w, path) in sol.wires.iter().zip(&r.paths) {
-        if matches!(w.points[0], WirePoint::Branch(_)) && path.len() == 2 && path[0] == path[1] {
+        if path.len() == 2 && path[0] == path[1] {
             continue;
         }
         let net = &p.routes[w.route].net;

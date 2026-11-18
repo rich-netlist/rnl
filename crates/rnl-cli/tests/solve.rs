@@ -843,7 +843,7 @@ fn a_write_that_fails_says_what_it_wrote_before() {
     assert_eq!(code, 2, "{stdout}{stderr}");
     assert!(stdout.ends_with(&format!("wrote {}\n", path_str(&dir.join("04-hierarchy.sp")))), "{stdout}");
     // an error of the library that writes, without its kind for now
-    assert!(stderr.contains("\nerror: cannot write "), "{stderr}");
+    assert!(stderr.lines().any(|l| l.starts_with("error: cannot write ")), "{stderr}");
 }
 
 fn rnl(args: &[&str]) -> (i32, String, String) {
@@ -2197,7 +2197,7 @@ fn in_a_spice_section_of_a_spectre_file_a_record_is_carried_by_a_star() {
 fn solve_and_preview_print_nothing_on_the_standard_error_when_they_have_nothing_to_report() {
     // since core 0.6.0 neither says that the solver is a preview (RNL8111 is retired)
     let f = path_str(&case("T2b-common-source-dragged"));
-    let dir = scratch("preview-notice");
+    let dir = scratch("nothing-on-stderr");
     let out = path_str(&dir.join("out"));
     let work = format!("limit=\"work\",work={WORK_04},safety_seconds=3600");
     let (code, stdout, stderr) = rnl(&["solve", &f, "-o", &out, "--solver-config", &work]);

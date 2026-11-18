@@ -290,36 +290,36 @@ fn every_case_of_the_corpus_resolves() {
 }
 
 #[test]
-fn the_groups_of_the_low_order_of_corpus_03_are_not_sought_by_default() {
-    // corpus 03 discards the low ORDER of its $FLOW, whose one minimal conflict group took about 9
-    // million nodes of the search for seeds to be known as the only one. Its hints may be left out
-    // (the draft 0.3, 8.5; 7.6): by default it has that group, its first, and the resolution of the
-    // level costs a few hundred nodes, as before every group was sought
+fn the_groups_of_the_low_fact_of_corpus_03_are_not_sought_by_default() {
+    // corpus 03 discards one fact of priority low, the DISTRIBUTE of a structure of the standard
+    // series. Its hints may be left out (8.5; 7.6): by default the resolution of the level costs a
+    // few hundred nodes, as before every group was sought
     let ps = problems(&repo().join("tests/conformance/cases-0.4/from-0.2/03-five-transistor-ota.sp"));
     let p = &ps[0];
     let r = check_level("03", p);
     let low: Vec<&Discarded> = r.discarded.iter().filter(|d| p.facts[d.fact].priority == Priority::Low).collect();
     assert_eq!(low.len(), 1, "{}", summary(p, &r));
-    assert!(matches!(p.facts[low[0].fact].kind, FactKind::Order { .. }), "{:?}", p.facts[low[0].fact]);
+    assert!(matches!(p.facts[low[0].fact].kind, FactKind::Distribute { .. }), "{:?}", p.facts[low[0].fact]);
     assert!(r.work.resolve_nodes < 10_000, "{}", summary(p, &r));
 }
 
 #[test]
-fn with_its_hints_asked_for_the_low_order_of_corpus_03_has_its_one_group_found_whole() {
-    // the enumeration of every minimal group on the one large case of the corpus, which `rnl solve
-    // --report` runs (hints_for_low): the low ORDER [46] conflicts with [16], [19], [23] and [26]
-    // alone, a list known complete after about 9 million nodes, and the facts kept are those kept
-    // without it, which gives that group first (the draft 0.3, 8.5)
+fn with_its_hints_asked_for_the_low_fact_of_corpus_03_keeps_what_it_kept() {
+    // the enumeration of the minimal groups on the one large case of the corpus, which `rnl solve
+    // --report` runs (hints_for_low): in 0.4 the resolution seeks the other groups with as much
+    // work again as it took itself, within which the groups of 03 are not all found; the facts
+    // kept are those kept without the hints, which give the same first group (8.5)
     let ps = problems(&repo().join("tests/conformance/cases-0.4/from-0.2/03-five-transistor-ota.sp"));
     let p = &ps[0];
     let r = resolve(p, &SolverOptions { hints_for_low: true, ..SolverOptions::without_time_limit() });
     let low: Vec<&Discarded> = r.discarded.iter().filter(|d| p.facts[d.fact].priority == Priority::Low).collect();
     assert_eq!(low.len(), 1, "{}", summary(p, &r));
-    assert_eq!((low[0].fact, &low[0].groups, low[0].complete), (46, &vec![vec![16, 19, 23, 26]], true));
+    assert!(matches!(p.facts[low[0].fact].kind, FactKind::Distribute { .. }), "{:?}", p.facts[low[0].fact]);
     let first = resolve(p, &SolverOptions::without_time_limit());
     assert_eq!(r.kept, first.kept);
-    let d = first.discarded.iter().find(|d| d.fact == 46).unwrap();
-    assert_eq!((&d.groups, d.complete), (&low[0].groups, false));
+    let d = first.discarded.iter().find(|d| d.fact == low[0].fact).unwrap();
+    assert_eq!(d.groups.first(), low[0].groups.first());
+    assert!(!d.complete);
 }
 
 fn object(p: &LevelProblem, label: &str) -> usize {

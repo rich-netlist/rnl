@@ -18,6 +18,7 @@ const NET: &str = "* nets\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PAC
                    *   &out @TEXT(\"vout\");\n\
                    *   #R1:1 @TEXT(\"v\");\n\
                    *   %w @TEXT(\"ground wire\");\n\
+                   *   $IO_PORT @ATTACH &in;\n\
                    *   &in @ROUTE-NET\n\
                    * }\n.ends amp\nX1 a b c 0 amp\n.end\n";
 
@@ -70,7 +71,8 @@ fn the_nets_of_a_level_with_their_pins_wires_routes_and_ports() {
         _ => (usize::MAX, 0),
     });
     assert_eq!(sorted, p.nets.iter().find(|n| n.name == "vss").unwrap().pins);
-    // the wires that draw each net, and the ROUTE-NET that asks for one
+    // the wires that draw each net, and the ROUTE-NET that asks for one; the port on in is written
+    // so that the fill gives the pin of M1 on in no label of its own, which would unroute it
     let wires = |name: &str| p.nets.iter().find(|n| n.name == name).unwrap().wires.clone();
     assert_eq!((wires("out").len(), wires("vss").len(), wires("in").len()), (1, 1, 0));
     assert_eq!(p.wires[wires("vss")[0]].nets, ["vss"]);
@@ -82,7 +84,8 @@ fn the_nets_of_a_level_with_their_pins_wires_routes_and_ports() {
     let names: Vec<&str> = top.nets.iter().map(|n| n.name.as_str()).collect();
     assert_eq!(names, ["a", "b", "c", "0"]);
     assert!(top.nets.iter().all(|n| n.port.is_none()));
-    assert_eq!(on(top, "a"), ["#X1"]);
+    // the fill of rnl-std-all reaches the file level too: the unwired pin of X1 on a gets its label
+    assert_eq!(on(top, "a"), ["#X1", "%l"]);
 }
 
 #[test]
