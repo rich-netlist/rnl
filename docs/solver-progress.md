@@ -4,7 +4,10 @@ A frontend can follow a solve while it runs, as a stream of events. Every fronte
 same events:
 
 - **CLI:** `rnl solve FILE -o DIR --progress=json` writes one JSON object per line on standard
-  error. The report stays on standard output. `--progress` without `=json` keeps the older
+  error. Standard error also carries the command's own text lines, such as the hint RNL8111 that
+  the solver is a preview, warnings on the command line, and the count of errors in the source,
+  which `rnl check` details: a reader takes the lines that parse as a JSON object and skips the
+  others. The report stays on standard output. `--progress` without `=json` keeps the older
   text lines. `rnl preview FILE --progress=json` tells the same events, for the viewers' development
   server, and ends with `done` (no `written`: a preview writes nothing).
 - **Library:** `rnl_cli::progress::solve_progress` and `rnl_cli::preview::preview_progress`
@@ -31,7 +34,7 @@ and shows an event or a stage it does not know by its name.
 | `stage` | A level enters a stage | `level`, `stage`, `work`, `elapsed` |
 | `work` | More work | `level`, `stage`, `work`, `elapsed`, `tried`; `fraction`, the share of the limit used from 0 to 1, for a time or a work limit |
 | `best` | A better candidate than any before in the level | `level`, `tried`, `work`, `elapsed`; `cost`, numbers to compare element by element, lower first, with no promised meaning |
-| `level-done` | A level is solved | `level`; `status`: `"complete"`, `"time"`, `"work"`, `"safety"` or `"cancelled"`; `work`, the count to replay with; `seconds`, the solver's own time; `kept`, `discarded`, the facts; `junction_seconds`, the junction placement outside the budget, when there was one |
+| `level-done` | A level is solved | `level`; `status`: `"complete"`, `"time"`, `"work"`, `"safety"` or `"cancelled"`; `work`, the count to replay with, except after `"safety"`, which does not replay; `seconds`, the solver's own time; `kept`, `discarded`, the facts; `junction_seconds`, the junction placement outside the budget, when there was one |
 | `done` | The files are written (CLI only) | `seconds`, the whole run; `exit`, the exit code; `written`, the files written |
 | `error` | The run stopped on an error (CLI only) | `message` |
 

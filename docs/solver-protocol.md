@@ -1,6 +1,6 @@
 # Independent solver protocol
 
-The `rnl-solver-io` library encodes an independent solver's decisions as JSON and validates them against the original `LevelProblem` before writeback. Protocol version 5 is independent of the solver executable's version.
+The `rnl-solver-io` library encodes an independent solver's decisions as JSON and validates them against the original `LevelProblem` before writeback. The protocol's version, now 6 (`rnl_solver_io::VERSION`, which every request and result carries and both sides check), is independent of the solver executable's version.
 
 The `rnl-solver` executable has its own version, currently `0.4.8`. It reads one input JSON document from stdin (or an explicit file) and writes one result document to stdout. Diagnostics go to stderr. Viewers continue using the solver library. Its opt-in [skeleton experiment](solver-skeleton.md) uses the same result protocol.
 
@@ -155,7 +155,13 @@ A rule-created usage that remains implicit is matched only when its source, para
 
 A constraint already dropped or deferred in the baseline may keep that unchanged outcome. Newly introduced dropped or deferred constraints still have to hold in the drawing; an existing unresolved outcome never excuses a new conflict or an unproved kept fact.
 
-This completion phase validates one baseline and at most 64 trials for the whole level. Each record containing numbered references first passes through normal writer finalization, which requires an additional interpretation to calculate its numbering check. Validation compares actual drawn coordinates, including following text, rather than requiring redundant fixed slots. It does not invoke the backend again. Its trial count and elapsed time, including numbering preparation, are reported separately from the backend's time/work budget. Custom configurations for which no candidate can be verified are reported as unresolved; the command does not replace files on that failure.
+This completion phase tries at most 64 candidate records for the whole level: the bound counts trials, not readings. Each attempt first reads the record without new dots back in full (a baseline) and checks that the first-pass placements survived; an attempt that fails there ends before its first trial and adds none. The phase first tries all the dots together. If that fails, it reads the record with no dot once more, outside the bound, and then tries the dots one at a time, in order, each beside those kept before it, each with a baseline of its own and its trials taken from what is left of the 64. A level with many dots can therefore read its record far more often than once plus 64 times. Each record containing numbered references first passes through normal writer finalization, which requires an additional interpretation to calculate its numbering check. Validation compares actual drawn coordinates, including following text, rather than requiring redundant fixed slots. It does not invoke the backend again. Its trial count and elapsed time, including numbering preparation, are reported separately from the backend's time/work budget. There are three outcomes:
+
+- every dot is placed, and the level is written with all of them;
+- some dots are placed: the level is written with those, and the report names each dot left out with why, such as no candidate verified, the bound on trials reached, or no time left;
+- the record without any dot does not read back as it was solved: the run stops with an error and writes no file.
+
+A custom configuration for which no candidate can be verified for a dot is reported as unresolved for that dot.
 
 Numbering preparation uses the same explicit file-format overrides and package discovery context as the original solve. Inserting a file header is accounted for when mapping authored source locations. A changed header sharing a physical line with another record is conservatively refused because its column locations cannot be safely inferred.
 

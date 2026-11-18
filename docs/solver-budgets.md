@@ -19,8 +19,11 @@ group-tree start the line layout begins with stopped refining its arrangement, w
 work alone does not tell. Give it with the work.
 
 Use the reported count for the same drawing level, input, settings and solver build. For a
-file with several levels, replay each level with `--level` and that level's own count. Keep
-`--report` the same: requesting additional conflict explanations consumes budget too.
+file with several levels, replay each level with `--level` and that level's own count.
+`--report` does not move the cutoff: the further conflict groups of low-priority facts it asks
+for are sought after the level is solved, outside its budget, within a budget of their own as
+large as the work the level took, so that a replay by that work finds the same groups unless its
+time stopped them first.
 Progress goes to standard error and does not enter the saved file. Profiling or progress
 observation can move a time cutoff; neither consumes deterministic work.
 
@@ -31,9 +34,21 @@ unfinished checks are undecided, with warnings, rather than contradictory or sat
 Necessary result assembly and forced route completion are deterministic finalization, and so,
 under the line layout, are the routing rounds that make the drawing taken keep its gaps and its
 spacing: once the budget is spent they run past its limit, their work left out of the reported
-count ([line layout](solver-lines.md)).
+count ([line layout](solver-lines.md)). Under a limit of work, of the seed or none, only the safety
+limit stops them; if it does, the level reports the stop reason `Safety`, as what they did then
+hung on the clock, and offers no replay. Under a limit of time they have no safety limit and stop
+only at their own caps, so that the work reported replays them.
 
 The seconds limit applies to each drawing level's solver, not the whole CLI process.
+In 0.4 the CLI keeps part of a level's time limit, or of its safety limit under a limit of work
+or of the seed, for placing its junction dots and writing it: sixteen readings of the document,
+and at most a quarter of the limit; the solver has the rest, and the report of a level stopped by
+its time or its safety limit notes what was kept.
+The kept time is an estimate, not a bound. Junction placement is bounded by its 64 candidate
+trials for the level ([protocol](solver-protocol.md)); it stops at a deadline only when the
+level's safety limit stopped the solve, and then only between trials. After a stop by the time or
+the work limit it tries every dot, as a replay by the work does, however long that takes, so
+that a level can end later than its time limit.
 Package loading and interpretation, re-reading between levels, record validation and
 writeback happen outside that budget, as does the finalization above. A ten-second search can
 therefore take longer end to end. Compare the level's solver time with the CLI/process time when diagnosing
@@ -66,14 +81,11 @@ It is not a successful completion of the requested work budget. The solver uses 
 caller's clock, including in WebAssembly; it does not read environment switches or spawn
 worker threads.
 
-At a zero-second limit, the old 0.4 resolution-only deadline still allowed placement to run.
-The shared zero-second limit admits no model work: the facts remain undecided and the two
-symbols stay at their initial coincident positions. This boundary example demonstrates the
+A zero-second limit admits no work: the facts are not resolved, and the report lists them as
+discarded, undecided. What the drawing still gets is the finishing above, which runs past the
+limit: two symbols with no fact kept are drawn apart and wired by the group-tree and the line
+layouts, and left at their common start, overlapping, by the row layout. This boundary shows the
 scope of the limit; it is not the default ten-second setting.
-
-| Previous resolution-only limit | Shared solve limit |
-| --- | --- |
-| ![Two symbols placed](images/shared-budget-before.png) | ![No optional placement admitted](images/shared-budget-after.png) |
 
 `limit="seed"` finishes the selected layout's initial heuristic pass without later
 refinement. Rows, group trees and line layouts use the same shared budget. This mode
