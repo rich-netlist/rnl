@@ -776,9 +776,10 @@ fn one_level_alone() {
     let out = &run.files[0].text;
     assert_eq!(out.matches("type=\"generated\"").count(), text.matches("type=\"generated\"").count());
     let record = out.find("type=\"generated\"").unwrap();
-    let ends = out.find("\n.ends\n").unwrap();
+    // (the one line that ends a subcircuit, whatever the line ends of the checkout)
+    let ends = out.find("\n.ends").unwrap();
     assert!(record < ends && out[record..ends].contains(&run.levels[0].hash), "{out}");
-    assert_eq!(out[ends..], text[text.find("\n.ends\n").unwrap()..]);
+    assert_eq!(out[ends..], text[text.find("\n.ends").unwrap()..]);
     let err = solve(&f, &fs, &SolveOptions { level: Some("nope".into()), ..unlimited() }).unwrap_err();
     assert_eq!(err, "no drawing level is titled nope");
 }
