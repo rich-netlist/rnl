@@ -111,7 +111,7 @@
   /* Two symmetric objects at one height, mirror images of each other about an axis: a layout only,
      which says nothing about the circuit. Places; routes nothing; asserts nothing: left on the left of axis, right on the right, and right oriented as left
      flipped left-right (14.7); the usage's own point is at the centre between left and right. Write
-     the roles the other way round to swap the sides. */
+     the roles the other way round to swap the sides. A usage on a side must have a symbol, such as a port tag: the orientation of one without a symbol fails (14.9). */
   $MIRRORED_LAYOUT = @DEFINE(
       roles=[
         ["left", ["instance", "usage"]],
@@ -126,7 +126,7 @@
   /* Two symmetric objects in one column, mirror images of each other about a horizontal axis: a
      layout only. Places; routes nothing; asserts nothing: top above axis, bottom below, and bottom oriented as top flipped
      top-bottom (14.7); the usage's own point is at the centre between top and bottom. Write the
-     roles the other way round to swap the sides. */
+     roles the other way round to swap the sides. A usage on a side must have a symbol, such as a port tag: the orientation of one without a symbol fails (14.9). */
   $MIRRORED_VERTICAL_LAYOUT = @DEFINE(
       roles=[
         ["top", ["instance", "usage"]],
@@ -274,10 +274,10 @@
         => @ORIENT("down", priority="low");
     {?left ?right ?tail} @SELECT-INSTANCE(type="njf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("down", priority="low");
+        => @ORIENT("down", priority="low"); {?left ?right ?tail} @SELECT-INSTANCE(type="nmf") => @SELECT-PIN(terminal="s") => @ORIENT("down", priority="low");
     {?left ?right ?tail} @SELECT-INSTANCE(type="pjf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("down", priority="low");
+        => @ORIENT("down", priority="low"); {?left ?right ?tail} @SELECT-INSTANCE(type="pmf") => @SELECT-PIN(terminal="s") => @ORIENT("down", priority="low");
     {?left ?right ?tail} @SELECT-INSTANCE(type="npn")
         => @SELECT-PIN(terminal="e")
         => @ORIENT("down", priority="low");
@@ -339,10 +339,10 @@
         => @ORIENT("up", priority="low");
     {?left ?right ?tail} @SELECT-INSTANCE(type="njf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("up", priority="low");
+        => @ORIENT("up", priority="low"); {?left ?right ?tail} @SELECT-INSTANCE(type="nmf") => @SELECT-PIN(terminal="s") => @ORIENT("up", priority="low");
     {?left ?right ?tail} @SELECT-INSTANCE(type="pjf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("up", priority="low");
+        => @ORIENT("up", priority="low"); {?left ?right ?tail} @SELECT-INSTANCE(type="pmf") => @SELECT-PIN(terminal="s") => @ORIENT("up", priority="low");
     {?left ?right ?tail} @SELECT-INSTANCE(type="npn")
         => @SELECT-PIN(terminal="e")
         => @ORIENT("up", priority="low");
@@ -403,10 +403,10 @@
         => @ORIENT("up", priority="low");
     {?left ?right} @SELECT-INSTANCE(type="njf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("down", priority="low");
+        => @ORIENT("down", priority="low"); {?left ?right} @SELECT-INSTANCE(type="nmf") => @SELECT-PIN(terminal="s") => @ORIENT("down", priority="low");
     {?left ?right} @SELECT-INSTANCE(type="pjf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("up", priority="low");
+        => @ORIENT("up", priority="low"); {?left ?right} @SELECT-INSTANCE(type="pmf") => @SELECT-PIN(terminal="s") => @ORIENT("up", priority="low");
     {?left ?right} @SELECT-INSTANCE(type="npn")
         => @SELECT-PIN(terminal="e")
         => @ORIENT("down", priority="low");
@@ -472,10 +472,10 @@
         => @ORIENT("up", priority="low");
     {?left ?right ?tailleft ?tailright} @SELECT-INSTANCE(type="njf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("down", priority="low");
+        => @ORIENT("down", priority="low"); {?left ?right ?tailleft ?tailright} @SELECT-INSTANCE(type="nmf") => @SELECT-PIN(terminal="s") => @ORIENT("down", priority="low");
     {?left ?right ?tailleft ?tailright} @SELECT-INSTANCE(type="pjf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("up", priority="low");
+        => @ORIENT("up", priority="low"); {?left ?right ?tailleft ?tailright} @SELECT-INSTANCE(type="pmf") => @SELECT-PIN(terminal="s") => @ORIENT("up", priority="low");
     {?left ?right ?tailleft ?tailright} @SELECT-INSTANCE(type="npn")
         => @SELECT-PIN(terminal="e")
         => @ORIENT("down", priority="low");
@@ -541,10 +541,10 @@
         => @ORIENT("up", priority="low");
     {?left ?right ?tail} @SELECT-INSTANCE(type="njf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("down", priority="low");
+        => @ORIENT("down", priority="low"); {?left ?right ?tail} @SELECT-INSTANCE(type="nmf") => @SELECT-PIN(terminal="s") => @ORIENT("down", priority="low");
     {?left ?right ?tail} @SELECT-INSTANCE(type="pjf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("up", priority="low");
+        => @ORIENT("up", priority="low"); {?left ?right ?tail} @SELECT-INSTANCE(type="pmf") => @SELECT-PIN(terminal="s") => @ORIENT("up", priority="low");
     {?left ?right ?tail} @SELECT-INSTANCE(type="npn")
         => @SELECT-PIN(terminal="e")
         => @ORIENT("down", priority="low");
@@ -596,10 +596,10 @@
         => @ORIENT("down", priority="low");
     {?ref ?out} @SELECT-INSTANCE(type="njf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("down", priority="low");
+        => @ORIENT("down", priority="low"); {?ref ?out} @SELECT-INSTANCE(type="nmf") => @SELECT-PIN(terminal="s") => @ORIENT("down", priority="low");
     {?ref ?out} @SELECT-INSTANCE(type="pjf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("down", priority="low");
+        => @ORIENT("down", priority="low"); {?ref ?out} @SELECT-INSTANCE(type="pmf") => @SELECT-PIN(terminal="s") => @ORIENT("down", priority="low");
     {?ref ?out} @SELECT-INSTANCE(type="npn")
         => @SELECT-PIN(terminal="e")
         => @ORIENT("down", priority="low");
@@ -644,10 +644,10 @@
         => @ORIENT("up", priority="low");
     {?ref ?out} @SELECT-INSTANCE(type="njf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("up", priority="low");
+        => @ORIENT("up", priority="low"); {?ref ?out} @SELECT-INSTANCE(type="nmf") => @SELECT-PIN(terminal="s") => @ORIENT("up", priority="low");
     {?ref ?out} @SELECT-INSTANCE(type="pjf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("up", priority="low");
+        => @ORIENT("up", priority="low"); {?ref ?out} @SELECT-INSTANCE(type="pmf") => @SELECT-PIN(terminal="s") => @ORIENT("up", priority="low");
     {?ref ?out} @SELECT-INSTANCE(type="npn")
         => @SELECT-PIN(terminal="e")
         => @ORIENT("up", priority="low");
@@ -706,10 +706,10 @@
         => @ORIENT("down", priority="low");
     {?refcascode ?outcascode} @SELECT-INSTANCE(type="njf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("down", priority="low");
+        => @ORIENT("down", priority="low"); {?refcascode ?outcascode} @SELECT-INSTANCE(type="nmf") => @SELECT-PIN(terminal="s") => @ORIENT("down", priority="low");
     {?refcascode ?outcascode} @SELECT-INSTANCE(type="pjf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("down", priority="low");
+        => @ORIENT("down", priority="low"); {?refcascode ?outcascode} @SELECT-INSTANCE(type="pmf") => @SELECT-PIN(terminal="s") => @ORIENT("down", priority="low");
     {?refcascode ?outcascode} @SELECT-INSTANCE(type="npn")
         => @SELECT-PIN(terminal="e")
         => @ORIENT("down", priority="low");
@@ -765,10 +765,10 @@
         => @ORIENT("up", priority="low");
     {?refcascode ?outcascode} @SELECT-INSTANCE(type="njf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("up", priority="low");
+        => @ORIENT("up", priority="low"); {?refcascode ?outcascode} @SELECT-INSTANCE(type="nmf") => @SELECT-PIN(terminal="s") => @ORIENT("up", priority="low");
     {?refcascode ?outcascode} @SELECT-INSTANCE(type="pjf")
         => @SELECT-PIN(terminal="s")
-        => @ORIENT("up", priority="low");
+        => @ORIENT("up", priority="low"); {?refcascode ?outcascode} @SELECT-INSTANCE(type="pmf") => @SELECT-PIN(terminal="s") => @ORIENT("up", priority="low");
     {?refcascode ?outcascode} @SELECT-INSTANCE(type="npn")
         => @SELECT-PIN(terminal="e")
         => @ORIENT("up", priority="low");
@@ -1025,7 +1025,7 @@
     $GROUND_NET_SET @SELECT-TERMINAL(terminal="c") => @SELECT-INSTANCE => @ADD-TO %grounded_set;
     $GROUND_NET_SET @SELECT-TERMINAL(terminal="p") => @SELECT-INSTANCE => @ADD-TO %grounded_set;
     $GROUND_NET_SET @SELECT-TERMINAL(terminal="n") => @SELECT-INSTANCE => @ADD-TO %grounded_set;
-    ?device @ASSERT-IN(message="the device of a $GROUND_SWITCH has a terminal on a ground net")
+    ?device @SELECT-INSTANCE(type="*") => @ASSERT-IN(message="the device of a $GROUND_SWITCH has a terminal on a ground net")
         %grounded_set;
   };
 
@@ -1039,7 +1039,7 @@
     $SUPPLY_NET_SET @SELECT-TERMINAL(terminal="c") => @SELECT-INSTANCE => @ADD-TO %supplied_set;
     $SUPPLY_NET_SET @SELECT-TERMINAL(terminal="p") => @SELECT-INSTANCE => @ADD-TO %supplied_set;
     $SUPPLY_NET_SET @SELECT-TERMINAL(terminal="n") => @SELECT-INSTANCE => @ADD-TO %supplied_set;
-    ?device @ASSERT-IN(message="the device of a $POWER_SWITCH has a terminal on a supply net")
+    ?device @SELECT-INSTANCE(type="*") => @ASSERT-IN(message="the device of a $POWER_SWITCH has a terminal on a supply net")
         %supplied_set;
   };
 
@@ -1285,9 +1285,9 @@
   };
 
   /* A decoupling capacitor on a supply or bias node.
-     Places: its pins in one column, so that it stands upright between its node and the rail. */
-  $DECAP = @DEFINE(roles=[["device", ["instance", "usage"]]]) {
-    ?device @SELECT-PIN => @ALIGN("x", priority="low");
+     Places: its pins in one column, so that it stands upright between its node and the rail, with the usage's own point in that column. */
+  $DECAP = @DEFINE(roles=[["device", "instance"]]) {
+    ?device @SELECT-PIN => @ALIGN("x", priority="low"); {?device ?} @ALIGN("x", priority="low");
   };
 
   /* A series coupling capacitor that passes the AC signal and blocks DC.

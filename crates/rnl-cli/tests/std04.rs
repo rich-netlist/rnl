@@ -1011,9 +1011,10 @@ fn a_coupling_capacitor_places_nothing_and_a_decap_stands_in_one_column() {
     // $AC_COUPLE is meaning only: a coupling capacitor may lie or stand
     let (with, with_ok) = low_aligns("{#C1 #C2} @AS $AC_COUPLE;");
     assert_eq!((with, with_ok), (without, without_ok));
-    // $DECAP aligns them in x: it holds for C3 and not for C4
+    // $DECAP aligns their pins in x, which holds for C3 and not for C4, and puts the usage's own
+    // point in that column, which is left to a solver
     let (with, with_ok) = low_aligns("{#C3 #C4} @AS $DECAP;");
-    assert_eq!((with, with_ok), (without + 2, without_ok + 1));
+    assert_eq!((with, with_ok), (without + 4, without_ok + 1));
 }
 
 #[test]
