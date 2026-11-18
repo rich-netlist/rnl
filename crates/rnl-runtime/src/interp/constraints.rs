@@ -364,14 +364,13 @@ impl Interp<'_> {
                 })
                 .collect();
         }
-        // a combination that takes one object twice is left out (14.1, 14.5); in a level of 0.4 a
-        // usage that may stand for its members (14.1) is not yet one object: it is kept until the
-        // symbols are known and each side has stood for its members (`split_usage_constraints`)
-        let deferred = self.follows_0_4(self.level_unit[self.scenes[s].level])
-            && matches!(
-                template.kind,
-                ConstraintKind::Align | ConstraintKind::Order | ConstraintKind::Distribute | ConstraintKind::Distance
-            );
+        // a combination that takes one object twice is left out (14.1, 14.5); a usage that may
+        // stand for its members (14.1) is not yet one object: it is kept until the symbols are
+        // known and each side has stood for its members (`split_usage_constraints`)
+        let deferred = matches!(
+            template.kind,
+            ConstraintKind::Align | ConstraintKind::Order | ConstraintKind::Distribute | ConstraintKind::Distance
+        );
         if template.kind != ConstraintKind::OrientRelation && !combinations.is_empty() {
             combinations.retain(|row| {
                 let mut seen = HashSet::new();
