@@ -42,7 +42,7 @@ SITE_SRC = ROOT / "site" / "src"
 # the package files the reference is written from: the series, and the public packages of the lock written
 # in the same language version, which the catalog lists with it
 sys.path.insert(0, str(ROOT / "scripts"))
-from packages import locks as public_package_locks, require as require_public_package
+from packages import CACHE as PUBLIC_PACKAGE_CACHE, locks as public_package_locks, require as require_public_package
 LIBRARIES = [ROOT / "libraries" / "standard" / SERIES]
 ALLOWED_FRONT = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
 FENCE = re.compile(r"^(```+)([^\n]*)\n(.*?)^\1[ \t]*$", re.M | re.S)
@@ -266,6 +266,22 @@ def symbols_in(text: str) -> set[str]:
     return set(re.findall(r"^\s*(\$\w+)\s*=\s*@DEFINE-SYMBOL\b", text, re.M))
 
 
+def catalog_summaries() -> dict[tuple[str, str], str]:
+    """{(name, version): summary} of the public packages, in English, from the catalog that the download wrote
+    beside them; a package's own file may open with no more than its name, which a published file keeps."""
+    try:
+        data = json.loads((PUBLIC_PACKAGE_CACHE / "catalog.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    found = {}
+    for p in data.get("packages", []):
+        text = p.get("summary")
+        text = text.get("en") if isinstance(text, dict) else text
+        if isinstance(text, str) and text.strip():
+            found[p["name"], p["version"]] = table_cell(" ".join(text.split()))
+    return found
+
+
 def summary(text: str) -> str:
     """What a package is for: the first sentence of its opening comment that is not the one naming it, such as
     "rnl-std-fill 0.4, a package of the standard series 0.4 (16.3)."."""
@@ -345,9 +361,10 @@ def packages_md(rnl: Path) -> str:
         "| Package | References | What it is for |",
         "| --- | --- | --- |",
     ]
+    catalog = catalog_summaries()
     for p in pkgs:
         name = f"`{p['name']}` {p['version']}"
-        what = summary(files[p["name"], p["version"]][1])
+        what = catalog.get((p["name"], p["version"])) or summary(files[p["name"], p["version"]][1])
         if not what:
             errors.append(f"{p['name']}: its package file opens with no comment that says what it is for")
         refs = ", ".join(f"`{x}`" for x in p["references"]) or "–"
