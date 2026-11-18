@@ -54,7 +54,7 @@ fn directed_set_minimum_after_choosing_an_axis_is_not_a_second_manual_choice() {
     assert!(r.report.files[0].unconverted.iter().any(|u| u.rule == "distance-sets"));
 }
 fn pair(models: &str, second: &str, approximate: bool) -> Upgrade {
-    let source=format!("* title\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n{models}\nM1 a ip tail 0 first w=1u l=1u\nM2 b in tail 0 {second} w=1u l=1u\n* @RNL {{ %pair = #M1(in_p) #M2(in_n) {{}}(tail) @AS $DIFFERENTIAL_PAIR; %pair::in_p @TEXT(\"input\") }}\n.end\n");
+    let source=format!("* title\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n{models}\nM1 a ip tail 0 first w=1u l=1u\nM2 b in tail 0 {second} w=1u l=1u\nM5 tail vb 0 0 first w=1u l=1u\n* @RNL {{ %pair = #M1(in_p) #M2(in_n) {{#M5}}(tail) @AS $DIFFERENTIAL_PAIR; %pair::in_p @TEXT(\"input\") }}\n.end\n");
     upgrade(
         "t.sp",
         &MemoryProvider::new().with("t.sp", &source),
@@ -96,7 +96,7 @@ fn definition_directions_use_only_their_own_role_witnesses() {
 
 #[test]
 fn spectre_model_polarity_is_read_from_the_host() {
-    let source="// title\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.3\") }\nmodel input_device bsim4 type=p\nM1 (a ip tail 0) input_device w=1u l=1u\nM2 (b in tail 0) input_device w=1u l=1u\n// @RNL { #M1(in_p) #M2(in_n) {}(tail) @AS $DIFFERENTIAL_PAIR }\n";
+    let source="// title\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.3\") }\nmodel input_device bsim4 type=p\nM1 (a ip tail 0) input_device w=1u l=1u\nM2 (b in tail 0) input_device w=1u l=1u\nM5 (tail vb 0 0) input_device w=1u l=1u\n// @RNL { #M1(in_p) #M2(in_n) {#M5}(tail) @AS $DIFFERENTIAL_PAIR }\n";
     let r = upgrade(
         "t.scs",
         &MemoryProvider::new().with("t.scs", source),
@@ -124,9 +124,36 @@ fn differential_pair_and_mirror_agree_on_sides_and_role_references() {
     let r = layout("%axis = (_, _); %mirror = #M1(a) #M2(b) %axis(axis) @AS $MIRRORED; %pair = #M2(in_p) #M1(in_n) @AS $DIFFERENTIAL_PAIR; %pair::in_p @TEXT(\"input\")", true);
     let text = &r.files["layout.sp"];
     assert!(text.contains("#M1(left) #M2(right) %axis(axis) @AS $MIRRORED_LAYOUT"), "{text}");
-    assert!(text.contains("#M2(right) #M1(left) @AS $DIFFERENTIAL_PAIR_N"), "{text}");
+    assert!(text.contains("#M2(right) #M1(left) @AS $PSEUDO_DIFFERENTIAL_PAIR"), "{text}");
     assert!(text.contains("%pair::right @TEXT"));
     assert!(r.report.files[0].unconverted.is_empty(), "{:?}", r.report.files[0].unconverted);
+}
+
+#[test]
+fn a_pair_with_no_tail_becomes_a_pseudo_differential_pair_that_reads_without_errors() {
+    // `_N` and `_P` need their tail (9.4): written without one, they would not read
+    for tail in ["{}(tail) ", ""] {
+        let statement =
+            format!("%pair = #M1(in_p) #M2(in_n) {tail}@AS $DIFFERENTIAL_PAIR; %pair::in_p @TEXT(\"input\")");
+        let r = layout(&statement, true);
+        let text = &r.files["layout.sp"];
+        assert!(text.contains("%pair = #M1(left) #M2(right) @AS $PSEUDO_DIFFERENTIAL_PAIR"), "{text}");
+        assert!(text.contains("%pair::left @TEXT"), "{text}");
+        assert!(!text.contains("tail)"), "{text}");
+        assert!(
+            r.report.files[0]
+                .approximations
+                .iter()
+                .any(|a| a.rule == "approximate-differential-pair" && a.risk.contains("pseudo-differential pair")),
+            "{:?}",
+            r.report.files[0].approximations
+        );
+        let errors: Vec<_> =
+            r.report.diagnostics.iter().filter(|d| matches!(d.severity.as_str(), "error" | "violation")).collect();
+        assert!(errors.is_empty(), "{errors:?}");
+        // what the new definition adds is reported as differences, as for `_N` and `_P`
+        assert!(r.report.files[0].unconverted.is_empty(), "{:?}", r.report.files[0].unconverted);
+    }
 }
 
 #[test]
