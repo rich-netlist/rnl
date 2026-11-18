@@ -282,8 +282,8 @@ pub(super) fn definition_policies(input: &Interpretation) -> BTreeMap<(usize, St
                 None => Some((
                     "standard-definition-removed",
                     match target_name.as_str() {
-                        "$CURRENT_MIRROR" => "CURRENT_MIRROR was split into CURRENT_MIRROR_N and CURRENT_MIRROR_P, which add low-priority ALIGN y, orientation relations, ROUTE-OBJECT and model/topology assertions; choose the matching polarity or retain only the intended facts (16.3)",
-                        "$DIFFERENTIAL_PAIR" => "DIFFERENTIAL_PAIR was split into DIFFERENTIAL_PAIR_N and DIFFERENTIAL_PAIR_P with left/right roles and a single-object tail; choose the matching polarity and side order explicitly (16.3)",
+                        "$CURRENT_MIRROR" => "CURRENT_MIRROR was split into CURRENT_MIRROR_N and CURRENT_MIRROR_P, which add low-priority ALIGN y, orientation relations, the orientation of the source or emitter pins and model/topology assertions; choose the matching polarity or retain only the intended facts (16.3)",
+                        "$DIFFERENTIAL_PAIR" => "DIFFERENTIAL_PAIR was split into DIFFERENTIAL_PAIR_N and DIFFERENTIAL_PAIR_P with left/right roles and a tail that must be filled; choose the matching polarity and side order explicitly, or PSEUDO_DIFFERENTIAL_PAIR for a pair with no tail (16.3)",
                         "$DELAY_CELL" => "the point-attached DELAY_CELL definition was removed in 0.4, where DELAY_CELL is the two-terminal logic symbol; use FIGURE with SET-SYMBOL DELAY_CELL for a drawing-only figure or place a host instance (16.3)",
                         "$CHAIN" => "CHAIN was removed in 0.4; retain the intended ordering or series topology explicitly (16.3)",
                         "$SUPPLY_HIGH" | "$SUPPLY_LOW" => "SUPPLY_HIGH and SUPPLY_LOW were removed in 0.4; choose an explicit supply or placement policy (16.3)",
@@ -297,7 +297,7 @@ pub(super) fn definition_policies(input: &Interpretation) -> BTreeMap<(usize, St
                     "standard-definition-roles",
                     match target_name.as_str() {
                         "$INTEGRATOR" | "$DISCRETE_TIME_INTEGRATOR" | "$QUANTIZER" | "$UNIT_DELAY" => {
-                            "this signal-flow definition changed from a point-attached figure to a semantic block with in/out roles; use FIGURE with its _SYMBOL for a drawing-only figure or bind the block's input and output instances (16.3)"
+                            "this signal-flow definition changed from a point-attached figure to a semantic block with in/out roles; use FIGURE with its _SYMBOL for a drawing-only figure or bind the block's input and output nets (16.3)"
                         }
                         "$CASCADE" => {
                             "CASCADE replaces first/second/feedback/load with a single stages role; choose the intended stage sequence explicitly (16.3)"

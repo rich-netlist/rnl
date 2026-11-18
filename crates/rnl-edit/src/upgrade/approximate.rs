@@ -21,6 +21,7 @@ pub(super) const CONVERSIONS: &[(&str, &str)] = &[
     ("CURRENT_MIRROR", "CURRENT_MIRROR_P"),
     ("DIFFERENTIAL_PAIR", "DIFFERENTIAL_PAIR_N"),
     ("DIFFERENTIAL_PAIR", "DIFFERENTIAL_PAIR_P"),
+    ("DIFFERENTIAL_PAIR", "PSEUDO_DIFFERENTIAL_PAIR"),
 ];
 
 /// The definition a rule turns `old` into for the polarity of its devices (`_N` or `_P`), read from
@@ -33,6 +34,17 @@ fn polarized(old: &str, is_n: bool) -> &'static str {
 /// The definition a rule turns a top-level `IO_PORT` into, read from the table.
 fn label() -> &'static str {
     CONVERSIONS.iter().find(|(from, _)| *from == "IO_PORT").map(|(_, to)| *to).unwrap()
+}
+
+/// The definition a rule turns a `DIFFERENTIAL_PAIR` with no tail into, read from the table: the
+/// tail of `_N` and `_P` is a single role that must be filled (9.4), and a pair without one is a
+/// pseudo-differential pair.
+fn tailless_pair() -> &'static str {
+    CONVERSIONS
+        .iter()
+        .find(|(from, to)| *from == "DIFFERENTIAL_PAIR" && to.starts_with("PSEUDO_"))
+        .map(|(_, to)| *to)
+        .unwrap()
 }
 
 #[derive(Clone, PartialEq)]
@@ -528,7 +540,12 @@ impl Approximate {
                     else {
                         continue;
                     };
-                    polarized("DIFFERENTIAL_PAIR", is_n)
+                    // `{}(tail)`, or no tail written: `_N` and `_P` need one
+                    if tail.is_none_or(|r| r.members.is_empty()) {
+                        tailless_pair()
+                    } else {
+                        polarized("DIFFERENTIAL_PAIR", is_n)
+                    }
                 };
                 let Ok(side) = pair_direction(p, first, second, &mirrored) else {
                     out.conflicts.insert(key, true);
@@ -888,6 +905,8 @@ impl Approximate {
             }
             let risk = if mirror {
                 "The singleton axis keeps its point. The directed distribution changes minimum spacing and conflict grouping."
+            } else if pair.kind == tailless_pair() {
+                "Both input devices have the same resolved model polarity and the pair has no tail, which DIFFERENTIAL_PAIR_N and _P require, so it becomes a pseudo-differential pair. The new definition adds mirrored layout, directed distribution, pin orientation and assertions, and routes and groups nothing."
             } else {
                 "Both input devices have the same resolved model polarity. The new definition adds directed distribution/order, routing, grouping, pin orientation and assertions."
             };
@@ -943,6 +962,7 @@ mod tests {
             assert_eq!(polarized(old, false), format!("{old}_P"));
         }
         assert_eq!(label(), "NET_LABEL");
+        assert_eq!(tailless_pair(), "PSEUDO_DIFFERENTIAL_PAIR");
         for (from, to) in CONVERSIONS {
             assert_ne!(from, to);
         }

@@ -76,6 +76,21 @@ fn report_collisions_are_rejected_before_writeback() {
 }
 
 #[test]
+fn an_approximate_pair_with_no_tail_has_no_target_error() {
+    let dir = scratch("tailless-pair");
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n.model channel nmos\nM1 a ip tail 0 channel\nM2 b in tail 0 channel\n* @RNL { #M1(in_p) #M2(in_n) {}(tail) @AS $DIFFERENTIAL_PAIR }\n.end\n";
+    std::fs::write(dir.join("top.sp"), source).unwrap();
+    let output = run(&dir, &["top.sp", "--approximate", "-o", "out"]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // the facts the new definition adds are differences, as for `_N` and `_P`, so the command
+    // exits 1 for them; the file it writes reads without an error
+    assert!(stdout.contains(" 1 approximations,"), "{stdout}");
+    assert!(stdout.contains(" 0 unconverted, 0 target errors,"), "{stdout}");
+    let upgraded = std::fs::read_to_string(dir.join("out/top.sp")).unwrap();
+    assert!(upgraded.contains("#M1(left) #M2(right) @AS $PSEUDO_DIFFERENTIAL_PAIR"), "{upgraded}");
+}
+
+#[test]
 fn an_unconverted_statement_is_retained_and_reported() {
     let dir = scratch("unconverted");
     let statement = "(0, 0) (1, 0) @DISTANCE(\"x\", min=1)";
