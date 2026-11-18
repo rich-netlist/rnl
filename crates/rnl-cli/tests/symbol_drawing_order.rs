@@ -10,7 +10,7 @@ use rnl_runtime::{Interpretation, Options};
 
 fn read(body: &str) -> Interpretation {
     let text = format!(
-        "* symbol drawing order\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\nR1 a b 1k\n* @RNL {{\n{}\n* }}\n.end\n",
+        "* symbol drawing order\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\nR1 a b 1k\n* @RNL {{\n{}\n* }}\n.end\n",
         body.lines().map(|line| format!("* {line}")).collect::<Vec<_>>().join("\n")
     );
     let files = MemoryProvider::new().with("order.sp", &text);

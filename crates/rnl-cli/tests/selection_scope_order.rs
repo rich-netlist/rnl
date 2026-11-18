@@ -82,12 +82,6 @@ fn annotation_selections_deduplicate_repeated_members() {
     assert_eq!(labels(&read("0.4", body, "{%b %a %b} @SELECT-ANNOTATION")), ["RECTANGLE", "CIRCLE"]);
 }
 
-#[test]
-fn released_wire_and_label_scopes_keep_their_existing_scene_order() {
-    assert_eq!(labels(&read("0.3", WIRES, "{&b &a} @SELECT-WIRE")), ["%wa", "%wb", "%wa2"]);
-    assert_eq!(labels(&read("0.3", LABELS, "{#R2 #R1} @SELECT-LABEL")), ["#R1::first", "#R2::second", "#R1::third"]);
-}
-
 /// A usage in the scope gives the labels attached to it, those its symbol draws, as an instance
 /// does: by its name, and through SELECT-USAGE.
 #[test]

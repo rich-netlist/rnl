@@ -534,10 +534,46 @@ fn geometry(
 mod tests {
     use crate::{BuildOptions, MemoryProvider};
 
+    /// Usages of every kind of role, and one in a subcircuit of its own.
+    const USAGES: &str = r#"* Usage inspection and independent drawing scopes
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-basic", version="0.4"); @USE-PACKAGE(name="rnl-std-spice", version="0.4") }
+.subckt other p n
+Rother p n 1k
+* @RNL {
+*   $OTHER = @DEFINE(roles=["part"]) {};
+*   %other = #Rother @AS $OTHER;
+*   #Rother @PLACE(0, 0)
+* }
+.ends other
+R1 a b 1k
+R2 b c 2k
+R3 c d 3k
+R4 d e 4k
+* @RNL {
+*   $PAIR = @DEFINE(roles=["left", "right"]) {};
+*   $SET = @DEFINE(roles=["{members}"]) {};
+*   $NEST = @DEFINE(roles=[["inner", "usage"]]) {};
+*   $NET = @DEFINE(roles=[["signal", "net"]]) {};
+*   $PIN = @DEFINE(roles=[["pin", "terminal"]]) {};
+*   $POINT = @DEFINE(roles=[["axis", "point"]]) {};
+*   #R1 @PLACE(0, 0); #R2 @PLACE(9, 0); #R3 @PLACE(20, 0);
+*   %pair1 = #R1(left) #R2(right) @AS $PAIR;
+*   %pair2 = #R2(left) #R3(right) @AS $PAIR;
+*   %unseen = #R4(left) #R4(right) @AS $PAIR;
+*   %set1 = {#R1 #R3} @AS $SET;
+*   %nested = %pair1 @AS $NEST;
+*   %signal = &a @AS $NET;
+*   %pin1 = #R1:1 @AS $PIN;
+*   %axis = (4, 5) @AS $POINT;
+*   %ground = $GROUND @ATTACH #R1:2::net => @PLACE(0, -2);
+*   %wire = &a @WIRE {(-6, 2) #R1:1}
+* }
+.end
+"#;
+
     #[test]
     fn usages_keep_their_scope_source_identity_and_visible_roles() {
-        let p =
-            MemoryProvider::new().with("usages.sp", include_str!("../../../../tests/viewer/inputs/usage-inspector.sp"));
+        let p = MemoryProvider::new().with("usages.sp", USAGES);
         let d = crate::build("usages.sp", &p, &BuildOptions::default()).unwrap();
         assert!(!d.diagnostics.iter().any(|d| d.severity == "error"), "{:?}", d.diagnostics);
         let lv = &d.levels[0];
@@ -602,12 +638,6 @@ mod tests {
         assert_eq!((g("%e").state, g("%e").crosses, g("%e").group_parent), ("left-out", None, None));
         // the tree first, siblings by their first member, then the groups outside it
         assert_eq!(order, ["%again", "%cross", "%far", "%outer", "%inner", "%off", "%e"]);
-
-        let p = MemoryProvider::new().with("g.sp", &file("0.3"));
-        let d = crate::build("g.sp", &p, &BuildOptions::default()).unwrap();
-        let lv = &d.levels[0];
-        assert!(lv.usages.iter().all(|u| u.group_parent.is_none() && u.same_as.is_none() && u.crosses.is_none()));
-        assert!(lv.usages.iter().all(|u| u.state == "in-effect" || u.state == "disabled"));
     }
 
     #[test]
@@ -628,10 +658,6 @@ mod tests {
         let small = d.levels[0].usages.iter().find(|u| u.id == "%small").unwrap();
         let within: Vec<_> = d.objects[small.object].usages.iter().map(|e| e.id.as_str()).collect();
         assert_eq!(within, ["%big"], "a group is within the group above it in the tree");
-        let p = MemoryProvider::new().with("g.sp", &file("0.3"));
-        let d = crate::build("g.sp", &p, &BuildOptions::default()).unwrap();
-        let object = |name: &str| d.objects.iter().find(|o| o.name == name).unwrap();
-        assert!(object("R3").usages.iter().all(|e| e.state == "in-effect"), "0.3 has no tree of groups");
     }
 
     #[test]
@@ -663,7 +689,11 @@ R1 out 0 1k
     fn drawing_wrappers_are_distinct_from_pure_semantic_usages() {
         let p = MemoryProvider::new().with(
             "wrappers.sp",
-            "* wrappers\nR1 a 0 1k\n* @RNL { #R1 @PLACE(0, 0); %stub = $GROUND_STUB @ATTACH #R1:2; $ROUTER = @DEFINE(roles=[[\"signal\", \"net\"]]) { ?signal @ROUTE }; %r = &a @AS $ROUTER }\n.end\n",
+            "* wrappers\nR1 a 0 1k\n\
+             * @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-basic\", version=\"0.4\"); \
+             @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\") }\n\
+             * @RNL { #R1 @PLACE(0, 0); %stub = $GROUND_STUB @ATTACH #R1::n; \
+             $ROUTER = @DEFINE(roles=[[\"signal\", \"net\"]]) { ?signal @ROUTE-NET }; %r = &a @AS $ROUTER }\n.end\n",
         );
         let d = crate::build("wrappers.sp", &p, &BuildOptions::default()).unwrap();
         assert!(!d.diagnostics.iter().any(|d| d.severity == "error"), "{:?}", d.diagnostics);
@@ -689,8 +719,7 @@ R1 out 0 1k
     #[test]
     fn wire_fragments_and_quoted_virtual_pins_keep_all_visible_geometry() {
         use rnl_runtime::model::Attach;
-        let p =
-            MemoryProvider::new().with("usages.sp", include_str!("../../../../tests/viewer/inputs/usage-inspector.sp"));
+        let p = MemoryProvider::new().with("usages.sp", USAGES);
         let mut r = crate::interpret("usages.sp", None, &p, &Default::default()).unwrap();
         let lv = &mut r.model.levels[0];
         let k = lv.wires.iter().position(|w| w.object_id == "%wire").unwrap();

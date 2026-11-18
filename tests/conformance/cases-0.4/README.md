@@ -1,13 +1,12 @@
 # Modern conformance examples
 
-These are RNL 0.4 counterparts of the examples in `cases` and `cases-0.3`.
-The `from-0.2` and `from-0.3` directories retain their original filenames so
-each test's purpose and migration can be traced. The existing corpora continue
-to test their declared language versions independently during development.
+These are the RNL 0.4 counterparts of the examples of the corpora of 0.2 and
+0.3, `cases` and `cases-0.3`, which went with the cores of 0.5.x. The
+`from-0.2` and `from-0.3` directories retain their original filenames so each
+test's purpose and migration can be traced.
 
 Each case has an effective-model reference (`.expected.json`) and an editor
-snapshot reference (`.snapshot.json`). `RNL_BLESS_0_4=1` updates only these new
-references. The existing blessing variables do not update them. The modern
+snapshot reference (`.snapshot.json`). `RNL_BLESS_0_4=1` updates them. The modern
 SPICE/Spectre pairs live in `../equivalence-0.4` and must produce equal models
 after removing only the same file-location fields as the original pairs.
 

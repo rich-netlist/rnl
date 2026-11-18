@@ -98,8 +98,6 @@ fn terminal_selection_reads_the_circuit_even_when_no_pin_is_drawn() {
     assert_eq!(count(&selected(body, "#R1 @SELECT-TERMINAL")), 2);
     assert_eq!(count(&selected(body, "&b @SELECT-INSTANCE")), 2);
     assert_eq!(count(&selected(body, "#R1 @SELECT-NET")), 2);
-    let r = read("0.3", &format!("{body}; #R1 @SELECT-TERMINAL => @AS $PROBE"));
-    assert_eq!(count(&r), 1);
 }
 
 #[test]
@@ -221,11 +219,7 @@ fn terminal_count_condition_is_exact_and_rejects_fractional_counts() {
 }
 
 #[test]
-fn new_words_are_version_gated_and_terminal_wired_is_removed() {
-    for statement in ["# @SELECT-PIN", "# @SELECT-INSTANCE(symbol=\"$S\")", "# @SELECT-USAGE(drawn=true)"] {
-        let r = read("0.3", statement);
-        assert!(r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{statement}");
-    }
+fn terminal_wired_is_removed() {
     let r = read("0.4", "# @SELECT-TERMINAL(wired=false)");
     assert!(r.diagnostics().iter().any(|d| d.severity == Severity::Error));
 }

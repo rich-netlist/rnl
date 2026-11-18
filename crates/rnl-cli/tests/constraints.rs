@@ -16,15 +16,15 @@ use serde_json::Value;
 /// A pair, a structure over it, a ground that a rule of the standard package makes, a semantic
 /// usage without a symbol, a handle, and one constraint turned off.
 const NETLIST: &str = "* constraints
-* @RNL(type=\"header\") { @VERSION(\"0.3\")}
+* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }
 M1 d g 0 0 nch
 M2 d g 0 0 nch
 R1 d g 1k
 R2 d g 1k
 * @RNL {
 *   %c1 = {#M1 #M2} @ALIGN(\"x\");
-*   {#R1 #R2} @ORDER(\"y\", priority=\"disabled\");
-*   $WIRE_NET_SET @ROUTE;
+*   {#R1 #R2} @ORDER(\"top-to-bottom\", priority=\"disabled\");
+*   {&d &g} @ROUTE-NET;
 * }
 .model nch nmos level=1
 .end
@@ -89,7 +89,7 @@ fn a_fact_says_what_it_relates_and_its_objects_are_in_the_document() {
     assert_eq!(names, [("instance", Some("#M1"), vec!["M1"]), ("instance", Some("#M2"), vec!["M2"])]);
     // what a hit stands for is what a member is, so that the drawing can be found from it
     assert!(d.objects[c.objects[origins(members)[0]].objects[0]].kind == "instance");
-    // the ROUTE, with its pins, and nothing of the constraint turned off
+    // the ROUTE-NET, with its pins, and nothing of the constraint turned off
     let route = c.routes.iter().find(|r| r.net == "d").unwrap();
     assert!(!route.pins.is_empty());
     assert!(c.facts.iter().all(|f| !f.what.starts_with("ORDER")));
@@ -156,9 +156,10 @@ impl Clock for NoTime {
 }
 
 /// A symbol whose first pin has a terminal the device does not have, so no net: R1 turned, R2 not,
-/// R3 and R4 with no position; a ground on a pin of R2, and a point with no position.
+/// R3 and R4 with no position; a ground on the net of a pin of R2, placed on that pin, and a point
+/// with no position.
 const POSITIONS: &str = "* positions
-* @RNL(type=\"header\") { @VERSION(\"0.3\")}
+* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-basic\", version=\"0.4\") }
 R1 a b 1k
 R2 a b 1k
 R3 a b 1k
@@ -172,7 +173,7 @@ R4 a b 1k
 *   #R1 @SET-SYMBOL $THREE => @PLACE(10, 20) => @ORIENT(\"R90\");
 *   #R2 @SET-SYMBOL $THREE => @PLACE(30, 20);
 *   #R4 @SET-SYMBOL $THREE;
-*   %g = $GROUND @ATTACH #R2:2;
+*   %g = $GROUND @ATTACH #R2:2 => @PLACE(30, 23);
 *   %free = (5, _);
 *   {#R1:1 #R2:1 %free} @ALIGN(\"y\");
 *   {#R1 #R3 #R4} @ALIGN(\"x\", priority=\"low\")
@@ -193,7 +194,7 @@ fn the_box_of_a_drawn_object_has_its_registration_point() {
     // an instance, turned or not, in pixels with y down, wherever its box is
     assert_eq!(origin_of(&d, "R1"), Some([10.0 * s, -20.0 * s]));
     assert_eq!(origin_of(&d, "R2"), Some([30.0 * s, -20.0 * s]));
-    // a usage with a symbol, drawn on the pin it is attached to
+    // a usage with a symbol, placed on the pin of the net it is attached to
     let ground = d.levels[0].hits.iter().find(|h| h.kind == "box" && h.name.as_deref() == Some("g")).unwrap();
     assert_eq!(ground.origin, Some([30.0 * s, -23.0 * s]));
     // no position, with a symbol of its own or not: no box
@@ -224,8 +225,10 @@ fn the_pins_of_the_constraints_are_where_they_are_drawn() {
     assert_eq!(at, [10.0 * s, -22.0 * s]);
     let hits: Vec<_> = level.hits.iter().filter(|h| h.kind == "pin").map(|h| h.points[0]).collect();
     assert!(hits.contains(&at), "{at:?} is not in {hits:?}");
-    // the pin with no net is drawn and has no hit: the reason it cannot be found through them
-    assert!(!hits.contains(&object("#R1").pins[0]), "{hits:?}");
+    // the pin with no net is drawn, and its hit stands for no net: the reason it cannot be found
+    // through them
+    let unconnected = level.hits.iter().filter(|h| h.kind == "pin" && h.points[0] == object("#R1").pins[0]);
+    assert!(unconnected.clone().count() == 1 && unconnected.clone().all(|h| h.objects.is_empty()), "{hits:?}");
     // no position, or no symbol
     for label in ["#R3", "#R4", "%free"] {
         assert!(object(label).pins.is_empty(), "{label}");
@@ -253,9 +256,12 @@ fn a_preview_has_the_positions_of_the_drawing_as_solved() {
         let ([x0, y0], [x1, y1]) = (b.points[0], b.points[1]);
         assert!(x0 <= at[0] && at[0] <= x1 && y0 <= at[1] && at[1] <= y1, "{b:?}");
     }
-    for o in c.objects.iter().filter(|o| matches!(o.kind, "instance" | "usage")) {
+    // every instance has its pins, and so does a usage drawn with a symbol, such as the ground of
+    // a stub; the stub itself has no symbol
+    for o in c.objects.iter().filter(|o| o.kind == "instance") {
         assert!(!o.pins.is_empty(), "{}", o.label);
     }
+    assert!(c.objects.iter().any(|o| o.kind == "usage" && !o.pins.is_empty()), "{:?}", c.objects);
 }
 
 #[test]

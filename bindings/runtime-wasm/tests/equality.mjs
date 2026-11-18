@@ -62,7 +62,7 @@ const core = await loadCore(pathToFileURL(join(dist, "rnl_runtime_wasm.wasm")));
 const { publicPackageDir, publicPackagesAvailable } = await import("../../../scripts/packages.mjs");
 const hasPublicPackages = publicPackagesAvailable();
 const entries = [];
-for (const dir of ["tests/conformance/cases", "tests/conformance/equivalence", "tests/conformance/cases-0.3", "tests/conformance/cases-0.4", "tests/conformance/equivalence-0.4", "libraries/standard"]) {
+for (const dir of ["tests/conformance/cases-0.4", "tests/conformance/equivalence-0.4", "libraries/standard"]) {
   entries.push(...files(join(root, dir)).filter((path) => /\.(sp|scs|inc|rnl)$/.test(path)));
 }
 // The 0.4 solver-record corpus also exercises browser/native parity.
@@ -79,7 +79,7 @@ entries.push(defaultHairlines);
 const edaDirs = hasPublicPackages ? ["eda-symbol", "eda-style"].map(name => publicPackageDir(name).replaceAll("\\", "/")) : [];
 const edaEntries = new Set(edaDirs.flatMap((dir) => files(dir).filter((path) => /\.(rnl|scs|sp)$/.test(path))));
 entries.push(...edaEntries);
-if (hasPublicPackages) entries.push(join(publicPackageDir("analog-canvas-extensions"), "analog-canvas-extensions.rnl"));
+if (hasPublicPackages) entries.push(join(publicPackageDir("analog-canvas-extensions", "0.7"), "analog-canvas-extensions.rnl"));
 const edaFiles = Object.fromEntries(await Promise.all(edaDirs.map(async (dir) => {
   const name = dir.split("/").at(-2);
   const path = `${dir}/${name}.rnl`;

@@ -226,19 +226,6 @@ fn settings_keep_string_source_and_make_no_output_object() {
 }
 
 #[test]
-fn released_versions_do_not_gain_solver_config() {
-    for version in ["0.2", "0.3"] {
-        let r = read_files(
-            &MemoryProvider::new().with("main.sp", &source(version, "@SOLVER-CONFIG(a=1)", "@SOLVER-CONFIG(b=2)")),
-        );
-        assert!(r.diagnostics().iter().any(|d| d.severity == Severity::Error));
-        assert!(settings(&r, 0).is_empty());
-        let unknown = r.diagnostics().into_iter().find(|d| d.code == codes::KEYWORD_UNKNOWN).unwrap();
-        assert_eq!(unknown.message, "unknown keyword @SOLVER-CONFIG (16.4)");
-    }
-}
-
-#[test]
 fn standard_key_aliases_work_and_duplicate_alias_spellings_fail() {
     let r = read("@ALIAS(\"gap\",\"spacing_x\")", "@SOLVER-CONFIG(gap=-2)");
     clean(&r);
@@ -277,23 +264,21 @@ fn public_problem_and_viewer_constraints_keep_typed_values_and_sources() {
         assert!(values[0]["source"]["col"].as_u64().unwrap() > 1);
         assert_eq!(values[0]["package"], "");
     }
-    for version in ["0.2", "0.3", "0.4"] {
-        let files = MemoryProvider::new().with("/w/main.sp", &source(version, "", ""));
-        let doc = rnl_view::build(
-            "/w/main.sp",
-            &files,
-            &rnl_view::BuildOptions {
-                constraints: true,
-                runtime: Options { std: false, ..Default::default() },
-                ..Default::default()
-            },
-        )
-        .unwrap();
-        let view = serde_json::to_value(doc.levels[0].constraints.as_ref().unwrap()).unwrap();
-        assert!(view.get("solver_config").is_none());
-        let r = read_files(&MemoryProvider::new().with("main.sp", &source(version, "", "")));
-        assert!(rnl_cli::problem::level(&r.problems[0], "").get("solver_config").is_none());
-    }
+    let files = MemoryProvider::new().with("/w/main.sp", &source("0.4", "", ""));
+    let doc = rnl_view::build(
+        "/w/main.sp",
+        &files,
+        &rnl_view::BuildOptions {
+            constraints: true,
+            runtime: Options { std: false, ..Default::default() },
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let view = serde_json::to_value(doc.levels[0].constraints.as_ref().unwrap()).unwrap();
+    assert!(view.get("solver_config").is_none());
+    let r = read_files(&MemoryProvider::new().with("main.sp", &source("0.4", "", "")));
+    assert!(rnl_cli::problem::level(&r.problems[0], "").get("solver_config").is_none());
 }
 
 #[test]
@@ -402,52 +387,26 @@ fn tool_overrides_are_explicit_and_change_only_the_effective_hash_input() {
 }
 
 #[test]
-fn new_settings_words_do_not_expand_the_released_alias_vocabulary() {
-    for version in ["0.2", "0.3", "0.4"] {
-        let files = MemoryProvider::new().with(
-            "main.sp",
-            &source(
-                version,
-                r#"@ALIAS("@SC","@SOLVER-CONFIG"); @ALIAS("dot","junction")"#,
-                if version == "0.4" {
-                    r#"$CUSTOM = @DEFINE(roles=["p"]) {}; @SC(dot="$CUSTOM")"#
-                } else {
-                    r#"@SC(dot="$CUSTOM")"#
-                },
-            ),
-        );
-        let r = read_files(&files);
-        if version == "0.4" {
-            clean(&r);
-            assert_eq!(settings(&r, 0)["junction"], "\"$CUSTOM\"");
-        } else {
-            assert_eq!(r.diagnostics().iter().filter(|d| d.code == codes::ALIAS_ORIGINAL_NOT_STANDARD).count(), 2);
-            assert!(r
-                .diagnostics()
-                .iter()
-                .any(|d| d.code == codes::KEYWORD_UNKNOWN && d.message == "unknown keyword @SC (16.4)"));
-            assert!(settings(&r, 0).is_empty());
-        }
-    }
+fn settings_words_can_be_aliased() {
+    let files = MemoryProvider::new().with(
+        "main.sp",
+        &source(
+            "0.4",
+            r#"@ALIAS("@SC","@SOLVER-CONFIG"); @ALIAS("dot","junction")"#,
+            r#"$CUSTOM = @DEFINE(roles=["p"]) {}; @SC(dot="$CUSTOM")"#,
+        ),
+    );
+    let r = read_files(&files);
+    clean(&r);
+    assert_eq!(settings(&r, 0)["junction"], "\"$CUSTOM\"");
 }
 
 #[test]
-fn alias_packages_and_ordinary_packages_check_new_words_in_their_version() {
-    for version in ["0.2", "0.3", "0.4"] {
-        let main = source(version, r#"@USE-ALIASES(name="alias"); @USE-PACKAGE(name="ordinary")"#, "@SC(dot=\"$D\")");
-        let a=format!("@RNL(type=\"header\") {{ @VERSION(\"{version}\"); @PACKAGE(name=\"alias\",version=\"1.0\"); @ALIAS(\"@SC\",\"@SOLVER-CONFIG\"); @ALIAS(\"dot\",\"junction\") }}\n");
-        let p=format!("@RNL(type=\"header\") {{ @VERSION(\"{version}\"); @PACKAGE(name=\"ordinary\",version=\"1.0\"); @ALIAS(\"dot\",\"junction\") }}\n@RNL {{ $D = @DEFINE(roles=[\"p\"]) {{}} }}\n");
-        let r = read_files(&with_packages(&main, &[("alias", a), ("ordinary", p)]));
-        if version == "0.4" {
-            clean(&r);
-            assert_eq!(settings(&r, 0)["junction"], "\"$D\"");
-        } else {
-            assert_eq!(
-                r.diagnostics().iter().filter(|d| d.code == codes::USE_ALIASES_ORIGINAL_NOT_IN_VERSION).count(),
-                2
-            );
-            assert!(r.diagnostics().iter().any(|d| d.code == codes::ALIAS_ORIGINAL_NOT_STANDARD));
-            assert!(settings(&r, 0).is_empty());
-        }
-    }
+fn settings_words_aliased_by_an_alias_package_reach_the_file() {
+    let main = source("0.4", r#"@USE-ALIASES(name="alias"); @USE-PACKAGE(name="ordinary")"#, "@SC(dot=\"$D\")");
+    let a = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"alias\",version=\"1.0\"); @ALIAS(\"@SC\",\"@SOLVER-CONFIG\"); @ALIAS(\"dot\",\"junction\") }\n".to_string();
+    let p = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"ordinary\",version=\"1.0\"); @ALIAS(\"dot\",\"junction\") }\n@RNL { $D = @DEFINE(roles=[\"p\"]) {} }\n".to_string();
+    let r = read_files(&with_packages(&main, &[("alias", a), ("ordinary", p)]));
+    clean(&r);
+    assert_eq!(settings(&r, 0)["junction"], "\"$D\"");
 }

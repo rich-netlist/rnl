@@ -1,4 +1,4 @@
-//! Draft 0.4 Spectre terminal defaults follow the instance's source file (6.12).
+//! Spectre terminal defaults of transmission lines and transformers (6.12).
 use rnl_cli::interpret_file;
 use rnl_runtime::diag::Severity;
 use rnl_runtime::source::MemoryProvider;
@@ -68,23 +68,9 @@ fn explicit_device_names_still_override_the_defaults() {
 }
 
 #[test]
-fn released_versions_keep_their_adapter_defaults() {
-    for version in ["0.2", "0.3"] {
-        assert_eq!(
-            names(&read(&source(version, "transformer", ""), None)),
-            named(&["p_plus", "p_minus", "s_plus", "s_minus"])
-        );
-        assert_eq!(names(&read(&source(version, "tline", ""), None)), vec![None; 4]);
-    }
-}
-
-#[test]
-fn included_instances_use_their_own_files_version() {
-    for (outer, inner) in [("0.3", "0.4"), ("0.4", "0.3")] {
-        let main = format!("// main\nsimulator lang=spectre\n// @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\ninclude \"cells.scs\"\n");
-        let child = source(inner, "transformer", "");
-        let expected =
-            if inner == "0.4" { ["p1", "n1", "p2", "n2"] } else { ["p_plus", "p_minus", "s_plus", "s_minus"] };
-        assert_eq!(names(&read(&main, Some(&child))), named(&expected));
-    }
+fn included_instances_get_the_defaults_too() {
+    let main =
+        "// main\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.4\") }\ninclude \"cells.scs\"\n";
+    let child = source("0.4", "transformer", "");
+    assert_eq!(names(&read(main, Some(&child))), named(&["p1", "n1", "p2", "n2"]));
 }

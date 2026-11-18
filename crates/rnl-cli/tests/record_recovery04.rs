@@ -54,14 +54,6 @@ fn incomplete_strings_comments_and_record_braces_still_fail_the_whole_record() {
     }
 }
 #[test]
-fn released_versions_keep_their_record_failure_boundary() {
-    for version in ["0.2", "0.3"] {
-        let result = read_body(version, "#R1 @PLACE(1,2");
-        assert_eq!(labels(&result), ["next"]);
-        assert!(result.diagnostics().iter().any(|d| d.code == codes::RECORD_NEW_BEFORE_END));
-    }
-}
-#[test]
 fn the_version_declaration_survives_an_unclosed_later_header_member() {
     let text="* header\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @DEVICE(name=\"unused\"; }\nR1 a 0 1k\n* @RNL { (0,0) @TEXT(\"before\"); #R1 @PLACE(1,2; (3,0) @TEXT(\"after\") }\n.end\n";
     let result = read(&MemoryProvider::new().with("t.sp", text), "t.sp");
@@ -132,8 +124,8 @@ fn valid_nested_sets_and_parameter_strings_keep_their_record_boundaries() {
 }
 #[test]
 fn a_duplicate_version_does_not_change_the_first_version() {
-    let text = source("0.3", "#R1 @PLACE(1,2").replace("@VERSION(\"0.3\")", "@VERSION(\"0.3\"); @VERSION(\"0.4\")");
+    let text = source("0.4", "#R1 @PLACE(1,2").replace("@VERSION(\"0.4\")", "@VERSION(\"0.4\"); @VERSION(\"0.3\")");
     let result = read(&MemoryProvider::new().with("t.sp", &text), "t.sp");
-    assert_eq!(labels(&result), ["next"]);
-    assert_eq!(result.problems[0].version, "0.3");
+    assert_eq!(labels(&result), ["before", "after", "next"], "{:?}", result.diagnostics());
+    assert_eq!(result.problems[0].version, "0.4");
 }

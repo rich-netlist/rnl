@@ -11,7 +11,7 @@ fn rnl(args: &[&str]) -> (i32, String) {
 
 fn case(name: &str) -> String {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/conformance/cases")
+        .join("../../tests/conformance/cases-0.4/from-0.2")
         .join(name)
         .to_string_lossy()
         .into_owned()
@@ -37,7 +37,7 @@ fn check_reports_what_a_solver_would_have_to_do() {
 fn check_fails_on_errors_and_lists_unplaced_objects() {
     let (code, out) = rnl(&["check", &case("12-diagnostics.sp")]);
     assert_eq!(code, 1, "{out}");
-    assert!(out.lines().any(|l| l.starts_with("status ") && l.contains("2 without a position")), "{out}");
+    assert!(out.lines().any(|l| l.starts_with("status ") && l.contains("5 without a position")), "{out}");
 }
 
 #[test]
@@ -75,7 +75,7 @@ fn upgrade_is_not_a_command_and_says_which_core_has_it() {
         assert_eq!(
             err.trim(),
             "error: RNL8032 cli-unknown-command: rnl upgrade is not a command of this core, which reads only the \
-             language 0.4: core 0.5.6, the last core that reads 0.2 and 0.3, has it, and writes a file of 0.2 or 0.3 in 0.4"
+             language 0.4: core 0.5.7, the last core that reads 0.2 and 0.3, has it, and writes a file of 0.2 or 0.3 in 0.4"
         );
     }
 }
@@ -108,25 +108,15 @@ fn view_gives_the_primitives_and_the_svg_as_asked() {
 }
 
 #[test]
-fn files_of_0_3_are_read() {
-    let f = Path::new(env!("CARGO_TARGET_TMPDIR")).join("version-0.3.sp");
+fn the_draft_switch_is_gone() {
+    let f = Path::new(env!("CARGO_TARGET_TMPDIR")).join("version-0.4.sp");
     let text =
-        "* a file of 0.3\nR1 a b 1k\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n* @RNL { #R1 @PLACE(3, 4)}\n.end\n";
+        "* a file of 0.4\nR1 a b 1k\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n* @RNL { #R1 @PLACE(3, 4)}\n.end\n";
     std::fs::write(&f, text).unwrap();
     let f = f.to_string_lossy();
-    // 0.3 is read without any switch (16.1)
     let (code, out) = rnl(&["check", &f]);
     assert_eq!(code, 0, "{out}");
-    assert!(out.lines().any(|l| l.starts_with("0 errors")), "{out}");
-    // the solver's view reads it too
-    let places = |args: &[&str]| -> usize {
-        let (code, out) = rnl(args);
-        assert_eq!(code, 0, "{out}");
-        let p: serde_json::Value = serde_json::from_str(&out).unwrap();
-        p["levels"][0]["facts"].as_array().unwrap().iter().filter(|f| f["kind"] == "PLACE-x").count()
-    };
-    assert_eq!(places(&["problem", &f]), 1);
-    // --draft, which once read them and then had no effect, is gone
+    // --draft, which once read the files of a draft and then had no effect, is gone
     let (code, out) = rnl(&["check", &f, "--draft"]);
     assert_eq!(code, 2, "{out}");
     let help = Command::new(env!("CARGO_BIN_EXE_rnl")).arg("--help").output().unwrap();
@@ -164,7 +154,7 @@ fn a_file_of_0_2_or_0_3_is_not_read_and_is_told_how_to_upgrade() {
         // the error is at the declaration, on line 3, and names the core that converts the file
         let message = format!(
             "unsupported version {version}: no RNL of this file is interpreted (16.1; this implementation reads 0.4); \
-             core 0.5.6 reads {version}, and its `rnl upgrade` writes the file in 0.4"
+             core 0.5.7 reads {version}, and its `rnl upgrade` writes the file in 0.4"
         );
         assert!(out.contains(&message), "{out}");
         assert!(out.contains(":3:"), "{out}");
@@ -192,24 +182,6 @@ fn strip_generated_reads_the_bundled_packages_too() {
     // the standard package has no generated records, so it comes out as it is
     let std = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../libraries/standard/0.4/rnl-std-basic.rnl");
     assert_eq!(std::fs::read_to_string(out).unwrap(), std::fs::read_to_string(std).unwrap());
-}
-
-#[test]
-fn std_version_reads_a_file_with_another_standard_series() {
-    // a file of 0.3 that writes $GND of the series 0.2: an error that names $GROUND, and none when
-    // the series 0.2 is asked for
-    let dir = std::env::temp_dir().join(format!("rnl-cli-std-version-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let file = dir.join("t.sp");
-    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\n* @RNL { $GND @ATTACH &a }\n.end\n";
-    std::fs::write(&file, text).unwrap();
-    let path = file.to_string_lossy();
-    let (code, out) = rnl(&["check", &path]);
-    assert_eq!(code, 1, "{out}");
-    assert!(out.contains("the standard series 0.3 calls it $GROUND"), "{out}");
-    let (code, out) = rnl(&["check", &path, "--std-version", "0.2"]);
-    assert_eq!(code, 0, "{out}");
-    std::fs::remove_dir_all(&dir).unwrap();
 }
 
 #[test]
@@ -263,7 +235,7 @@ fn catalog_prints_the_packages_the_core_has() {
     // a package of a package directory
     let dir = std::env::temp_dir().join(format!("rnl-cli-catalog-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    let acme = "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"acme\", version=\"1.0\")}\n\
+    let acme = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"acme\", version=\"1.0\")}\n\
                 @RNL { $ACME = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1, direction=\"up\") } }\n";
     std::fs::write(dir.join("acme.rnl"), acme).unwrap();
     let (code, out) = rnl(&["catalog", "--package-dir", &dir.to_string_lossy(), "--package", "acme"]);

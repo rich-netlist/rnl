@@ -38,48 +38,16 @@ fn modern_success_is_a_hint_at_the_requesting_instance() {
 }
 
 #[test]
-fn released_success_retains_the_exact_warning() {
-    for version in ["0.2", "0.3"] {
-        let files = MemoryProvider::new()
-            .with("/top.sp", &(header(version) + "X1 a b cell\n"))
-            .with("/lib.inc", ".subckt cell p n\n.ends\n");
-        let result = run(&files, &["/lib.inc"]);
-        let diagnostics = success(&result);
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].severity, Severity::Warning);
-        assert_eq!(
-            diagnostics[0].message,
-            "Subcircuit cell was not included; found in /lib.inc and added by Auto Include"
-        );
-    }
-}
-
-#[test]
-fn explicit_child_version_wins_over_the_main_version() {
-    for (root, child, expected) in [("0.4", "0.3", Severity::Warning), ("0.3", "0.4", Severity::Hint)] {
-        let files = MemoryProvider::new()
-            .with("/top.sp", &(header(root) + ".include child.inc\n"))
-            .with("/child.inc", &(header(child) + "X1 a b cell\n"))
-            .with("/lib.inc", ".subckt cell p n\n.ends\n");
-        let result = run(&files, &["/lib.inc"]);
-        let diagnostics = success(&result);
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].severity, expected);
-        assert_eq!(diagnostics[0].loc.as_ref().unwrap().file, "child.inc");
-    }
-}
-
-#[test]
-fn recursive_additions_use_the_version_of_each_requester() {
+fn recursive_additions_are_told_at_each_requester() {
     let files = MemoryProvider::new()
         .with("/top.sp", &(header("0.4") + "X1 a b cell\n"))
-        .with("/cell.inc", &(header("0.3") + ".subckt cell p n\nX2 p n leaf\n.ends\n"))
+        .with("/cell.inc", &(header("0.4") + ".subckt cell p n\nX2 p n leaf\n.ends\n"))
         .with("/leaf.inc", ".subckt leaf p n\n.ends\n");
     let result = run(&files, &["/cell.inc", "/leaf.inc"]);
     let diagnostics = success(&result);
     assert_eq!(diagnostics.len(), 2);
     assert!(diagnostics.iter().any(|d| d.severity == Severity::Hint && d.loc.as_ref().unwrap().file == "top.sp"));
-    assert!(diagnostics.iter().any(|d| d.severity == Severity::Warning && d.loc.as_ref().unwrap().file == "cell.inc"));
+    assert!(diagnostics.iter().any(|d| d.severity == Severity::Hint && d.loc.as_ref().unwrap().file == "cell.inc"));
 }
 
 #[test]
@@ -124,14 +92,14 @@ fn versionless_includes_inherit_the_requesting_version() {
 }
 
 #[test]
-fn selected_sections_keep_their_individual_versions() {
+fn selected_sections_are_told_where_they_request() {
     let files = MemoryProvider::new()
-        .with("/top.sp", &(header("0.3") + ".lib sections.inc old\n.lib sections.inc modern\n"))
+        .with("/top.sp", &(header("0.4") + ".lib sections.inc old\n.lib sections.inc modern\n"))
         .with(
             "/sections.inc",
             &format!(
                 "* title\n.lib old\n{}X1 a b old_cell\n.endl old\n.lib modern\n{}X2 c d modern_cell\n.endl modern\n",
-                header("0.3"),
+                header("0.4"),
                 header("0.4")
             ),
         )
@@ -139,7 +107,7 @@ fn selected_sections_keep_their_individual_versions() {
     let result = run(&files, &["/lib.inc"]);
     let diagnostics = success(&result);
     assert_eq!(diagnostics.len(), 2);
-    assert!(diagnostics.iter().any(|d| d.message.contains("old_cell") && d.severity == Severity::Warning));
+    assert!(diagnostics.iter().any(|d| d.message.contains("old_cell") && d.severity == Severity::Hint));
     assert!(diagnostics.iter().any(|d| d.message.contains("modern_cell") && d.severity == Severity::Hint));
     assert!(diagnostics.iter().all(|d| d.loc.as_ref().unwrap().file == "sections.inc"));
 }

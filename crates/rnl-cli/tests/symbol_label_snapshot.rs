@@ -1,4 +1,4 @@
-//! Symbol labels belong to the snapshot read by draft generation rules (10.5).
+//! Symbol labels belong to the snapshot read by generation rules (10.5).
 use rnl_cli::interpret_file;
 use rnl_runtime::diag::Severity;
 use rnl_runtime::source::MemoryProvider;
@@ -75,43 +75,31 @@ fn anonymous_symbol_labels_are_not_materialized_twice() {
 }
 
 #[test]
-fn released_selections_keep_their_existing_symbol_label_visibility() {
-    assert_eq!(probes(&read("0.3", &format!("{SYMBOL}; {SELECT}"))), 0);
-    assert_eq!(probes(&read("0.3", &format!("{SYMBOL}; #R1 @TEXT(\"explicit\",key=\"mark\"); {SELECT}"))), 1);
-}
-
-#[test]
-fn visibility_follows_the_selection_file_version() {
-    for (host, rules, expected) in [("0.3", "0.4", 1), ("0.4", "0.3", 0)] {
-        let input = format!("* scoped rules\n* @RNL(type=\"header\") {{ @VERSION(\"{rules}\") }}\n.include rules.inc\n* @RNL(scope=\"child\") {{ $P = @DEFINE(roles=[\"x\"]) {{}}; {SYMBOL}; {SELECT} }}\n.end\n");
-        let extra = format!("* included circuit\n* @RNL(type=\"header\") {{ @VERSION(\"{host}\") }}\n.subckt child a b\nR1 a b 1k\n.ends child\n");
-        let result = read_files(&input, Some(&extra));
-        let count =
-            result.problems.iter().flat_map(|problem| &problem.usages).filter(|usage| usage.definition == "$P").count();
-        assert_eq!(count, expected);
-    }
+fn a_scoped_selection_sees_the_symbol_labels_of_an_included_level() {
+    let input = format!("* scoped rules\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n.include rules.inc\n* @RNL(scope=\"child\") {{ $P = @DEFINE(roles=[\"x\"]) {{}}; {SYMBOL}; {SELECT} }}\n.end\n");
+    let extra = "* included circuit\n.subckt child a b\nR1 a b 1k\n.ends child\n";
+    let result = read_files(&input, Some(extra));
+    let count =
+        result.problems.iter().flat_map(|problem| &problem.usages).filter(|usage| usage.definition == "$P").count();
+    assert_eq!(count, 1);
 }
 
 #[test]
 fn empty_keyed_text_hides_the_symbol_label_without_drawing_anything() {
     let options = rnl_render::RenderOptions { flylines: false, ..Default::default() };
-    for version in ["0.2", "0.3", "0.4"] {
-        let before = read(version, &format!("{SYMBOL}; #R1 @PLACE(0,0)"));
-        assert!(!rnl_render::primitives(&before.model.levels[0], &options).is_empty());
-        for text in ["", "${model}"] {
-            let result = read(version, &format!("{SYMBOL}; #R1 @PLACE(0,0); #R1 @TEXT(\"{text}\",key=\"mark\")"));
-            assert!(rnl_render::primitives(&result.model.levels[0], &options).is_empty());
-            assert!(rnl_render::text_boxes(&result.model.levels[0], &options).iter().all(Option::is_none));
-        }
+    let before = read("0.4", &format!("{SYMBOL}; #R1 @PLACE(0,0)"));
+    assert!(!rnl_render::primitives(&before.model.levels[0], &options).is_empty());
+    for text in ["", "${model}"] {
+        let result = read("0.4", &format!("{SYMBOL}; #R1 @PLACE(0,0); #R1 @TEXT(\"{text}\",key=\"mark\")"));
+        assert!(rnl_render::primitives(&result.model.levels[0], &options).is_empty());
+        assert!(rnl_render::text_boxes(&result.model.levels[0], &options).iter().all(Option::is_none));
     }
 }
 
 #[test]
 fn an_empty_annotation_has_no_rendered_box() {
     let options = rnl_render::RenderOptions { flylines: false, ..Default::default() };
-    for version in ["0.2", "0.3", "0.4"] {
-        let result = read(version, "(0,0) @TEXT(\"\")");
-        assert!(rnl_render::primitives(&result.model.levels[0], &options).is_empty());
-        assert!(rnl_render::text_boxes(&result.model.levels[0], &options).iter().all(Option::is_none));
-    }
+    let result = read("0.4", "(0,0) @TEXT(\"\")");
+    assert!(rnl_render::primitives(&result.model.levels[0], &options).is_empty());
+    assert!(rnl_render::text_boxes(&result.model.levels[0], &options).iter().all(Option::is_none));
 }

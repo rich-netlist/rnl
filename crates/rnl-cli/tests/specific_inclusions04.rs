@@ -41,13 +41,6 @@ fn each_symbol_is_expanded_from_itself_in_either_declaration_order() {
 }
 
 #[test]
-fn released_symbol_cycle_keeps_its_published_result() {
-    let result = read("0.3", "$A = @DEFINE-SYMBOL { $B; (0,0) @CIRCLE(radius=1) }; $B = @DEFINE-SYMBOL { $A; (0,0) @CIRCLE(radius=2) }; #R1 @SET-SYMBOL $A; #R2 @SET-SYMBOL $B");
-    assert_eq!(radii(&result, "#R1"), [2.0, 1.0]);
-    assert_eq!(radii(&result, "#R2"), [2.0]);
-}
-
-#[test]
 fn style_cycles_merge_properties_independently_and_keep_local_overrides() {
     let a = "$A = @DEFINE-STYLE(linecolor=\"#ff0000\") { $B }";
     let b = "$B = @DEFINE-STYLE(linewidth=0.3) { $A }";

@@ -424,79 +424,23 @@
           {
             "id": "&a",
             "global": false,
-            "port": true,
-            "usages": [
-              {
-                "kind": "usage",
-                "id": "@rnl-std-fill.rnl:37:3#1",
-                "definition": "$IOPORT",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&a",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 37,
-                "source": "rule",
-                "rule": {
-                  "package": "rnl-std-fill",
-                  "file": "rnl-std-fill.rnl",
-                  "line": 37
-                },
-                "state": "in-effect"
-              }
-            ]
+            "port": true
           },
           {
             "id": "&b",
             "global": false,
-            "port": true,
-            "usages": [
-              {
-                "kind": "usage",
-                "id": "@rnl-std-fill.rnl:37:3#2",
-                "definition": "$IOPORT",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&b",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 37,
-                "source": "rule",
-                "rule": {
-                  "package": "rnl-std-fill",
-                  "file": "rnl-std-fill.rnl",
-                  "line": 37
-                },
-                "state": "in-effect"
-              }
-            ]
+            "port": true
           }
         ]
       },
       "model": {
         "symbols": [
           {
-            "id": "$RES",
-            "name": "$RES",
-            "package": "rnl-std-symbols",
+            "id": "%\"(viewer default)\"",
+            "name": "%\"(viewer default)\"",
+            "package": null,
             "level": null,
-            "default": false,
-            "definition": null
-          },
-          {
-            "id": "$PORT_TAG",
-            "name": "$PORT_TAG",
-            "package": "rnl-std-virtual",
-            "level": null,
-            "default": false,
+            "default": true,
             "definition": null
           }
         ],
@@ -514,111 +458,7 @@
             "definition": null,
             "attach": null,
             "symbol": {
-              "value": "$RES",
-              "source": null
-            },
-            "at": {
-              "value": [
-                0.0,
-                0.0
-              ],
-              "source": null
-            },
-            "orient": {
-              "value": "R0",
-              "source": null
-            },
-            "pins": [
-              {
-                "terminals": [
-                  "#R1:1"
-                ],
-                "at": [
-                  0.0,
-                  3.0
-                ],
-                "dir": 90,
-                "nets": [
-                  "&a"
-                ]
-              },
-              {
-                "terminals": [
-                  "#R1:2"
-                ],
-                "at": [
-                  0.0,
-                  -3.0
-                ],
-                "dir": 270,
-                "nets": [
-                  "&b"
-                ]
-              }
-            ]
-          },
-          {
-            "id": "#R2",
-            "kind": "instance",
-            "host": [
-              "#R2"
-            ],
-            "definition": null,
-            "attach": null,
-            "symbol": {
-              "value": "$RES",
-              "source": null
-            },
-            "at": {
-              "value": [
-                10.0,
-                0.0
-              ],
-              "source": null
-            },
-            "orient": {
-              "value": "R0",
-              "source": null
-            },
-            "pins": [
-              {
-                "terminals": [
-                  "#R2:1"
-                ],
-                "at": [
-                  10.0,
-                  3.0
-                ],
-                "dir": 90,
-                "nets": [
-                  "&a"
-                ]
-              },
-              {
-                "terminals": [
-                  "#R2:2"
-                ],
-                "at": [
-                  10.0,
-                  -3.0
-                ],
-                "dir": 270,
-                "nets": [
-                  "&b"
-                ]
-              }
-            ]
-          },
-          {
-            "id": "@rnl-std-fill.rnl:37:3#1",
-            "kind": "usage",
-            "host": [],
-            "definition": "$IOPORT",
-            "attach": {
-              "p": "&a"
-            },
-            "symbol": {
-              "value": "$PORT_TAG",
+              "value": "%\"(viewer default)\"",
               "source": null
             },
             "at": {
@@ -632,15 +472,15 @@
             "pins": []
           },
           {
-            "id": "@rnl-std-fill.rnl:37:3#2",
-            "kind": "usage",
-            "host": [],
-            "definition": "$IOPORT",
-            "attach": {
-              "p": "&b"
-            },
+            "id": "#R2",
+            "kind": "instance",
+            "host": [
+              "#R2"
+            ],
+            "definition": null,
+            "attach": null,
             "symbol": {
-              "value": "$PORT_TAG",
+              "value": "%\"(viewer default)\"",
               "source": null
             },
             "at": {
@@ -656,144 +496,7 @@
         ],
         "points": [],
         "wires": [],
-        "texts": [
-          {
-            "id": "#R1::name",
-            "attach": "#R1",
-            "attach_point": null,
-            "key": "name",
-            "markup": {
-              "value": "${name}",
-              "source": null
-            },
-            "written": false,
-            "lines": [
-              [
-                {
-                  "kind": "text",
-                  "text": "R1",
-                  "style": {
-                    "level": 0,
-                    "bold": false,
-                    "italic": false,
-                    "overline": false
-                  }
-                }
-              ]
-            ],
-            "anchor": [
-              1.1,
-              0.25
-            ],
-            "halign": "start",
-            "valign": "baseline",
-            "rotate": 0.0,
-            "size": 1.0,
-            "style": {}
-          },
-          {
-            "id": "#R1::value",
-            "attach": "#R1",
-            "attach_point": null,
-            "key": "value",
-            "markup": {
-              "value": "${value}",
-              "source": null
-            },
-            "written": false,
-            "lines": [
-              [
-                {
-                  "kind": "text",
-                  "text": "1k",
-                  "style": {
-                    "level": 0,
-                    "bold": false,
-                    "italic": false,
-                    "overline": false
-                  }
-                }
-              ]
-            ],
-            "anchor": [
-              1.1,
-              -0.95
-            ],
-            "halign": "start",
-            "valign": "baseline",
-            "rotate": 0.0,
-            "size": 1.0,
-            "style": {}
-          },
-          {
-            "id": "#R2::name",
-            "attach": "#R2",
-            "attach_point": null,
-            "key": "name",
-            "markup": {
-              "value": "${name}",
-              "source": null
-            },
-            "written": false,
-            "lines": [
-              [
-                {
-                  "kind": "text",
-                  "text": "R2",
-                  "style": {
-                    "level": 0,
-                    "bold": false,
-                    "italic": false,
-                    "overline": false
-                  }
-                }
-              ]
-            ],
-            "anchor": [
-              11.1,
-              0.25
-            ],
-            "halign": "start",
-            "valign": "baseline",
-            "rotate": 0.0,
-            "size": 1.0,
-            "style": {}
-          },
-          {
-            "id": "#R2::value",
-            "attach": "#R2",
-            "attach_point": null,
-            "key": "value",
-            "markup": {
-              "value": "${value}",
-              "source": null
-            },
-            "written": false,
-            "lines": [
-              [
-                {
-                  "kind": "text",
-                  "text": "2k",
-                  "style": {
-                    "level": 0,
-                    "bold": false,
-                    "italic": false,
-                    "overline": false
-                  }
-                }
-              ]
-            ],
-            "anchor": [
-              11.1,
-              -0.95
-            ],
-            "halign": "start",
-            "valign": "baseline",
-            "rotate": 0.0,
-            "size": 1.0,
-            "style": {}
-          }
-        ],
+        "texts": [],
         "shapes": []
       }
     },
@@ -803,7 +506,7 @@
       "name": "sub_03",
       "file": 1,
       "line": 24,
-      "status": "2 without a position",
+      "status": "1 without a position",
       "host": {
         "ports": [
           "&a",
@@ -833,79 +536,23 @@
           {
             "id": "&a",
             "global": false,
-            "port": true,
-            "usages": [
-              {
-                "kind": "usage",
-                "id": "@rnl-std-fill.rnl:40:3#1",
-                "definition": "$IO_PORT",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&a",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 40,
-                "source": "rule",
-                "rule": {
-                  "package": "rnl-std-fill",
-                  "file": "rnl-std-fill.rnl",
-                  "line": 40
-                },
-                "state": "in-effect"
-              }
-            ]
+            "port": true
           },
           {
             "id": "&b",
             "global": false,
-            "port": true,
-            "usages": [
-              {
-                "kind": "usage",
-                "id": "@rnl-std-fill.rnl:40:3#2",
-                "definition": "$IO_PORT",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&b",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 40,
-                "source": "rule",
-                "rule": {
-                  "package": "rnl-std-fill",
-                  "file": "rnl-std-fill.rnl",
-                  "line": 40
-                },
-                "state": "in-effect"
-              }
-            ]
+            "port": true
           }
         ]
       },
       "model": {
         "symbols": [
           {
-            "id": "$RESISTOR",
-            "name": "$RESISTOR",
-            "package": "rnl-std-basic",
+            "id": "%\"(viewer default)\"",
+            "name": "%\"(viewer default)\"",
+            "package": null,
             "level": null,
-            "default": false,
-            "definition": null
-          },
-          {
-            "id": "$IO_PORT_SYMBOL",
-            "name": "$IO_PORT_SYMBOL",
-            "package": "rnl-std-basic",
-            "level": null,
-            "default": false,
+            "default": true,
             "definition": null
           }
         ],
@@ -923,81 +570,7 @@
             "definition": null,
             "attach": null,
             "symbol": {
-              "value": "$RESISTOR",
-              "source": null
-            },
-            "at": {
-              "value": [
-                0.0,
-                0.0
-              ],
-              "source": null
-            },
-            "orient": {
-              "value": "R0",
-              "source": null
-            },
-            "pins": [
-              {
-                "terminals": [
-                  "#R3:1"
-                ],
-                "at": [
-                  0.0,
-                  2.0
-                ],
-                "dir": 90,
-                "nets": [
-                  "&a"
-                ]
-              },
-              {
-                "terminals": [
-                  "#R3:2"
-                ],
-                "at": [
-                  0.0,
-                  -2.0
-                ],
-                "dir": 270,
-                "nets": [
-                  "&b"
-                ]
-              }
-            ]
-          },
-          {
-            "id": "@rnl-std-fill.rnl:40:3#1",
-            "kind": "usage",
-            "host": [],
-            "definition": "$IO_PORT",
-            "attach": {
-              "p": "&a"
-            },
-            "symbol": {
-              "value": "$IO_PORT_SYMBOL",
-              "source": null
-            },
-            "at": {
-              "value": null,
-              "source": null
-            },
-            "orient": {
-              "value": "R0",
-              "source": null
-            },
-            "pins": []
-          },
-          {
-            "id": "@rnl-std-fill.rnl:40:3#2",
-            "kind": "usage",
-            "host": [],
-            "definition": "$IO_PORT",
-            "attach": {
-              "p": "&b"
-            },
-            "symbol": {
-              "value": "$IO_PORT_SYMBOL",
+              "value": "%\"(viewer default)\"",
               "source": null
             },
             "at": {
@@ -1013,76 +586,7 @@
         ],
         "points": [],
         "wires": [],
-        "texts": [
-          {
-            "id": "#R3::name",
-            "attach": "#R3",
-            "attach_point": null,
-            "key": "name",
-            "markup": {
-              "value": "${name}",
-              "source": null
-            },
-            "written": false,
-            "lines": [
-              [
-                {
-                  "kind": "text",
-                  "text": "R3",
-                  "style": {
-                    "level": 0,
-                    "bold": false,
-                    "italic": false,
-                    "overline": false
-                  }
-                }
-              ]
-            ],
-            "anchor": [
-              0.95,
-              0.25
-            ],
-            "halign": "start",
-            "valign": "baseline",
-            "rotate": 0.0,
-            "size": 1.0,
-            "style": {}
-          },
-          {
-            "id": "#R3::value",
-            "attach": "#R3",
-            "attach_point": null,
-            "key": "value",
-            "markup": {
-              "value": "${value}",
-              "source": null
-            },
-            "written": false,
-            "lines": [
-              [
-                {
-                  "kind": "text",
-                  "text": "1k",
-                  "style": {
-                    "level": 0,
-                    "bold": false,
-                    "italic": false,
-                    "overline": false
-                  }
-                }
-              ]
-            ],
-            "anchor": [
-              0.95,
-              -0.95
-            ],
-            "halign": "start",
-            "valign": "baseline",
-            "rotate": 0.0,
-            "size": 1.0,
-            "style": {}
-          }
-        ],
+        "texts": [],
         "shapes": []
       }
     },
@@ -1137,7 +641,7 @@
                   }
                 ],
                 "file": null,
-                "line": 60,
+                "line": 61,
                 "source": "rule",
                 "rule": {
                   "package": "rnl-std-fill",
@@ -1166,7 +670,7 @@
                   }
                 ],
                 "file": null,
-                "line": 60,
+                "line": 61,
                 "source": "rule",
                 "rule": {
                   "package": "rnl-std-fill",
@@ -1482,7 +986,7 @@
                   }
                 ],
                 "file": null,
-                "line": 60,
+                "line": 61,
                 "source": "rule",
                 "rule": {
                   "package": "rnl-std-fill",
@@ -1568,7 +1072,7 @@
                   }
                 ],
                 "file": null,
-                "line": 60,
+                "line": 61,
                 "source": "rule",
                 "rule": {
                   "package": "rnl-std-fill",
@@ -1766,70 +1270,6 @@
     {
       "name": "rnl-std-all",
       "version": "0.4"
-    },
-    {
-      "name": "rnl-std-style",
-      "version": "0.2"
-    },
-    {
-      "name": "rnl-std-symbols",
-      "version": "0.2"
-    },
-    {
-      "name": "rnl-std-virtual",
-      "version": "0.2"
-    },
-    {
-      "name": "rnl-std-core",
-      "version": "0.2"
-    },
-    {
-      "name": "rnl-std-fill",
-      "version": "0.2"
-    },
-    {
-      "name": "rnl-std-semantics",
-      "version": "0.2"
-    },
-    {
-      "name": "rnl-std-layout",
-      "version": "0.2"
-    },
-    {
-      "name": "rnl-std",
-      "version": "0.2"
-    },
-    {
-      "name": "rnl-std-style",
-      "version": "0.3"
-    },
-    {
-      "name": "rnl-std-basic",
-      "version": "0.3"
-    },
-    {
-      "name": "rnl-std-semiconductors",
-      "version": "0.3"
-    },
-    {
-      "name": "rnl-std-spice",
-      "version": "0.3"
-    },
-    {
-      "name": "rnl-std-core",
-      "version": "0.3"
-    },
-    {
-      "name": "rnl-std-fill",
-      "version": "0.3"
-    },
-    {
-      "name": "rnl-std-structures",
-      "version": "0.3"
-    },
-    {
-      "name": "rnl-std",
-      "version": "0.3"
     }
   ],
   "files": [

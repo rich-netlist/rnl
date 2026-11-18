@@ -49,17 +49,6 @@ fn complete_groups_accept_spacing_nesting_and_literal_attributes() {
 }
 
 #[test]
-fn released_versions_keep_their_incomplete_fraction() {
-    for version in ["0.2", "0.3"] {
-        let r = read(&MemoryProvider::new().with("main.sp", &source(version, r"\frac{a}")));
-        assert!(!r.diagnostics().iter().any(|d| d.code == codes::MARKUP_FRAC_BRACES));
-        let Run::Frac { num, den, .. } = &r.model.levels[0].texts[0].lines[0][0] else { panic!() };
-        assert_eq!(plain(num), "a");
-        assert!(den.is_empty());
-    }
-}
-
-#[test]
 fn math_fraction_validation_stays_in_the_formula_parser() {
     let r = read(&MemoryProvider::new().with("main.sp", &source("0.4", r"\(\frac{a}\)")));
     assert!(r.diagnostics().iter().any(|d| d.code == codes::MARKUP_UNKNOWN_COMMAND));
@@ -68,17 +57,11 @@ fn math_fraction_validation_stays_in_the_formula_parser() {
 }
 
 #[test]
-fn included_pin_labels_follow_their_defining_file_version() {
-    for (parent, child, warning) in [("0.3", "0.4", true), ("0.4", "0.3", false)] {
-        let top = format!(
-            "* fractions\n* @RNL(type=\"header\") {{ @VERSION(\"{parent}\") }}\n.include child.sp\nX1 a child\n"
-        );
-        let included = format!("* child\n* @RNL(type=\"header\") {{ @VERSION(\"{child}\") }}\n.subckt child a\nR1 a 0 1k\n* @RNL {{ $S = @DEFINE-SYMBOL {{ (0,0) @PIN(terminal=1,label=\"\\frac{{a}}\") }}; #R1 @SET-SYMBOL $S => @PLACE(0,0) }}\n.ends child\n");
-        let r = read(&MemoryProvider::new().with("main.sp", &top).with("child.sp", &included));
-        let diagnostics: Vec<_> = r.diagnostics().into_iter().filter(|d| d.code == codes::MARKUP_FRAC_BRACES).collect();
-        assert_eq!(!diagnostics.is_empty(), warning, "{:?}", r.diagnostics());
-        if warning {
-            assert!(diagnostics[0].loc.as_ref().unwrap().file.ends_with("child.sp"));
-        }
-    }
+fn included_pin_labels_warn_in_their_defining_file() {
+    let top = "* fractions\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include child.sp\nX1 a child\n";
+    let included = "* child\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child a\nR1 a 0 1k\n* @RNL { $S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1,label=\"\\frac{a}\") }; #R1 @SET-SYMBOL $S => @PLACE(0,0) }\n.ends child\n";
+    let r = read(&MemoryProvider::new().with("main.sp", top).with("child.sp", included));
+    let diagnostics: Vec<_> = r.diagnostics().into_iter().filter(|d| d.code == codes::MARKUP_FRAC_BRACES).collect();
+    assert!(!diagnostics.is_empty(), "{:?}", r.diagnostics());
+    assert!(diagnostics[0].loc.as_ref().unwrap().file.ends_with("child.sp"));
 }

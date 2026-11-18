@@ -65,14 +65,6 @@ fn nested_roles_are_checked_in_their_own_scope() {
 }
 
 #[test]
-fn released_unused_nested_bodies_keep_their_old_behavior() {
-    for version in ["0.2", "0.3"] {
-        let r = read(version, "%I = @DEFINE(roles=[]) { ?absent }", false);
-        assert_eq!(errors(&r), [codes::REF_HOLE_UNKNOWN], "{:?}", r.diagnostics());
-    }
-}
-
-#[test]
 fn an_invalid_nested_pipe_is_omitted_and_its_sibling_still_draws() {
     let r = read(
         "0.4",

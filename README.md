@@ -74,14 +74,14 @@ for rehearsal, publication and recovery if npm succeeds before GitHub publicatio
 ## Trying it
 
 ```bash
-cargo run --release -p rnl-cli -- check tests/conformance/cases/03-five-transistor-ota.sp
-cargo run --release -p rnl-cli -- render tests/conformance/cases/03-five-transistor-ota.sp -o target/svg
+cargo run --release -p rnl-cli -- check tests/conformance/cases-0.4/from-0.2/03-five-transistor-ota.sp
+cargo run --release -p rnl-cli -- render tests/conformance/cases-0.4/from-0.2/03-five-transistor-ota.sp -o target/svg
 ```
 
 See [`crates/rnl-cli`](crates/rnl-cli/README.md) for the other commands. The desktop viewer has installers for Windows x64, Linux x86_64 and macOS (Apple Silicon and Intel) on the [releases](https://github.com/rich-netlist/rnl/releases) page (the newest tag `viewer-v…`), and the core is on npm: `npm i @rich-netlist/runtime`. To run the desktop viewer from source, including on macOS, and look at a netlist in it:
 
 ```bash
-cargo run --manifest-path apps/desktop/Cargo.toml -- tests/conformance/cases/03-five-transistor-ota.sp
+cargo run --manifest-path apps/desktop/Cargo.toml -- tests/conformance/cases-0.4/from-0.2/03-five-transistor-ota.sp
 ```
 
 Or in the web viewer, which is on the site with the same samples: [rich-netlist.github.io/rnl/viewer/?url=samples/cases/03-five-transistor-ota.sp](https://rich-netlist.github.io/rnl/viewer/?url=samples/cases/03-five-transistor-ota.sp). To run it here, build its site with the samples and serve it, then open `http://127.0.0.1:8000/?url=samples/cases/03-five-transistor-ota.sp`. Both viewers draw texts in the shipped fonts once `python scripts/fonts.py web` has written them ([`scripts`](scripts/README.md)), and fall back on a system font without them.

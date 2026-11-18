@@ -1,7 +1,7 @@
 # Roundtrip corpus (language 0.4)
 
-Six deterministic solver-record cases mirror the coverage of the independent
-[0.3 corpus](../roundtrip/README.md): SPICE and Spectre carriers, numbered points,
+Six deterministic solver-record cases mirror the coverage of the corpus of 0.3,
+which went with the cores of 0.5.x: SPICE and Spectre carriers, numbered points,
 text and wires, keyed text offsets, generated usages, body/application/disabled
 priorities, and replacement within a subcircuit.
 

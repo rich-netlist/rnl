@@ -6,15 +6,13 @@
 //! hash the same, and the text the snapshot in `tests/integration/solver/solved`. After a change to
 //! the solver that is meant, `RNL_BLESS=1 cargo test -p rnl-cli --test cli solve::` writes the snapshots
 //! again. Every solve here has no time limit, so that it is the resolution of 8.5 exactly and the
-//! same on every run (the draft 0.3, 8.5), but where a test is about the limit: those measure it on
-//! a clock that counts its readings ([`Ticks`]), or check the default of the command.
+//! same on every run (8.5), and a level of 0.4 a fixed work ([`within_work`]), but where a test is
+//! about the limit: those cut the work, or check the default of the command.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use rnl_cli::solve::{
-    describe_fact, destinations, lines, solve, solve_with_clock, write, SolveOptions, SolveRun, Target,
-};
+use rnl_cli::solve::{describe_fact, destinations, lines, solve, write, SolveOptions, SolveRun, Target};
 use rnl_cli::{interpret_file, path_str, FsProvider};
 use rnl_runtime::diag::Severity;
 use rnl_runtime::geom::{Orient, Pt};
@@ -48,7 +46,7 @@ fn within_work(work: u64) -> SolveOptions {
 }
 
 /// The options a case written for the solver is solved with: [`unlimited`], and a file of 0.4
-/// [`within_work`] [`WORK_04`]. A file of 0.2 keeps the options of its snapshot.
+/// [`within_work`] [`WORK_04`].
 fn for_case(f: &Path) -> SolveOptions {
     if std::fs::read_to_string(f).is_ok_and(|t| t.contains("@VERSION(\"0.4\")")) {
         within_work(WORK_04)
@@ -57,36 +55,9 @@ fn for_case(f: &Path) -> SolveOptions {
     }
 }
 
-/// A clock that advances one second each time it is read: a time limit is out at the same point
-/// on every run (the draft 0.3, 8.5).
-#[derive(Default)]
-struct Ticks(std::cell::Cell<u64>);
-
-impl Ticks {
-    /// How many times it was read.
-    fn reads(&self) -> u64 {
-        self.0.get()
-    }
-}
-
-impl rnl_solver::Clock for Ticks {
-    fn elapsed(&self) -> f64 {
-        let t = self.0.get();
-        self.0.set(t + 1);
-        t as f64
-    }
-}
-
-/// The cases written for the solver: T1–T6, and T2 after a solve and a drag in an editor.
-const CASES: [&str; 7] = [
-    "T1-rc-lowpass",
-    "T2-common-source",
-    "T2b-common-source-dragged",
-    "T3-ota5t",
-    "T4-miller-conflicts",
-    "T5-inverting-amp-rlc",
-    "T6-r2r-ladder",
-];
+/// The cases written for the solver: a common-source stage after a solve and a drag in an editor,
+/// and a Miller amplifier whose facts conflict.
+const CASES: [&str; 2] = ["T2b-common-source-dragged", "T4-miller-conflicts"];
 
 fn solver_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/integration/solver")
@@ -97,12 +68,12 @@ fn case(name: &str) -> PathBuf {
 }
 
 fn corpus(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/cases").join(name)
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/cases-0.4/from-0.2").join(name)
 }
 
 /// A case of the corpus of the draft 0.3.
 fn corpus_03(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/cases-0.3").join(name)
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/cases-0.4/from-0.3").join(name)
 }
 
 /// A directory of its own for a test, empty.
@@ -669,21 +640,12 @@ fn a_level_whose_rnl_is_not_interpreted_is_not_solved() {
     assert_eq!(writing, Default::default());
     assert!(!dir.join("out").exists());
 
-    // a file of 0.3 is read without any switch
-    let t1 = corpus("01-rc-lowpass.sp");
-    let text = fs.read(&path_str(&t1)).unwrap().replace("@VERSION(\"0.2\")", "@VERSION(\"0.3\")");
-    let mem = MemoryProvider::new().with(&path_str(&t1), &text);
-    let both = Layered { layers: vec![&mem, &fs] };
-    let run = solve(&t1, &both, &unlimited()).unwrap();
-    assert_eq!(run.levels.len(), 1);
-    assert!(run.not_solved.is_empty());
-
     // a subcircuit in an included file of an unsupported version, its file being read for its
     // netlist only; the main level is solved, and the order of the levels kept
     let files = MemoryProvider::new()
         .with(
             "/w/top.sp",
-            "* top\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.include lib.inc\nX1 a 0 div\nR1 a 0 1k\n.end\n",
+            "* top\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.include lib.inc\nX1 a 0 div\nR1 a 0 1k\n.end\n",
         )
         .with(
             "/w/lib.inc",
@@ -743,7 +705,7 @@ fn under_a_directory_the_other_files_read_are_copied() {
     std::fs::create_dir_all(root.join("shared")).unwrap();
     std::fs::write(
         root.join("src/top.sp"),
-        "* top\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.include models.inc\n.include ../shared/params.inc\n\
+        "* top\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.include models.inc\n.include ../shared/params.inc\n\
          M1 d g 0 0 nch\nR1 vdd d 1k\nV1 vdd 0 1.8\nV2 g 0 0.9\n.end\n",
     )
     .unwrap();
@@ -775,19 +737,20 @@ fn under_a_directory_the_other_files_read_are_copied() {
 #[test]
 fn a_file_is_written_back_in_its_encoding() {
     let dir = scratch("encoding");
-    let t1 = std::fs::read(case("T1-rc-lowpass")).unwrap();
-    let first = t1.iter().position(|&b| b == b'\n').unwrap() + 1;
+    let t2b = case("T2b-common-source-dragged");
+    let bytes = std::fs::read(&t2b).unwrap();
+    let first = bytes.iter().position(|&b| b == b'\n').unwrap() + 1;
     // Latin-1, which is not UTF-8: µ is one byte
-    let latin1 = [&t1[..first], b"* the filter of 1 \xb5F\n", &t1[first..]].concat();
+    let latin1 = [&bytes[..first], b"* the filter of 1 \xb5F\n", &bytes[first..]].concat();
     let f = dir.join("latin1.sp");
     std::fs::write(&f, &latin1).unwrap();
     // UTF-8 with a byte order mark
-    let marked = [&[0xEF, 0xBB, 0xBF][..], &t1].concat();
+    let marked = [&[0xEF, 0xBB, 0xBF][..], &bytes].concat();
     let g = dir.join("marked.sp");
     std::fs::write(&g, &marked).unwrap();
     let fs = FsProvider::new(&[]);
     for file in [&f, &g] {
-        let run = solve(file, &fs, &unlimited()).unwrap();
+        let run = solve(file, &fs, &for_case(&t2b)).unwrap();
         let writing = write(&run, &Target::InPlace);
         assert_eq!(writing.error, None);
         assert_eq!(writing.written.len(), 1);
@@ -803,18 +766,19 @@ fn a_file_is_written_back_in_its_encoding() {
 
 #[test]
 fn one_level_alone() {
+    // the subcircuit amp of corpus 04 alone: its record of the solver is replaced by one at the end
+    // of the subcircuit; the rest of the file, the record of the file level with it, as it was
     let fs = FsProvider::new(&[]);
-    let f = case("T3-ota5t");
+    let f = corpus("04-hierarchy.sp");
     let text = fs.read(&path_str(&f)).unwrap();
-    let run = solve(&f, &fs, &SolveOptions { level: Some("ota5t".into()), ..unlimited() }).unwrap();
-    assert_eq!(run.levels.iter().map(|l| l.problem.title.as_str()).collect::<Vec<_>>(), ["ota5t"]);
-    // one record, at the end of the subcircuit; the rest of the file as it was
+    let run = solve(&f, &fs, &SolveOptions { level: Some("amp".into()), ..for_case(&f) }).unwrap();
+    assert_eq!(run.levels.iter().map(|l| l.problem.title.as_str()).collect::<Vec<_>>(), ["amp"]);
     let out = &run.files[0].text;
-    assert_eq!(out.matches("type=\"generated\"").count(), 1);
+    assert_eq!(out.matches("type=\"generated\"").count(), text.matches("type=\"generated\"").count());
     let record = out.find("type=\"generated\"").unwrap();
-    let ends = out.find(".ends ota5t").unwrap();
-    assert!(record < ends);
-    assert_eq!(out[ends..], text[text.find(".ends ota5t").unwrap()..]);
+    let ends = out.find("\n.ends\n").unwrap();
+    assert!(record < ends && out[record..ends].contains(&run.levels[0].hash), "{out}");
+    assert_eq!(out[ends..], text[text.find("\n.ends\n").unwrap()..]);
     let err = solve(&f, &fs, &SolveOptions { level: Some("nope".into()), ..unlimited() }).unwrap_err();
     assert_eq!(err, "no drawing level is titled nope");
 }
@@ -846,7 +810,7 @@ fn the_levels_of_an_included_file_are_written_into_it() {
     let files = MemoryProvider::new()
         .with(
             "/w/a/top.sp",
-            "* top\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.include ../lib/div.inc\nX1 a 0 div\nR1 a 0 1k\n.end\n",
+            "* top\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.include ../lib/div.inc\nX1 a 0 div\nR1 a 0 1k\n.end\n",
         )
         .with("/w/lib/div.inc", ".subckt div p n\nR1 p m 1k\nR2 m n 1k\n.ends div\n");
     let run = solve(Path::new("/w/a/top.sp"), &files, &unlimited()).unwrap();
@@ -890,7 +854,7 @@ fn rnl(args: &[&str]) -> (i32, String, String) {
 
 #[test]
 fn the_command_writes_where_it_is_told_and_reports_each_level() {
-    let f = path_str(&case("T1-rc-lowpass"));
+    let f = path_str(&case("T2b-common-source-dragged"));
     let dir = scratch("command");
     let out = path_str(&dir.join("out"));
     // where to write is not optional, and what does not read is an error
@@ -908,30 +872,31 @@ fn the_command_writes_where_it_is_told_and_reports_each_level() {
     );
     assert!(!dir.join("out").exists());
 
-    // the command's time limit is the toolkit's 5 seconds unless the options say otherwise
-    let (code, stdout, _) = rnl(&["solve", &f, "-o", &out, "--report", "--solver-options", "beam=2"]);
+    // each level is reported with the options of its replay, which name the work it took, and
+    // the hash of its record ends with their digest (17)
+    let work = format!("limit=\"work\",work={WORK_04},safety_seconds=3600");
+    let (code, stdout, _) = rnl(&["solve", &f, "-o", &out, "--report", "--solver-config", &work]);
     assert_eq!(code, 0, "{stdout}");
-    let options = SolverOptions { beam: 2, ..SolverOptions::default() }.canonical();
-    assert!(options.ends_with(";time_limit=5"), "{options}");
-    assert!(stdout.starts_with(&format!("solver options: {options}\n")), "{stdout}");
-    assert!(stdout.contains("\nlevel T1-rc-lowpass.sp (file in T1-rc-lowpass.sp): "), "{stdout}");
+    assert!(
+        stdout.starts_with("level T2b-common-source-dragged.sp (file in T2b-common-source-dragged.sp): "),
+        "{stdout}"
+    );
     assert!(stdout.contains("\n    kept [0] "), "{stdout}");
     assert!(!stdout.contains("stage S"), "{stdout}");
-    let written = dir.join("out").join("T1-rc-lowpass.sp");
+    let written = dir.join("out").join("T2b-common-source-dragged.sp");
     assert!(stdout.ends_with(&format!("wrote {}\n", path_str(&written))), "{stdout}");
+    let replay = stdout.lines().find_map(|l| l.strip_prefix("  replay options: ")).unwrap();
+    assert!(replay.contains(";run=work:"), "{replay}");
     let text = std::fs::read_to_string(&written).unwrap();
-    assert!(text.contains(&format!(".{}\"", rnl_runtime::problem::options_digest(&options))), "{text}");
+    assert!(text.contains(&format!(".{}\"", rnl_runtime::problem::options_digest(replay))), "{text}");
 
-    // in place and without a time limit, a copy of the file becomes the snapshot
-    let copy = dir.join("T1-rc-lowpass.sp");
-    std::fs::copy(case("T1-rc-lowpass"), &copy).unwrap();
-    let (code, stdout, _) = rnl(&["solve", &path_str(&copy), "--in-place", "--solver-options", "time_limit=none"]);
+    // in place and within the work of the snapshot, a copy of the file becomes the snapshot
+    let copy = dir.join("T2b-common-source-dragged.sp");
+    std::fs::copy(case("T2b-common-source-dragged"), &copy).unwrap();
+    let (code, stdout, _) = rnl(&["solve", &path_str(&copy), "--in-place", "--solver-config", &work]);
     assert_eq!(code, 0, "{stdout}");
-    let options = SolverOptions::without_time_limit().canonical();
-    assert!(options.ends_with(";time_limit=none"), "{options}");
-    assert!(stdout.starts_with(&format!("solver options: {options}\n")), "{stdout}");
     assert!(!stdout.contains("warning: "), "{stdout}");
-    let snapshot = std::fs::read(solver_dir().join("solved/T1-rc-lowpass.sp")).unwrap();
+    let snapshot = std::fs::read(solver_dir().join("solved/T2b-common-source-dragged.sp")).unwrap();
     assert!(std::fs::read(&copy).unwrap() == snapshot);
 
     // a file whose RNL is not interpreted: said, and nothing written; its version is an error of
@@ -947,8 +912,7 @@ fn the_command_writes_where_it_is_told_and_reports_each_level() {
 
     // the files beside the netlist that it reads are copied
     let alias = path_str(&corpus("11-header-alias-device.sp"));
-    let (code, stdout, _) =
-        rnl(&["solve", &alias, "-o", &path_str(&dir.join("alias")), "--solver-options", "time_limit=none"]);
+    let (code, stdout, _) = rnl(&["solve", &alias, "-o", &path_str(&dir.join("alias")), "--solver-config", &work]);
     assert_eq!(code, 0, "{stdout}");
     assert!(
         stdout.ends_with(&format!("copied {}\n", path_str(&dir.join("alias").join("11-acme-style.rnl")))),
@@ -1022,7 +986,7 @@ fn every_corpus_case_solved_reads_back_as_its_authors_wrote_it() {
     let mut solved = 0;
     for f in corpus_cases() {
         let name = f.file_name().unwrap().to_string_lossy().to_string();
-        let run = solve(&f, &fs, &unlimited()).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let run = solve(&f, &fs, &for_case(&f)).unwrap_or_else(|e| panic!("{name}: {e}"));
         if run.files.is_empty() {
             assert!(run.levels.is_empty(), "{name}");
             continue;
@@ -1088,7 +1052,7 @@ fn every_corpus_case_solved_reads_back_as_its_authors_wrote_it() {
         }
         // solved again from what it wrote: the same
         let texts = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
-        let twice = solve(&f, &Layered { layers: vec![&texts, &fs] }, &unlimited()).unwrap();
+        let twice = solve(&f, &Layered { layers: vec![&texts, &fs] }, &for_case(&f)).unwrap();
         assert_eq!(twice.files, run.files, "{name}: not the same solved again");
     }
     assert!(solved >= 18, "{solved}");
@@ -1117,8 +1081,8 @@ fn a_label_that_the_scene_places_on_one_axis_keeps_its_owner_where_it_is() {
     for line in [
         "#R1 @PLACE(0, 0) => @ORIENT(\"R0\");",
         "#R3 @PLACE(20, 0) => @ORIENT(\"R0\");",
-        "#R1::name @PLACE(x=-3);",
-        "#R3::name @PLACE(x=25);",
+        "#R1::name @PLACE(x=-3)",
+        "#R3::name @PLACE(x=25)",
         "#R4::value @PLACE(x=1)",
     ] {
         assert!(level.record.contains(line), "{}", level.record);
@@ -1153,7 +1117,8 @@ fn a_text_whose_offset_the_solver_discards_reads_back_where_the_solver_put_it() 
     ] {
         let label = &line[..line.find(' ').unwrap()];
         let body = format!(
-            "* offsets\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\nR1 a b 1k\nR2 b c 1k\n* @RNL {{ {text}; \
+            "* offsets\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\")}}\n\
+             R1 a b 1k\nR2 b c 1k\n* @RNL {{ {text}; \
              #R1 @PLACE(0, 0); #R2 @PLACE(10, 10); {{{label} #R2}} @ALIGN(\"y\", priority=\"high\") }}\n.end\n"
         );
         let files = MemoryProvider::new().with("/w/t.sp", &body);
@@ -1179,7 +1144,7 @@ fn a_statement_written_after_the_record_that_conflicts_with_it_is_dropped() {
     // the record writes every position, those the file fixes too, with priority high (14.8): a
     // statement of normal priority written after it, as between two solves, that conflicts with
     // the solver's results is dropped until the next solve, and not drawn as needing a solver
-    let body = "* between\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 b c 1k\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
+    let body = "* between\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\nR1 a b 1k\nR2 b c 1k\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
     let files = MemoryProvider::new().with("/w/t.sp", body);
     let run = solve(Path::new("/w/t.sp"), &files, &unlimited()).unwrap();
     let record = &run.levels[0].record;
@@ -1191,7 +1156,7 @@ fn a_statement_written_after_the_record_that_conflicts_with_it_is_dropped() {
     let statuses: Vec<(&str, &str)> =
         r.model.levels[0].constraints.iter().map(|c| (c.kind.as_str(), c.status.as_str())).collect();
     assert_eq!(statuses, vec![("ALIGN", "dropped")]);
-    // the file was raised to 0.3 when the solver wrote it (16.1): the hint is that of 8.5
+    // the hint is that of 8.5
     assert!(dropped(&r).iter().any(|m| m.starts_with("ALIGN is discarded in the order of 8.5")), "{:?}", dropped(&r));
 }
 
@@ -1207,7 +1172,7 @@ fn a_file_saved_without_a_header_gets_one() {
     let first = interpret_file(&plain, None, &fs, &Options::default()).unwrap();
     assert!(messages(&first, Severity::Hint).iter().any(|m| m.starts_with(hint)));
     let run = solve(&plain, &fs, &unlimited()).unwrap();
-    assert!(run.files[0].text.starts_with("* plain\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\n"));
+    assert!(run.files[0].text.starts_with("* plain\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\nR1 a 0 1k\n"));
     let out = dir.join("out");
     assert_eq!(write(&run, &Target::Dir(out.clone())).error, None);
     let back = interpret_file(&out.join("plain.sp"), None, &fs, &Options::default()).unwrap();
@@ -1216,26 +1181,17 @@ fn a_file_saved_without_a_header_gets_one() {
     let again = solve(&out.join("plain.sp"), &fs, &unlimited()).unwrap();
     assert_eq!(again.files[0].text, run.files[0].text);
 
-    // the included file of 04-hierarchy, and a subcircuit on the first line of one; the first is
-    // read in the 0.2 of the file that includes it, and its record needs 0.3 for the number of its
-    // junction (5.9), so its header says 0.3 and keeps the standard series 0.2 (16.1, 16.3)
-    let run = solve(&corpus("04-hierarchy.sp"), &fs, &unlimited()).unwrap();
-    let lib = run.files.iter().find(|f| f.path.ends_with("04-hierarchy-lib.inc")).unwrap();
-    let text = lib.text.replace("\r\n", "\n");
-    let head = "* library for 04-hierarchy: a resistor divider without a block symbol\n\
-                * @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")}\n\
-                .subckt rdiv";
-    assert!(text.starts_with(head), "{text}");
+    // an included file with a subcircuit on its first line: read in the 0.4 of the file that
+    // includes it, and written with a header that says so on line 2 (16.1)
     let files = MemoryProvider::new()
         .with(
             "/w/top.sp",
-            "* top\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.include div.inc\nX1 a 0 div\nR1 a 0 1k\n.end\n",
+            "* top\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.include div.inc\nX1 a 0 div\nR1 a 0 1k\n.end\n",
         )
         .with("/w/div.inc", ".subckt div p n\nR1 p m 1k\nR2 m n 1k\n.ends div\n");
     let run = solve(Path::new("/w/top.sp"), &files, &unlimited()).unwrap();
     let div = run.files.iter().find(|f| f.path == "/w/div.inc").unwrap();
-    // read in the 0.2 of the file that includes it, and written: raised (16.1)
-    assert!(div.text.starts_with("*\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")}\n.subckt div p n\n"), "{}", div.text);
+    assert!(div.text.starts_with("*\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.subckt div p n\n"), "{}", div.text);
     let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
     let both = Layered { layers: vec![&solved, &files] };
     check_read_back(&run, Path::new("/w/top.sp"), &both, "div.inc");
@@ -1251,7 +1207,7 @@ fn a_record_of_the_solver_written_with_scope_is_replaced_by_its_subcircuit() {
     let stale =
         "* @RNL(type=\"generated\", scope=\"pair\", priority=\"high\") { #R1 @PLACE(0, 0); #R2 @PLACE(50, 50) }\n";
     let top = format!(
-        "* scoped\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\n.subckt pair a b\nR1 a m 1k\nR2 m b 1k\n\
+        "* scoped\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\")}}\n.subckt pair a b\nR1 a m 1k\nR2 m b 1k\n\
          * @RNL {{ {{#R1 #R2}} @ALIGN(\"y\") }}\n.ends\nX1 p q pair\n{stale}.end\n"
     );
     let files = MemoryProvider::new().with("/w/scoped.sp", &top);
@@ -1275,12 +1231,12 @@ fn a_record_of_the_solver_written_with_scope_is_replaced_by_its_subcircuit() {
         .with(
             "/w/top.sp",
             &format!(
-                "* top\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\n.include pair.inc\nX1 p q pair\n{stale}.end\n"
+                "* top\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\")}}\n.include pair.inc\nX1 p q pair\n{stale}.end\n"
             ),
         )
         .with(
             "/w/pair.inc",
-            "* pair\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.subckt pair a b\nR1 a m 1k\nR2 m b 1k\n.ends\n",
+            "* pair\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.subckt pair a b\nR1 a m 1k\nR2 m b 1k\n.ends\n",
         );
     let run = solve(Path::new("/w/top.sp"), &files, &pair).unwrap();
     let paths: Vec<&str> = run.files.iter().map(|f| f.path.as_str()).collect();
@@ -1296,7 +1252,8 @@ fn a_free_text_goes_beside_what_it_is_attached_to() {
     // viewer that does not solve puts it (13.3); the report names a text by its name
     let files = MemoryProvider::new().with(
         "/w/t.sp",
-        "* texts\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 p 0 1k\nC1 p 0 1p\n* @RNL {\n\
+        "* texts\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\")}\n\
+         R1 p 0 1k\nC1 p 0 1p\n* @RNL {\n\
          *   %t = #R1:p @TEXT(\"hi\");\n*   %u = #C1 @TEXT(\"cap\");\n*   %q = (_, _);\n*   %v = %q @TEXT(\"at q\");\n\
          *   {%t #C1} @ALIGN(\"x\")\n* }\n.end\n",
     );
@@ -1386,10 +1343,10 @@ fn labels_on_a_wire_and_a_net_are_left_to_the_viewer_and_one_a_fact_reaches_is_w
     // viewer draws the label of the wire above its middle and that of the
     // net at the start of its wire. A label of the wire whose y an ALIGN gives is the solver's: the
     // record writes it, its x in the middle of the wire, where the viewer puts such a label, not at
-    // the origin. The file is raised to 0.3, as every file of 0.2 the solver writes into (16.1)
+    // the origin
     let body = concat!(
         "* labels\n",
-        "* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n",
+        "* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\")}\n",
         "R1 a b 1k\n",
         "R2 b c 1k\n",
         "* @RNL {\n",
@@ -1431,65 +1388,67 @@ fn labels_on_a_wire_and_a_net_are_left_to_the_viewer_and_one_a_fact_reaches_is_w
 }
 
 #[test]
-fn a_ground_without_a_name_on_a_net_that_nothing_draws_is_left_unplaced() {
-    // corpus 0.3/09: the subcircuit divider, in an included file read in 0.2, writes `$GND @ATTACH
-    // &bot` without a name, on a net that no ROUTE or wire written draws, so that the solver knows
-    // no pin of R2 on it and has nothing to put the ground beside. Placed where the witness and the
-    // repair of overlaps put it, (3, 0), it was drawn beside the wire of &mid, as if that net were
-    // grounded, and the record needed its number. The solver leaves it free: the record has no
-    // decision for it and needs no number, and read back it is unplaced, as it is unsolved (11.1);
-    // the ports that the rules make there are placed, and the record names them (10.5). The files
-    // written are raised to 0.3 (16.1)
+fn a_ground_without_a_name_on_a_net_that_nothing_draws_is_placed_by_its_number() {
+    // corpus 0.3/09: the subcircuit divider, in an included file read in the 0.4 of the file that
+    // includes it, writes `$GROUND @ATTACH &bot` without a name, on a net that no ROUTE-NET or wire
+    // written draws. The solver places it, and the record refers to it by its number, with the
+    // check of the numbers in its head (5.9), so that nothing of the level is left unsolved and read
+    // back nothing is unplaced; the ports that the rules make there are placed, and the record names
+    // them (10.5). The included file is written with a header of 0.4 (16.1)
     let fs = FsProvider::new(&[]);
     let f = corpus_03("09-include-without-header.sp");
-    let run = solve(&f, &fs, &unlimited()).unwrap();
+    let run = solve(&f, &fs, &for_case(&f)).unwrap();
     let level = run.levels.iter().find(|l| l.problem.title == "divider").unwrap();
     let p = &level.problem;
-    let ground = p.objects.iter().position(|o| o.label == "a usage of $GND").unwrap();
-    assert!(matches!(p.objects[ground].reference, Reference::Number { .. }), "{:?}", p.objects[ground]);
-    assert!(level.solved.solution.placements.iter().all(|pl| pl.object != ground));
+    let ground = p.objects.iter().position(|o| o.label == "a usage of $GROUND").unwrap();
+    let Reference::Number { number, .. } = &p.objects[ground].reference else { panic!("{:?}", p.objects[ground]) };
+    assert!(level.solved.solution.placements.iter().any(|pl| pl.object == ground && pl.at().is_some()));
     assert!(level.written.unsolved.is_empty(), "{:?}", level.written.unsolved);
-    assert!(!level.record.contains("%#"), "{}", level.record);
-    assert!(level.record.contains("%ioport_top @PLACE("), "{}", level.record);
-    let notes = &level.solved.report.notes;
-    let note = "1 symbol without a name that no fact kept reaches is left free";
-    assert!(notes.iter().any(|n| n.starts_with(note)), "{notes:#?}");
+    assert!(level.record.contains(&format!("%#{number} @PLACE(")), "{}", level.record);
+    assert!(level.record.contains("%io_port_top @PLACE("), "{}", level.record);
     let lib = run.files.iter().find(|f| f.path.ends_with("09-include-without-header-lib.inc")).unwrap();
-    assert!(lib.text.contains("@VERSION(\"0.3\")") && !lib.text.contains("numbering="), "{}", lib.text);
-    let back = read_solved(&run, &fs, &f);
-    let lv = back.model.levels.iter().find(|l| l.level == p.level).unwrap();
-    assert_eq!(lv.unplaced, ["a usage of $GND"]);
+    assert!(lib.text.contains("@VERSION(\"0.4\")") && lib.text.contains("numbering="), "{}", lib.text);
+    let texts = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
+    check_read_back(&run, &f, &Layered { layers: vec![&texts, &fs] }, "09-include-without-header");
     let unsolved = interpret_file(&f, None, &fs, &Options { generated: false, ..Options::default() }).unwrap();
     let before = unsolved.model.levels.iter().find(|l| l.level == p.level).unwrap();
-    assert!(before.unplaced.iter().any(|u| u == "a usage of $GND"), "{:?}", before.unplaced);
+    assert!(before.unplaced.iter().any(|u| u == "a usage of $GROUND"), "{:?}", before.unplaced);
     // solved again from what it wrote: the same
-    let texts = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
-    let twice = solve(&f, &Layered { layers: vec![&texts, &fs] }, &unlimited()).unwrap();
+    let twice = solve(&f, &Layered { layers: vec![&texts, &fs] }, &for_case(&f)).unwrap();
     assert_eq!(twice.files, run.files);
 }
 
-// TODO: under RNL_BLESS=1 this test can read T1's snapshot before the test that blesses it has
+// TODO: under RNL_BLESS=1 this test can read T2b's snapshot before the test that blesses it has
 // written it again, as the tests run in parallel; a second plain run passes. Bless with
 // `--test-threads=1`.
 #[test]
-fn the_problem_command_hashes_the_options_as_solve_writes_them() {
-    let f = path_str(&case("T1-rc-lowpass"));
+fn the_problem_command_hashes_the_input_as_solve_writes_it_and_the_options_it_is_given() {
+    let f = path_str(&case("T2b-common-source-dragged"));
     let hash = |args: &[&str]| {
         let (code, out, err) = rnl(args);
         assert_eq!(code, 0, "{err}");
         let v: serde_json::Value = serde_json::from_str(&out).unwrap();
         v["levels"][0]["hash"].as_str().unwrap().to_string()
     };
-    let snapshot = std::fs::read_to_string(solver_dir().join("solved/T1-rc-lowpass.sp")).unwrap();
+    // a level of 0.4 is written with the options of its replay, which name the work its solve
+    // took (17): the problem, which is not solved, has the input of the hash that the solve writes
+    let snapshot = std::fs::read_to_string(solver_dir().join("solved/T2b-common-source-dragged.sp")).unwrap();
     let unlimited = hash(&["problem", &f, "--solver-options", "time_limit=none"]);
-    assert!(snapshot.contains(&format!("hash=\"{unlimited}\"")), "{unlimited}");
-    // the default, with the time limit of 5 seconds, is another hash
+    let input = &unlimited[..unlimited.rfind('.').unwrap()];
+    assert!(snapshot.contains(&format!("hash=\"{input}.")), "{unlimited}");
+    // the default, with the time limit of 5 seconds, is another hash of the same input; the
+    // options are those the solver takes for a level of 0.4, with the settings of its file (17)
+    let p = &interpret_file(&case("T2b-common-source-dragged"), None, &FsProvider::new(&[]), &Options::solver())
+        .unwrap()
+        .problems[0];
+    let digest = |o: SolverOptions| rnl_runtime::problem::options_digest(&o.for_problem(p).0.canonical());
     let default = hash(&["problem", &f]);
-    assert!(default.ends_with(&rnl_runtime::problem::options_digest(&SolverOptions::default().canonical())));
+    assert!(default.ends_with(&digest(SolverOptions::default())), "{default}");
     assert_ne!(default, unlimited);
-    let beam = SolverOptions { beam: 2, ..SolverOptions::default() }.canonical();
+    assert!(default.starts_with(&format!("{input}.")), "{default}");
+    let beam = digest(SolverOptions { beam: 2, ..SolverOptions::default() });
     let with = hash(&["problem", &f, "--solver-options", "beam=2"]);
-    assert!(with.ends_with(&rnl_runtime::problem::options_digest(&beam)), "{with}");
+    assert!(with.ends_with(&beam), "{with}");
     let (code, _, err) = rnl(&["problem", &f, "--solver-options", "speed=3"]);
     assert_eq!(code, 2);
     assert!(err.contains("--solver-options: the solver has no option `speed`"), "{err}");
@@ -1507,12 +1466,11 @@ fn a_header_after_a_subcircuit_solved_moves_to_line_2() {
     // a header record without VERSION after the subcircuit that is solved, in an included file and
     // in a main file solved a level at a time: the record of the subcircuit goes in before its
     // `.ends`, and would come before the header, which is the first record of its file (2.8); so
-    // the header moves where a new header goes, to line 2 after the first line (the draft 0.3,
-    // 16.3 and 2.2), after a bare marker put first when that line is a statement, and VERSION goes
-    // into it, not into that record (16.1, 17)
-    // the included file, read in the 0.2 of the file that includes it, is raised as it is written
-    // (16.1), and the header takes the VERSION of the raise with it
-    let header = "* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\") }\n";
+    // the header moves where a new header goes, to line 2 after the first line (16.3 and 2.2),
+    // after a bare marker put first when that line is a statement, and VERSION goes into it, not
+    // into that record (16.1, 17); the included file is read in the 0.4 of the file that includes
+    // it, which the header takes with it
+    let header = "* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n";
     let body = ".subckt pair a b\nR1 a m 1k\nR2 m b 1k\n.ends\n* @RNL(type=\"header\") { }\n";
     let model = ".model nch nmos level=1\n";
     for (head, want) in
@@ -1521,7 +1479,7 @@ fn a_header_after_a_subcircuit_solved_moves_to_line_2() {
         let files = MemoryProvider::new()
             .with(
                 "/w/top4.sp",
-                "* top\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.include lib4.inc\nX1 p q pair\n.end\n",
+                "* top\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.include lib4.inc\nX1 p q pair\n.end\n",
             )
             .with("/w/lib4.inc", &format!("{head}{body}"));
         let entry = Path::new("/w/top4.sp");
@@ -1539,12 +1497,12 @@ fn a_header_after_a_subcircuit_solved_moves_to_line_2() {
         format!("* top\n{model}.subckt pair a b\nR1 a m 1k\nR2 m b 1k\n.ends\n* @RNL(type=\"header\") {{ }}\nX1 p q pair\n.end\n");
     let files = MemoryProvider::new().with("/w/top.sp", &top);
     let entry = Path::new("/w/top.sp");
-    // a main file whose header has no VERSION is read in the tool's default, 0.3 (16.1), which its
+    // a main file whose header has no VERSION is read in the tool's default, 0.4 (16.1), which its
     // header gets; the main file alone keeps the header below the subcircuit, its record going at
     // the end
-    let header = "* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n";
+    let header = "* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n";
     let moved = format!("{header}{model}.subckt pair a b\n");
-    let below = "\n.ends\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nX1 p q pair\n";
+    let below = "\n.ends\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nX1 p q pair\n";
     for (level, header) in [("pair", format!("* top\n{moved}")), ("top.sp", below.to_string())] {
         let one = SolveOptions { level: Some(level.into()), ..unlimited() };
         let run = solve(entry, &files, &one).unwrap();
@@ -1572,7 +1530,7 @@ fn an_included_file_that_switches_to_spectre_gets_its_header_after_the_switch() 
     let files = MemoryProvider::new()
         .with(
             "/w/top.scs",
-            "// top\n// @RNL(type=\"header\") { @VERSION(\"0.2\")}\nsimulator lang=spectre\ninclude \"div.inc\"\n\
+            "// top\n// @RNL(type=\"header\") { @VERSION(\"0.4\")}\nsimulator lang=spectre\ninclude \"div.inc\"\n\
              X1 (p 0) div\n",
         )
         .with(
@@ -1583,7 +1541,7 @@ fn an_included_file_that_switches_to_spectre_gets_its_header_after_the_switch() 
     let run = solve(entry, &files, &unlimited()).unwrap();
     assert_eq!(run.levels.iter().map(|l| l.problem.title.as_str()).collect::<Vec<_>>(), ["top.scs", "div"]);
     let div = &run.files.iter().find(|f| f.path == "/w/div.inc").unwrap().text;
-    let head = "simulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")}\nsubckt div (p n)\n";
+    let head = "simulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.4\")}\nsubckt div (p n)\n";
     assert!(div.starts_with(head), "{div}");
     assert!(div.contains("\n// @RNL(type=\"generated\""), "{div}");
     let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
@@ -1599,10 +1557,10 @@ fn above_the_switch_to_spectre_an_included_file_gets_its_header_in_stars() {
     // marker before a statement, are written with `*`, and the record of the solver follows them;
     // so is a header put before a record that the reading takes above the switch, written with
     // `*` there, so that it is the first record (2.8)
-    let top = "// top\n// @RNL(type=\"header\") { @VERSION(\"0.2\")}\nsimulator lang=spectre\ninclude \"div.inc\"\n\
+    let top = "// top\n// @RNL(type=\"header\") { @VERSION(\"0.4\")}\nsimulator lang=spectre\ninclude \"div.inc\"\n\
                X1 (p 0) div\n";
     let body = "simulator lang=spectre\nsubckt div (p n)\nR1 (p m) resistor r=1k\nR2 (m n) resistor r=1k\nends div\n";
-    let star = "* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")}";
+    let star = "* @RNL(type=\"header\") { @VERSION(\"0.4\")}";
     for (head, want) in [
         ("* lib\n.param rr=1k\n", format!("* lib\n{star}\n.param rr=1k\n")),
         ("simulator lang=spice\n.param rr=1k\n", format!("*\n{star}\nsimulator lang=spice\n.param rr=1k\n")),
@@ -1640,7 +1598,7 @@ fn a_header_in_slashes_moved_into_spice_mode_carries_every_record_of_its_file() 
     let run = solve(entry, &files, &unlimited()).unwrap();
     assert_eq!(run.levels.iter().map(|l| l.problem.title.as_str()).collect::<Vec<_>>(), ["top.net", "pair"]);
     let text = &run.files[0].text;
-    let head = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n.param rr=1k\nsimulator lang=spectre\n";
+    let head = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.param rr=1k\nsimulator lang=spectre\n";
     assert!(text.starts_with(head), "{text}");
     assert_eq!(text.matches("\n* @RNL(type=\"generated\"").count(), 2, "{text}");
     assert!(!text.contains("// @RNL") && !alone(text), "{text}");
@@ -1654,7 +1612,7 @@ fn a_header_in_slashes_moved_into_spice_mode_carries_every_record_of_its_file() 
     let one = SolveOptions { level: Some("top.net".into()), ..unlimited() };
     let first = solve(entry, &files, &one).unwrap();
     let text = &first.files[0].text;
-    assert!(text.contains("\nends pair\n// @RNL(type=\"header\") { @VERSION(\"0.3\") }\n"), "{text}");
+    assert!(text.contains("\nends pair\n// @RNL(type=\"header\") { @VERSION(\"0.4\") }\n"), "{text}");
     assert!(text.contains("\n// @RNL(type=\"generated\""), "{text}");
     let solved = MemoryProvider::new().with("/w/top.net", text);
     let after = solve(entry, &Layered { layers: vec![&solved, &files] }, &unlimited()).unwrap();
@@ -1667,10 +1625,10 @@ fn a_file_read_only_through_a_library_section_gets_no_header_outside_it() {
     // section, and tools must not write outside it (2.2): it gets no header record there, the
     // record of the subcircuit goes inside the section, no new warning comes, and a second solve
     // writes the same. A header inside the section is read, and gets its version there.
-    let spice = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.lib models.lib tt\nX1 p q pair\n.end\n";
+    let spice = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.lib models.lib tt\nX1 p q pair\n.end\n";
     let tt = ".lib tt\n.subckt pair a b\nR1 a m 1k\nR2 m b 1k\n.ends\n.endl tt\n";
     let ff = ".lib ff\n.subckt pair a b\nR1 a m 2k\nR2 m b 2k\n.ends\n.endl ff\n";
-    let spectre = "// top\n// @RNL(type=\"header\") { @VERSION(\"0.2\")}\nsimulator lang=spectre\n\
+    let spectre = "// top\n// @RNL(type=\"header\") { @VERSION(\"0.4\")}\nsimulator lang=spectre\n\
                    include \"models.scs\" section=tt\nX1 (p 0) div\n";
     let scs = "// models\nsection tt\nsubckt div (p n)\nR1 (p m) resistor r=1k\nR2 (m n) resistor r=1k\nends div\n\
                endsection tt\n";
@@ -1683,7 +1641,7 @@ fn a_file_read_only_through_a_library_section_gets_no_header_outside_it() {
             spice,
             "/w/models.lib",
             format!("{inside}{ff}"),
-            Some(".lib tt\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")}\n"),
+            Some(".lib tt\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n"),
         ),
     ] {
         let files = MemoryProvider::new().with(entry, top).with(lib_path, &lib);
@@ -1739,7 +1697,8 @@ fn a_text_whose_offset_or_place_the_solver_discards_is_written_where_it_put_it()
     for (name, body, discarded, lines, dropped_back) in cases {
         let path = format!("/w/{name}.sp");
         let text = format!(
-            "* {name}\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\nR1 a b 1k\nC1 b 0 1p\n* @RNL {{ {body} }}\n.end\n"
+            "* {name}\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\")}}\n\
+             R1 a b 1k\nC1 b 0 1p\n* @RNL {{ {body} }}\n.end\n"
         );
         let files = MemoryProvider::new().with(&path, &text);
         let entry = Path::new(&path);
@@ -1775,24 +1734,23 @@ fn a_text_whose_offset_or_place_the_solver_discards_is_written_where_it_put_it()
 }
 
 #[test]
-fn an_orientation_without_a_name_is_unsolved_only_where_the_file_does_not_fix_it() {
-    // two grounds without a name in a file of 0.2, which a record of 0.2 cannot refer to (5.9): the
-    // one whose ORIENT the solver keeps is drawn so all the same, and its orientation is not
-    // unsolved; the other's the solver chooses, and it is (14.8). `rnl solve` raises the file, as
-    // a tool writes only 0.3 (16.1), and in 0.3 its record holds both
+fn an_orientation_without_a_name_is_written_by_its_number_where_the_file_does_not_fix_it() {
+    // two grounds without a name: the one whose ORIENT the solver keeps is drawn so all the same;
+    // the other's the solver chooses, and the record refers to it by its number (5.9, 14.8), so
+    // that neither orientation is unsolved
     let files = MemoryProvider::new().with(
         "/w/an.sp",
-        "* anonymous\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a 0 1k\nR2 b 0 1k\n\
-         * @RNL { #R1 @PLACE(0, 0); #R2 @PLACE(10, 0); $GND @ATTACH #R1:n => @ORIENT(\"R90\"); $GND @ATTACH #R2:n }\n\
+        "* anonymous\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\")}\n\
+         R1 a 0 1k\nR2 b 0 1k\n\
+         * @RNL { #R1 @PLACE(0, 0); #R2 @PLACE(10, 0); $GROUND @ATTACH #R1:n => @ORIENT(\"R90\"); $GROUND @ATTACH #R2:n }\n\
          .end\n",
     );
     let entry = Path::new("/w/an.sp");
     let r = interpret_file(entry, None, &files, &Options::solver()).unwrap();
     let p = &r.problems[0];
-    assert_eq!(p.version, "0.2");
-    let solved = rnl_solver::solve(p, &SolverOptions::without_time_limit());
+    let solved = rnl_solver::solve(p, &within_work(WORK_04).solver);
     let written = write_record(p, &solved.solution, rnl_solver::AUTHOR, &sig2(p, ""));
-    let grounds: Vec<usize> = (0..p.objects.len()).filter(|&k| p.objects[k].label == "a usage of $GND").collect();
+    let grounds: Vec<usize> = (0..p.objects.len()).filter(|&k| p.objects[k].label == "a usage of $GROUND").collect();
     let fixed: Vec<usize> = grounds
         .iter()
         .copied()
@@ -1805,10 +1763,10 @@ fn an_orientation_without_a_name_is_unsolved_only_where_the_file_does_not_fix_it
     assert_eq!(turned(fixed[0]), Some(Orient::R90));
     assert!(turned(free[0]).is_some());
     let unsolved: Vec<Decision> = written.unsolved.iter().map(|u| u.decision).collect();
-    assert!(unsolved.contains(&Decision::Orientation { object: free[0] }), "{:?}", written.unsolved);
+    assert!(!unsolved.contains(&Decision::Orientation { object: free[0] }), "{:?}", written.unsolved);
     assert!(!unsolved.contains(&Decision::Orientation { object: fixed[0] }), "{:?}", written.unsolved);
-    // raised, the record holds it
-    let run = solve(entry, &files, &unlimited()).unwrap();
+    // the record of `rnl solve` holds both, and reads back
+    let run = solve(entry, &files, &within_work(WORK_04)).unwrap();
     assert!(run.levels[0].written.unsolved.is_empty(), "{:?}", run.levels[0].written.unsolved);
     let solved = MemoryProvider::new().with("/w/an.sp", &run.files[0].text);
     check_read_back(&run, entry, &Layered { layers: vec![&solved, &files] }, "an");
@@ -1821,7 +1779,7 @@ fn within_its_tolerance_the_record_writes_the_constants_of_the_facts_that_rank_f
     // ranks first, #R2's 0.4, and a viewer drops only the last, #R1's 0 (8.5, 17)
     let files = MemoryProvider::new().with(
         "/w/tol.sp",
-        "* tol\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 b c 1k\n\
+        "* tol\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\nR1 a b 1k\nR2 b c 1k\n\
          * @RNL { #R1 @PLACE(0, 0, priority=\"high\"); #R2 @PLACE(x=0.4, priority=\"high\"); \
          {#R1 #R2} @ALIGN(\"x\", priority=\"high\") }\n.end\n",
     );
@@ -1889,12 +1847,6 @@ fn alternatives(p: &LevelProblem, k: usize) -> Vec<FactKind> {
         .collect()
 }
 
-/// The options of `rnl solve` with a time limit of `seconds`, which [`Ticks`] counts in readings.
-fn within(seconds: f64) -> SolveOptions {
-    let solver = SolverOptions { time_limit: Some(seconds), ..SolverOptions::without_time_limit() };
-    SolveOptions { solver, ..unlimited() }
-}
-
 /// What the report of a level says of the facts its resolution did not decide: a line for each,
 /// discarded for want of time, and its warning on a line of its own (7.6).
 fn check_undecided(level: &rnl_cli::solve::SolvedLevel, what: &str) {
@@ -1925,59 +1877,17 @@ fn check_undecided(level: &rnl_cli::solve::SolvedLevel, what: &str) {
 }
 
 #[test]
-fn with_no_time_at_all_only_what_the_origin_satisfies_is_kept_and_the_rest_is_warned() {
-    // the time is out at the first check (the draft 0.3, 8.5): a fact that needs one is discarded
-    // undecided, with a warning (7.6); a fact that every object at the origin satisfies is kept
-    let body =
-        "* timed\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 b c 1k\n* @RNL { #R1 @PLACE(0, 0); \
-                #R2 @PLACE(10, 0); {#R1 #R2} @ALIGN(\"y\") }\n.end\n";
-    let files = MemoryProvider::new().with("/w/t.sp", body);
-    let run = solve_with_clock(Path::new("/w/t.sp"), &files, &within(0.0), &Ticks::default()).unwrap();
-    let level = &run.levels[0];
-    let p = &level.problem;
-    let r = &level.solved.report;
-    let fact = |text: &str| (0..p.facts.len()).find(|&k| describe_fact(p, k).contains(text)).unwrap();
-    let (x2, align) = (fact("the x of #R2 = 10"), fact("ALIGN y {#R1 #R2}"));
-    assert!(r.discarded.iter().any(|d| d.fact == x2 && d.undecided && d.groups.is_empty() && !d.complete), "{r:?}");
-    for kept in [align, fact("the x of #R1 = 0"), fact("the y of #R1 = 0"), fact("the y of #R2 = 0")] {
-        assert!(r.kept.contains(&kept), "{}: {r:?}", describe_fact(p, kept));
-    }
-    assert!(r.warnings.iter().any(|w| w.starts_with(&format!("the fact [{x2}] ")) && w.contains(" 0 s ")));
-    check_undecided(level, "timed");
-    check_kept(&run, "timed");
-    assert!(level.hash.ends_with(&rnl_runtime::problem::options_digest(&within(0.0).solver.canonical())));
-    // the record reads back without an error, and the same again on a fresh clock
-    let solved = MemoryProvider::new().with("/w/t.sp", &run.files[0].text);
-    let both = Layered { layers: vec![&solved, &files] };
-    let back = interpret_file(Path::new("/w/t.sp"), None, &both, &Options::default()).unwrap();
-    let errors: Vec<_> = back.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).collect();
-    assert!(errors.is_empty(), "{errors:?}");
-    let again = solve_with_clock(Path::new("/w/t.sp"), &files, &within(0.0), &Ticks::default()).unwrap();
-    assert_eq!(again.files, run.files);
-    // without a limit, every fact is decided
-    let all = solve(Path::new("/w/t.sp"), &files, &unlimited()).unwrap();
-    let report = &all.levels[0].solved.report;
-    assert!(report.discarded.is_empty() && report.warnings.is_empty(), "{report:?}");
-}
-
-#[test]
-fn every_minimal_group_is_named_and_a_limit_that_cuts_them_says_the_list_is_not_complete() {
+fn every_minimal_group_is_named() {
     // an ALIGN on x of three resistors written before their PLACEs apart on x, which rank first:
     // each pair of the PLACEs is a minimal conflict group of the ALIGN, and its line names the three
-    // (the draft 0.3, 8.5). A limit that runs out after every fact is decided, while the groups are
-    // found, keeps the facts of 8.5 and gives the groups found by then, each minimal, and the line
-    // of the ALIGN says that the list is not complete, as does the head of the hints by statement;
-    // with more time, the groups are those of 8.5
-    let body = "* cut\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 b c 1k\nR3 c d 1k\n* @RNL { \
+    // (8.5), as does the head of the hints by statement
+    let body = "* cut\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\nR1 a b 1k\nR2 b c 1k\nR3 c d 1k\n* @RNL { \
                 {#R1 #R2 #R3} @ALIGN(\"x\"); #R1 @PLACE(0, 0); #R2 @PLACE(10, 0); #R3 @PLACE(20, 0) }\n.end\n";
     let files = MemoryProvider::new().with("/w/t.sp", body);
-    let clock = Ticks::default();
-    let all = solve_with_clock(Path::new("/w/t.sp"), &files, &within(1e9), &clock).unwrap();
-    let reads = clock.reads();
+    let all = solve(Path::new("/w/t.sp"), &files, &within_work(WORK_04)).unwrap();
     let level = &all.levels[0];
     let p = &level.problem;
     let whole = &level.solved.report;
-    assert_eq!(whole, &solve(Path::new("/w/t.sp"), &files, &unlimited()).unwrap().levels[0].solved.report);
     let fact = |text: &str| (0..p.facts.len()).find(|&k| describe_fact(p, k).contains(text)).unwrap();
     let align = fact("ALIGN x");
     let xs = [fact("the x of #R1 = 0"), fact("the x of #R2 = 10"), fact("the x of #R3 = 20")];
@@ -2004,38 +1914,8 @@ fn every_minimal_group_is_named_and_a_limit_that_cuts_them_says_the_list_is_not_
             |l: &&String| l.starts_with("    t.sp:6 ") && l.contains(&format!(" [{x}] the x of ")) && l.ends_with(&end);
         assert!(lines.iter().any(|l| named(&l)), "{x}: {lines:#?}");
     }
-    let incomplete = " (the list is not complete: the time limit was reached)";
-    assert!(!lines.iter().any(|l| l.contains(incomplete)), "{lines:#?}");
-    let mut cut = Vec::new();
-    for limit in 0..=reads {
-        let run = solve_with_clock(Path::new("/w/t.sp"), &files, &within(limit as f64), &Ticks::default()).unwrap();
-        let level = &run.levels[0];
-        let r = &level.solved.report;
-        check_undecided(level, &format!("{limit} s"));
-        check_kept(&run, &format!("{limit} s"));
-        if !r.warnings.is_empty() {
-            continue;
-        }
-        assert_eq!(r.kept, whole.kept, "{limit} s");
-        let d = &r.discarded[0];
-        let lines = rnl_cli::solve::report(level, false);
-        if d.complete {
-            assert_eq!(r.discarded, whole.discarded, "{limit} s");
-            assert_eq!(r.statements, whole.statements, "{limit} s");
-            assert!(!lines.iter().any(|l| l.contains(incomplete)), "{limit} s: {lines:#?}");
-            continue;
-        }
-        cut.push(d.groups.len());
-        assert!(d.groups.iter().all(|g| groups.contains(g)), "{limit} s: {d:?}");
-        let start = format!("  discarded {}: ", describe_fact(p, align));
-        let line = lines.iter().find(|l| l.starts_with(&start)).unwrap();
-        assert!(line.ends_with(incomplete), "{limit} s: {line}");
-        let head =
-            "  statements whose facts took part in discarding (8.5; the list is not complete: the time limit was reached):";
-        assert_eq!(lines.iter().any(|l| l == head), !d.groups.is_empty(), "{limit} s: {lines:#?}");
-    }
-    // cut before the first group was found, after it, and after the second
-    assert!(cut.contains(&0) && cut.contains(&1) && cut.contains(&2), "{cut:?}");
+    assert!(lines.contains(&"  statements whose facts took part in discarding (8.5):".to_string()), "{lines:#?}");
+    assert!(!lines.iter().any(|l| l.contains(" (the list is not complete: ")), "{lines:#?}");
 }
 
 #[test]
@@ -2074,7 +1954,8 @@ fn a_case_whose_resolution_runs_out_of_time_keeps_what_it_decided() {
 /// ALIGN y puts on one height, and the ground stubs of the standard package.
 fn with_statements(statements: &str) -> String {
     format!(
-        "* facts that contradict themselves\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\n\
+        "* facts that contradict themselves\n\
+         * @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\")}}\n\
          .model nch nmos level=1\nM1 out in 0 0 nch W=4u L=1u\nR1 out a 1k\nR2 a 0 1k\n* @RNL {{\n\
          *   # @SELECT-INSTANCE(model=\"nch\") => @SET-SYMBOL $NMOS;\n{statements}\
          *   #R1 @PLACE(0, 0);\n*   #R2 @PLACE(0, 5);\n*   {{#R1 #R2}} @ALIGN(\"y\")\n* }}\n.end\n"
@@ -2090,15 +1971,17 @@ fn unranked(p: &LevelProblem, k: usize) -> String {
 #[test]
 fn a_fact_that_contradicts_itself_fails_and_the_level_is_solved_without_it() {
     // The drain and the gate of the NMOS, at (0, 2) and (−3, 0), at one height whatever its
-    // orientation; an ORDER of the NMOS and the centre of its drain and its source, which is its
-    // origin whatever its orientation; its drain and its source at least 5 apart on x, where they
-    // are 0 or 4 apart; its gate and its drain exactly 1 apart on y, where they are 2 or 3 apart.
+    // orientation; an ORDER of its gate, its drain and its source from left to right, where the
+    // drain and the source are one above the other, or the gate is on the x between them or beyond
+    // both; its drain and its source at least 5 apart from left to right, where they are 0 or 4
+    // apart; its gate and its drain exactly 1 apart from bottom to top, where they are 2 or 3 apart.
     // Only the pins of its symbol and its orientations tie these points, which the runtime does
     // not look at (8.5, 9.5): it gives them to the solver, and the solver finds that none has a
-    // solution on its own: each fails with an error (the draft 0.3, 8.5; 7.6), takes no part in
-    // the resolution, and the level is solved as without them.
-    let failing = "*   {#M1:d #M1:g} @ALIGN(\"y\");\n*   {#M1 {#M1:d #M1:s}} @ORDER(\"x\");\n\
-                   *   #M1:d #M1:s @DISTANCE(\"x\", min=5);\n*   #M1:g #M1:d @DISTANCE(\"y\", exact=1);\n";
+    // solution on its own: each fails with an error (8.5, 7.6), takes no part in the resolution,
+    // and the level is solved as without them.
+    let failing = "*   {#M1:d #M1:g} @ALIGN(\"y\");\n*   {#M1:g #M1:d #M1:s} @ORDER(\"left-to-right\");\n\
+                   *   #M1:d #M1:s @DISTANCE(\"left-to-right\", min=5);\n\
+                   *   #M1:g #M1:d @DISTANCE(\"bottom-to-top\", exact=1);\n";
     let files = MemoryProvider::new().with("/w/self.sp", &with_statements(failing));
     let run = solve(Path::new("/w/self.sp"), &files, &unlimited()).unwrap();
     assert_eq!(run.errors, 0, "the runtime does not fail them");
@@ -2108,7 +1991,7 @@ fn a_fact_that_contradicts_itself_fails_and_the_level_is_solved_without_it() {
     let fact = |text: &str| (0..p.facts.len()).find(|&k| describe_fact(p, k).contains(text)).unwrap();
     let mut failed = vec![
         fact("ALIGN y {#M1:d #M1:g}"),
-        fact("ORDER x either {#M1 {#M1:d #M1:s}}"),
+        fact("ORDER x increasing {#M1:g #M1:d #M1:s}"),
         fact("{#M1:d} {#M1:s}"),
         fact("{#M1:g} {#M1:d}"),
     ];
@@ -2131,7 +2014,7 @@ fn a_fact_that_contradicts_itself_fails_and_the_level_is_solved_without_it() {
         assert!(lines.contains(&format!("  error: {e}")), "{e}\n{lines:#?}");
     }
     assert!(
-        lines[0].ends_with(&format!(" kept, {} discarded, 4 failed of 13 facts", r.discarded.len())),
+        lines[0].ends_with(&format!(" kept, {} discarded, 4 failed of 30 facts", r.discarded.len())),
         "{}",
         lines[0]
     );
@@ -2159,12 +2042,12 @@ fn a_fact_that_contradicts_itself_fails_and_the_level_is_solved_without_it() {
     assert_eq!(level.solved.solution, other.solved.solution);
     // the record is written all the same
     assert!(run.files[0].text.contains(&level.hash), "{}", run.files[0].text);
-    // with no time at all, their checks on their own do not finish: undecided, not failed
-    let cut = solve_with_clock(Path::new("/w/self.sp"), &files, &within(0.0), &Ticks::default()).unwrap();
+    // with no work at all, their checks on their own do not finish: undecided, not failed
+    let cut = solve(Path::new("/w/self.sp"), &files, &within_work(0)).unwrap();
     let r = &cut.levels[0].solved.report;
     assert!(r.failed.is_empty() && r.errors.is_empty(), "{r:?}");
     assert!(failed.iter().all(|k| r.discarded.iter().any(|d| d.fact == *k && d.undecided)), "{r:?}");
-    check_undecided(&cut.levels[0], "no time");
+    check_undecided(&cut.levels[0], "no work");
 
     // the command prints the errors, writes the file and exits with 1
     let dir = scratch("self-contradiction");
@@ -2187,19 +2070,19 @@ fn a_fact_that_contradicts_itself_fails_and_the_level_is_solved_without_it() {
 
 #[test]
 fn a_fact_that_the_runtime_sees_contradict_itself_never_reaches_the_solver() {
-    // an ORDER of one set written twice, and an ORDER of a resistor and the set of it alone: from
-    // what is written, two members at one place. The runtime fails each itself, with an error at
-    // its statement, and leaves it out of the problem (8.5, 9.5): the solver fails nothing, and the
-    // level is solved as without them; the command gives the errors of the netlist on the standard
-    // error, writes the file and exits with 1, as for any error (7.6)
-    let failing = "*   {{#R1 #R2} {#R1 #R2}} @ORDER(\"y\");\n*   {#R1 {#R1}} @ORDER(\"y\");\n";
+    // two ORIENT-RELATIONs that each have an object on both of their sides, mirrored and turned
+    // against itself: from what is written, no orientation holds them (14.9). The runtime fails
+    // each itself, with an error at its statement, and leaves it out of the problem (8.5, 9.5):
+    // the solver fails nothing, and the level is solved as without them; the command gives the
+    // errors of the netlist on the standard error, writes the file and exits with 1, as for any
+    // error (7.6)
+    let failing = "*   #R1 #R1 @ORIENT-RELATION(\"MY\");\n*   #R2 #R2 @ORIENT-RELATION(\"R90\");\n";
     let files = MemoryProvider::new().with("/w/self.sp", &with_statements(failing));
     let run = solve(Path::new("/w/self.sp"), &files, &unlimited()).unwrap();
     assert_eq!(run.errors, 2, "the runtime fails them");
     let level = &run.levels[0];
     let p = &level.problem;
     let r = &level.solved.report;
-    assert!((0..p.facts.len()).all(|k| !describe_fact(p, k).contains("ORDER")), "{:#?}", p.facts);
     assert!(r.failed.is_empty() && r.errors.is_empty(), "{r:?}");
     let none = MemoryProvider::new().with("/w/self.sp", &with_statements(&"*\n".repeat(2)));
     let without = solve(Path::new("/w/self.sp"), &none, &unlimited()).unwrap();
@@ -2244,68 +2127,29 @@ fn the_command_exits_with_1_on_the_errors_of_the_netlist() {
 }
 
 #[test]
-fn a_place_decided_before_the_time_ran_out_is_written_as_written() {
-    // #R1 at (5.5, 0) is decided; #R2 at x = 10, after it in the order of 8.5, is not, for want of
-    // time. The positions are still taken from the facts kept with their constants as written,
-    // which is not timed: the record writes 5.5, not a tolerance off it, every fact kept holds at
-    // 1e-6 where the solution puts the objects, and read back, no fact kept is dropped against
-    // the record (8.5, 17)
-    let body = "* decimal\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 b c 1k\n\
-                * @RNL { #R2 @PLACE(x=10); #R1 @PLACE(5.5, 0) }\n.end\n";
-    let files = MemoryProvider::new().with("/w/t.sp", body);
-    let entry = Path::new("/w/t.sp");
-    let clock = Ticks::default();
-    solve_with_clock(entry, &files, &within(1e9), &clock).unwrap();
-    let mut cut = 0;
-    for limit in 0..=clock.reads() {
-        let run = solve_with_clock(entry, &files, &within(limit as f64), &Ticks::default()).unwrap();
-        let level = &run.levels[0];
-        let p = &level.problem;
-        let r = &level.solved.report;
-        let fact = |text: &str| (0..p.facts.len()).find(|&k| describe_fact(p, k).contains(text)).unwrap();
-        let (x1, x2) = (fact("the x of #R1 = 5.5"), fact("the x of #R2 = 10"));
-        if !(r.kept.contains(&x1) && r.discarded.iter().any(|d| d.fact == x2 && d.undecided)) {
-            continue;
-        }
-        cut += 1;
-        check_kept(&run, &format!("{limit} s"));
-        assert!(level.record.contains("#R1 @PLACE(5.5, 0)"), "{limit} s: {}", level.record);
-        let back = read_solved(&run, &files, entry);
-        let dropped = dropped(&back);
-        for &k in &r.kept {
-            let label = &p.facts[k].label;
-            assert!(
-                !dropped.iter().any(|m| m.starts_with(&format!("{label} conflicts with"))),
-                "{limit} s: {dropped:?}"
-            );
-        }
-    }
-    assert!(cut > 0, "no limit decides #R1 and leaves #R2 undecided");
-}
-
-#[test]
 fn no_record_is_written_in_a_region_written_to_be_encrypted() {
     // a record in `.prot … .unprot` is gone once the region is encrypted (2.2): a subcircuit whose
     // `.subckt` lies in a region, as in an encrypted library, is solved but not written, and its
-    // report says so; one whose `.ends` lies in a region that begins inside it has its record
+    // report says so with an error of the writing; one whose `.ends` lies in a region that begins
+    // inside it has its record
     // before the region. Read back, every level written is placed whole, no record is in a region,
     // and a second solve writes the same
     let lib = "* lib\n.prot\n.subckt enc a b\nR1 a m 1k\nR2 m b 1k\n.ends\n.unprot\n\
                .subckt half a b\nR1 a m 1k\n.prot\nR2 m b 1k\n.ends\n.unprot\n";
-    let top = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.include lib.inc\nX1 p q enc\nX2 p q half\n.end\n";
+    let top = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.include lib.inc\nX1 p q enc\nX2 p q half\n.end\n";
     let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/lib.inc", lib);
     let entry = Path::new("/w/top.sp");
     let run = solve(entry, &files, &unlimited()).unwrap();
     assert_eq!(run.levels.iter().map(|l| l.problem.title.as_str()).collect::<Vec<_>>(), ["top.sp", "enc", "half"]);
-    // lib.inc, read in the 0.2 of the file that includes it, is written and raised (16.1): its new
-    // header on line 2 puts the region on lines 3 to 8
-    let note = "the record is not written: enc lies in a region written to be encrypted, lines 3 to 8 of lib.inc, \
+    // lib.inc, read in the 0.4 of the file that includes it, is written with a header of 0.4 on
+    // line 2 (16.1), after the region was found on lines 2 to 7 of the text as it was read
+    let note = "the record is not written: enc lies in a region written to be encrypted, lines 2 to 7 of lib.inc, \
                 where a record is gone once the region is encrypted (2.2)";
-    assert_eq!(run.levels[1].written.notes, [note]);
-    assert!(lines(&run, false).contains(&format!("    {note}")));
+    let errors: Vec<_> = run.levels[1].write_errors.iter().map(|e| (e.code, e.message.as_str())).collect();
+    assert_eq!(errors, [(rnl_runtime::diag::codes::WRITEBACK_REGION_ENCRYPTED, note)]);
+    assert!(lines(&run, false).iter().any(|l| l.contains(note)), "{:#?}", lines(&run, false));
     let text = &run.files.iter().find(|f| f.path == "/w/lib.inc").unwrap().text;
-    let head =
-        "* lib\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")}\n.prot\n\
+    let head = "* lib\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.prot\n\
          .subckt enc a b\nR1 a m 1k\nR2 m b 1k\n.ends\n.unprot\n.subckt half a b\nR1 a m 1k\n* @RNL(type=\"generated\"";
     assert!(text.starts_with(head) && text.ends_with("* }\n.prot\nR2 m b 1k\n.ends\n.unprot\n"), "{text}");
     assert_eq!(text.matches("type=\"generated\"").count(), 1, "{text}");
@@ -2338,7 +2182,7 @@ fn in_a_spice_section_of_a_spectre_file_a_record_is_carried_by_a_star() {
     assert_eq!(run.levels.iter().map(|l| l.problem.title.as_str()).collect::<Vec<_>>(), ["top.scs", "half"]);
     let text = &run.files[0].text;
     assert!(
-        text.starts_with("// top\n// @RNL(type=\"header\") { @VERSION(\"0.3\")}\nsimulator lang=spice\n"),
+        text.starts_with("// top\n// @RNL(type=\"header\") { @VERSION(\"0.4\")}\nsimulator lang=spice\n"),
         "{text}"
     );
     assert!(text.contains("\nR2 m b 1k\n* @RNL(type=\"generated\"") && text.contains("\n* }\n.ends\n"), "{text}");
@@ -2355,19 +2199,20 @@ fn solve_and_preview_say_on_the_standard_error_that_the_solver_is_a_preview() {
     let kind = rnl_runtime::diag::codes::SOLVE_PREVIEW_NOTICE;
     assert_eq!(rnl_cli::SOLVER_PREVIEW_NOTICE, format!("hint: {kind}: {text}"));
     let notice = format!("{}\n", rnl_cli::SOLVER_PREVIEW_NOTICE);
-    let f = path_str(&case("T1-rc-lowpass"));
+    let f = path_str(&case("T2b-common-source-dragged"));
     let dir = scratch("preview-notice");
     let out = path_str(&dir.join("out"));
-    let (code, stdout, stderr) = rnl(&["solve", &f, "-o", &out, "--solver-options", "time_limit=none"]);
+    let work = format!("limit=\"work\",work={WORK_04},safety_seconds=3600");
+    let (code, stdout, stderr) = rnl(&["solve", &f, "-o", &out, "--solver-config", &work]);
     assert_eq!(code, 0, "{stdout}{stderr}");
     assert_eq!(stderr, notice);
     // the standard output and the file written are as they were
-    assert!(stdout.starts_with("solver options: "), "{stdout}");
+    assert!(stdout.starts_with("level "), "{stdout}");
     assert!(!stdout.contains(rnl_cli::SOLVER_PREVIEW_NOTICE), "{stdout}");
-    let snapshot = std::fs::read(solver_dir().join("solved/T1-rc-lowpass.sp")).unwrap();
-    assert!(std::fs::read(dir.join("out").join("T1-rc-lowpass.sp")).unwrap() == snapshot);
+    let snapshot = std::fs::read(solver_dir().join("solved/T2b-common-source-dragged.sp")).unwrap();
+    assert!(std::fs::read(dir.join("out").join("T2b-common-source-dragged.sp")).unwrap() == snapshot);
     // the preview's JSON is the whole of its standard output
-    let (code, stdout, stderr) = rnl(&["preview", &f, "--solver-options", "time_limit=none"]);
+    let (code, stdout, stderr) = rnl(&["preview", &f, "--solver-config", &work]);
     assert_eq!(code, 0, "{stderr}");
     assert_eq!(stderr, notice);
     let v: serde_json::Value = serde_json::from_str(&stdout).unwrap();

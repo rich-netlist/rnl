@@ -212,21 +212,4 @@ mod tests {
         let text = it.objs.iter().find(|o| o.name == "t").unwrap();
         assert!(matches!(text.data, ObjData::Prim { shape: super::super::obj::Shape::Text, .. }));
     }
-
-    #[test]
-    fn old_symbols_keep_point_results_and_do_not_acquire_pin_names() {
-        for version in ["0.2", "0.3"] {
-            let files = source(
-                version,
-                "$S = @DEFINE-SYMBOL { %p = (2,3) @PIN(terminal=1); %p = (4,5) @PIN(terminal=1); @LINE {%p (0,0)} }",
-            );
-            let it = read(&files);
-            no_errors(&it);
-            let s = symbol(&it, "$S");
-            assert_eq!(s.pins.len(), 1);
-            assert!(s.pins[0].names.is_empty());
-            assert_eq!(s.prims[0].points, [(4.0, 5.0), (0.0, 0.0)]);
-            assert!(!it.objs.iter().any(|o| matches!(o.data, ObjData::SymbolPin { .. })));
-        }
-    }
 }

@@ -126,15 +126,6 @@ fn authored_numbered_role_members_survive_generated_writeback() {
 }
 
 #[test]
-fn released_numbered_role_export_is_unchanged() {
-    let files = MemoryProvider::new().with("main.sp", &numbered_roles("0.3"));
-    let read =
-        interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
-    let usage = read.problems[0].usages.iter().find(|u| u.definition == "$GROUPING").unwrap();
-    assert_eq!(usage.roles[0].written, None);
-}
-
-#[test]
 fn numbers_owned_by_the_replaced_record_are_not_exported_as_role_references() {
     let text = numbered_roles("0.4")
         .replace("* $ANCHOR @ATTACH;\n", "")

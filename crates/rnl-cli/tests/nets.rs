@@ -1,6 +1,6 @@
 //! The nets of a level in the problem a solver reads (6.3): each net with the pins on it, the
-//! wires that draw it, the ROUTEs that ask for it and its place among the ports, in the order the
-//! netlist first names them; and the nets that each virtual part and each text is on.
+//! wires that draw it, the ROUTE-NETs that ask for it and its place among the ports, in the order
+//! the netlist first names them; and the nets that each virtual part and each text is on.
 
 use std::path::Path;
 
@@ -9,16 +9,16 @@ use rnl_runtime::problem::{LevelProblem, PointRef};
 use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 
-const NET: &str = "* nets\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.subckt amp in out vdd vss\n\
+const NET: &str = "* nets\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n.subckt amp in out vdd vss\n\
                    M1 out in vss vss nch\nR1 vdd out 10k\nC1 out vss 1p\n\
                    * @RNL {\n\
-                   *   $GND @ATTACH &vss;\n\
+                   *   $GROUND @ATTACH &vss;\n\
                    *   &out @WIRE {#M1:1 #R1:2};\n\
                    *   %w = &vss @WIRE {#M1:3 #C1:2};\n\
                    *   &out @TEXT(\"vout\");\n\
                    *   #R1:1 @TEXT(\"v\");\n\
                    *   %w @TEXT(\"ground wire\");\n\
-                   *   &in @ROUTE\n\
+                   *   &in @ROUTE-NET\n\
                    * }\n.ends amp\nX1 a b c 0 amp\n.end\n";
 
 fn read(text: &str) -> Interpretation {
@@ -54,13 +54,14 @@ fn the_nets_of_a_level_with_their_pins_wires_routes_and_ports() {
     let ports: Vec<Option<usize>> = p.nets.iter().map(|n| n.port).collect();
     assert_eq!(ports, [Some(0), Some(1), Some(2), Some(3)]);
     assert!(p.nets.iter().all(|n| n.reference == rnl_runtime::problem::Reference::Name(format!("&{}", n.name))));
-    // every pin on a net, in the order of the objects: the instances, then the virtual parts,
-    // the port that the standard package draws on each port of the subcircuit and the ground on vss
-    assert_eq!(on(p, "out"), ["#M1", "#R1", "#C1", "a usage of $IOPORT"]);
-    assert_eq!(on(p, "vdd"), ["#R1", "a usage of $IOPORT"]);
+    // every pin on a net, in the order of the objects: the instances, then the virtual parts:
+    // the ground on vss, the label %l that the standard package's fill puts on each unwired pin
+    // and the port it draws on each port of the subcircuit
+    assert_eq!(on(p, "out"), ["#M1", "#R1", "#C1", "%l", "a usage of $IO_PORT"]);
+    assert_eq!(on(p, "vdd"), ["#R1", "%l", "a usage of $IO_PORT"]);
     let vss = on(p, "vss");
     assert!(vss.contains(&"#M1".to_string()) && vss.contains(&"#C1".to_string()), "{vss:?}");
-    assert!(vss.iter().any(|l| l == "a usage of $GND"), "{vss:?}");
+    assert!(vss.iter().any(|l| l == "a usage of $GROUND"), "{vss:?}");
     let mut sorted = p.nets.iter().find(|n| n.name == "vss").unwrap().pins.clone();
     sorted.sort_by_key(|q| match q {
         PointRef::Pin { object, pin, .. }
@@ -69,7 +70,7 @@ fn the_nets_of_a_level_with_their_pins_wires_routes_and_ports() {
         _ => (usize::MAX, 0),
     });
     assert_eq!(sorted, p.nets.iter().find(|n| n.name == "vss").unwrap().pins);
-    // the wires that draw each net, and the ROUTE that asks for one
+    // the wires that draw each net, and the ROUTE-NET that asks for one
     let wires = |name: &str| p.nets.iter().find(|n| n.name == name).unwrap().wires.clone();
     assert_eq!((wires("out").len(), wires("vss").len(), wires("in").len()), (1, 1, 0));
     assert_eq!(p.wires[wires("vss")[0]].nets, ["vss"]);
@@ -94,7 +95,7 @@ fn the_nets_of_a_virtual_part_and_of_a_text() {
         o.nets.clone()
     };
     // the ground on vss, by its role
-    assert_eq!(nets("a usage of $GND"), [index("vss")]);
+    assert_eq!(nets("a usage of $GROUND"), [index("vss")]);
     // the instances list none: their pins say where they are
     assert!(nets("#M1").is_empty() && nets("#R1").is_empty());
     // a text on a net, on a terminal, on a wire
@@ -113,7 +114,8 @@ fn the_nets_of_a_virtual_part_and_of_a_text() {
 
 #[test]
 fn a_bus_pin_of_a_bundle_is_on_each_net_of_its_members() {
-    let corpus = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/cases/09-buses-and-bundles.sp");
+    let corpus = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/conformance/cases-0.4/from-0.2/09-buses-and-bundles.sp");
     let r = interpret_file(&corpus, None, &FsProvider::new(&[]), &Options::solver()).unwrap();
     let mut seen = 0;
     for p in &r.problems {

@@ -370,40 +370,38 @@ mod tests {
         let r = symbol(&c, "$RESISTOR");
         assert_eq!(
             (r.package.as_str(), r.version.as_str(), r.file.as_str()),
-            ("rnl-std-basic", "0.3", "rnl-std-basic.rnl")
+            ("rnl-std-basic", "0.4", "rnl-std-basic.rnl")
         );
         let pins: Vec<(Terminal, [f64; 2], Option<&str>)> =
             r.pins.iter().map(|p| (p.terminal.clone(), p.at, p.direction)).collect();
-        assert_eq!(
-            pins,
-            [(Terminal::Number(1), [0.0, 2.0], Some("up")), (Terminal::Number(2), [0.0, -2.0], Some("down"))]
-        );
+        let name = |n: &str| Terminal::Name(n.into());
+        assert_eq!(pins, [(name("p"), [0.0, 2.0], Some("up")), (name("n"), [0.0, -2.0], Some("down"))]);
         assert_eq!(r.bbox, [-1.0, -2.0, 1.0, 2.0]);
         let keys: Vec<&str> = r.labels.iter().map(|l| l.key.as_str()).collect();
         assert_eq!(keys, ["name", "value"]);
         // no rule draws the usages of a definition with it
         assert_eq!(r.definition, None);
-        // as JSON, a terminal by number is a number
+        // as JSON, a terminal by name is a string
         let v = serde_json::to_value(r).unwrap();
-        assert_eq!(v["pins"][1], json!({"terminal": 2, "at": [0.0, -2.0], "direction": "down"}));
+        assert_eq!(v["pins"][1], json!({"terminal": "n", "at": [0.0, -2.0], "direction": "down"}));
         assert_eq!(v["box"], json!([-1.0, -2.0, 1.0, 2.0]));
         assert_eq!(
             v["labels"][0],
             json!({"key": "name", "text": "${name}", "at": [0.95, 0.25], "halign": "start", "valign": "baseline"})
         );
-        // the pins in terminal order, not in the order written: $TRANSFORMER writes 2, 1, 4, 3
+        // terminals by name in the order written: $TRANSFORMER writes p1, n1, p2, n2
         let t = symbol(&c, "$TRANSFORMER");
         let order: Vec<Terminal> = t.pins.iter().map(|p| p.terminal.clone()).collect();
-        assert_eq!(order, [1, 2, 3, 4].map(Terminal::Number));
-        assert_eq!(t.pins[0].at, [2.0, 1.0]);
+        assert_eq!(order, ["p1", "n1", "p2", "n2"].map(name));
+        assert_eq!(t.pins[0].at, [-1.0, 2.0]);
     }
 
     #[test]
-    fn every_symbol_of_0_3_has_its_pin_sides_on_its_outermost_pins() {
+    fn every_symbol_of_the_series_has_its_pin_sides_on_its_outermost_pins() {
         let c = default();
-        let symbols_03: Vec<&CatalogSymbol> = c.symbols.iter().filter(|s| s.version == "0.3").collect();
-        assert_eq!(symbols_03.len(), 93);
-        for s in symbols_03 {
+        let symbols: Vec<&CatalogSymbol> = c.symbols.iter().filter(|s| s.version == "0.4").collect();
+        assert!(!symbols.is_empty() && symbols.len() == c.symbols.len());
+        for s in symbols {
             let [x1, y1, x2, y2] = s.bbox;
             for p in &s.pins {
                 let [px, py] = p.at;
@@ -438,7 +436,8 @@ mod tests {
     #[test]
     fn a_symbol_is_what_the_drawings_have() {
         // the box and the pins of the resistor an instance is drawn with
-        let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
+        let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); \
+                    @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\") }\nR1 a 0 1k\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
         let files = MemoryProvider::new().with("/w/t.sp", text);
         let r = crate::interpret("/w/t.sp", None, &files, &Options::default()).unwrap();
         let drawn = r.model.levels[0].symbols.iter().find(|s| s.name == "$RESISTOR").unwrap();
@@ -451,25 +450,28 @@ mod tests {
     }
 
     #[test]
-    fn a_rule_links_a_definition_and_its_symbol() {
+    fn a_definition_comes_with_its_roles_and_parameters() {
         let c = default();
-        assert_eq!(symbol(&c, "$GROUND_SYMBOL").definition.as_deref(), Some("$GROUND"));
         let ground = definition(&c, "$GROUND");
-        assert_eq!((ground.package.as_str(), ground.version.as_str()), ("rnl-std-basic", "0.3"));
-        assert_eq!(ground.symbol.as_deref(), Some("$GROUND_SYMBOL"));
+        assert_eq!((ground.package.as_str(), ground.version.as_str()), ("rnl-std-basic", "0.4"));
         // the roles as written
-        assert_eq!(serde_json::to_value(&ground.roles).unwrap(), json!([["p", ["net", "terminal"]]]));
-        assert_eq!(serde_json::to_value(&definition(&c, "$NO_CONNECT").roles).unwrap(), json!([["t", "terminal"]]));
-        assert_eq!(serde_json::to_value(&definition(&c, "$MATCHED").roles).unwrap(), json!(["{members}"]));
+        assert_eq!(serde_json::to_value(&ground.roles).unwrap(), json!([["p", "net"]]));
+        assert_eq!(
+            serde_json::to_value(&definition(&c, "$NO_CONNECT").roles).unwrap(),
+            json!([["t", ["terminal", "pin"]]])
+        );
+        let matched = definition(&c, "$MATCHED");
+        assert_eq!(matched.package, "rnl-std-semantics");
+        assert_eq!(serde_json::to_value(&matched.roles).unwrap(), json!([["{members}", ["instance", "usage"]]]));
         // the parameters with their defaults; no rule draws a stub
         let stub = definition(&c, "$GROUND_STUB");
-        assert_eq!(serde_json::to_value(&stub.parameters).unwrap(), json!([["gap", 2.0]]));
+        assert_eq!(serde_json::to_value(&stub.parameters).unwrap(), json!([["gap", 3.0]]));
         assert_eq!(stub.symbol, None);
         // a rule of another form draws $NAMED_GROUND_SYMBOL, through the nets of a set
         assert_eq!(symbol(&c, "$NAMED_GROUND_SYMBOL").definition, None);
-        // the sets of the fill
-        let fill: Vec<&str> = c.sets.iter().filter(|s| s.package == "rnl-std-fill").map(|s| s.set.as_str()).collect();
-        assert_eq!(fill[..3], ["$GROUND_NET_SET", "$SUPPLY_NET_SET", "$PORT_FILL_SET"]);
+        // the net sets that the fill reads
+        let basic: Vec<&str> = c.sets.iter().filter(|s| s.package == "rnl-std-basic").map(|s| s.set.as_str()).collect();
+        assert_eq!(basic, ["$GROUND_NET_SET", "$SUPPLY_NET_SET", "$BIAS_NET_SET", "$PORT_FILL_SET"]);
     }
 
     #[test]
@@ -477,7 +479,8 @@ mod tests {
         let c = default();
         let inputs = |name: &str| -> Vec<[f64; 2]> {
             let s = symbol(&c, name);
-            s.pins.iter().filter(|p| matches!(p.terminal, Terminal::Number(1..=4))).map(|p| p.at).collect()
+            let input = |t: &Terminal| matches!(t, Terminal::Name(n) if ["a", "b", "c", "d"].contains(&n.as_str()));
+            s.pins.iter().filter(|p| input(&p.terminal)).map(|p| p.at).collect()
         };
         assert_eq!(symbol(&c, "$AND_4INPUT").package, "rnl-std-logic");
         assert_eq!(inputs("$AND_4INPUT"), [[-3.0, 2.0], [-3.0, 1.0], [-3.0, -1.0], [-3.0, -2.0]]);
@@ -487,86 +490,65 @@ mod tests {
     fn of_each_name_the_newest_version_or_every_version() {
         let c = default();
         let listed = packages(&c);
-        assert!(listed.contains(&("rnl-std", "0.3")) && !listed.contains(&("rnl-std", "0.2")), "{listed:?}");
-        // the draft series 0.4, written in a version newer than the default, is not the newest when
-        // a package also has an earlier version; only names new in 0.4 appear at 0.4
-        assert!(
-            listed.iter().all(|(name, version)| *version != "0.4"
-                || matches!(*name, "alias-zh" | "rnl-std-45deg" | "rnl-std-all" | "rnl-std-no-instance-labels")),
-            "{listed:?}"
-        );
-        // one version of each name, rnl-zh's 0.3; a name only the series 0.2 has keeps its version
+        // the 16 packages of the series 0.4, one version of each name
+        assert_eq!(listed.len(), 16, "{listed:?}");
+        assert!(listed.iter().all(|(_, version)| *version == "0.4"), "{listed:?}");
         let mut names: Vec<&str> = listed.iter().map(|p| p.0).collect();
         names.dedup();
         assert_eq!(names.len(), listed.len(), "{listed:?}");
         assert!(
-            listed.contains(&("rnl-zh", "0.3"))
-                && listed.contains(&("rnl-std-virtual", "0.2"))
-                && listed.contains(&("rnl-std-semantics", "0.2"))
-                && listed.contains(&("rnl-std-all", "0.4"))
-                && listed.contains(&("rnl-std-45deg", "0.4"))
-                && listed.contains(&("rnl-std-no-instance-labels", "0.4"))
+            listed.contains(&("rnl-std-all", "0.4"))
+                && listed.contains(&("rnl-std-basic", "0.4"))
+                && listed.contains(&("rnl-std-semantics", "0.4"))
                 && listed.contains(&("alias-zh", "0.4")),
             "{listed:?}"
         );
-        assert!(
-            listed.iter().all(|(name, _)| name.starts_with("rnl-std") || *name == "rnl-zh" || *name == "alias-zh"),
-            "{listed:?}"
-        );
-        // the 15 packages of the series 0.3 and rnl-zh; the four that only <= 0.3 has
-        // (rnl-std-symbols, rnl-std-virtual, rnl-std-semantics and rnl-std-layout); and the four
-        // names that only the draft 0.4 has (alias-zh, rnl-std-45deg, rnl-std-all and
-        // rnl-std-no-instance-labels)
-        assert_eq!(listed.len(), 16 + 4 + 4);
+        assert!(listed.iter().all(|(name, _)| name.starts_with("rnl-std") || *name == "alias-zh"), "{listed:?}");
         // by name, then by version
         let mut sorted = listed.clone();
         sorted.sort();
         assert_eq!(listed, sorted);
-        let std = c.packages.iter().find(|p| p.name == "rnl-std").unwrap();
+        let all = c.packages.iter().find(|p| p.name == "rnl-std-all").unwrap();
         let want = CatalogPackage {
-            name: "rnl-std".into(),
-            version: "0.3".into(),
-            language: "0.3".into(),
-            file: "rnl-std.rnl".into(),
-            references: ["rnl-std-core", "rnl-std-fill", "rnl-std-structures"].map(String::from).to_vec(),
+            name: "rnl-std-all".into(),
+            version: "0.4".into(),
+            language: "0.4".into(),
+            file: "rnl-std-all.rnl".into(),
+            references: [
+                "rnl-std-style",
+                "rnl-std-basic",
+                "rnl-std-semiconductors",
+                "rnl-std-fill",
+                "rnl-std-semantics",
+                "rnl-std-functional",
+                "rnl-std-rf",
+                "rnl-std-logic",
+                "rnl-std-signal-flow",
+                "rnl-std-spice",
+                "rnl-std-spectre",
+            ]
+            .map(String::from)
+            .to_vec(),
             series: true,
-            implicit: true,
+            // in 0.4 no standard package comes in unless the reading asks for it (16.3)
+            implicit: false,
         };
-        assert_eq!(*std, want);
+        assert_eq!(*all, want);
 
-        // every version: every series, the draft 0.4 too
-        let all = every_version();
-        let listed = packages(&all);
-        assert_eq!(listed.len(), crate::BUNDLED.len());
-        let at = |p: (&str, &str)| listed.iter().position(|q| *q == p).unwrap();
-        assert_eq!(at(("rnl-std", "0.2")) + 1, at(("rnl-std", "0.3")));
-        assert_eq!(at(("rnl-std-semantics", "0.2")) + 1, at(("rnl-std-semantics", "0.4")));
-        assert_eq!(all.packages[at(("rnl-std", "0.2"))].language, "0.2");
-        assert!(all.packages[at(("rnl-std", "0.3"))].implicit);
-        assert_eq!(all.packages[at(("rnl-std-all", "0.4"))].language, "0.4");
-        assert!(!all.packages[at(("rnl-std-all", "0.4"))].implicit);
-        assert_eq!(all.packages[at(("alias-zh", "0.4"))].language, "0.4");
-        // a name of the series 0.2 for a symbol, and one of the series 0.3 for a definition
-        let ground: Vec<(&str, &str)> = all
-            .symbols
-            .iter()
-            .filter(|s| s.symbol == "$GROUND")
-            .map(|s| (s.package.as_str(), s.version.as_str()))
-            .collect();
-        assert_eq!(ground, [("rnl-std-virtual", "0.2")]);
-        assert_eq!(definition(&all, "$GROUND").version, "0.3");
-        // the rules of each series link its own: $GND of the series 0.2 is drawn with its $GROUND
-        assert_eq!(symbol(&all, "$GROUND").definition.as_deref(), Some("$GND"));
-        assert_eq!(symbol(&all, "$GROUND_SYMBOL").definition.as_deref(), Some("$GROUND"));
+        // every version: the bundled files have one version of each name
+        let every = every_version();
+        assert_eq!(packages(&every), listed);
+        assert_eq!(packages(&every).len(), crate::BUNDLED.len());
+        assert!(every.packages.iter().all(|p| p.language == "0.4" && p.series && !p.implicit));
     }
 
     #[test]
     fn packages_keeps_only_the_names_it_gives() {
-        let names = ["rnl-std-basic", "rnl-std"].map(String::from).to_vec();
+        let names = ["rnl-std-logic", "rnl-std-all"].map(String::from).to_vec();
         let options = CatalogOptions { packages: Some(names), ..CatalogOptions::default() };
         let c = crate::catalog(&MemoryProvider::new(), &options);
-        assert_eq!(packages(&c), [("rnl-std", "0.3"), ("rnl-std-basic", "0.3")]);
-        assert!(c.symbols.iter().all(|s| s.package == "rnl-std-basic"));
+        assert_eq!(packages(&c), [("rnl-std-all", "0.4"), ("rnl-std-logic", "0.4")]);
+        assert!(c.symbols.iter().all(|s| s.package == "rnl-std-logic"));
         assert!(!c.symbols.is_empty());
         assert!(c.sets.is_empty());
         let none = CatalogOptions { packages: Some(vec!["no-such-package".into()]), ..CatalogOptions::default() };
@@ -574,9 +556,9 @@ mod tests {
     }
 
     const ACME: &str = r#"@RNL(type="header") {
-  @VERSION("0.3");
+  @VERSION("0.4");
   @PACKAGE(name="acme", version="1.0");
-  @USE-PACKAGE(name="rnl-std-basic", version="0.3")
+  @USE-PACKAGE(name="rnl-std-basic", version="0.4")
 }
 @RNL {
   $BLOCK = @DEFINE-SYMBOL(box=[-2, -2, 2, 2]) {
@@ -608,7 +590,7 @@ mod tests {
         let acme = c.packages.iter().find(|p| p.name == "acme").unwrap();
         assert_eq!(
             serde_json::to_value(acme).unwrap(),
-            json!({"name": "acme", "version": "1.0", "language": "0.3", "file": "acme.rnl",
+            json!({"name": "acme", "version": "1.0", "language": "0.4", "file": "acme.rnl",
                    "references": ["rnl-std-basic"], "series": false, "implicit": false})
         );
         // the terminals by number first, then by name as written; a pin without a direction; a
@@ -646,8 +628,8 @@ mod tests {
 
     #[test]
     fn of_one_name_and_version_the_first_package_directory_has_it() {
-        // a frontend's own rnl-std-basic 0.3 hides the bundled one, as the runtime finds it (16.2)
-        let own = "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"rnl-std-basic\", version=\"0.3\")}\n\
+        // a frontend's own rnl-std-basic 0.4 hides the bundled one, as the runtime finds it (16.2)
+        let own = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"rnl-std-basic\", version=\"0.4\")}\n\
                    @RNL { $ONLY = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1) } }\n";
         let mut files = MemoryProvider::new().with("/p/basic.rnl", own);
         files.package_dirs.push("/p".into());
@@ -687,8 +669,8 @@ mod tests {
         // a header record written as an example in the file's header comment declares nothing: the
         // catalog lists the package by the name, the version and the language of its own (2.7, 16.1)
         let real = concat!(
-            "/* an example: @RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"example\", version=\"9.9\") } */\n",
-            "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"real\", version=\"1.0\") }\n",
+            "/* an example: @RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"example\", version=\"9.9\") } */\n",
+            "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"real\", version=\"1.0\") }\n",
             "@RNL { $REAL_SYMBOL = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1) } }\n"
         );
         let mut files = MemoryProvider::new().with("/p/real.rnl", real);
@@ -696,7 +678,7 @@ mod tests {
         let only = |name: &str| CatalogOptions { packages: Some(vec![name.into()]), ..CatalogOptions::default() };
         let c = crate::catalog(&files, &only("real"));
         assert_eq!(packages(&c), [("real", "1.0")]);
-        assert_eq!(c.packages[0].language, "0.3");
+        assert_eq!(c.packages[0].language, "0.4");
         assert_eq!(c.symbols.iter().map(|s| s.symbol.as_str()).collect::<Vec<_>>(), ["$REAL_SYMBOL"]);
         assert_eq!(crate::catalog(&files, &only("example")), Catalog::default());
     }
@@ -709,7 +691,7 @@ mod tests {
         let file = |name: &str, version: &str| {
             format!(
                 "/* from a template: @PACKAGE(name=\"template\", version=\"9.9\") */\n\
-                 @RNL(type=\"header\", author=\"see @PACKAGE(name=\"\"template\"\", version=\"\"9.9\"\")\") {{ @VERSION(\"0.3\"); @PACKAGE(name=\"{name}\", version=\"{version}\") }}\n\
+                 @RNL(type=\"header\", author=\"see @PACKAGE(name=\"\"template\"\", version=\"\"9.9\"\")\") {{ @VERSION(\"0.4\"); @PACKAGE(name=\"{name}\", version=\"{version}\") }}\n\
                  @RNL {{ $ONE = @DEFINE-SYMBOL {{ (0, 0) @PIN(terminal=1) }} }}\n"
             )
         };

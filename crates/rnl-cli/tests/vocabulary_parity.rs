@@ -1,5 +1,4 @@
-//! Published vocabulary versus the signatures actually used by the interpreter: that of 0.3 whole,
-//! and that of the draft 0.4 but for the parts the changes still to come bring.
+//! Published vocabulary of 0.4 versus the signatures actually used by the interpreter.
 //! Handler-owned defaults and cross-parameter rules are checked through execution below.
 //! This is vocabulary parity, not exhaustive semantic conformance.
 
@@ -15,17 +14,8 @@ use rnl_runtime::{Interpretation, Options};
 use serde_json::{json, Value};
 
 fn published() -> Value {
-    serde_json::from_str(include_str!("../../../spec/rnl-words-0.3.json")).unwrap()
-}
-
-fn published_0_4() -> Value {
     serde_json::from_str(include_str!("../../../spec/rnl-words-0.4.json")).unwrap()
 }
-
-/// What the draft 0.4 has that the runtime does not yet: keywords by name, and the parts of the list
-/// that change with them. A change that brings one takes it off this list, so that the comparison
-/// covers it from then on; the list is empty when 0.4 is released.
-const PENDING_0_4: &[&str] = &[];
 
 // Every field is accounted for. These are the only prose-only exemptions: descriptions,
 // human-readable form/sentence templates (with ellipses), and explanations of keys/array items.
@@ -113,18 +103,12 @@ fn at_least_one(value: Option<&Value>) -> Value {
 
 #[test]
 fn runtime_signatures_match_every_published_word_and_structured_field() {
-    compare(&published(), "0.3", &[]);
-}
-
-#[test]
-fn runtime_signatures_match_the_draft_0_4_but_for_the_pending_parts() {
-    compare(&published_0_4(), "0.4", PENDING_0_4);
+    compare(&published(), "0.4");
 }
 
 /// The published list `p` of the language version `version` against the runtime's signatures as a
-/// file of that version has them, leaving out the keywords and the parts of the list in `pending`.
-fn compare(p: &Value, version: &str, pending: &[&str]) {
-    let pending = |name: &str| pending.contains(&name);
+/// file of that version has them.
+fn compare(p: &Value, version: &str) {
     keys(
         p,
         &[
@@ -152,23 +136,18 @@ fn compare(p: &Value, version: &str, pending: &[&str]) {
     assert_eq!(p["version"], version);
     assert!(READ_VERSIONS.contains(&version));
     let w = words();
-    if !pending("removed") {
-        let removed: Vec<_> = w
-            .removed
-            .iter()
-            .filter(|r| w.removed_in(&r.word, version).any(|active| active.until == r.until && active.what == r.what))
-            .map(|r| json!({"word":r.word, "what":r.what, "until":r.until, "see":r.see}))
-            .collect();
-        assert_eq!(json!(removed), p.get("removed").cloned().unwrap_or(json!([])), "removed");
-        for item in p["removed"].as_array().into_iter().flatten() {
-            keys(item, &["word", "what", "until", "see"]);
-        }
+    let removed: Vec<_> = w
+        .removed
+        .iter()
+        .filter(|r| w.removed_in(&r.word, version).any(|active| active.until == r.until && active.what == r.what))
+        .map(|r| json!({"word":r.word, "what":r.what, "until":r.until, "see":r.see}))
+        .collect();
+    assert_eq!(json!(removed), p.get("removed").cloned().unwrap_or(json!([])), "removed");
+    for item in p["removed"].as_array().into_iter().flatten() {
+        keys(item, &["word", "what", "until", "see"]);
     }
     let kinds = w.kinds_in(version);
     for (category, actual) in [("kinds", &kinds), ("subobjects", &w.subobjects), ("attributes", &w.attributes)] {
-        if pending(category) {
-            continue;
-        }
         assert_eq!(strings(actual), names(&p[category]), "{category}");
         for item in p[category].as_array().unwrap() {
             keys(item, &["name", "since"]);
@@ -186,18 +165,13 @@ fn compare(p: &Value, version: &str, pending: &[&str]) {
     }
     let record = &p["record"];
     keys(record, &["marker", "section", "fields"]);
-    let mut record_fields = record["fields"].as_array().unwrap().clone();
-    if pending("record") {
-        record_fields.clear();
-    }
+    let record_fields = record["fields"].as_array().unwrap();
     // Exercise the marker as syntax, not a duplicated expected string.
     assert!(rnl_runtime::syntax::parse_record(&format!("{} {{}}", record["marker"].as_str().unwrap())).error.is_none());
     assert_eq!(record["section"], "2.8");
     let headers: BTreeMap<_, _> = w.header_fields.iter().map(|f| (f.name.as_str(), f)).collect();
-    if !pending("record") {
-        assert_eq!(headers.len(), record_fields.len());
-    }
-    for field in &record_fields {
+    assert_eq!(headers.len(), record_fields.len());
+    for field in record_fields {
         keys(field, &["name", "type", "values", "default", "affects_interpretation", "since"]);
         let name = field["name"].as_str().unwrap();
         let actual = headers.get(name).unwrap_or_else(|| panic!("missing header field {name}"));
@@ -233,15 +207,9 @@ fn compare(p: &Value, version: &str, pending: &[&str]) {
         })
         .collect();
     assert_eq!(json!(groups), p["style_groups"]);
-    let published_names: BTreeSet<&str> = p["keywords"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|k| k["keyword"].as_str().unwrap())
-        .filter(|n| !pending(n))
-        .collect();
-    let runtime_names: BTreeSet<&str> =
-        w.keywords_in(version).map(|k| k.name.as_str()).filter(|n| !pending(n)).collect();
+    let published_names: BTreeSet<&str> =
+        p["keywords"].as_array().unwrap().iter().map(|k| k["keyword"].as_str().unwrap()).collect();
+    let runtime_names: BTreeSet<&str> = w.keywords_in(version).map(|k| k.name.as_str()).collect();
     assert_eq!(runtime_names, published_names, "keywords of {version}");
     let mut pseudo = BTreeSet::new();
     let mut takes = BTreeSet::new();
@@ -279,9 +247,6 @@ fn compare(p: &Value, version: &str, pending: &[&str]) {
             ],
         );
         let name = k["keyword"].as_str().unwrap();
-        if pending(name) {
-            continue;
-        }
         let a = w.keyword_in(name, version).unwrap_or_else(|| panic!("missing keyword {name}"));
         assert_eq!(k["since"], a.since.as_deref().unwrap_or(&w.language_version), "{name} since");
         assert_eq!(k["section"], a.section, "{name} section");
@@ -370,12 +335,8 @@ fn compare(p: &Value, version: &str, pending: &[&str]) {
         };
         assert_eq!(a.output, output, "{name} output");
     }
-    if !pending("pseudo_kinds") {
-        assert_eq!(pseudo, names(&p["pseudo_kinds"]));
-    }
-    if !pending("takes") {
-        assert_eq!(takes, names(&p["takes"]));
-    }
+    assert_eq!(pseudo, names(&p["pseudo_kinds"]));
+    assert_eq!(takes, names(&p["takes"]));
     for list in ["pseudo_kinds", "takes"] {
         for item in p[list].as_array().unwrap() {
             keys(item, &["name", "meaning"]);
@@ -398,13 +359,11 @@ fn compare(p: &Value, version: &str, pending: &[&str]) {
         all_words.insert(name.into());
     }
     all_words.extend(p["reserved"].as_array().unwrap().iter().map(|v| v.as_str().unwrap().to_string()));
-    if !pending("all_words") {
-        assert_eq!(all_words, w.all_words_in(version), "all standard/reserved words");
-    }
+    assert_eq!(all_words, w.all_words_in(version), "all standard/reserved words");
 }
 
 fn interpret(body: &str, head: &str) -> Interpretation {
-    let text = format!("* vocabulary parity\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\nR1 a b 1k\n* @RNL{head} {{ {body} }}\n.end\n");
+    let text = format!("* vocabulary parity\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\nR1 a b 1k\n* @RNL{head} {{ {body} }}\n.end\n");
     read(&text)
 }
 
@@ -449,20 +408,23 @@ fn default_body(keyword: &str, param: &str) -> String {
         "LINE" | "RECTANGLE" | "CIRCLE" | "ELLIPSE" | "ARC" | "BEZIER" => graphic(keyword, param),
         "TEXT" => format!("(2,3) @TEXT(text=\"wide text\"{comma}{param})", comma=if param.is_empty() {""} else {","}),
         "WIRE" => format!("&a @WIRE({param}) {{(0,0) (5,3)}}"),
-        "ROUTE" => format!("$S = @DEFINE-SYMBOL {{ (0,0) @PIN(terminal=1); (2,2) @PIN(terminal=2) }}; #R1 @SET-SYMBOL $S => @PLACE(0,0); &a @ROUTE({param})"),
+        "ROUTE-NET" => format!("$S = @DEFINE-SYMBOL {{ (0,0) @PIN(terminal=1); (2,2) @PIN(terminal=2) }}; #R1 @SET-SYMBOL $S => @PLACE(0,0); &a @ROUTE-NET({param})"),
+        "ROUTE-OBJECT" => format!("$S = @DEFINE-SYMBOL {{ (0,0) @PIN(terminal=1); (2,2) @PIN(terminal=2) }}; #R1 @SET-SYMBOL $S => @PLACE(0,0); #R1 @ROUTE-OBJECT({param})"),
+        "ANNOTATION" => format!("$A = @DEFINE-SYMBOL {{ @LINE {{(0,0) (2,1)}}; (1,0) @TEXT(\"a\") }}; (2,3) @ANNOTATION({param}) $A"),
+        "TABLE" => format!("%p = (_, _); %q = (_, _); %r = (_, _); @TABLE({param}) layout: {{{{%p %q}} {{%r}}}}"),
         _ => panic!("unhandled default on {keyword}"),
     }
 }
 
 fn selection(keyword: &str, parameter: &str) -> Interpretation {
-    // Give the created usage its symbol directly. Its main object is #R1, so it is
-    // anchored there and must not receive an independent PLACE (12.1).
+    // Give the created usage its symbol directly, and its own point a place, as a solver would, so
+    // that it is drawn (9.4).
     // Ancestor selection uses a recursive inner selection: a direct #R1 reference
     // resolves only in its own level and would mask the recursive=false behavior.
     let definitions = "$S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1); (2,2) @PIN(terminal=2) }; $BOX = @DEFINE-SYMBOL { (0,0) @RECTANGLE(width=2,height=2) }; $U = @DEFINE(roles=[\"r\"]) {}";
-    let setup = "#R1 @SET-SYMBOL $S => @PLACE(0,0); %u = #R1 @AS $U => @SET-SYMBOL $BOX; #R1 @TEXT(\"label\",key=\"label\"); (2,2) @CIRCLE(radius=1); &a @WIRE {#R1:1 (5,0)}";
+    let setup = "#R1 @SET-SYMBOL $S => @PLACE(0,0); %u = #R1 @AS $U => @SET-SYMBOL $BOX => @PLACE(0,0); #R1 @TEXT(\"label\",key=\"label\"); (2,2) @CIRCLE(radius=1); &a @WIRE {#R1:1 (5,0)}";
     let (scope, definition, action) = match keyword {
-        "SELECT-INSTANCE" | "SELECT-TERMINAL" | "SELECT-NET" | "SELECT-WIRE" => {
+        "SELECT-INSTANCE" | "SELECT-TERMINAL" | "SELECT-PIN" | "SELECT-NET" | "SELECT-WIRE" => {
             ("#", "", "@TEXT(\"selected\",key=\"selected\")")
         }
         "SELECT-LABEL" | "SELECT-ANNOTATION" => ("#", "", "@LAYER(\"top\")"),
@@ -470,7 +432,7 @@ fn selection(keyword: &str, parameter: &str) -> Interpretation {
         "SELECT-ANCESTOR-USAGE" => ("{# @SELECT-INSTANCE}", "$U", "@LAYER(\"top\")"),
         _ => panic!("unhandled recursive default {keyword}"),
     };
-    read(&format!("* recursive\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n* @RNL {{ {definitions} }}\n.subckt cell a b\nR1 a b 1k\n* @RNL {{ {setup} }}\n.ends cell\nR1 a b 1k\nX1 a b cell\n* @RNL {{ {setup}; {scope} @{keyword}({parameter}) {definition} => {action} }}\n.end\n"))
+    read(&format!("* recursive\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n* @RNL {{ {definitions} }}\n.subckt cell a b\nR1 a b 1k\n* @RNL {{ {setup} }}\n.ends cell\nR1 a b 1k\nX1 a b cell\n* @RNL {{ {setup}; {scope} @{keyword}({parameter}) {definition} => {action} }}\n.end\n"))
 }
 
 #[test]
@@ -502,10 +464,14 @@ fn every_published_default_matches_omission_in_the_running_toolkit() {
     }
     for prop in p["style_properties"].as_array().unwrap() {
         if let Some(default) = prop.get("default") {
-            let explicit = format!("{}={default}", prop["name"].as_str().unwrap());
+            let name = prop["name"].as_str().unwrap();
+            let explicit = format!("{name}={default}");
+            // a property of lines on a LINE, one of texts alone on a TEXT
+            let on_line = words().groups["line_style"].iter().any(|n| n == name);
+            let probe = |params: &str| if on_line { graphic("LINE", params) } else { default_body("TEXT", params) };
             assert_eq!(
-                view(&interpret(&graphic("LINE", ""), "")),
-                view(&interpret(&graphic("LINE", &explicit), "")),
+                view(&interpret(&probe(""), "")),
+                view(&interpret(&probe(&explicit), "")),
                 "style default {prop}"
             );
         }
@@ -542,7 +508,8 @@ fn published_shape_rules_and_keyed_outputs_are_executed_by_the_handlers() {
         for pair in keyword["exclusive"].as_array().into_iter().flatten() {
             let params: Vec<_> =
                 pair.as_array().unwrap().iter().map(|v| format!("{}=2", v.as_str().unwrap())).collect();
-            let r = interpret(&format!("(0,0) (4,0) @{name}(direction=\"x\",{})", params.join(",")), "");
+            no_errors(&interpret(&format!("(0,0) (4,0) @{name}(\"left-to-right\",{})", params[0]), ""));
+            let r = interpret(&format!("(0,0) (4,0) @{name}(\"left-to-right\",{})", params.join(",")), "");
             assert!(r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{name}: {pair}");
         }
         if let Some(kind) = keyword.get("rewrites") {
@@ -572,20 +539,15 @@ fn published_shape_rules_and_keyed_outputs_are_executed_by_the_handlers() {
 
 #[test]
 fn corrected_signature_metadata_preserves_existing_dispatch() {
-    for version in ["0.2", "0.3"] {
-        let interpret = |body: &str| {
-            read(&format!("* vocabulary parity\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\nR1 a b 1k\n* @RNL {{ {body} }}\n.end\n"))
-        };
-        // SELECT-USAGE accepts a set of member objects, not only a level/usage. Kinds are
-        // descriptive metadata; select_usages already implements this scope in both versions.
-        let r = interpret(
-            "$D = @DEFINE(roles=[\"r\"]) {}; %u = #R1 @AS $D; {#R1} @SELECT-USAGE $D => @PRIORITY(\"disabled\")",
-        );
-        no_errors(&r);
-        // DEFINE-STYLE has always checked that its enclosed statements produce styles.
-        let good = interpret("$base = @DEFINE-STYLE(linecolor=\"#ff0000\") {}; $s = @DEFINE-STYLE {$base}");
-        no_errors(&good);
-        let bad = interpret("$s = @DEFINE-STYLE {(0,0)}");
-        assert!(bad.diagnostics().iter().any(|d| d.severity == Severity::Error), "{version}: non-style body accepted");
-    }
+    let interpret = |body: &str| interpret(body, "");
+    // SELECT-USAGE accepts a set of member objects, not only a level/usage. Kinds are
+    // descriptive metadata; select_usages already implements this scope.
+    let r =
+        interpret("$D = @DEFINE(roles=[\"r\"]) {}; %u = #R1 @AS $D; {#R1} @SELECT-USAGE $D => @PRIORITY(\"disabled\")");
+    no_errors(&r);
+    // DEFINE-STYLE checks that its enclosed statements produce styles.
+    let good = interpret("$base = @DEFINE-STYLE(linecolor=\"#ff0000\") {}; $s = @DEFINE-STYLE {$base}");
+    no_errors(&good);
+    let bad = interpret("$s = @DEFINE-STYLE {(0,0)}");
+    assert!(bad.diagnostics().iter().any(|d| d.severity == Severity::Error), "non-style body accepted");
 }

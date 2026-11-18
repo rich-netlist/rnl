@@ -133,9 +133,7 @@ fn a_terminal_and_names_of_its_last_pin_connect_to_one_physical_pin() {
 #[test]
 fn equal_coordinates_do_not_connect_distinct_points_in_0_4() {
     let separate = "&a @WIRE {(0,0) (1,0)}; &a @WIRE {(1,0) (2,0)}";
-    for (version, expected) in [("0.2", 1), ("0.3", 1), ("0.4", 2)] {
-        assert_eq!(parts(&interpret(&source(version, separate, ""))), expected, "{version}");
-    }
+    assert_eq!(parts(&interpret(&source("0.4", separate, ""))), 2);
     let shared = "%junction = (1,0); &a @WIRE {(0,0) %junction}; &a @WIRE {%junction (2,0)}";
     assert_eq!(parts(&interpret(&source("0.4", shared, ""))), 1);
 }

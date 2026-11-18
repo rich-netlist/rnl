@@ -123,16 +123,6 @@ fn cpp_directive_payload_and_continuations_are_not_carriers() {
 }
 
 #[test]
-fn foreign_language_includes_are_not_followed() {
-    let files = MemoryProvider::new()
-        .with("t.scs", "// title\nahdl_include \"hidden.va\"\n// @RNL { (1,2) @TEXT(\"after\") }\n")
-        .with("hidden.va", "// title\n// @RNL { hidden language\n");
-    let r = interpret_file(Path::new("t.scs"), None, &files, &Options { std: false, ..Options::default() }).unwrap();
-    assert_eq!(r.doc.sources.len(), 1);
-    assert_eq!(record_texts(&r).len(), 1);
-}
-
-#[test]
 fn writes_move_before_an_unterminated_host_region_and_read_back() {
     for (file, prefix, opening, marker) in [
         ("t.sp", "* title\nR1 a 0 1k\n", ".control", "*"),

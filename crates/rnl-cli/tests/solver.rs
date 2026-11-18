@@ -15,7 +15,7 @@ use rnl_runtime::writeback::{replace_generated, strip_generated};
 use rnl_runtime::Options;
 
 fn case(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/cases").join(name)
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/cases-0.4/from-0.2").join(name)
 }
 
 /// The cases written for the brainstorm on the solver's algorithms.
@@ -69,12 +69,15 @@ fn generated_records_are_left_out_in_every_file() {
         assert!(b.items.len() < a.items.len(), "{title}");
     }
     let rdiv = without.model.levels.iter().find(|l| l.title == "rdiv").unwrap();
-    assert_eq!(rdiv.unplaced, ["#R1", "#R2", "a usage of $IOPORT", "a usage of $IOPORT", "a usage of $IOPORT"]);
+    assert_eq!(
+        rdiv.unplaced,
+        ["#R1", "#R2", "%l", "%l", "a usage of $IO_PORT", "a usage of $IO_PORT", "a usage of $IO_PORT"]
+    );
 }
 
 #[test]
 fn generated_records_left_out_report_nothing() {
-    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a 0 1k\n* @RNL(type=\"generated\", priority=\"high\") { #R9 @PLACE(0, 0); #R1 @PLACE(1, 2)}\n.end\n";
+    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\nR1 a 0 1k\n* @RNL(type=\"generated\", priority=\"high\") { #R9 @PLACE(0, 0); #R1 @PLACE(1, 2)}\n.end\n";
     let files = MemoryProvider::new().with("t.sp", text);
     let options = Options { std: false, generated: false, ..Options::default() };
     let r = interpret_file(Path::new("t.sp"), None, &files, &options).unwrap();
@@ -88,7 +91,7 @@ fn generated_records_left_out_report_nothing() {
 
 #[test]
 fn the_tolerance_is_an_option() {
-    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a 0 1k\nR2 a 0 1k\n* @RNL { #R1 @PLACE(0, 0); #R2 @PLACE(4, 0.001); {#R1 #R2} @ALIGN(\"y\")}\n.end\n";
+    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\nR1 a 0 1k\nR2 a 0 1k\n* @RNL { #R1 @PLACE(0, 0); #R2 @PLACE(4, 0.001); {#R1 #R2} @ALIGN(\"y\")}\n.end\n";
     let files = MemoryProvider::new().with("t.sp", text);
     let status = |tolerance: f64| {
         let options = Options { std: false, tolerance, ..Options::default() };
@@ -113,22 +116,41 @@ fn the_problem_holds_what_a_solver_places() {
     let ps = problems(&case("01-rc-lowpass.sp"), &FsProvider::new(&[]));
     let p = &ps[0];
     assert_eq!((p.title.as_str(), p.kind, p.level), ("01-rc-lowpass.sp", "file", 0));
-    // the standard package and its sub-packages, as it brings them in (16.3)
-    let std = ["style", "symbols", "virtual", "core", "fill", "semantics", "layout"].map(|n| format!("rnl-std-{n}"));
-    let want: Vec<(String, String)> =
-        std.into_iter().chain(["rnl-std".to_string()]).map(|n| (n, "0.2".to_string())).collect();
+    // the packages of the standard series that its header uses, and those they use, as it brings
+    // them in (16.3)
+    let std = [
+        "style",
+        "basic",
+        "semiconductors",
+        "fill",
+        "semantics",
+        "functional",
+        "rf",
+        "logic",
+        "signal-flow",
+        "spice",
+        "spectre",
+        "all",
+    ];
+    let want: Vec<(String, String)> = std.iter().map(|n| (format!("rnl-std-{n}"), "0.4".to_string())).collect();
     assert_eq!(p.packages, want);
-    assert_eq!(p.names, ["j", "o"]);
+    assert_eq!(p.names, ["input_corner", "j", "o"]);
 
-    // instances: free, with a symbol whose pins carry the terminals
+    // instances: placed by the record of priority high written by hand, each fact the rank of the
+    // fact that writes it, with a symbol whose pins carry the terminals
     let v1 = object(p, "#V1");
     let o = &p.objects[v1];
     assert_eq!((o.kind, &o.reference), (ObjectKind::Instance, &Reference::Name("#V1".into())));
-    assert_eq!(o.position, Position::Own { x: Slot::Free, y: Slot::Free });
-    assert_eq!(o.orient, Some(OrientSlot::Free));
+    let Position::Own { x: Slot::Fixed { value: 0.0, fact: fx }, y: Slot::Fixed { value: 0.0, fact: fy } } = o.position
+    else {
+        panic!("{:?}", o.position)
+    };
+    assert_eq!(p.facts[fx].kind, FactKind::Place { at: PointRef::Origin(v1), axis: Axis::X, value: 0.0 });
+    assert_eq!(p.facts[fy].kind, FactKind::Place { at: PointRef::Origin(v1), axis: Axis::Y, value: 0.0 });
     let sym = &p.symbols[o.symbol.unwrap()];
-    assert_eq!(sym.name, "$VSRC");
-    assert_eq!(sym.pins.iter().map(|q| q.terminals.concat()).collect::<Vec<_>>(), ["1", "2"]);
+    assert!(matches!(o.orient, Some(OrientSlot::Fixed { code: Orient::R0, .. })), "{:?}", o.orient);
+    assert_eq!(sym.name, "$VOLTAGE_SOURCE");
+    assert_eq!(sym.pins.iter().map(|q| q.terminals.concat()).collect::<Vec<_>>(), ["p", "n"]);
 
     // a named point with its coordinates, each the rank of the fact that writes it
     let j = object(p, "%j");
@@ -140,29 +162,35 @@ fn the_problem_holds_what_a_solver_places() {
     assert_eq!(p.facts[fx].kind, FactKind::PointCoordinate { point: j, axis: Axis::X, value: 12.0 });
     assert_eq!(p.facts[fy].kind, FactKind::PointCoordinate { point: j, axis: Axis::Y, value: 6.0 });
 
-    // the junction is drawn on %j: no position of its own, and no name to write its orientation
-    // with, only its number after the three wires, which a file of 0.2 cannot write (the draft 0.3,
-    // 5.9)
+    // the junction attached to %j: no name, only its number after the three wires (5.9), and a
+    // position of its own, which the ALIGNs of the body of $JUNCTION put on %j (12.1)
     let dot = object(p, "a usage of $JUNCTION");
-    assert_eq!(p.objects[dot].position, Position::At(PointRef::Origin(j)));
+    assert_eq!(p.objects[dot].position, Position::Own { x: Slot::Free, y: Slot::Free });
     assert_eq!(p.objects[dot].reference, Reference::Number { number: 4, path: Vec::new() });
-    assert_eq!(p.version, "0.2");
-    assert_eq!(p.usages[p.objects[dot].usage.unwrap()].definition, "$JUNCTION");
+    assert_eq!(p.version, "0.4");
+    let junction = p.objects[dot].usage.unwrap();
+    assert_eq!(p.usages[junction].definition, "$JUNCTION");
+    let on_j: Vec<&FactKind> = p.facts.iter().filter(|f| f.chain == [junction]).map(|f| &f.kind).collect();
+    let members = vec![PointRef::Origin(dot), PointRef::Origin(j)];
+    assert_eq!(
+        on_j,
+        [&FactKind::Align { axis: Axis::Y, members: members.clone() }, &FactKind::Align { axis: Axis::X, members }]
+    );
 
     // the grounds that the fill of the standard package makes: generated, reached through their stubs
-    let g = generated_local(p, "#V1:n", "::g");
+    let g = generated_local(p, "#V1::n", "::g");
     assert!(p.objects[g].generated);
     let Reference::Generated { usage, .. } = &p.objects[g].reference else { unreachable!() };
     let stub = &p.usages[*usage];
-    assert_eq!(stub.definition, "$GND_STUB");
-    assert!(stub.generated && stub.rule_made && stub.object.is_none());
+    assert_eq!(stub.definition, "$GROUND_STUB");
+    assert!(stub.generated && stub.rule_made && stub.object.is_some());
     assert_eq!(stub.params.len(), 1);
     // its constraints come from the definition body, with the stub in their chain
     let from_stub: Vec<&ProblemFact> = p.facts.iter().filter(|f| f.chain == [*usage]).collect();
-    assert_eq!(from_stub.iter().map(|f| f.kind.name()).collect::<Vec<_>>(), ["DISTANCE", "ALIGN"]);
-    // written in the body of $GND_STUB, which is in the sub-package of the virtual elements (16.3)
-    let source = from_stub[0].source.as_ref().unwrap();
-    assert!(source.file.ends_with("rnl-std-virtual.rnl"), "{source:?}");
+    assert_eq!(from_stub.iter().map(|f| f.kind.name()).collect::<Vec<_>>(), ["ORIENT", "DISTANCE"]);
+    // written in the body of $GROUND_STUB, which is in the package of the basic elements (16.3)
+    let source = from_stub[1].source.as_ref().unwrap();
+    assert!(source.file.ends_with("rnl-std-basic.rnl"), "{source:?}");
 
     // texts: by the symbol, or free with offsets from the point they are attached to
     let name = object(p, "#R1::name");
@@ -253,7 +281,7 @@ fn the_later_segment_of_a_pipe_comes_first() {
     // before what a segment adds: its members, its nested statements, the axes of a PLACE (8.5, as
     // the draft 0.3 makes it clear, in every version)
     let text = "* pipes\nR1 a b 1k\nR2 c d 1k\nR3 e f 1k\nR4 g h 1k\n\
-        * @RNL(type=\"header\") { @VERSION(\"0.2\")}\n\
+        * @RNL(type=\"header\") { @VERSION(\"0.4\")}\n\
         * @RNL {\n\
         *   $TALL = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1); (0, 10) @PIN(terminal=2) };\n\
         *   {#R1 #R2 #R3 #R4} @SET-SYMBOL $TALL;\n\
@@ -328,7 +356,7 @@ fn every_level_has_its_problem() {
     assert_eq!(ps.len(), 3);
     let rdiv = level(&ps, "rdiv");
     assert!(rdiv.file.ends_with("04-hierarchy-lib.inc") && rdiv.end_line > rdiv.line);
-    let ports: Vec<&UsageEntry> = rdiv.usages.iter().filter(|u| u.definition == "$IOPORT").collect();
+    let ports: Vec<&UsageEntry> = rdiv.usages.iter().filter(|u| u.definition == "$IO_PORT").collect();
     assert_eq!(ports.len(), 3);
     assert!(ports.iter().all(|u| u.rule_made && u.object.is_some()));
     assert_eq!(ports.iter().map(|u| u.roles[0].written.clone().unwrap()).collect::<Vec<_>>(), ["&top", "&mid", "&bot"]);
@@ -349,7 +377,7 @@ fn routes_give_their_pins_and_wires() {
     let out = p.routes.iter().find(|r| r.net == "out").unwrap();
     assert_eq!(out.wires, [0]);
     assert_eq!(out.pins.len(), 2);
-    assert!(out.pins.iter().all(|q| matches!(q, PointRef::Pin { .. })));
+    assert!(out.pins.iter().all(|q| matches!(q, PointRef::SymbolPin { .. })), "{:?}", out.pins);
     // an annotation placed by offsets from its point
     let dx: Vec<f64> = p
         .facts
@@ -364,20 +392,22 @@ fn routes_give_their_pins_and_wires() {
 
 /// Where a pin of a placed object is: its position plus the pin turned with it (9.2.4, 11.2).
 fn pin_at(p: &LevelProblem, at: &[(usize, Pt, Orient)], q: &PointRef) -> Pt {
-    let PointRef::Pin { object, pin, .. } = q else { panic!("{q:?}") };
+    let (PointRef::Pin { object, pin, .. } | PointRef::SymbolPin { object, pin, .. }) = q else { panic!("{q:?}") };
     let (_, xy, orient) = at.iter().find(|(o, _, _)| o == object).unwrap();
     let d = orient.apply(p.symbols[p.objects[*object].symbol.unwrap()].pins[*pin].pos);
     (xy.0 + d.0, xy.1 + d.1)
 }
 
-/// Write a solution back into a file of the corpus and read it again: the file text, and the
-/// interpretation of it.
+/// Write a solution back into a file of the corpus, its record finished with the check of the
+/// numbers as a solver writes it (5.9), and read it again: the file text, and the interpretation
+/// of it.
 fn write_back(f: &Path, p: &LevelProblem, written: &Written) -> (String, rnl_runtime::Interpretation) {
     let fs = FsProvider::new(&[]);
     let path = path_str(f);
     let text = fs.read(&path).unwrap();
     let doc = read_host(f, None, &fs, &mut Sink::new()).unwrap();
-    let out = replace_generated(&doc, p.level, &text, &written.record);
+    let record = rnl_view::finish_record(&doc, &fs, &Options::default(), p, &written.record);
+    let out = replace_generated(&doc, p.level, &text, &record);
     let mem = MemoryProvider::new().with(&path, &out);
     let both = Layered { layers: vec![&mem, &fs] };
     let r = interpret_file(f, None, &both, &Options::default()).unwrap();
@@ -395,37 +425,31 @@ fn a_solution_written_back_reads_back() {
             place(object(p, "#C1"), 12.0, 3.0, None),
             place(object(p, "#V1"), 0.0, 0.0, Some(Orient::R0)),
             place(object(p, "#R1"), 6.0, 6.0, Some(Orient::R90)),
-            place(generated_local(p, "#V1:n", "::g"), 0.0, -5.0, None),
-            place(generated_local(p, "#C1:n", "::g"), 12.0, -1.0, None),
-            // the junction has no position of its own, and in a file of 0.2 no name to write its
-            // orientation with
-            place(object(p, "a usage of $JUNCTION"), 1.0, 1.0, Some(Orient::R90)),
+            place(generated_local(p, "#V1::n", "::g"), 0.0, -5.0, None),
+            place(generated_local(p, "#C1::n", "::g"), 12.0, -1.0, None),
+            // the junction, on %j where its definition puts it, has no name: the record refers to
+            // it by its number (5.9)
+            place(object(p, "a usage of $JUNCTION"), 12.0, 6.0, Some(Orient::R90)),
         ],
         ..Solution::default()
     };
     let hash = sig2(p, OPTIONS);
     let written = write_record(p, &solution, "rnl-solver test", &hash);
-    // neither is left out silently (the draft 0.3, 14.8)
-    let unsolved: Vec<String> = written.unsolved.iter().map(|u| u.to_string()).collect();
-    assert_eq!(
-        unsolved,
-        [
-            "the position of a usage of $JUNCTION: it is drawn at the point of its main object and has no position of its own (12.1)",
-            "the orientation of a usage of $JUNCTION: it has no name, and a file of 0.2 cannot refer to it; the draft 0.3 refers to it by its number (5.9)",
-        ]
-    );
+    // nothing is left out (14.8)
+    assert!(written.unsolved.is_empty(), "{:?}", written.unsolved);
     assert!(written.notes.is_empty());
     assert_eq!(
         written.record,
         format!(
             "@RNL(type=\"generated\", priority=\"high\", author=\"rnl-solver test\", hash=\"{hash}\") {{
-  %gnd_stub_V1_n = $GND_STUB @ATTACH(gap=2, priority=\"normal\") #V1:n;
-  %gnd_stub_C1_n = $GND_STUB @ATTACH(gap=2, priority=\"normal\") #C1:n;
+  %ground_stub_V1_n = $GROUND_STUB @ATTACH(gap=3) #V1::n;
+  %ground_stub_C1_n = $GROUND_STUB @ATTACH(gap=3) #C1::n;
   #V1 @PLACE(0, 0) => @ORIENT(\"R0\");
   #R1 @PLACE(6, 6) => @ORIENT(\"R90\");
   #C1 @PLACE(12, 3);
-  %gnd_stub_V1_n::g @PLACE(0, -5);
-  %gnd_stub_C1_n::g @PLACE(12, -1)
+  %#4 @PLACE(12, 6) => @ORIENT(\"R90\");
+  %ground_stub_V1_n::g @PLACE(0, -5);
+  %ground_stub_C1_n::g @PLACE(12, -1)
 }}"
         )
     );
@@ -441,73 +465,84 @@ fn a_solution_written_back_reads_back() {
     // the stubs written out take the place of the generated ones: no third ground
     assert_eq!(lv.items.iter().filter(|i| i.id == "%g").count(), 2);
 
-    // read as a solver reads it, the file has the same input: the hash still holds
+    // read as a solver reads it, the file has the same input: the hash still holds, and the level
+    // ends as many lines lower as the text grew
     let mem = MemoryProvider::new().with(&path_str(&f), &text);
     let fs = FsProvider::new(&[]);
+    let before = fs.read(&path_str(&f)).unwrap();
     let again = problems(&f, &Layered { layers: vec![&mem, &fs] });
     assert_eq!(same_input(&hash, &again[0]), Some(true));
-    assert_eq!(again[0].end_line, p.end_line + 2);
+    let grown = text.lines().count() as i64 - before.lines().count() as i64;
+    assert_eq!(again[0].end_line as i64, p.end_line as i64 + grown);
     assert_eq!(again[0].objects, p.objects);
     assert_eq!(again[0].usages, p.usages);
 }
 
 #[test]
 fn a_routed_net_written_back_reads_back() {
-    let f = solver_case("T1-rc-lowpass.sp");
+    // T2b routes every net but its ground and its supply (13.7): the solution routes in with a
+    // bend, and out through a branch point with a dot
+    let f = solver_case("T2b-common-source-dragged.sp");
     let p = &problems(&f, &FsProvider::new(&[]))[0];
-    let (vin, r1, c1) = (object(p, "#VIN"), object(p, "#R1"), object(p, "#C1"));
-    let (g1, g2) = (generated_local(p, "#VIN:n", "::g"), generated_local(p, "#C1:n", "::g"));
+    let (m1, rd, vdd, vin) = (object(p, "#M1"), object(p, "#RD"), object(p, "#VDD"), object(p, "#VIN"));
     let at = [
         (vin, (0.0, 0.0), Orient::R0),
-        (r1, (6.0, 6.0), Orient::R90),
-        (c1, (12.0, 3.0), Orient::R0),
-        (g1, (0.0, -5.0), Orient::R0),
-        (g2, (12.0, -1.0), Orient::R0),
+        (m1, (10.0, 0.0), Orient::R0),
+        (rd, (10.0, 8.0), Orient::R0),
+        (vdd, (20.0, 4.0), Orient::R0),
+        (generated_local(p, "#M1::s", "::g"), (10.0, -5.0), Orient::R0),
+        (generated_local(p, "#VDD::n", "::g"), (20.0, -1.0), Orient::R0),
+        (generated_local(p, "#VIN::n", "::g"), (0.0, -5.0), Orient::R0),
+        (generated_local(p, "#RD::p", "::s"), (10.0, 13.0), Orient::R0),
+        (generated_local(p, "#VDD::p", "::s"), (20.0, 9.0), Orient::R0),
     ];
     let placements =
         at.iter().map(|(o, xy, r)| Placement { object: *o, x: Some(xy.0), y: Some(xy.1), orient: Some(*r) }).collect();
     let route = |net: &str| p.routes.iter().position(|r| r.net == net).unwrap();
-    // the pins each ROUTE joins
-    let pin = |object: usize, terminal: &str| -> PointRef {
+    // the pins each ROUTE-NET joins, by their index in the symbol
+    let pin = |object: usize, index: usize| -> PointRef {
         p.routes
             .iter()
             .flat_map(|r| &r.pins)
-            .find(|q| matches!(q, PointRef::Pin { object: o, terminal: t, .. } if *o == object && t == terminal))
+            .find(|q| matches!(q, PointRef::SymbolPin { object: o, pin: k, .. } if *o == object && *k == index))
             .unwrap()
             .clone()
     };
-    let (vp, rp) = (pin(vin, "p"), pin(r1, "p"));
-    let (rn, cp) = (pin(r1, "n"), pin(c1, "p"));
-    let (vp_at, rp_at, rn_at, cp_at) =
-        (pin_at(p, &at, &vp), pin_at(p, &at, &rp), pin_at(p, &at, &rn), pin_at(p, &at, &cp));
+    let (vp, g) = (pin(vin, 0), pin(m1, 1));
+    let (d, rn) = (pin(m1, 0), pin(rd, 1));
+    let (vp_at, g_at, d_at, rn_at) = (pin_at(p, &at, &vp), pin_at(p, &at, &g), pin_at(p, &at, &d), pin_at(p, &at, &rn));
+    let branch = (d_at.0, (d_at.1 + rn_at.1) / 2.0);
     let solution = Solution {
         placements,
-        branches: vec![Branch { at: (cp_at.0, rn_at.1), junction: true }],
+        branches: vec![Branch { at: branch, junction: true }],
         wires: vec![
             RoutedWire {
                 route: route("in"),
-                points: vec![WirePoint::Anchor(vp), WirePoint::Bend((vp_at.0, rp_at.1)), WirePoint::Anchor(rp)],
+                points: vec![WirePoint::Anchor(vp), WirePoint::Bend((g_at.0, vp_at.1)), WirePoint::Anchor(g)],
             },
-            RoutedWire { route: route("out"), points: vec![WirePoint::Anchor(rn), WirePoint::Branch(0)] },
-            RoutedWire { route: route("out"), points: vec![WirePoint::Branch(0), WirePoint::Anchor(cp)] },
+            RoutedWire { route: route("out"), points: vec![WirePoint::Anchor(d), WirePoint::Branch(0)] },
+            RoutedWire { route: route("out"), points: vec![WirePoint::Branch(0), WirePoint::Anchor(rn)] },
         ],
         ..Solution::default()
     };
-    let written = write_record(p, &solution, "rnl-solver test", &sig2(p, OPTIONS));
+    let mut written = write_record(p, &solution, "rnl-solver test", &sig2(p, OPTIONS));
     assert!(written.unsolved.is_empty(), "{:?}", written.unsolved);
-    assert!(written.record.contains("&in @WIRE(mode=\"straight\") {#VIN:p (0, 6) #R1:p}"), "{}", written.record);
-    assert!(written.record.contains("%rt1 = (12, 6)") && written.record.contains("$JUNCTION @ATTACH %rt1"));
+    assert!(written.record.contains("&in @WIRE(mode=\"straight\") {#VIN::p (7, 2) #M1::g}"), "{}", written.record);
+    assert!(written.record.contains("%rt1 = (10, 4)") && written.record.contains("$JUNCTION @ATTACH %rt1"));
+    // the dot is left to the junction postprocessing of `rnl solve`, which places it on its point
+    // (13.2), as it is placed here
+    let [dot] = written.junctions.as_slice() else { panic!("{:?}", written.junctions) };
+    assert_eq!(dot.target, "%rt1");
+    let statement = written.record[dot.span.clone()].to_string();
+    written.record = written.record.replace(&statement, &format!("{statement} => @PLACE(10, 4)"));
     let (_, r) = write_back(&f, p, &written);
     let lv = &r.model.levels[0];
     assert!(lv.unplaced.is_empty(), "{:?}", lv.unplaced);
-    // the ROUTEs are wired now: no flight lines are left on their nets
+    // the ROUTE-NETs are wired now: no flight lines are left on their nets
     assert!(!lv.flylines.iter().any(|f| p.routes.iter().any(|r| f.nets.contains(&r.net))), "{:?}", lv.flylines);
     let straight: Vec<&Vec<Pt>> = lv.wires.iter().filter(|w| w.mode == "straight").map(|w| &w.points).collect();
-    assert_eq!(
-        straight,
-        [&vec![vp_at, (vp_at.0, rp_at.1), rp_at], &vec![rn_at, (12.0, 6.0)], &vec![(12.0, 6.0), cp_at]]
-    );
-    assert!(lv.items.iter().any(|i| i.kind == "usage" && i.at == (12.0, 6.0)));
+    assert_eq!(straight, [&vec![vp_at, (g_at.0, vp_at.1), g_at], &vec![d_at, branch], &vec![branch, rn_at]]);
+    assert!(lv.items.iter().any(|i| i.kind == "usage" && i.at == branch));
 }
 
 /// The input digests of every level of a text, read as a solver reads it.
@@ -569,8 +604,8 @@ fn a_change_above_changes_the_hash_below() {
     let text = FsProvider::new(&[]).read(&path_str(&f)).unwrap();
     let base = digests(&f, &text);
     let changed = text.replace(
-        "# @SELECT-INSTANCE(name=\"R*\") => @SET-STYLE $grey;",
-        "# @SELECT-INSTANCE(name=\"R*\") => @ORIENT(\"R90\");",
+        "# @SELECT-INSTANCE(name=\"R*\", recursive=true) => @SET-STYLE $grey;",
+        "# @SELECT-INSTANCE(name=\"R*\", recursive=true) => @ORIENT(\"R90\");",
     );
     assert_ne!(changed, text);
     let after = digests(&f, &changed);
@@ -590,7 +625,7 @@ fn the_brainstorm_cases_give_whole_problems() {
         .filter(|p| p.extension().is_some_and(|e| e == "sp"))
         .collect();
     files.sort();
-    assert_eq!(files.len(), 7);
+    assert_eq!(files.len(), 2);
     for f in &files {
         let ps = problems(f, &fs);
         assert!(!ps.is_empty(), "{}", f.display());
@@ -644,44 +679,6 @@ fn the_brainstorm_cases_give_whole_problems() {
         panic!("{:?}", vin.position)
     };
     assert_eq!((fact, p.facts[fact].priority), (0, Priority::High));
-}
-
-#[test]
-fn rnl_problem_gives_a_file_of_0_2_no_numbers() {
-    // the numbers of the objects without a name are computed in every version, but only a file of
-    // the draft 0.3 writes them (5.9): `rnl problem` gives a file of 0.2 no number, and the draft
-    // switch, kept for compatibility, changes nothing
-    let fs = FsProvider::new(&[]);
-    let mut files = Vec::new();
-    for dir in [case("")] {
-        for e in std::fs::read_dir(dir).unwrap() {
-            let f = e.unwrap().path();
-            if f.extension().is_some_and(|x| x == "sp" || x == "scs") {
-                files.push(f);
-            }
-        }
-    }
-    files.sort();
-    assert!(files.len() > 20);
-    for f in files {
-        let json = |options: &Options| -> Vec<serde_json::Value> {
-            let r = interpret_file(&f, None, &fs, options).unwrap();
-            r.problems.iter().map(|p| rnl_cli::problem::level(p, OPTIONS)).collect()
-        };
-        for level in &json(&Options::solver()) {
-            assert!(level.get("authored_numbers").is_none(), "{}", f.display());
-            assert!(!has_key(level, "number"), "{}", f.display());
-        }
-    }
-}
-
-/// Whether an object in `v` has the key `key`.
-fn has_key(v: &serde_json::Value, key: &str) -> bool {
-    match v {
-        serde_json::Value::Object(m) => m.contains_key(key) || m.values().any(|x| has_key(x, key)),
-        serde_json::Value::Array(a) => a.iter().any(|x| has_key(x, key)),
-        _ => false,
-    }
 }
 
 #[test]

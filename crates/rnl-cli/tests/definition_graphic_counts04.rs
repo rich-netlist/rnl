@@ -6,7 +6,7 @@ use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 
 fn read(version: &str, aliases: &str, body: &str, calls: &str) -> Interpretation {
-    let anchor = if version == "0.4" { "; # @SELECT-USAGE $D => @PLACE(0,0)" } else { "" };
+    let anchor = "; # @SELECT-USAGE $D => @PLACE(0,0)";
     let text=format!("* graphic definitions\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\"); {aliases} }}\nR1 a b 1k\n* @RNL {{ $D = @DEFINE(roles=[],parameters=[\"colour\",\"size\"]) {{ {body} }}; {calls}{anchor} }}\n");
     rnl_cli::interpret_file(
         Path::new("main.sp"),
@@ -74,15 +74,5 @@ fn fixed_partial_dimensions_fail_once_at_the_definition() {
                 assert!(r.diagnostics().iter().filter(|d| d.severity == Severity::Error).all(|d| d.origin.is_empty()));
             }
         }
-    }
-}
-
-#[test]
-fn released_definitions_keep_application_time_errors() {
-    for version in ["0.2", "0.3"] {
-        let body = "(0,0) @LINE(linecolor=\"#123456\")";
-        assert!(errors(&read(version, "", body, "")).is_empty());
-        let r = read(version, "", body, "$D @ATTACH; $D @ATTACH");
-        assert_eq!(errors(&r), [codes::KEYWORD_GRAPHIC_POINT_COUNT, codes::KEYWORD_GRAPHIC_POINT_COUNT]);
     }
 }

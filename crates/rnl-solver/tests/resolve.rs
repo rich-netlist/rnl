@@ -1,7 +1,7 @@
 //! The resolution of 8.5 on documents read from files: the cases written for the solver
-//! (`tests/integration/solver`, T1–T6) and every case of the conformance corpus
-//! (`tests/conformance/cases`). Each level is read as a solver reads it (`Options::solver()`, the
-//! records of the solver left out, 2.8) and resolved; then:
+//! (`tests/integration/solver`, T2b and T4) and every case of the conformance corpus
+//! (`tests/conformance/cases-0.4/from-0.2`). Each level is read as a solver reads it
+//! (`Options::solver()`, the records of the solver left out, 2.8) and resolved; then:
 //!
 //! - every fact is kept or discarded, once: none contradicts itself (the draft 0.3, 8.5);
 //! - every fact kept holds where the witness puts the objects, checked as a viewer checks a
@@ -268,7 +268,7 @@ fn summary(p: &LevelProblem, r: &Resolved) -> String {
 #[test]
 fn every_case_of_the_solver_resolves() {
     let files = netlists("tests/integration/solver", "T");
-    assert!(files.len() >= 7, "{files:?}");
+    assert!(files.len() >= 2, "{files:?}");
     for f in files {
         for p in problems(&f) {
             let r = check_level(&f.to_string_lossy(), &p);
@@ -279,7 +279,7 @@ fn every_case_of_the_solver_resolves() {
 
 #[test]
 fn every_case_of_the_corpus_resolves() {
-    let files = netlists("tests/conformance/cases", "");
+    let files = netlists("tests/conformance/cases-0.4/from-0.2", "");
     assert!(files.len() >= 20, "{files:?}");
     for f in files {
         for p in problems(&f) {
@@ -295,7 +295,7 @@ fn the_groups_of_the_low_order_of_corpus_03_are_not_sought_by_default() {
     // million nodes of the search for seeds to be known as the only one. Its hints may be left out
     // (the draft 0.3, 8.5; 7.6): by default it has that group, its first, and the resolution of the
     // level costs a few hundred nodes, as before every group was sought
-    let ps = problems(&repo().join("tests/conformance/cases/03-five-transistor-ota.sp"));
+    let ps = problems(&repo().join("tests/conformance/cases-0.4/from-0.2/03-five-transistor-ota.sp"));
     let p = &ps[0];
     let r = check_level("03", p);
     let low: Vec<&Discarded> = r.discarded.iter().filter(|d| p.facts[d.fact].priority == Priority::Low).collect();
@@ -310,7 +310,7 @@ fn with_its_hints_asked_for_the_low_order_of_corpus_03_has_its_one_group_found_w
     // --report` runs (hints_for_low): the low ORDER [46] conflicts with [16], [19], [23] and [26]
     // alone, a list known complete after about 9 million nodes, and the facts kept are those kept
     // without it, which gives that group first (the draft 0.3, 8.5)
-    let ps = problems(&repo().join("tests/conformance/cases/03-five-transistor-ota.sp"));
+    let ps = problems(&repo().join("tests/conformance/cases-0.4/from-0.2/03-five-transistor-ota.sp"));
     let p = &ps[0];
     let r = resolve(p, &SolverOptions { hints_for_low: true, ..SolverOptions::without_time_limit() });
     let low: Vec<&Discarded> = r.discarded.iter().filter(|d| p.facts[d.fact].priority == Priority::Low).collect();

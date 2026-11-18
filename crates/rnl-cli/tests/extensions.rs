@@ -1,5 +1,5 @@
-//! The locked versions 0.1 and 0.6 of the public package analog-canvas-extensions.
-//! A file uses its Analog Canvas symbols by naming the package in its header record (16.2).
+//! The locked version 0.7 of the public package analog-canvas-extensions, written in the language
+//! 0.4. A file uses its Analog Canvas symbols by naming the package in its header record (16.2).
 
 use std::path::{Path, PathBuf};
 
@@ -28,7 +28,7 @@ fn rejects_an_unlocked_package_version() {
 }
 
 fn package_file() -> PathBuf {
-    public_packages::package_dir("analog-canvas-extensions").join("analog-canvas-extensions.rnl")
+    public_packages::version_dir("analog-canvas-extensions", "0.7").join("analog-canvas-extensions.rnl")
 }
 
 fn extension_files() -> MemoryProvider {
@@ -42,15 +42,15 @@ fn errors(r: &Interpretation) -> Vec<String> {
     r.diagnostics().iter().filter(|d| d.severity == Severity::Error).map(|d| r.sink.render(d)).collect()
 }
 
-/// A file of 0.3 that names the package, as Analog Canvas writes it, and draws each of its gates
+/// A file of 0.4 that names the package, as Analog Canvas writes it, and draws each of its gates
 /// with four inputs on an instance of a subcircuit with five terminals, a b c d y.
 fn read_gates() -> Interpretation {
     let instances: String = (0..GATES.len()).map(|k| format!("X{k} a b c d y g4\n")).collect();
     let record: Vec<String> =
         GATES.iter().enumerate().map(|(k, g)| format!("*   #X{k} @SET-SYMBOL {g} => @PLACE({}, 0)", 10 * k)).collect();
     let text = format!(
-        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); \
-         @USE-PACKAGE(name=\"analog-canvas-extensions\", version=\"0.1\")}}\n\
+        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); \
+         @USE-PACKAGE(name=\"analog-canvas-extensions\", version=\"0.7\") }}\n\
          .subckt g4 a b c d y\n.ends g4\n{instances}* @RNL {{\n{}\n* }}\n.end\n",
         record.join(";\n")
     );
@@ -72,7 +72,7 @@ fn a_file_that_names_the_package_finds_it_on_the_search_path() {
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     let lv = top(&r);
     let p = lv.packages.iter().find(|p| p.name == "analog-canvas-extensions").unwrap();
-    assert_eq!(p.version, "0.1");
+    assert_eq!(p.version, "0.7");
     assert!(
         r.sources.iter().any(|(f, _)| f == "analog-canvas-extensions.rnl"),
         "{:?}",
@@ -110,9 +110,9 @@ fn checked_on_its_own_it_gives_a_hint_for_those_pins_alone() {
         .filter(|l| l.contains(" = @DEFINE-SYMBOL("))
         .map(|l| l.trim_start().split(' ').next().unwrap())
         .collect();
-    assert_eq!(defined.len(), 33, "{defined:?}");
+    assert_eq!(defined.len(), 32, "{defined:?}");
     assert!(defined.iter().all(|n| n.starts_with("$CANVAS_")), "{defined:?}");
-    // written in the language 0.3, it is read without any switch; its only remarks are the four
+    // written in the language 0.4, it is read without any switch; its only remarks are the four
     // inputs of each of the six gates, off the integer points (9.2.4)
     let r = interpret_file(&package_file(), None, &FsProvider::new(&[]), &Options::default()).unwrap();
     let d: Vec<String> = r.diagnostics().iter().map(|d| r.sink.render(d)).collect();
@@ -122,13 +122,13 @@ fn checked_on_its_own_it_gives_a_hint_for_those_pins_alone() {
 }
 
 #[test]
-fn the_diamond_sources_have_their_terminals_box_and_labels() {
+fn the_diamond_current_source_has_its_terminals_box_and_labels() {
     if !public_packages::available() {
         return;
     }
-    // $CANVAS_VCVS_DIAMOND and $CANVAS_CCVS_DIAMOND, the diamonds of E and H without their control
-    // leads: the output's two terminals, Analog Canvas's view box, and the name and the value at
-    // the right of the diamond, as the catalog gives a frontend the symbols
+    // $CANVAS_CURRENT_SOURCE_DIAMOND, Analog Canvas's current source: its two terminals, Analog
+    // Canvas's view box, and the name and the value at the right of the diamond, as the catalog
+    // gives a frontend the symbols
     let options =
         rnl_view::CatalogOptions { packages: Some(vec!["analog-canvas-extensions".into()]), ..Default::default() };
     let c = serde_json::to_value(rnl_view::catalog(
@@ -137,25 +137,24 @@ fn the_diamond_sources_have_their_terminals_box_and_labels() {
     ))
     .unwrap();
     let label = |key: &str, y: f64| serde_json::json!({"key": key, "text": format!("${{{key}}}"), "at": [1.65, y], "halign": "start", "valign": "baseline"});
-    for name in ["$CANVAS_VCVS_DIAMOND", "$CANVAS_CCVS_DIAMOND"] {
-        let s = c["symbols"].as_array().unwrap().iter().find(|s| s["symbol"] == name).unwrap();
-        assert_eq!(
-            s["pins"],
-            serde_json::json!([{"terminal": 1, "at": [0.0, 2.0], "direction": "up"}, {"terminal": 2, "at": [0.0, -2.0], "direction": "down"}]),
-            "{name}"
-        );
-        assert_eq!(s["box"], serde_json::json!([-2.4, -2.0, 1.5, 2.0]), "{name}");
-        assert_eq!(s["labels"], serde_json::json!([label("name", 0.25), label("value", -0.95)]), "{name}");
-    }
+    let name = "$CANVAS_CURRENT_SOURCE_DIAMOND";
+    let s = c["symbols"].as_array().unwrap().iter().find(|s| s["symbol"] == name).unwrap();
+    assert_eq!(
+        s["pins"],
+        serde_json::json!([{"terminal": "p", "at": [0.0, 2.0], "direction": "up"}, {"terminal": "n", "at": [0.0, -2.0], "direction": "down"}])
+    );
+    assert_eq!(s["box"], serde_json::json!([-1.5, -2.0, 1.5, 2.0]));
+    assert_eq!(s["labels"], serde_json::json!([label("name", 0.25), label("value", -0.95)]));
 }
 
 /// The four controlled sources of two terminals as the standard series 0.3 drew them until it drew
-/// the diamonds (rnl 0d8e1d9), written as a package of their own, under other names.
-const BEFORE_THE_DIAMONDS: &str = r#"@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="before-the-diamonds", version="0.1")}
+/// the diamonds (rnl 0d8e1d9), written in 0.4 as a package of their own, under other names, with
+/// the terminal names of 0.4.
+const BEFORE_THE_DIAMONDS: &str = r#"@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="before-the-diamonds", version="0.1") }
 @RNL {
   $BEFORE_VCVS = @DEFINE-SYMBOL(box=[-2.4, -2, 1.5, 2]) {
-    (0, 2) @PIN(terminal=1, direction="up");
-    (0, -2) @PIN(terminal=2, direction="down");
+    %p = (0, 2) @PIN(terminal="p", direction="up");
+    %n = (0, -2) @PIN(terminal="n", direction="down");
     (0, 0) @CIRCLE(radius=1.0756);
     @LINE {(-2.0058, 1.4535) (-1.1919, 1.4535)};
     @LINE {(-1.5988, 1.8605) (-1.5988, 1.0465)};
@@ -166,8 +165,8 @@ const BEFORE_THE_DIAMONDS: &str = r#"@RNL(type="header") { @VERSION("0.3"); @PAC
     ? @TEXT("${value}", key="value") => @PLACE(1.5, -0.95)
   };
   $BEFORE_VCCS = @DEFINE-SYMBOL(box=[-1.5, -2, 1.5, 2]) {
-    (0, 2) @PIN(terminal=1, direction="up");
-    (0, -2) @PIN(terminal=2, direction="down");
+    %p = (0, 2) @PIN(terminal="p", direction="up");
+    %n = (0, -2) @PIN(terminal="n", direction="down");
     (0, 0) @CIRCLE(radius=1.0756);
     @LINE {(0, 0.6977) (0, 0.2326)};
     @LINE(fill="linecolor", linestyle="none") {(0, -0.6977) (-0.4651, 0.2326) (0.4651, 0.2326) (0, -0.6977)};
@@ -177,8 +176,8 @@ const BEFORE_THE_DIAMONDS: &str = r#"@RNL(type="header") { @VERSION("0.3"); @PAC
     ? @TEXT("${value}", key="value") => @PLACE(1.5, -0.95)
   };
   $BEFORE_CCVS = @DEFINE-SYMBOL(box=[-2.4, -2, 1.5, 2]) {
-    (0, 2) @PIN(terminal=1, direction="up");
-    (0, -2) @PIN(terminal=2, direction="down");
+    %p = (0, 2) @PIN(terminal="p", direction="up");
+    %n = (0, -2) @PIN(terminal="n", direction="down");
     (0, 0) @CIRCLE(radius=1.0756);
     @LINE {(-2.0058, 1.4535) (-1.1919, 1.4535)};
     @LINE {(-1.5988, 1.8605) (-1.5988, 1.0465)};
@@ -189,8 +188,8 @@ const BEFORE_THE_DIAMONDS: &str = r#"@RNL(type="header") { @VERSION("0.3"); @PAC
     ? @TEXT("${value}", key="value") => @PLACE(1.5, -0.95)
   };
   $BEFORE_CCCS = @DEFINE-SYMBOL(box=[-1.5, -2, 1.5, 2]) {
-    (0, 2) @PIN(terminal=1, direction="up");
-    (0, -2) @PIN(terminal=2, direction="down");
+    %p = (0, 2) @PIN(terminal="p", direction="up");
+    %n = (0, -2) @PIN(terminal="n", direction="down");
     (0, 0) @CIRCLE(radius=1.0756);
     @LINE {(0, 0.6977) (0, 0.2326)};
     @LINE(fill="linecolor", linestyle="none") {(0, -0.6977) (-0.4651, 0.2326) (0.4651, 0.2326) (0, -0.6977)};
@@ -208,7 +207,7 @@ fn the_circle_sources_draw_what_the_standard_series_drew_before_its_diamonds() {
         return;
     }
     // Analog Canvas's own drawing of the four controlled sources, kept for the files it exports: the
-    // same graphics, pins and box as the standard symbols had, beside the diamonds of the package
+    // same graphics, pins and box as the standard symbols had before they drew diamonds
     let pairs = [
         ("$BEFORE_VCVS", "$CANVAS_VCVS_CIRCLE"),
         ("$BEFORE_VCCS", "$CANVAS_VCCS_CIRCLE"),
@@ -222,9 +221,9 @@ fn the_circle_sources_draw_what_the_standard_series_drew_before_its_diamonds() {
         record.push(format!("*   #R{} @SET-SYMBOL {circle} => @PLACE({}, 10)", 2 * k + 1, 20 * k));
     }
     let text = format!(
-        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); \
-         @USE-PACKAGE(name=\"analog-canvas-extensions\", version=\"0.1\"); \
-         @USE-PACKAGE(name=\"before-the-diamonds\", version=\"0.1\")}}\n{instances}* @RNL {{\n{}\n* }}\n.end\n",
+        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); \
+         @USE-PACKAGE(name=\"analog-canvas-extensions\", version=\"0.7\"); \
+         @USE-PACKAGE(name=\"before-the-diamonds\", version=\"0.1\") }}\n{instances}* @RNL {{\n{}\n* }}\n.end\n",
         record.join(";\n")
     );
     let files = extension_files().with("t.sp", &text).with("pkgs/before-the-diamonds.rnl", BEFORE_THE_DIAMONDS);
@@ -274,50 +273,41 @@ fn the_circle_sources_are_in_the_catalog_with_their_terminals_box_and_labels() {
             .unwrap_or_else(|| panic!("{name} is not in the catalog"));
         assert_eq!(
             s["pins"],
-            serde_json::json!([{"terminal": 1, "at": [0.0, 2.0], "direction": "up"}, {"terminal": 2, "at": [0.0, -2.0], "direction": "down"}]),
+            serde_json::json!([{"terminal": "p", "at": [0.0, 2.0], "direction": "up"}, {"terminal": "n", "at": [0.0, -2.0], "direction": "down"}]),
             "{name}"
         );
         assert_eq!(s["box"], serde_json::json!(bbox), "{name}");
         assert_eq!(s["labels"], serde_json::json!([label("name", 0.25), label("value", -0.95)]), "{name}");
     }
-    // the diamonds are still there, for the files that were exported with them
+    // the diamonds are no longer here: the standard series draws them
     for name in ["$CANVAS_VCVS_DIAMOND", "$CANVAS_VCCS_DIAMOND", "$CANVAS_CCVS_DIAMOND", "$CANVAS_CCCS_DIAMOND"] {
-        assert!(c["symbols"].as_array().unwrap().iter().any(|s| s["symbol"] == name), "{name}");
+        assert!(!c["symbols"].as_array().unwrap().iter().any(|s| s["symbol"] == name), "{name}");
     }
 }
 
-/// The version Analog Canvas writes, locked beside 0.1: a file of 0.3 that names it reads its
-/// parts on primitive cards and on calls of the bodies Canvas writes.
+/// The version Analog Canvas writes: a file of 0.4 that names it reads its parts on primitive cards
+/// and on calls of the bodies Canvas writes, and its usages that only keep facts of the drawing.
 #[test]
 fn the_version_analog_canvas_writes_reads() {
     if !public_packages::available() {
         return;
     }
-    let dir = public_packages::version_dir("analog-canvas-extensions", "0.6");
-    let package = std::fs::read_to_string(dir.join("analog-canvas-extensions.rnl")).unwrap();
-    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); \
-                @USE-PACKAGE(name=\"analog-canvas-extensions\", version=\"0.6\")}\n\
-                .subckt potentiometer n1 nw n2\nR1 n1 nw 1k\nR2 nw n2 1k\n.ends potentiometer\n\
-                .subckt crystal n1 n2\nC0 n1 n2 5p\n.ends crystal\n\
-                C1 a 0 10u\nD1 a b DMOD\nVA1 b 0 DC 0\nX1 a b 0 potentiometer\nX2 a 0 crystal\n\
-                .model DMOD D\n\
+    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); \
+                @USE-PACKAGE(name=\"analog-canvas-extensions\", version=\"0.7\") }\n\
+                .subckt opamp inp inn out\nR1 inp inn 1meg\nR2 out 0 1k\n.ends opamp\n\
+                L1 a 0 10u\nM1 b a 0 0 nch\nX1 a b c opamp\n.model nch nmos\n\
                 * @RNL {\n\
-                *   #C1 @SET-SYMBOL $CANVAS_POLARIZED_CAPACITOR => @PLACE(0, 0);\n\
-                *   #D1 @SET-SYMBOL $CANVAS_LED => @PLACE(10, 0);\n\
-                *   #VA1 @SET-SYMBOL $CANVAS_AMMETER => @PLACE(20, 0);\n\
-                *   #X1 @SET-SYMBOL $CANVAS_POTENTIOMETER => @PLACE(30, 0);\n\
-                *   #X2 @SET-SYMBOL $CANVAS_CRYSTAL => @PLACE(40, 0)\n\
+                *   #L1 @SET-SYMBOL $CANVAS_INDUCTOR_LARGE => @PLACE(0, 0);\n\
+                *   #M1 @SET-SYMBOL $CANVAS_NMOS_4TERM => @PLACE(10, 0);\n\
+                *   #X1 @SET-SYMBOL $CANVAS_OPAMP_WIDE => @PLACE(20, 0);\n\
+                *   $CANVAS_NAME @ATTACH(name=\"M1\") #M1\n\
                 * }\n.end\n";
-    let mut files = MemoryProvider::new().with("t.sp", text).with("pkgs/analog-canvas-extensions.rnl", &package);
-    files.package_dirs.push("pkgs".into());
+    let files = extension_files().with("t.sp", text);
     let r = interpret_file(Path::new("t.sp"), None, &files, &Options::default()).unwrap();
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     let lv = top(&r);
-    assert_eq!(lv.packages.iter().find(|p| p.name == "analog-canvas-extensions").unwrap().version, "0.6");
+    assert_eq!(lv.packages.iter().find(|p| p.name == "analog-canvas-extensions").unwrap().version, "0.7");
     let drawn: Vec<&str> =
         lv.items.iter().filter(|i| i.kind == "instance").map(|i| lv.symbols[i.symbol].name.as_str()).collect();
-    assert_eq!(
-        drawn,
-        ["$CANVAS_POLARIZED_CAPACITOR", "$CANVAS_LED", "$CANVAS_AMMETER", "$CANVAS_POTENTIOMETER", "$CANVAS_CRYSTAL"]
-    );
+    assert_eq!(drawn, ["$CANVAS_INDUCTOR_LARGE", "$CANVAS_NMOS_4TERM", "$CANVAS_OPAMP_WIDE"]);
 }

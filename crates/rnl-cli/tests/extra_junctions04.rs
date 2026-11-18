@@ -141,22 +141,6 @@ fn generated_owners_are_written_before_their_dot() {
 }
 
 #[test]
-fn released_records_ignore_the_new_optional_interface() {
-    for version in ["0.2", "0.3"] {
-        let r = read(version, "", "%p=(0,0)");
-        clean(&r);
-        let a = write_record(&r.problems[0], &Solution::default(), "test", "hash");
-        let b = write_record(
-            &r.problems[0],
-            &Solution { junctions: vec![PointRef::Origin(object(&r, "%p"))], ..Default::default() },
-            "test",
-            "hash",
-        );
-        assert_eq!(a, b);
-    }
-}
-
-#[test]
 fn an_unnamed_authored_point_gets_a_numbering_check_on_writeback() {
     let input = source("0.4", ON, "(2,3)");
     let r = text(&input);

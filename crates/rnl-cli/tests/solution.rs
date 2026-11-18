@@ -1,8 +1,7 @@
-//! A solution written back as the record of the solver and read again (the draft 0.3, 5.9, 13.1,
-//! 14.8). In a level of a file of the draft, every decision is in the record: the objects without
-//! a name by their numbers, the routes of wires as WIRE given the wire, with the check of the
-//! numbers in the head. In a level of 0.2 no number and no rewrite is written. Either way, the
-//! writer lists every decision it does not write, with the reason.
+//! A solution written back as the record of the solver and read again (5.9, 13.1, 14.8): every
+//! decision is in the record, the objects without a name by their numbers, the routes of wires as
+//! WIRE given the wire, with the check of the numbers in the head, and the writer lists every
+//! decision it does not write, with the reason.
 
 use std::path::Path;
 use std::process::Command;
@@ -39,35 +38,30 @@ fn out_of_date(r: &Interpretation) -> usize {
     diagnostics(r, Severity::Hint).iter().filter(|m| m.contains("out of date for the objects without a name")).count()
 }
 
-/// The example of the draft's 5.9 with a capacitor: an unnamed usage, a free point in a wire, a
-/// label on each of two instances, an "auto" wire between two pins, a named wire, and a text
-/// without a key that a rule makes on C1.
-fn amp(version: &str) -> String {
+/// The header of a file that uses the whole standard series.
+const ALL: &str = "@VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\")";
+
+/// The header of a file that draws its devices with the symbols of the standard series, with no
+/// fill.
+const SYMBOLS: &str = "@VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\")";
+
+/// The example of 5.9 with a capacitor: an unnamed usage, a free point in a wire, a label on each
+/// of two instances, an "auto" wire between two pins, a named wire, and a text without a key that a
+/// rule makes on C1.
+fn amp() -> String {
     format!(
-        "* a round trip\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\"){}}}\n\
+        "* a round trip\n* @RNL(type=\"header\") {{ {ALL} }}\n\
          .subckt amp in out vdd vss\nM1 out in vss vss nch\nR1 vdd out 10k\nC1 out vss 1p\n\
          * @RNL {{\n\
          *   #M1 #R1 @ALIGN(\"x\");\n\
-         *   $GND @ATTACH &vss;\n\
+         *   $GROUND @ATTACH &vss;\n\
          *   &out @WIRE {{#M1:1 (_, _) #R1:2}};\n\
          *   {{#M1 #R1}} @TEXT(\"${{name}}\");\n\
          *   &vss @WIRE {{#M1:3 #C1:2}};\n\
          *   %w = &out @WIRE {{#R1:2 #C1:1}};\n\
          *   # @SELECT-INSTANCE(name=\"C*\") => @TEXT(\"${{value}}\")\n\
-         * }}\n.ends amp\n.end\n",
-        pin_02(version)
+         * }}\n.ends amp\n.end\n"
     )
-}
-
-/// A file of 0.3 uses the standard series 0.3 (16.3), whose names differ: these tests write and
-/// look for those of the series 0.2, such as $GND and $GND_STUB, so a file of 0.3 pins that series
-/// in its header record.
-fn pin_02(version: &str) -> &'static str {
-    if version == "0.3" {
-        "; @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")"
-    } else {
-        ""
-    }
 }
 
 /// Where the solution puts the instances: M1 and R1 on one x, as the ALIGN asks.
@@ -192,8 +186,8 @@ fn rnl_check(name: &str, text: &str) -> (bool, String) {
 }
 
 #[test]
-fn a_solution_of_the_draft_reads_back_as_it_was_solved() {
-    let s = solved(&amp("0.3"), "amp");
+fn a_solution_reads_back_as_it_was_solved() {
+    let s = solved(&amp(), "amp");
     // every decision is written, but the position of the text that the rule makes on C1, which
     // nothing can refer to (13.3)
     let unsolved: Vec<String> = s.written.unsolved.iter().map(|u| u.to_string()).collect();
@@ -205,8 +199,8 @@ fn a_solution_of_the_draft_reads_back_as_it_was_solved() {
     // by name, by number, and the routes as WIRE given the wire
     for written in [
         "#M1 @PLACE(10, 0) => @ORIENT(\"R0\")",
-        "%ioport_in = $IOPORT @ATTACH &in",
-        "%ioport_in @PLACE(",
+        "%io_port_in = $IO_PORT @ATTACH &in",
+        "%io_port_in @PLACE(",
         "%#1 @PLACE(",
         "%#3 @PLACE(",
         "%#5 @PLACE(",
@@ -226,11 +220,15 @@ fn a_solution_of_the_draft_reads_back_as_it_was_solved() {
     assert!(diagnostics(&r, Severity::Error).is_empty(), "{:?}", diagnostics(&r, Severity::Error));
     assert_eq!(out_of_date(&r), 0);
     assert_eq!(level_check(&r, level_index(&r, "amp")), Some(check.as_str()));
-    // every object where the solution put it, turned as it turned it
+    // every object where the solution put it, turned as it turned it, but the points that only
+    // help the solve, such as the column of the ports of the fill, which the record does not hold
     let back = problem(&r, "amp");
+    let auxiliary = auxiliary_points(&s.p);
     for pl in &s.solution.placements {
         let o = &s.p.objects[pl.object];
-        if s.written.unsolved.iter().any(|u| u.decision == Decision::Position { object: pl.object, axis: None }) {
+        if s.written.unsolved.iter().any(|u| u.decision == Decision::Position { object: pl.object, axis: None })
+            || auxiliary[pl.object]
+        {
             continue;
         }
         let reference = read_back(&s.p, &o.reference);
@@ -255,7 +253,7 @@ fn a_solution_of_the_draft_reads_back_as_it_was_solved() {
 
     // read with its record, the level numbers the record's own objects after the authored ones,
     // such as the bends: a new record that replaces it does not refer to them
-    let bend = back.objects.iter().position(|o| o.label == "(10, 18)").unwrap();
+    let bend = back.objects.iter().position(|o| o.label == "(8, 25)").unwrap();
     assert_eq!(back.objects[bend].reference, Reference::Number { number: 7, path: Vec::new() });
     let again = Solution {
         placements: vec![Placement { object: bend, x: Some(1.0), y: Some(1.0), orient: None }],
@@ -264,13 +262,13 @@ fn a_solution_of_the_draft_reads_back_as_it_was_solved() {
     let written = write_record(back, &again, "rnl-solver test", "sig1:0000000000000000.0000000000000000");
     assert_eq!(
         written.unsolved.iter().map(|u| u.to_string()).collect::<Vec<_>>(),
-        ["the position of (10, 18): it is an object of a record of the solver, which this record replaces: a solver reads the level without them (2.8)"]
+        ["the position of (8, 25): it is an object of a record of the solver, which this record replaces: a solver reads the level without them (2.8)"]
     );
 }
 
 #[test]
 fn changing_the_authored_text_puts_the_numbers_out_of_date() {
-    let s = solved(&amp("0.3"), "amp");
+    let s = solved(&amp(), "amp");
     let swapped = s.text.replace("{#M1 #R1} @TEXT", "{#R1 #M1} @TEXT");
     assert_ne!(swapped, s.text);
     let r = read(&swapped, &Options { problems: true, ..Options::default() });
@@ -293,61 +291,18 @@ fn changing_the_authored_text_puts_the_numbers_out_of_date() {
         assert_eq!(fixed_at(&o.position), Some(at));
     }
     let ports: Vec<&ProblemObject> =
-        back.objects.iter().filter(|o| o.kind == ObjectKind::Usage && o.label.starts_with("%ioport_")).collect();
+        back.objects.iter().filter(|o| o.kind == ObjectKind::Usage && o.label.starts_with("%io_port_")).collect();
     assert_eq!(ports.len(), 4);
     assert!(ports.iter().all(|o| fixed_at(&o.position).is_some()));
 }
 
 #[test]
-fn in_a_file_of_0_2_no_number_and_no_rewrite_is_written() {
-    let s = solved(&amp("0.2"), "amp");
-    // the record is as written: no numbers, no rewrites, and no numbering to finish it with
-    assert!(!s.record.contains("%#") && !s.record.contains("@WIRE") && !s.record.contains("numbering"));
-    assert_eq!(s.record, s.written.record);
-    // everything else is written
-    for written in ["#M1 @PLACE(10, 0) => @ORIENT(\"R0\")", "#C1 @PLACE(20, 4)", "%ioport_vss @PLACE("] {
-        assert!(s.record.contains(written), "{written}\n{}", s.record);
-    }
-    // and what is not, with the reason
-    let no_name =
-        "it has no name, and a file of 0.2 cannot refer to it; the draft 0.3 refers to it by its number (5.9)";
-    let no_rewrite =
-        "a file of 0.2 cannot rewrite a wire; the draft 0.3 writes its route with WIRE given the wire (13.1)";
-    let unsolved: Vec<String> = s.written.unsolved.iter().map(|u| u.to_string()).collect();
-    assert_eq!(
-        unsolved,
-        [
-            format!("the position of a usage of $GND: {no_name}"),
-            format!("the orientation of a usage of $GND: {no_name}"),
-            format!("the position of (_, _): {no_name}"),
-            format!("the position of a text: {no_name}"),
-            format!("the position of a text: {no_name}"),
-            "the position of a text: a text without a key that a rule makes cannot be referred to: the solver does not decide its position, the viewer places it (13.3, 14.8)".to_string(),
-            format!("the route of a wire: {no_rewrite}"),
-            format!("the route of a wire: {no_rewrite}"),
-            format!("the route of %w: {no_rewrite}"),
-        ]
-    );
-    // read back: what is written is placed, the rest is free, as if the level were not solved
-    let r = read(&s.text, &Options { problems: true, ..Options::default() });
-    assert!(diagnostics(&r, Severity::Error).is_empty(), "{:?}", diagnostics(&r, Severity::Error));
-    let back = problem(&r, "amp");
-    let m1 = back.objects.iter().find(|o| o.reference == Reference::Name("#M1".into())).unwrap();
-    assert_eq!(fixed_at(&m1.position), Some((10.0, 0.0)));
-    let point = back.objects.iter().find(|o| o.label == "(_, _)").unwrap();
-    assert_eq!(fixed_at(&point.position), None);
-    assert!(back.wires.iter().all(|w| w.label == "%w" || w.mode == "auto"));
-    assert_eq!(back.wires.iter().find(|w| w.label == "%w").unwrap().mode, "auto");
-}
-
-#[test]
 fn the_wire_of_a_ground_that_a_rule_makes_is_routed_by_its_number() {
-    // the standard package grounds V1:n and R1:n with a $GND_STUB each, whose wire, "auto" and
+    // the standard package grounds V1:n and R1:n with a $GROUND_STUB each, whose wire, "auto" and
     // without a name in its body, the record numbers once it writes the stub out (5.9, 10.5)
     let text = format!(
-        "* stubs\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"){}}}\nV1 a 0 1\nR1 a 0 1k\n\
-         * @RNL {{ (9, 9) @TEXT(\"note\") }}\n.end\n",
-        pin_02("0.3")
+        "* stubs\n* @RNL(type=\"header\") {{ {ALL} }}\nV1 a 0 1\nR1 a 0 1k\n\
+         * @RNL {{ (9, 9) @TEXT(\"note\") }}\n.end\n"
     );
     let s = solved(&text, "t.sp");
     assert_eq!(s.p.authored_numbers, 2);
@@ -359,12 +314,12 @@ fn the_wire_of_a_ground_that_a_rule_makes_is_routed_by_its_number() {
     // the stubs are written out first, and their wires are the record's own 3 and 4
     assert!(s.written.unsolved.is_empty(), "{:?}", s.written.unsolved);
     for written in [
-        "%gnd_stub_V1_n = $GND_STUB @ATTACH(gap=2) #V1:n",
-        "%gnd_stub_R1_n = $GND_STUB @ATTACH(gap=2) #R1:n",
-        "%gnd_stub_V1_n::g @PLACE(",
+        "%ground_stub_V1_n = $GROUND_STUB @ATTACH(gap=3) #V1::n",
+        "%ground_stub_R1_n = $GROUND_STUB @ATTACH(gap=3) #R1::n",
+        "%ground_stub_V1_n::g @PLACE(",
         "%#2 @PLACE(",
-        "%#3 @WIRE(mode=\"straight\") {#V1:n (",
-        "%#4 @WIRE(mode=\"straight\") {#R1:n (",
+        "%#3 @WIRE(mode=\"straight\") {#V1::n (",
+        "%#4 @WIRE(mode=\"straight\") {#R1::n (",
     ] {
         assert!(s.record.contains(written), "{written}\n{}", s.record);
     }
@@ -387,21 +342,16 @@ fn the_wire_of_a_ground_that_a_rule_makes_is_routed_by_its_number() {
     assert!(r.model.levels[0].unplaced.is_empty(), "{:?}", r.model.levels[0].unplaced);
     let (ok, counts) = rnl_check("solution-stubs.sp", &s.text);
     assert!(ok && counts.starts_with("0 errors"), "{counts}");
-
-    // in a file of 0.2 the stubs are written out and their grounds placed, the wires not routed
-    let s = solved(&text.replace("\"0.3\"", "\"0.2\""), "t.sp");
-    assert!(s.record.contains("%gnd_stub_R1_n::g @PLACE(") && !s.record.contains("@WIRE"));
-    let routes: Vec<&Unsolved> =
-        s.written.unsolved.iter().filter(|u| matches!(u.decision, Decision::WireRoute { .. })).collect();
-    assert_eq!(routes.len(), 2);
 }
 
 #[test]
 fn the_writer_says_what_it_does_not_write_and_what_a_solver_should_not_do() {
-    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a b 1k\nC1 a 0 1p\n\
-                * @RNL { #R1 @PLACE(0, 0); #C1 @PLACE(10, 0); %w = &a @WIRE(mode=\"manhattan\") {#R1:1 #C1:1};\n\
-                * %v = &b @WIRE {#R1:2 (5, -5)} }\n.end\n";
-    let r = read(text, &Options::solver());
+    let text = format!(
+        "* t\n* @RNL(type=\"header\") {{ {SYMBOLS} }}\nR1 a b 1k\nC1 a 0 1p\n\
+         * @RNL {{ #R1 @PLACE(0, 0); #C1 @PLACE(10, 0); %w = &a @WIRE(mode=\"manhattan\") {{#R1:1 #C1:1}};\n\
+         * %v = &b @WIRE {{#R1:2 (5, -5)}} }}\n.end\n"
+    );
+    let r = read(&text, &Options::solver());
     let p = problem(&r, "t.sp");
     let wire = |label: &str| p.wires.iter().position(|w| w.label == label).unwrap();
     let (w, v) = (wire("%w"), wire("%v"));
@@ -442,9 +392,9 @@ fn the_writer_says_what_it_does_not_write_and_what_a_solver_should_not_do() {
 
 #[test]
 fn a_record_that_uses_no_number_has_no_numbering() {
-    // in a file of the draft, a solution that reaches only named objects writes no number, and its
-    // record needs no numbering (5.9)
-    let text = "* named\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a b 1k\nC1 a b 1p\n.end\n";
+    // a solution that reaches only named objects writes no number, and its record needs no
+    // numbering (5.9)
+    let text = &format!("* named\n* @RNL(type=\"header\") {{ {SYMBOLS} }}\nR1 a b 1k\nC1 a b 1p\n.end\n");
     let files = MemoryProvider::new().with("t.sp", text);
     let r = interpret_file(Path::new("t.sp"), None, &files, &Options::solver()).unwrap();
     let p = problem(&r, "t.sp");
@@ -474,9 +424,9 @@ fn a_record_that_uses_no_number_has_no_numbering() {
 fn a_position_on_one_axis_is_written_on_that_axis_alone() {
     // the solver may decide one coordinate alone: the record writes `@PLACE(x=…)` or
     // `@PLACE(y=…)` (11.1), and the other axis is no decision of the solver's, so not unsolved
-    let text =
-        "* one axis\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")}\n\
-                R1 a b 1k\nR2 b c 1k\nR3 c 0 1k\n* @RNL { %p = (_, _) }\n.end\n";
+    let text = &format!(
+        "* one axis\n* @RNL(type=\"header\") {{ {SYMBOLS} }}\nR1 a b 1k\nR2 b c 1k\nR3 c 0 1k\n* @RNL {{ %p = (_, _) }}\n.end\n"
+    );
     let r = read(text, &Options::solver());
     let p = problem(&r, "t.sp");
     let at = |label: &str| p.objects.iter().position(|o| o.label == label).unwrap();
@@ -509,27 +459,5 @@ fn a_position_on_one_axis_is_written_on_that_axis_alone() {
             (at("#R3"), Some(1.0), Some(2.0)),
             (at("%p"), Some(7.0), None)
         ]
-    );
-
-    // in a file of 0.2, a point without a name: the axis given is unsolved, by itself
-    let text = "* one axis\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 b c 1k\n\
-                * @RNL { &b @WIRE {#R1:2 (_, _) #R2:1} }\n.end\n";
-    let r = read(text, &Options::solver());
-    let p = problem(&r, "t.sp");
-    let point = p.objects.iter().position(|o| o.label == "(_, _)").unwrap();
-    let solution = Solution {
-        placements: vec![Placement { object: point, x: Some(3.0), y: None, orient: None }],
-        ..Solution::default()
-    };
-    let written = write_record(p, &solution, "rnl-solver test", "sig1:0000000000000000.0000000000000000");
-    let unsolved: Vec<(Decision, String)> = written.unsolved.iter().map(|u| (u.decision, u.to_string())).collect();
-    assert_eq!(
-        unsolved,
-        [(
-            Decision::Position { object: point, axis: Some(Axis::X) },
-            "the x of (_, _): it has no name, and a file of 0.2 cannot refer to it; the draft 0.3 refers to it by its \
-             number (5.9)"
-                .to_string()
-        )]
     );
 }

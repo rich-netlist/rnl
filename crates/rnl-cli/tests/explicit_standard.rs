@@ -151,15 +151,6 @@ fn an_inline_drop_prevents_the_setting_from_adding_a_default() {
 }
 
 #[test]
-fn released_versions_keep_their_implicit_standard_package() {
-    for version in ["0.2", "0.3"] {
-        let result = read(&files(&source(version, "")), Options::solver());
-        assert_eq!(errors(&result), 0, "{version}: {:?}", result.diagnostics());
-        assert_eq!(result.problems[0].usages.len(), 1);
-    }
-}
-
-#[test]
 fn a_draft_include_does_not_get_its_own_implicit_standard() {
     let main = "* mixed\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n.include child.sp\n.end\n";
     let child = "* child\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child a b\nR1 a b 1k\n* @RNL { #R1 @AS $D }\n.ends child\n";

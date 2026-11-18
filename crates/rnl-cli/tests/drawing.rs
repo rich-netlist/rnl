@@ -16,14 +16,8 @@ fn read(text: &str, options: &Options) -> Interpretation {
     interpret_file(Path::new("t.sp"), None, &MemoryProvider::new().with("t.sp", text), options).unwrap()
 }
 
-/// A file of `version` where M1 and R1 are placed and `records` follow.
-fn netlist(version: &str, records: &str) -> String {
-    if version != "0.4" {
-        return format!(
-            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\")}}\nM1 out in vss vss nch\nR1 vdd out 10k\n\
-             * @RNL {{ #M1 @PLACE(0, 0); #R1 @PLACE(10, 0) }}\n{records}.end\n"
-        );
-    }
+/// A file of 0.4 where M1 and R1 are placed and `records` follow.
+fn netlist(records: &str) -> String {
     format!(
         "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); \
          @USE-PACKAGE(name=\"rnl-std-basic\", version=\"0.4\"); \
@@ -52,16 +46,16 @@ fn on_net<'a>(lv: &'a LevelView, net: &str) -> Vec<&'a WireView> {
 }
 
 /// The pins M1:1 and R1:2 that the wire on out joins, as a wire through placed points draws them.
-fn pins(version: &str) -> (Pt, Pt) {
-    let lv = level(&read(&netlist(version, &record("&out @WIRE {#M1:1 (5, 5) #R1:2}")), &Options::default()), "t.sp");
+fn pins() -> (Pt, Pt) {
+    let lv = level(&read(&netlist(&record("&out @WIRE {#M1:1 (5, 5) #R1:2}")), &Options::default()), "t.sp");
     let w = &on_net(&lv, "out")[0].points;
     (w[0], w[w.len() - 1])
 }
 
 #[test]
 fn a_wire_through_a_free_point_is_a_flyline() {
-    let (m1, r1) = pins("0.4");
-    let r = read(&netlist("0.4", &record("&out @WIRE {#M1:1 (_, _) #R1:2}")), &Options::default());
+    let (m1, r1) = pins();
+    let r = read(&netlist(&record("&out @WIRE {#M1:1 (_, _) #R1:2}")), &Options::default());
     let lv = level(&r, "t.sp");
     // no part of it has two points with a position: nothing drawn as the wire, a flyline over the
     // free point; the wire is not an object without a position, and neither is the point
@@ -69,20 +63,20 @@ fn a_wire_through_a_free_point_is_a_flyline() {
     assert_eq!(ends(&lv), [(m1, r1)]);
     assert!(lv.unplaced.is_empty(), "{:?}", lv.unplaced);
     // with the point placed, the wire is drawn whole, without a flyline
-    let r = read(&netlist("0.4", &record("&out @WIRE {#M1:1 (5, 5) #R1:2}")), &Options::default());
+    let r = read(&netlist(&record("&out @WIRE {#M1:1 (5, 5) #R1:2}")), &Options::default());
     let lv = level(&r, "t.sp");
     assert_eq!((on_net(&lv, "out").len(), ends(&lv).len()), (1, 0));
     // a wire with no point that has a position draws nothing
-    let r = read(&netlist("0.4", &record("&in @WIRE {(_, _) (_, 3)}")), &Options::default());
+    let r = read(&netlist(&record("&in @WIRE {(_, _) (_, 3)}")), &Options::default());
     let lv = level(&r, "t.sp");
     assert!(on_net(&lv, "in").is_empty() && lv.flylines.iter().all(|f| f.nets != ["in"]));
 }
 
 #[test]
 fn a_wire_whose_middle_point_is_free_is_drawn_in_two_runs() {
-    let (m1, r1) = pins("0.4");
+    let (m1, r1) = pins();
     let wire = "&out @WIRE(mode=\"horizontal-vertical\", linestyle=\"bold\") {#M1:1 (2, 5) (_, _) (8, 5) #R1:2}";
-    let r = read(&netlist("0.4", &record(wire)), &Options::default());
+    let r = read(&netlist(&record(wire)), &Options::default());
     assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error));
     let lv = level(&r, "t.sp");
     let runs = on_net(&lv, "out");
@@ -97,7 +91,7 @@ fn a_wire_whose_middle_point_is_free_is_drawn_in_two_runs() {
     assert_eq!(ends(&lv), [((2.0, 5.0), (8.0, 5.0))]);
 
     // the Document has a hit for each run, on the net, and draws the flyline when asked
-    let files = MemoryProvider::new().with("/w/t.sp", &netlist("0.4", &record(wire)));
+    let files = MemoryProvider::new().with("/w/t.sp", &netlist(&record(wire)));
     let options = rnl_view::BuildOptions { primitives: true, flylines: true, ..rnl_view::BuildOptions::default() };
     let d = rnl_view::build("/w/t.sp", &files, &options).unwrap();
     let out = d.objects.iter().position(|o| o.kind == "net" && o.name == "out").unwrap();
@@ -168,15 +162,15 @@ fn a_wire_whose_middle_point_is_free_is_drawn_in_two_runs() {
 
 #[test]
 fn a_stale_numbering_leaves_the_free_point_free_and_the_wire_drawn_in_part() {
-    // a file of the draft whose record of the solver is out of date: the statements with numbers
-    // take no effect (5.9), so the free point has no position again, the labels go where the viewer
-    // puts them, and the wire through the point is drawn as far as it has positions. The pins are
-    // those of the symbols of the standard series 0.2, which the file pins: a file of 0.3 uses the
-    // series 0.3 otherwise (16.3)
-    let authored = "*   &out @WIRE {#M1:1 (1, 3) (_, _) #R1:2};\n*   {#M1 #R1} @TEXT(\"${name}\")\n";
+    // a file whose record of the solver is out of date: the statements with numbers take no effect
+    // (5.9), so the free point has no position again, the labels go where the viewer puts them, and
+    // the wire through the point is drawn as far as it has positions
+    let authored = "*   #M1 @SET-SYMBOL $NMOS; #R1 @SET-SYMBOL $RESISTOR;\n\
+                    *   &out @WIRE {#M1:1 (1, 3) (_, _) #R1:2};\n*   {#M1 #R1} @TEXT(\"${name}\")\n";
     let solver = "* @RNL(type=\"generated\", priority=\"high\", numbering=\"0123456789abcdef\") {\n\
                   *   #M1 @PLACE(0, 0); #R1 @PLACE(10, 0); %#3 @PLACE(6, 6); %#4 @PLACE(2, 1); %#5 @PLACE(12, 1)\n* }\n";
-    let header = "@VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")";
+    let header = "@VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-basic\", version=\"0.4\"); \
+                  @USE-PACKAGE(name=\"rnl-std-semiconductors\", version=\"0.4\")";
     let text = format!(
         "* t\n* @RNL(type=\"header\") {{ {header}}}\nM1 out in vss vss nch\nR1 vdd out 10k\n* @RNL {{\n{authored}* }}\n{solver}.end\n"
     );
@@ -185,7 +179,7 @@ fn a_stale_numbering_leaves_the_free_point_free_and_the_wire_drawn_in_part() {
     let hints =
         r.diagnostics().into_iter().filter(|d| d.message.contains("out of date for the objects without a name"));
     assert_eq!(hints.count(), 1);
-    let (m1, r1) = pins("0.2");
+    let (m1, r1) = pins();
     let lv = level(&r, "t.sp");
     // the run from M1:1 to (1, 3) is drawn, and a flyline goes on to R1:2 over the free point
     let runs = on_net(&lv, "out");
@@ -216,7 +210,7 @@ fn scene_positioned_labels_keep_scene_alignment() {
             let body = format!(
                 "#M1 @ORIENT(\"{orientation}\"); #M1 @TEXT(\"${{name}}\", key=\"name\", halign=\"end\", valign=\"top\"{position}"
             );
-            let source = netlist("0.4", &record(&body)).replace("M1 out", ".model nch nmos\nM1 out");
+            let source = netlist(&record(&body)).replace("M1 out", ".model nch nmos\nM1 out");
             let r = read(&source, &Options::default());
             assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
             let lv = level(&r, "t.sp");
@@ -241,7 +235,7 @@ fn scene_positioned_labels_keep_scene_alignment() {
 fn a_label_using_a_symbol_axis_keeps_the_symbol_orientation() {
     for offset in ["", ", dx=-0.4", ", dy=-0.5"] {
         let body = format!("#M1 @ORIENT(\"MY\"); #M1 @TEXT(\"${{name}}\", key=\"name\", halign=\"end\"{offset})");
-        let source = netlist("0.4", &record(&body)).replace("M1 out", ".model nch nmos\nM1 out");
+        let source = netlist(&record(&body)).replace("M1 out", ".model nch nmos\nM1 out");
         let r = read(&source, &Options::default());
         assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
         let lv = level(&r, "t.sp");
@@ -254,43 +248,41 @@ fn a_label_using_a_symbol_axis_keeps_the_symbol_orientation() {
 
 #[test]
 fn a_text_on_a_wire_drawn_in_part_is_drawn_above_it() {
-    let (m1, r1) = pins("0.4");
+    let (m1, r1) = pins();
     // the wire is drawn up to (2, 5) and from (8, 5), with a flyline between: its label goes above
     // the middle of that drawing, here the flyline; a PLACE on one axis keeps its value
     let records = "%w = &out @WIRE {#M1:1 (2, 5) (_, _) (8, 5) #R1:2}; %w @TEXT(\"w\");                    %w @TEXT(\"x7\") => @PLACE(x=7); %t = %w @TEXT(\"t\"); {%t #R1} @ALIGN(\"x\")";
-    let r = read(&netlist("0.4", &record(records)), &Options::default());
+    let r = read(&netlist(&record(records)), &Options::default());
     let lv = level(&r, "t.sp");
     assert_eq!(text_at(&lv, "w"), Some((5.0, 5.6)));
     assert_eq!(text_at(&lv, "x7"), Some((7.0, 5.6)));
     // the place is the viewer's only: a constraint on the text still has nothing to check
     assert_eq!(lv.constraints[0].status, "unsolved");
     // a wire drawn only as a flyline: above its middle
-    let r =
-        read(&netlist("0.4", &record("%w = &out @WIRE {#M1:1 (_, _) #R1:2}; %w @TEXT(\"w\")")), &Options::default());
+    let r = read(&netlist(&record("%w = &out @WIRE {#M1:1 (_, _) #R1:2}; %w @TEXT(\"w\")")), &Options::default());
     assert_eq!(text_at(&level(&r, "t.sp"), "w"), Some(((m1.0 + r1.0) / 2.0, (m1.1 + r1.1) / 2.0 + 0.6)));
     // a wire with one point placed is not drawn, and neither is its label
-    let r = read(&netlist("0.4", &record("%w = &out @WIRE {#M1:1 (_, _)}; %w @TEXT(\"w\")")), &Options::default());
+    let r = read(&netlist(&record("%w = &out @WIRE {#M1:1 (_, _)}; %w @TEXT(\"w\")")), &Options::default());
     assert_eq!(text_at(&level(&r, "t.sp"), "w"), None);
 }
 
 #[test]
 fn a_text_on_a_net_goes_next_to_what_is_drawn_of_it() {
-    let (m1, r1) = pins("0.4");
+    let (m1, r1) = pins();
     // no wire of out has all its points placed: the label goes at the start of the first that is
     // drawn at all, here as a flyline from M1:1
-    let r =
-        read(&netlist("0.4", &record("&out @WIRE {#M1:1 (_, _) #R1:2}; &out @TEXT(\"${name}\")")), &Options::default());
+    let r = read(&netlist(&record("&out @WIRE {#M1:1 (_, _) #R1:2}; &out @TEXT(\"${name}\")")), &Options::default());
     assert_eq!(text_at(&level(&r, "t.sp"), "out"), Some(m1));
     // a net without a wire drawn: next to the first of its pins that is drawn (13.3)
-    let r = read(&netlist("0.4", &record("&out @TEXT(\"${name}\")")), &Options::default());
+    let r = read(&netlist(&record("&out @TEXT(\"${name}\")")), &Options::default());
     assert_eq!(text_at(&level(&r, "t.sp"), "out"), Some(m1));
-    let r = read(&netlist("0.4", &record("&out @WIRE {(_, _) #R1:2}; &out @TEXT(\"${name}\")")), &Options::default());
+    let r = read(&netlist(&record("&out @WIRE {(_, _) #R1:2}; &out @TEXT(\"${name}\")")), &Options::default());
     assert_eq!(text_at(&level(&r, "t.sp"), "out"), Some(m1));
     // a wire drawn whole comes first, as before
-    let r = read(&netlist("0.4", &record("&out @WIRE {#R1:2 (12, 6)}; &out @TEXT(\"${name}\")")), &Options::default());
+    let r = read(&netlist(&record("&out @WIRE {#R1:2 (12, 6)}; &out @TEXT(\"${name}\")")), &Options::default());
     assert_eq!(text_at(&level(&r, "t.sp"), "out"), Some(r1));
     // a net none of whose terminals is drawn: no label
-    let text = netlist("0.4", &record("&x @TEXT(\"${name}\")")).replace(
+    let text = netlist(&record("&x @TEXT(\"${name}\")")).replace(
         "R1 vdd out 10k
 ",
         "R1 vdd out 10k
@@ -305,7 +297,7 @@ fn a_text_on_a_graphic_is_drawn_beside_it() {
     // a label on a graphic in the scene is drawn beside its first point, as one on an object beside
     // its origin (13.3, 13.4); on a graphic that is not drawn, as one point has no position, it is not
     let records = "%r = @RECTANGLE {(20, 20) (24, 22)}; %r @TEXT(\"box\");                    %s = @LINE {(30, 30) (_, _)}; %s @TEXT(\"line\")";
-    let r = read(&netlist("0.4", &record(records)), &Options::default());
+    let r = read(&netlist(&record(records)), &Options::default());
     let lv = level(&r, "t.sp");
     assert_eq!(text_at(&lv, "box"), Some((21.2, 21.2)));
     assert_eq!(text_at(&lv, "line"), None);

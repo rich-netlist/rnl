@@ -95,43 +95,30 @@ fn equal_member_networks_return_one_network() {
 }
 
 #[test]
-fn released_versions_keep_index_mapping_and_parameter_warnings() {
-    for version in ["0.2", "0.3"] {
-        let result = read(&source(version, r#"["n","p"]"#, "1k", "%bundle:p::net"));
-        assert_eq!(role_nets(&result), ["a", "c"]);
-        assert_eq!(mismatch_count(&result), 0);
-        let result = read(&source(version, r#"["p","n"]"#, "1k temp=2", "%bundle:p::net"));
-        assert_eq!(mismatch_count(&result), 1);
-    }
-}
-
-#[test]
-fn bundle_semantics_follow_the_source_file_version_in_mixed_includes() {
-    for (main_version, child_version, expected) in [("0.4", "0.3", "d"), ("0.3", "0.4", "c")] {
-        let body = r#"$D = @DEFINE(roles=[["n","net"]]) {}; %bundle = {#R1 #R2} @BUNDLE; %u = %bundle:p::net @AS $D"#;
-        let main = format!("* mixed\n* @RNL(type=\"header\") {{ @VERSION(\"{main_version}\") }}\n.include child.sp\n* @RNL(scope=\"child\") {{ {body} }}\n.end\n");
-        let child = format!("* child\n* @RNL(type=\"header\") {{ @VERSION(\"{child_version}\"); @DEVICE(name=\"R1\", terminals=[\"p\",\"n\"]); @DEVICE(name=\"R2\", terminals=[\"n\",\"p\"]) }}\n.subckt child a b c d\nR1 a b 1k\nR2 c d 1k\n.ends child\n");
-        let provider = MemoryProvider::new().with("t.sp", &main).with("child.sp", &child);
-        let result =
-            interpret_file(Path::new("t.sp"), None, &provider, &Options { std: false, ..Options::solver() }).unwrap();
-        assert!(result.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", result.diagnostics());
-        let nets: Vec<_> = result
-            .problems
-            .iter()
-            .flat_map(|p| &p.usages)
-            .flat_map(|u| &u.roles[0].members)
-            .filter_map(|f| match f {
-                Filler::Net(name) => Some(name.as_str()),
-                _ => None,
-            })
-            .collect();
-        assert_eq!(nets, ["a", expected]);
-    }
+fn a_scoped_record_on_an_included_level_follows_terminal_names() {
+    let body = r#"$D = @DEFINE(roles=[["n","net"]]) {}; %bundle = {#R1 #R2} @BUNDLE; %u = %bundle:p::net @AS $D"#;
+    let main = format!("* mixed\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n.include child.sp\n* @RNL(scope=\"child\") {{ {body} }}\n.end\n");
+    let child = format!("* child\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @DEVICE(name=\"R1\", terminals=[\"p\",\"n\"]); @DEVICE(name=\"R2\", terminals=[\"n\",\"p\"]) }}\n.subckt child a b c d\nR1 a b 1k\nR2 c d 1k\n.ends child\n");
+    let provider = MemoryProvider::new().with("t.sp", &main).with("child.sp", &child);
+    let result =
+        interpret_file(Path::new("t.sp"), None, &provider, &Options { std: false, ..Options::solver() }).unwrap();
+    assert!(result.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", result.diagnostics());
+    let nets: Vec<_> = result
+        .problems
+        .iter()
+        .flat_map(|p| &p.usages)
+        .flat_map(|u| &u.roles[0].members)
+        .filter_map(|f| match f {
+            Filler::Net(name) => Some(name.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(nets, ["a", "d"]);
 }
 
 #[test]
 fn net_attributes_follow_names_and_collapse_a_shared_net() {
-    for (version, second_net, expected) in [("0.4", "d", "a,d"), ("0.4", "a", "a"), ("0.3", "d", "a,c")] {
+    for (version, second_net, expected) in [("0.4", "d", "a,d"), ("0.4", "a", "a")] {
         let text = source(version, r#"["n","p"]"#, "1k", "%bundle:p::net")
             .replace("R2 c d", &format!("R2 c {second_net}"))
             .replace("%u = %bundle:p::net @AS $D", r#"%bundle @PLACE(0,0); %bundle:p @TEXT("${net}")"#);

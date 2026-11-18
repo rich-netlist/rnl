@@ -1,6 +1,0 @@
-@RNL(type="generated", priority="high", author="roundtrip", hash="sig2:e857e46185014389.0653ceb45968b8c2", numbering="381b861c3b95d083") {
-  %mark_R1_n = $MARK @ATTACH(priority="high") #R1:n;
-  #R1 @PLACE(0, 0) => @ORIENT("R0");
-  %mark_R1_n::p @PLACE(0, -6);
-  %#1 @WIRE(mode="straight") {#R1:n (0, -6) %mark_R1_n::p}
-}

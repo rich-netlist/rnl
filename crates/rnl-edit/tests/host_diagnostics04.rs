@@ -39,20 +39,22 @@ fn editor_host_errors_use_the_named_declaration_location() {
 }
 
 #[test]
-fn includes_keep_their_own_declared_language() {
-    for version in ["0.3", "0.4"] {
-        let child = format!("* child\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\n.include\n");
-        let files = MemoryProvider::new().with("/rnl-edit/child.sp", &child);
-        let req = request(Some("0.4"), "spice", "title\n.include child.sp\nR1 a b 1k\n");
-        let result = write_with_options_diagnosed(&req, &files, &Options { std: false, ..Default::default() });
-        if version == "0.4" {
-            let failure = result.unwrap_err();
-            assert_eq!(failure.code.number().as_deref(), Some("RNL9012"));
-            assert!(failure.diagnostics.iter().any(|d| d.line == 3 && d.file.ends_with("child.sp")));
-        } else {
-            assert!(result.unwrap().diagnostics.iter().all(|d| d.code.as_deref() != Some("RNL9012")));
-        }
-    }
+fn includes_are_checked_in_their_own_declared_language() {
+    // an include that declares 0.4 has its host errors at its own lines
+    let child = "* child\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include\n";
+    let files = MemoryProvider::new().with("/rnl-edit/child.sp", child);
+    let req = request(Some("0.4"), "spice", "title\n.include child.sp\nR1 a b 1k\n");
+    let failure =
+        write_with_options_diagnosed(&req, &files, &Options { std: false, ..Default::default() }).unwrap_err();
+    assert_eq!(failure.code.number().as_deref(), Some("RNL9012"));
+    assert!(failure.diagnostics.iter().any(|d| d.line == 3 && d.file.ends_with("child.sp")));
+    // one that declares a version this core does not read refuses the write, at its declaration
+    let child = "* child\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n.include\n";
+    let files = MemoryProvider::new().with("/rnl-edit/child.sp", child);
+    let failure =
+        write_with_options_diagnosed(&req, &files, &Options { std: false, ..Default::default() }).unwrap_err();
+    assert_eq!(failure.code.number().as_deref(), Some("RNL2102"));
+    assert!(failure.diagnostics.iter().any(|d| d.line == 2 && d.file.ends_with("child.sp")));
 }
 
 #[test]
@@ -65,19 +67,13 @@ fn an_undeclared_include_inherits_the_requested_output_language() {
 }
 
 #[test]
-fn library_readings_keep_separate_version_boundaries() {
-    for version in ["0.3", "0.4"] {
-        let library = format!("* library\n.lib tt\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\n.include\n.endl tt\n.lib other\n.include\n.endl other\n");
-        let files = MemoryProvider::new().with("/rnl-edit/lib.sp", &library);
-        let req = request(Some("0.4"), "spice", "title\n.lib lib.sp tt\n");
-        let result = write_with_options_diagnosed(&req, &files, &Options { std: false, ..Default::default() });
-        if version == "0.4" {
-            let failure = result.unwrap_err();
-            assert_eq!(failure.diagnostics.iter().filter(|d| d.code.as_deref() == Some("RNL9012")).count(), 1);
-        } else {
-            assert!(result.is_ok(), "{result:?}");
-        }
-    }
+fn only_the_selected_library_section_is_checked() {
+    let library = "* library\n.lib tt\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include\n.endl tt\n.lib other\n.include\n.endl other\n";
+    let files = MemoryProvider::new().with("/rnl-edit/lib.sp", library);
+    let req = request(Some("0.4"), "spice", "title\n.lib lib.sp tt\n");
+    let failure =
+        write_with_options_diagnosed(&req, &files, &Options { std: false, ..Default::default() }).unwrap_err();
+    assert_eq!(failure.diagnostics.iter().filter(|d| d.code.as_deref() == Some("RNL9012")).count(), 1);
 }
 
 #[test]
@@ -103,19 +99,6 @@ fn warnings_are_kept_once_at_locations_in_the_written_text() {
     let line = written.text.lines().position(|line| line == "* @RNL {}").unwrap() + 1;
     assert_eq!(found[0].line as usize, line);
     assert_eq!(found[0].message, "RNL in a library section that is not selected is not read (2.2)");
-}
-
-#[test]
-fn released_writes_keep_their_existing_acceptance_and_text() {
-    for version in [None, Some("0.3")] {
-        for netlist in
-            ["title\n.include\nR1 a b 1k\n", "title\n.lib\nR1 a b 1k\n", "title\n.subckt open_cell a b\nR1 a b 1k\n"]
-        {
-            let written = write_diagnosed(&request(version, "spice", netlist)).unwrap();
-            assert!(written.text.contains("@VERSION(\"0.3\")"));
-            assert!(!written.diagnostics.iter().any(|d| d.code.as_deref() == Some("RNL9012")));
-        }
-    }
 }
 
 #[test]

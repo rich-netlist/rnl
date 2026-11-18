@@ -4,9 +4,9 @@
 *! 2.8: A header record must be the first record of the whole file (or .lib section)
 *!   at the file level; a second header record or one written after a subcircuit's
 *!   record is an error and is ignored.
-*! 2.8, 16.1, 16.5: Each .lib section read counts as a file and can declare its own
-*!   version. `numbering` is a new standard word in 0.3, so `@ALIAS("numbering", "axis")`
-*!   is valid in the 0.2 section `sec_02` and an error in the 0.3 section `sec_03`.
+*! 2.8, 16.1, 16.5: Each .lib section read counts as a file and can declare its own version.
+*!   `sec_02` and `sec_03` declare 0.2 and 0.3, which the toolkit does not read: each is an
+*!   error at its declaration and none of its RNL is read (16.1); the rest is read.
 * @RNL(type="header") {
 *   @VERSION("0.4");
 *   @USE-PACKAGE(name="rnl-std-all", version="0.4");

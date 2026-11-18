@@ -1531,7 +1531,7 @@ mod tests {
         }
     }
 
-    const LEVELS: &str = "* t\r\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\r\n.subckt s a b\r\nR1 a b 1k\r\n\
+    const LEVELS: &str = "* t\r\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\r\n.subckt s a b\r\nR1 a b 1k\r\n\
                           * @RNL(author=\"x\") {}\r\n* @RNL(type=\"generated\") {}\r\n.ends\r\n.subckt u a b\r\n\
                           * @RNL(author=\"y\") {}\r\n.ends\r\nX1 a b s\r\n* @RNL(author=\"z\") {}\r\n.end\r\n";
 
@@ -1614,7 +1614,7 @@ mod tests {
     #[test]
     fn records_come_after_the_header_record_of_their_file() {
         // the header is written below the subcircuit: records put at its end would come before it
-        let net = "* t\n.subckt s a b\nR1 a b 1k\n.ends\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n.end\n";
+        let net = "* t\n.subckt s a b\nR1 a b 1k\n.ends\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.end\n";
         let d = doc(net, "a.sp", "*");
         let err = replace_records(&d, 1, net, "@RNL {}", read_again("a.sp", "*")).unwrap_err();
         assert_eq!(err.code, crate::diag::codes::WRITEBACK_REPLACE_BEFORE_HEADER);
@@ -1648,7 +1648,7 @@ mod tests {
 
     #[test]
     fn a_file_of_a_version_that_is_not_read_is_kept() {
-        let net = LEVELS.replace("0.3", "9.9");
+        let net = LEVELS.replace("0.4", "9.9");
         let d = doc(&net, "a.sp", "*");
         let err = replace_records(&d, 1, &net, "@RNL {}", read_again("a.sp", "*")).unwrap_err();
         assert_eq!(err.code, crate::diag::codes::WRITEBACK_REPLACE_VERSION_UNSUPPORTED);

@@ -155,17 +155,3 @@ fn a_disabled_record_checks_nothing() {
     let r = read(&text);
     assert_eq!(of(&r, Severity::Violation), Vec::new());
 }
-
-#[test]
-fn files_of_0_2_and_0_3_have_no_assertions() {
-    for version in ["0.2", "0.3"] {
-        let r = read(&netlist(version, "{#M1 #M2} @ASSERT-INSTANCE(same=[\"l\"])"));
-        let e = of(&r, Severity::Error);
-        assert_eq!(e.len(), 1, "{version}: {e:?}");
-        assert_eq!(e[0].0, codes::KEYWORD_UNKNOWN, "{version}: {e:?}");
-        let said =
-            format!("unknown keyword @ASSERT-INSTANCE: the language 0.4 adds it, and this file is of {version} (16.1)");
-        assert!(e[0].1.contains(&said), "{e:?}");
-        assert_eq!(of(&r, Severity::Violation), Vec::new(), "{version}");
-    }
-}

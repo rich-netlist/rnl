@@ -457,7 +457,7 @@ mod tests {
     /// The netlists and package files of the conformance corpus.
     fn corpus() -> Vec<String> {
         let mut out = Vec::new();
-        for dir in ["cases", "equivalence"] {
+        for dir in ["cases-0.4/from-0.2", "cases-0.4/from-0.3", "equivalence-0.4"] {
             let dir = crate::tests::corpus(dir);
             let mut files: Vec<String> = std::fs::read_dir(&dir)
                 .unwrap()
@@ -689,7 +689,7 @@ mod tests {
     #[test]
     fn a_double_line_is_two_strokes_on_every_shape() {
         let options = BuildOptions { primitives: true, ..BuildOptions::default() };
-        let d = crate::build(&crate::tests::corpus("cases/17-line-styles.sp"), &Disk, &options).unwrap();
+        let d = crate::build(&crate::tests::corpus("cases-0.4/from-0.2/17-line-styles.sp"), &Disk, &options).unwrap();
         let mut doubles = Vec::new();
         let mut units = [false; 2];
         for p in d.levels[0].primitives.as_ref().unwrap() {
@@ -733,7 +733,7 @@ mod tests {
     #[test]
     fn what_the_fonts_do_not_map_is_in_runs_of_its_own() {
         let options = BuildOptions { primitives: true, ..BuildOptions::default() };
-        let d = crate::build(&crate::tests::corpus("cases/18-fallback-text.sp"), &Disk, &options).unwrap();
+        let d = crate::build(&crate::tests::corpus("cases-0.4/from-0.2/18-fallback-text.sp"), &Disk, &options).unwrap();
         let level = &d.levels[0];
         let (mut fallback, mut mapped) = (Vec::new(), 0);
         for p in level.primitives.as_ref().unwrap() {

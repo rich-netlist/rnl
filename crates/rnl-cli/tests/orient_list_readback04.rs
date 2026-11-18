@@ -84,8 +84,8 @@ fn disjoint_lists_and_scalar_conflicts_remain_reported() {
     let r = read(&disjoint);
     assert!(drops(&r) > 0, "{:?}", r.diagnostics());
     assert!(r.diagnostics().iter().any(|d| d.message.contains("orientation [R0, R90]")), "{:?}", r.diagnostics());
-    let old = one_object("0.3", r#"#R1 @ORIENT("R0"); #R1 @ORIENT("MY")"#);
-    let r = read(&old);
+    let scalar = one_object("0.4", r#"#R1 @ORIENT("R0"); #R1 @ORIENT("MY")"#);
+    let r = read(&scalar);
     assert_eq!(direction(&r), Orient::MY);
     assert!(drops(&r) > 0, "{:?}", r.diagnostics());
 }

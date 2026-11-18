@@ -289,15 +289,9 @@ fn net_requests_convert_terminal_and_pin_inputs_but_do_not_split_bus_conversions
 }
 
 #[test]
-fn routing_vocabulary_is_versioned_and_legacy_intents_keep_their_shape() {
-    let old = read("0.3", "&a @ROUTE");
-    assert!(errors(&old).is_empty());
-    assert_eq!(old.problems[0].routes.len(), 1);
-    assert!(!old.problems[0].routes[0].tree);
+fn route_is_not_a_keyword() {
+    // ROUTE-NET routes a whole net (13.7)
     assert!(!errors(&read("0.4", "&a @ROUTE")).is_empty());
-    for keyword in ["ROUTE-NET", "ROUTE-OBJECT", "UNROUTE-NET", "UNROUTE-OBJECT"] {
-        assert!(!errors(&read("0.3", &format!("&a @{keyword}"))).is_empty(), "{keyword}");
-    }
 }
 
 #[test]
@@ -379,33 +373,27 @@ fn an_explicit_route_priority_overrides_the_disabled_record_default() {
 }
 
 #[test]
-fn viewer_routes_preserve_independent_trees_without_changing_legacy_json() {
-    for (version, body, count, tree) in
-        [("0.4", "{#R1 #R2} @ROUTE-OBJECT; {#R3 #R4} @ROUTE-OBJECT", 2, true), ("0.3", "&a @ROUTE", 1, false)]
-    {
-        let r = read(version, body);
-        assert!(errors(&r).is_empty());
-        let input = &r.doc.sources[0].1;
-        let document = rnl_view::build(
-            "routes.sp",
-            &MemoryProvider::new().with("routes.sp", input),
-            &rnl_view::BuildOptions {
-                constraints: true,
-                runtime: Options { std: false, ..Default::default() },
-                ..Default::default()
-            },
-        )
-        .unwrap();
-        let data = serde_json::to_value(document.levels[0].constraints.as_ref().unwrap()).unwrap();
-        let routes = data["routes"].as_array().unwrap();
-        assert_eq!(routes.len(), count);
-        for route in routes {
-            assert_eq!(route.get("tree"), tree.then_some(&serde_json::Value::Bool(true)));
-        }
-        if tree {
-            assert_eq!(routes[0]["pins"].as_array().unwrap().len(), 2);
-        }
+fn viewer_routes_preserve_independent_trees() {
+    let r = read("0.4", "{#R1 #R2} @ROUTE-OBJECT; {#R3 #R4} @ROUTE-OBJECT");
+    assert!(errors(&r).is_empty());
+    let input = &r.doc.sources[0].1;
+    let document = rnl_view::build(
+        "routes.sp",
+        &MemoryProvider::new().with("routes.sp", input),
+        &rnl_view::BuildOptions {
+            constraints: true,
+            runtime: Options { std: false, ..Default::default() },
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let data = serde_json::to_value(document.levels[0].constraints.as_ref().unwrap()).unwrap();
+    let routes = data["routes"].as_array().unwrap();
+    assert_eq!(routes.len(), 2);
+    for route in routes {
+        assert_eq!(route.get("tree"), Some(&serde_json::Value::Bool(true)));
     }
+    assert_eq!(routes[0]["pins"].as_array().unwrap().len(), 2);
 }
 
 #[test]

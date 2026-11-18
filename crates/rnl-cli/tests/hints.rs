@@ -9,16 +9,21 @@ use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::Options;
 use rnl_view::hints::{interpretation_hints, Hint, Kind};
 
-/// A file of 0.3 with these devices and this record, read as `rnl check` reads it.
+/// The header of the files of these tests.
+const HEADER: &str = r#"@VERSION("0.4"); @USE-PACKAGE(name="rnl-std-spice", version="0.4")"#;
+
+/// A file of 0.4 that uses the rule package of SPICE, with these devices and this record, read as
+/// `rnl check` reads it. The rule package brings in the symbols but not the fill, which would
+/// label the unwired pins.
 fn hints(devices: &str, record: &str) -> Vec<Hint> {
-    hints_of(&format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n{devices}{}.end\n", records(record)))
+    hints_of(&format!("* t\n* @RNL(type=\"header\") {{ {HEADER} }}\n{devices}{}.end\n", records(record)))
 }
 
 /// [`hints`] of a subcircuit whose ports are `ports`, with these devices and this record; the top
 /// level only calls it.
 fn hints_in_cell(ports: &str, devices: &str, record: &str) -> Vec<Hint> {
     hints_of(&format!(
-        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n.subckt cell {ports}\n{devices}{}.ends\nX1 {ports} cell\n.end\n",
+        "* t\n* @RNL(type=\"header\") {{ {HEADER} }}\n.subckt cell {ports}\n{devices}{}.ends\nX1 {ports} cell\n.end\n",
         records(record)
     ))
 }
@@ -73,8 +78,11 @@ fn a_wire_over_a_symbol_against_a_pin_and_over_another_nets_pin() {
     );
     // the wire of b runs through R2, names it and the line of its PLACE
     assert!(has(&hs, Kind::WireOverSymbol, &["the wire of &b", "the symbol of #R2 (line 9)"]), "{hs:#?}");
-    // it comes into R3's pin 1, which points up, from the left
-    assert!(has(&hs, Kind::WrongExit, &["#R3:p", "going left", "points up"]), "{hs:#?}");
+    // it comes into R3's pin 1, which points up, from the left: at a right angle, which is no
+    // wrong exit (13.1); a wire that leaves a pin against it is
+    assert!(!kinds(&hs).contains(&Kind::WrongExit), "{hs:#?}");
+    let against = hints("R1 a b 1k\n", "#R1 @PLACE(0, 0);\n&a @WIRE(mode=\"straight\") {#R1:1 (0, 1) (3, 1)}");
+    assert!(has(&against, Kind::WrongExit, &["#R1:p", "going down", "points up"]), "{against:#?}");
     // the wire of e ends on R4's pin of g: a warning, it looks joined
     let joined = hs.iter().find(|h| h.kind == Kind::LooksJoined).expect("looks joined");
     assert_eq!(joined.severity, Severity::Warning);
@@ -108,11 +116,12 @@ R3 e f 1k
 
 #[test]
 fn a_t_join_needs_a_dot_and_a_dot_on_a_corner_is_the_authors() {
+    // each dot drawn at its point, as the record of a solver places it
     let hs = hints(
         "R1 a b 1k\nR2 a c 1k\nR3 a d 1k\n",
         "#R1 @PLACE(0, 0);\n#R2 @PLACE(6, 0);\n#R3 @PLACE(12, 0);\n%j = (6, 4);\n%k = (0, 4);\n\
          &a @WIRE(mode=\"straight\") {#R1:1 %k %j (12, 4) #R3:1};\n&a @WIRE(mode=\"straight\") {%j #R2:1};\n\
-         $JUNCTION @ATTACH %k",
+         $JUNCTION @ATTACH %k => @PLACE(0, 4)",
     );
     assert!(has(&hs, Kind::NoDot, &["&a joins at (6, 4) without a junction dot"]), "{hs:#?}");
     // a dot where only two wires meet is the author's to draw (13.2): nothing is said of it
@@ -122,7 +131,7 @@ fn a_t_join_needs_a_dot_and_a_dot_on_a_corner_is_the_authors() {
         "R1 a b 1k\nR2 a c 1k\nR3 a d 1k\n",
         "#R1 @PLACE(0, 0);\n#R2 @PLACE(6, 0);\n#R3 @PLACE(12, 0);\n%j = (6, 4);\n\
          &a @WIRE(mode=\"straight\") {#R1:1 (0, 4) %j (12, 4) #R3:1};\n&a @WIRE(mode=\"straight\") {%j #R2:1};\n\
-         $JUNCTION @ATTACH %j",
+         $JUNCTION @ATTACH %j => @PLACE(6, 4)",
     );
     assert!(!kinds(&hs).contains(&Kind::NoDot), "{hs:#?}");
 }
@@ -139,8 +148,9 @@ fn a_wire_end_on_its_net_that_it_does_not_name_is_a_silent_open() {
     // the two wires of a meet at (3, 4) by their coordinates alone: said once
     assert_eq!(open.iter().filter(|h| h.message.contains("at (3, 4)")).count(), 1, "{open:#?}");
     // the wire of b ends on R2's pin 2 without naming it
-    assert!(open.iter().any(|h| h.message.contains("#R2:2") && h.message.contains("write #R2:2")), "{open:#?}");
-    assert!(open.iter().all(|h| h.severity == Severity::Hint));
+    assert!(open.iter().any(|h| h.message.contains("#R2:n") && h.message.contains("write #R2::n")), "{open:#?}");
+    // in 0.4 a silent open is a warning
+    assert!(open.iter().all(|h| h.severity == Severity::Warning));
 }
 
 #[test]
@@ -171,7 +181,7 @@ R5 m e 1k
 
 #[test]
 fn a_net_partly_wired_and_a_pin_joined_by_name_alone() {
-    // no ROUTE, which leaves the pins to a solver; the fill of the series 0.3 labels no pin
+    // no ROUTE-NET, which leaves the pins to a solver, and no fill, which would label the pin
     let devices = "R1 a b 1k\nR2 b c 1k\nR3 b d 1k\n";
     let placed = "#R1 @PLACE(0, 0);\n#R2 @PLACE(4, 0) => @ORIENT(\"R180\");\n#R3 @PLACE(8, 0);\n\
                   &b @WIRE(mode=\"straight\") {#R1:2 (0, -3) (4, -3) #R2:1}";
@@ -179,7 +189,7 @@ fn a_net_partly_wired_and_a_pin_joined_by_name_alone() {
     assert!(has(&hs, Kind::PartlyNamed, &["&b is drawn in 2 pieces", "#R3:p"]), "{hs:#?}");
     // the fix it gives names the pin, and no definition of a package
     assert!(
-        has(&hs, Kind::NameOnly, &["#R3:p is joined to &b by its name alone", "give it a label at #R3:1"]),
+        has(&hs, Kind::NameOnly, &["#R3:p is joined to &b by its name alone", "give it a label at #R3::p"]),
         "{hs:#?}"
     );
     // a net-name text at the pin names it: no longer headless, though the net is still in pieces
@@ -218,7 +228,7 @@ fn check_prints_the_hints_and_counts_them_but_does_not_fail() {
     let f = dir.join("t.sp");
     std::fs::write(
         &f,
-        "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a b 1k\nR2 c d 1k\n* @RNL {\n\
+        "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\") }\nR1 a b 1k\nR2 c d 1k\n* @RNL {\n\
          *   #R1 @PLACE(0, 0); #R2 @PLACE(10, 0);\n\
          *   &a @WIRE(mode=\"straight\") {#R1:1 (0, 4) (6, 4)};\n\
          *   &c @WIRE(mode=\"straight\") {#R2:1 (10, 4) (4, 4)}\n* }\n.end\n",
@@ -285,15 +295,15 @@ fn the_stack_of_a_name_and_a_value_is_no_text_over_text() {
     }
 }
 
-/// A net a ROUTE is to wire, drawn before it is solved, is left to the solver: not joined by name.
+/// A net a ROUTE-NET is to wire, drawn before it is solved, is left to the solver: not joined by name.
 #[test]
 fn a_net_a_route_is_to_wire_is_not_joined_by_name() {
     let hs = hints(
         "R1 a b 1k\nR2 b c 1k\nR3 c a 1k\n",
-        "#R1 @PLACE(0, 0);\n#R2 @PLACE(6, 0);\n#R3 @PLACE(12, 0);\n&b @ROUTE;\n&c @ROUTE;\n\
+        "#R1 @PLACE(0, 0);\n#R2 @PLACE(6, 0);\n#R3 @PLACE(12, 0);\n&b @ROUTE-NET;\n&c @ROUTE-NET;\n\
          &c @WIRE(mode=\"straight\") {#R2:2 (6, -4) (12, -4) (12, -6)}",
     );
-    // a, which no ROUTE names and no wire draws, is joined by name alone; b and c are not
+    // a, which no ROUTE-NET names and no wire draws, is joined by name alone; b and c are not
     let by_name = |net: &str| {
         hs.iter()
             .any(|h| matches!(h.kind, Kind::NameOnly | Kind::PartlyNamed) && h.message.contains(&format!("&{net} ")))
@@ -330,7 +340,8 @@ fn the_hints_of_a_long_chain_are_quick() {
 /// taps on the buses of the conformance case of buses and bundles look joined to nothing.
 #[test]
 fn a_bus_and_its_taps_do_not_look_joined() {
-    let case = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/cases/09-buses-and-bundles.sp");
+    let case = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/conformance/cases-0.4/from-0.2/09-buses-and-bundles.sp");
     let text = std::fs::read_to_string(case).unwrap();
     let files = MemoryProvider::new().with("/w/t.sp", &text);
     let r =
@@ -346,7 +357,7 @@ fn a_bus_and_its_taps_do_not_look_joined() {
 /// file and line of each; not asked, it has none, and its levels have no `hints`.
 #[test]
 fn a_document_has_the_hints_when_asked() {
-    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a b 1k\nR2 c d 1k\n* @RNL {\n\
+    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\") }\nR1 a b 1k\nR2 c d 1k\n* @RNL {\n\
                 *   #R1 @PLACE(0, 0); #R2 @PLACE(10, 0);\n\
                 *   &a @WIRE(mode=\"straight\") {#R1:1 (0, 4) (6, 4)};\n\
                 *   &c @WIRE(mode=\"straight\") {#R2:1 (10, 4) (4, 4)}\n* }\n.end\n";
@@ -365,30 +376,35 @@ fn a_document_has_the_hints_when_asked() {
 }
 
 /// The hints tell objects apart by their structure, not by the names of a package's definitions: a
-/// usage of a definition of the file's own, with its pin at its own point, marks the point it sits
-/// on, as a junction dot of the standard series does; attached to a net, it stands for the net.
+/// usage of a definition of the file's own without a pin marks the point it is drawn on, as a
+/// junction dot of the standard series does; one whose pin is bound to its role stands for the net
+/// it is attached to.
 #[test]
 fn a_junction_dot_or_a_net_symbol_of_any_name() {
-    let own = "$DOT_SYM = @DEFINE-SYMBOL {(0, 0) @PIN(terminal=\"p\"); (0, 0) @CIRCLE(radius=0.2)};\n\
-               $DOT = @DEFINE(roles=[[\"p\", [\"point\", \"net\", \"terminal\"]]]) {};\n\
-               # @SELECT-USAGE $DOT => @SET-SYMBOL $DOT_SYM;\n";
+    let own = "$DOT_SYM = @DEFINE-SYMBOL {(0, 0) @CIRCLE(radius=0.2)};\n\
+               $DOT = @DEFINE(roles=[[\"p\", \"point\"]]) {};\n\
+               # @SELECT-USAGE $DOT => @SET-SYMBOL $DOT_SYM;\n\
+               $TAG_SYM = @DEFINE-SYMBOL {(0, 0) @PIN(terminal=\"p\"); (0, 0) @CIRCLE(radius=0.2)};\n\
+               $TAG = @DEFINE(roles=[[\"p\", [\"net\", \"terminal\"]]]) {};\n\
+               # @SELECT-USAGE $TAG => @SET-SYMBOL $TAG_SYM;\n";
     let tee = "#R1 @PLACE(0, 0);\n#R2 @PLACE(6, 0);\n#R3 @PLACE(12, 0);\n%j = (6, 4);\n\
                &a @WIRE(mode=\"straight\") {#R1:1 (0, 4) %j (12, 4) #R3:1};\n&a @WIRE(mode=\"straight\") {%j #R2:1}";
     let devices = "R1 a b 1k\nR2 a c 1k\nR3 a d 1k\n";
-    // without a dot, the T-join wants one; with one of the file's own definition, it has one
+    // without a dot, the T-join wants one; with one of the file's own definition, drawn on the
+    // point, it has one
     assert!(has(&hints(devices, &format!("{own}{tee}")), Kind::NoDot, &["&a joins at (6, 4)"]));
-    let hs = hints(devices, &format!("{own}{tee};\n$DOT @ATTACH %j"));
+    let hs = hints(devices, &format!("{own}{tee};\n$DOT @ATTACH %j => @PLACE(6, 4)"));
     assert!(!kinds(&hs).contains(&Kind::NoDot), "{hs:#?}");
-    // attached to a net, the same usage stands for it: its net is left out of the joins by name
+    // attached to a net, a usage stands for it: its net is left out of the joins by name
     let pieces = "#R1 @PLACE(0, 0);\n#R2 @PLACE(4, 0) => @ORIENT(\"R180\");\n#R3 @PLACE(8, 0);\n\
                   &b @WIRE(mode=\"straight\") {#R1:2 (0, -3) (4, -3) #R2:1}";
     let devices = "R1 a b 1k\nR2 b c 1k\nR3 b d 1k\n";
     assert!(has(&hints(devices, &format!("{own}{pieces}")), Kind::PartlyNamed, &["&b"]));
-    let hs = hints(devices, &format!("{own}{pieces};\n%n = $DOT @ATTACH &b;\n%n @PLACE(8, -3)"));
+    let hs = hints(devices, &format!("{own}{pieces};\n%n = $TAG @ATTACH &b;\n%n @PLACE(8, -3)"));
     assert!(!kinds(&hs).iter().any(|k| matches!(k, Kind::NameOnly | Kind::PartlyNamed)), "{hs:#?}");
     // attached to a terminal, its pin at its own point on the terminal's net, it stands for the
     // net too, as a ground or a supply drawn on a pin does
-    let hs = hints(devices, &format!("{own}{pieces};\n$DOT @ATTACH #R3:1"));
+    let hs = hints(devices, &format!("{own}{pieces};\n$TAG @ATTACH #R3:1 => @PLACE(8, 2)"));
     assert!(!kinds(&hs).iter().any(|k| matches!(k, Kind::NameOnly | Kind::PartlyNamed)), "{hs:#?}");
 }
 
@@ -398,18 +414,16 @@ fn a_junction_dot_or_a_net_symbol_of_any_name() {
 /// apart, they do not.
 #[test]
 fn texts_over_texts_are_judged_by_the_box_the_solver_keeps_them_clear_by() {
-    for version in ["0.3", "0.4"] {
-        let over = |gap: f64| {
-            let text = format!(
-                "* t\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\nR1 a b 1k\n{}.end\n",
-                records(&format!(
-                    "#R1 @PLACE(0, 0);\n(-6, 6) @TEXT(\"left\", halign=\"end\");\n({}, 6) @TEXT(\"right\", halign=\"start\")",
-                    -6.0 + gap
-                ))
-            );
-            has(&hints_of(&text), Kind::TextOverText, &["\"left\"", "\"right\""])
-        };
-        assert!(over(0.15), "{version}: 0.15 apart");
-        assert!(!over(0.25), "{version}: 0.25 apart");
-    }
+    let over = |gap: f64| {
+        let text = format!(
+            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\nR1 a b 1k\n{}.end\n",
+            records(&format!(
+                "#R1 @PLACE(0, 0);\n(-6, 6) @TEXT(\"left\", halign=\"end\");\n({}, 6) @TEXT(\"right\", halign=\"start\")",
+                -6.0 + gap
+            ))
+        );
+        has(&hints_of(&text), Kind::TextOverText, &["\"left\"", "\"right\""])
+    };
+    assert!(over(0.15), "0.15 apart");
+    assert!(!over(0.25), "0.25 apart");
 }

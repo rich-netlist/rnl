@@ -27,16 +27,11 @@ fn no_errors(r: &Interpretation) {
 
 #[test]
 fn a_setting_selects_the_collection_by_language_not_package_version() {
-    for language in ["0.2", "0.3", "0.4"] {
-        let provider = files(language, "1.7", "", "#R1 @AS $D");
-        let r = read(&provider, Options { include_std: true, std_version: Some("1.7".into()), ..Options::solver() });
-        no_errors(&r);
-        assert_eq!(r.problems[0].usages.len(), 1);
-        assert_eq!(
-            rnl_runtime::interp::standard_package_name(language),
-            if language == "0.4" { "rnl-std-all" } else { "rnl-std" }
-        );
-    }
+    let provider = files("0.4", "1.7", "", "#R1 @AS $D");
+    let r = read(&provider, Options { include_std: true, std_version: Some("1.7".into()), ..Options::solver() });
+    no_errors(&r);
+    assert_eq!(r.problems[0].usages.len(), 1);
+    assert_eq!(rnl_runtime::interp::standard_package_name("0.4"), "rnl-std-all");
 }
 
 #[test]
@@ -133,20 +128,13 @@ fn an_explicit_empty_collection_suppresses_the_setting() {
 
 #[test]
 fn missing_standard_reports_the_requested_collection_and_modern_header_location() {
-    for language in ["0.3", "0.4"] {
-        let provider = files(language, "1.7", "", "#R1 @PLACE(0,0)");
-        let r = read(&provider, Options { include_std: true, std_version: Some("9.9".into()), ..Options::solver() });
-        let matching: Vec<_> = r.diagnostics().into_iter().filter(|d| d.code == codes::STD_VERSION_NOT_FOUND).collect();
-        assert_eq!(matching.len(), 1, "{:?}", r.diagnostics());
-        if language == "0.4" {
-            assert!(matching[0].message.contains("rnl-std-all 9.9"));
-            let loc = matching[0].loc.as_ref().unwrap();
-            assert_eq!((loc.file.as_str(), loc.line), ("t.sp", 2));
-        } else {
-            assert!(matching[0].message.contains("rnl-std 9.9"));
-            assert!(matching[0].loc.is_none());
-        }
-    }
+    let provider = files("0.4", "1.7", "", "#R1 @PLACE(0,0)");
+    let r = read(&provider, Options { include_std: true, std_version: Some("9.9".into()), ..Options::solver() });
+    let matching: Vec<_> = r.diagnostics().into_iter().filter(|d| d.code == codes::STD_VERSION_NOT_FOUND).collect();
+    assert_eq!(matching.len(), 1, "{:?}", r.diagnostics());
+    assert!(matching[0].message.contains("rnl-std-all 9.9"));
+    let loc = matching[0].loc.as_ref().unwrap();
+    assert_eq!((loc.file.as_str(), loc.line), ("t.sp", 2));
 }
 
 #[test]
@@ -197,6 +185,7 @@ fn a_package_language_failure_precedes_alias_kind_validation() {
     let r = read(&provider, Options { include_std: true, std_version: Some("1.7".into()), ..Options::solver() });
     let errors: Vec<_> = r.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).collect();
     assert_eq!(errors.len(), 1, "{:?}", r.diagnostics());
-    assert_eq!(errors[0].code, codes::PACKAGE_LANGUAGE_MISMATCH);
+    // a package of 0.3 is not read at all (16.1)
+    assert_eq!(errors[0].code, codes::VERSION_UNSUPPORTED);
     assert_eq!(r.included_standard, None);
 }

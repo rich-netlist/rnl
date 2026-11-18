@@ -1,4 +1,4 @@
-//! Focused 0.3 regressions found while auditing chapters 9–15.
+//! Focused regressions found while auditing chapters 9–15.
 
 use std::path::Path;
 
@@ -18,12 +18,13 @@ fn read(path: &str, text: &str) -> Interpretation {
 
 #[test]
 fn a_shorter_bundle_member_contributes_only_its_existing_terminals() {
-    // 11.8 keeps a heterogeneous bundle with a warning. Its first member gives the pins;
-    // the resistor has no third or fourth node, so these pins retain only the MOS's nets.
+    // 11.8 keeps a heterogeneous bundle with a warning. Its first member gives the pins, and a
+    // terminal of the bundle stands for the terminals of that name of the members: the resistor
+    // has none of the MOS's names, so these pins retain only the MOS's nets.
     let r = read(
         "mixed.sp",
         r#"* mixed bundle
-* @RNL(type="header") { @VERSION("0.3") }
+* @RNL(type="header") { @VERSION("0.4") }
 M1 drain gate source bulk nch
 R1 rtop rbottom 1k
 .model nch nmos
@@ -44,7 +45,7 @@ R1 rtop rbottom 1k
     assert!(warnings.iter().any(|w| w.contains("not the same kind")), "{warnings:?}");
     let top = &r.model.levels[0];
     let bundle = top.items.iter().find(|i| i.kind == "bundle").unwrap();
-    assert_eq!(bundle.pin_nets, [vec!["drain", "rtop"], vec!["gate", "rbottom"], vec!["source"], vec!["bulk"]]);
+    assert_eq!(bundle.pin_nets, [["drain"], ["gate"], ["source"], ["bulk"]]);
     assert_eq!(top.wires.len(), 1);
     assert_eq!(top.wires[0].nets, ["source"]);
     assert_eq!(top.texts.iter().filter(|t| t.markup == "third").count(), 1);
@@ -56,7 +57,7 @@ fn terminal_selections_obey_the_hosts_case_rules() {
     let spectre = read(
         "case.scs",
         r#"simulator lang=spectre
-// @RNL(type="header") { @VERSION("0.3") }
+// @RNL(type="header") { @VERSION("0.4") }
 subckt cell (P p)
 ends cell
 I0 (upper lower) cell
@@ -75,7 +76,7 @@ I0 (upper lower) cell
     let spice = read(
         "case.sp",
         r#"* terminal case
-* @RNL(type="header") { @VERSION("0.3") }
+* @RNL(type="header") { @VERSION("0.4") }
 R1 upper lower 1k
 * @RNL {
 *   $S = @DEFINE-SYMBOL { (-1, 0) @PIN(terminal="p"); (1, 0) @PIN(terminal="n") };
@@ -91,7 +92,7 @@ R1 upper lower 1k
     let mixed = read(
         "mixed.scs",
         r#"simulator lang=spectre
-// @RNL(type="header") { @VERSION("0.3") }
+// @RNL(type="header") { @VERSION("0.4") }
 simulator lang=spice
 R1 upper lower 1k
 * @RNL {

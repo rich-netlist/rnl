@@ -5,6 +5,16 @@ use rnl_runtime::source::MemoryProvider;
 use rnl_solver::StoppedClock;
 use std::path::Path;
 
+/// The options of a solve within a fixed work and with no time or safety limit: a level of 0.4
+/// is solved the same on every run, whatever the clock (17).
+fn within_work() -> SolveOptions {
+    let mut options = SolveOptions::default();
+    options.solver.time_limit = None;
+    options.solver.run_limit = Some(rnl_solver::RunLimit::Work(100_000_000));
+    options.solver.safety_seconds = None;
+    options
+}
+
 #[test]
 fn profile_json_and_records_are_independent() {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("solver-profile");
@@ -12,9 +22,9 @@ fn profile_json_and_records_are_independent() {
     let path = dir.join("complete.json");
     let provider = MemoryProvider::default().with(
         "test.sp",
-        ".title Profile\n* @VERSION(\"0.3\")\nR1 a b 1k\nR2 b 0 2k\n* #R1 @PLACE(0,0)\n* #R2 @PLACE(10,0)\n.end\n",
+        ".title Profile\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nR1 a b 1k\nR2 b 0 2k\n* #R1 @PLACE(0,0)\n* #R2 @PLACE(10,0)\n.end\n",
     );
-    let options = SolveOptions { std: false, ..SolveOptions::default() };
+    let options = SolveOptions { std: false, ..within_work() };
     let plain = solve_with_clock(Path::new("test.sp"), &provider, &options, &StoppedClock).unwrap();
     let _ = std::fs::remove_file(&path);
     let clock = ProfileClock::new(&path).unwrap();
@@ -114,12 +124,11 @@ fn cli_profile_paths_cannot_overwrite_inputs_or_solved_outputs() {
 }
 
 #[test]
-fn disabled_profile_keeps_committed_t1_bytes() {
+fn disabled_profile_keeps_committed_snapshot_bytes() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/integration/solver");
-    let options = SolveOptions { solver: rnl_solver::SolverOptions::without_time_limit(), ..SolveOptions::default() };
-    let run = solve_with_clock(&root.join("T1-rc-lowpass.sp"), &rnl_cli::FsProvider::new(&[]), &options, &StoppedClock)
-        .unwrap();
-    let expected = std::fs::read(root.join("solved/T1-rc-lowpass.sp")).unwrap();
+    let case = root.join("T2b-common-source-dragged.sp");
+    let run = solve_with_clock(&case, &rnl_cli::FsProvider::new(&[]), &within_work(), &StoppedClock).unwrap();
+    let expected = std::fs::read(root.join("solved/T2b-common-source-dragged.sp")).unwrap();
     assert_eq!(run.files.len(), 1);
     assert_eq!(run.files[0].text.as_bytes(), expected);
 }

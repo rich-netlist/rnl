@@ -76,26 +76,6 @@ fn a_level_of_0_4_prints_its_tree_of_groups() {
     assert_eq!(out, want);
 }
 
-/// A level of 0.3 has no tree of groups: each group is listed with all its members, and the level
-/// with the parts in none of them. `--all` names each virtual part: a usage without a name of its
-/// own by its definition and what its first role is attached to.
-#[test]
-fn a_level_of_0_3_lists_its_groups_flat() {
-    let dir = written("g.sp", &netlist("0.3"));
-    let (code, out, _) = groups(&dir, &["g.sp", "--all"]);
-    assert_eq!(code, 0);
-    let want = "g.sp · language 0.3 · 6 groups; no tree of groups before 0.4, each with all its members
-  (level) · 4 virtual: $GROUND(&0) $GROUND(&0) $GROUND(&0) $GROUND(&0) · 0 devices
-  %cross · #R3 #R4 · 2 devices (written at g.sp:11)
-  %block · #R1 #R2 #R3 + 1 virtual: %g · 3 devices (written at g.sp:12)
-  %pair · #R1 #R2 · 2 devices (written at g.sp:13)
-  %again · #R1 #R2 · 2 devices (written at g.sp:14)
-  %off · turned off by PRIORITY · #R5 #R6 · 2 devices (written at g.sp:15)
-  %e · also &a · 0 devices (written at g.sp:17)
-";
-    assert_eq!(out, want);
-}
-
 /// `--json` gives the same tree, nested, with the groups outside it and every virtual part;
 /// `--level` keeps one level, and a title no level has is an error that names the titles.
 #[test]

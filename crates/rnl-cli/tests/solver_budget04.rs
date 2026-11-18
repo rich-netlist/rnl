@@ -100,56 +100,6 @@ fn defaults_command_prints_accepted_named_parameters() {
 }
 
 #[test]
-fn legacy_explicit_options_do_not_add_settings_to_the_input_hash() {
-    for version in ["0.2", "0.3"] {
-        let text = format!(
-            "* old settings\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\n* @RNL {{ %a=(0,0); %b=(5,2); }}\n"
-        );
-        let files = MemoryProvider::new().with("main.sp", &text);
-        let values = "beam=4;grid=1;objectives=none;time_limit=none";
-        let plain = SolveOptions {
-            std: false,
-            solver: SolverOptions::default().with_overrides(values).unwrap(),
-            ..Default::default()
-        };
-        let explicit =
-            SolveOptions { solver: SolverOptions::default().with_legacy_config(values).unwrap(), ..plain.clone() };
-        let before = solve_with_clock(Path::new("main.sp"), &files, &plain, &StoppedClock).unwrap();
-        let after = solve_with_clock(Path::new("main.sp"), &files, &explicit, &StoppedClock).unwrap();
-        assert!(after.levels[0].problem.solver_config.is_empty());
-        assert_eq!(before.levels[0].hash, after.levels[0].hash, "{version}");
-        assert_eq!(before.files[0].text, after.files[0].text, "{version}");
-    }
-}
-
-/// A level before 0.4 is laid out in rows whatever layout the old options name, so the layout is
-/// not in the options its hash covers: the record is the one written with no layout named.
-#[test]
-fn a_layout_named_for_a_level_before_0_4_is_not_in_its_hash() {
-    for version in ["0.2", "0.3"] {
-        let text = format!(
-            "* old settings\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\n* @RNL {{ %a=(0,0); %b=(5,2); }}\n"
-        );
-        let files = MemoryProvider::new().with("main.sp", &text);
-        let values = "beam=4;grid=1;objectives=none;time_limit=none";
-        let solve = |values: &str| {
-            let options = SolveOptions {
-                std: false,
-                solver: SolverOptions::default().with_overrides(values).unwrap(),
-                ..Default::default()
-            };
-            solve_with_clock(Path::new("main.sp"), &files, &options, &StoppedClock).unwrap()
-        };
-        let plain = solve(values);
-        for layout in ["rows", "tree", "lines"] {
-            let named = solve(&format!("{values};layout={layout}"));
-            assert_eq!(plain.levels[0].hash, named.levels[0].hash, "{version} {layout}");
-            assert_eq!(plain.files[0].text, named.files[0].text, "{version} {layout}");
-        }
-    }
-}
-
-#[test]
 fn junction_tool_metadata_changes_options_and_writeback_but_not_file_identity() {
     use rnl_runtime::{
         problem::{input_digest, sig2},

@@ -1,9 +1,0 @@
-// A standard series without rule packages drops nothing
-*! The header record pins the tool's standard package 0.2, and a pinned version comes before the 0.3 implied by the language version (16.3): the 0.2 series has no dialect rule packages, so a file of version 0.3 leaves nothing out either; I0 is drawn as a current source by name, under the 0.2 rules.
-simulator lang=spectre
-// @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="rnl-std", version="0.2")}
-subckt cell (p n)
-ends cell
-I0 (a 0) cell
-R0 (a 0) resistor r=1k
-// @RNL { #I0 @PLACE(0, 0); #R0 @PLACE(10, 0) }

@@ -8,7 +8,7 @@ use rnl_runtime::model::RefTarget;
 use rnl_runtime::{Interpretation, Options};
 
 fn interpret(name: &str) -> (Interpretation, Vec<String>) {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/cases").join(name);
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/cases-0.4/from-0.2").join(name);
     let text = std::fs::read_to_string(&path).unwrap();
     let r = interpret_file(&path, None, &FsProvider::new(&[]), &Options::default()).unwrap();
     (r, text.lines().map(String::from).collect())
@@ -29,18 +29,19 @@ fn references_name_their_instances_and_nets() {
         let c = col(&lines, line, needle);
         r.refs.iter().filter(|x| x.loc.line == line && x.loc.col == c).collect::<Vec<_>>()
     };
-    // `&in @WIRE(…) {#V1:1 #R1:1}`: the net, and the instances without their terminals
-    let net = at(8, "&in");
+    // `&in @WIRE(…) {#V1:1 %input_corner #R1:1}`: the net, and the instances without their
+    // terminals
+    let net = at(9, "&in");
     assert_eq!(net.len(), 1);
     assert_eq!((net[0].len, &net[0].target), (3, &RefTarget::Net("in".into())));
-    let v = at(8, "#V1:1");
+    let v = at(9, "#V1:1");
     assert_eq!((v[0].len, &v[0].target, v[0].level), (3, &RefTarget::Instance(v1), 0));
-    assert_eq!(at(8, "#R1:1")[0].target, RefTarget::Instance(r1));
+    assert_eq!(at(9, "#R1:1")[0].target, RefTarget::Instance(r1));
     // a terminal reference also reaches the net at the terminal: `#R1:1` is on `in`
-    let t = at(8, "#R1:1");
+    let t = at(9, "#R1:1");
     assert!(t.iter().any(|x| x.len == 5 && x.target == RefTarget::Net("in".into())), "{t:?}");
     // the solver's record names them too
-    assert_eq!(at(19, "#R1")[0].target, RefTarget::Instance(r1));
+    assert_eq!(at(35, "#R1")[0].target, RefTarget::Instance(r1));
     // each place once, however often it was evaluated
     let mut seen = std::collections::HashSet::new();
     assert!(r.refs.iter().all(|x| seen.insert(x.clone())));
@@ -101,12 +102,12 @@ fn a_symbol_overridden_for_every_object_is_listed_as_overridden() {
     let text = "* t
 R1 a 0 1k
 R2 a b 1k
-* @RNL(type=\"header\") { @VERSION(\"0.2\")}
+* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }
 * @RNL {
-*   #R1 @SET-SYMBOL $CAP;
-*   #R1 @SET-SYMBOL $IND;
+*   #R1 @SET-SYMBOL $CAPACITOR;
+*   #R1 @SET-SYMBOL $INDUCTOR;
 *   {#R1 #R2} @SET-SYMBOL $DIODE;
-*   #R2 @SET-SYMBOL $VSRC
+*   #R2 @SET-SYMBOL $VOLTAGE_SOURCE
 * }
 .end
 ";
@@ -121,5 +122,5 @@ R2 a b 1k
     over.sort();
     // the later statement wins each object: the group wins R1 over both earlier ones, and loses
     // only R2, so it takes effect
-    assert_eq!(over, ["#R1 @SET-SYMBOL $CAP", "#R1 @SET-SYMBOL $IND"]);
+    assert_eq!(over, ["#R1 @SET-SYMBOL $CAPACITOR", "#R1 @SET-SYMBOL $INDUCTOR"]);
 }

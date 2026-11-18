@@ -109,15 +109,6 @@ fn a_level_keeps_its_own_limit_when_its_share_is_more_or_its_limit_is_not_of_tim
 }
 
 #[test]
-fn a_level_before_0_4_does_not_share_and_its_hash_does_not_change() {
-    let text = source_of("0.3");
-    let (given, _, hashes) = solve_text(&text, Some(9.), SolverOptions::default(), 5.);
-    assert_eq!(given, [RunLimit::Time(10.); 3]);
-    let (_, _, alone) = solve_text(&text, None, SolverOptions::default(), 5.);
-    assert_eq!(hashes, alone);
-}
-
-#[test]
 fn timeall_is_an_option_of_solve_and_preview_with_seconds() {
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("main.sp");

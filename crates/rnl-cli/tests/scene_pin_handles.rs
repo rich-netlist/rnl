@@ -391,18 +391,3 @@ fn a_text_key_with_no_surviving_layer_fails_its_dependent_usage() {
         .iter()
         .any(|diagnostic| diagnostic.code == rnl_runtime::diag::codes::USAGE_ROLE_FAILED_OBJECT));
 }
-
-#[test]
-fn released_versions_keep_the_existing_failed_local_position_behavior() {
-    let source = "* old failed local\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a b 1k\n* @RNL { $D = @DEFINE(roles=[\"r\"]) { %bad = (0,0) @CIRCLE(radius=\"bad\") }; %u = #R1 @AS $D; &a @WIRE {%u::bad::position (1,1)} }\n.end\n";
-    let r = interpret_file(
-        Path::new("old.sp"),
-        None,
-        &MemoryProvider::new().with("old.sp", source),
-        &Options { std: false, ..Options::solver() },
-    )
-    .unwrap();
-    assert_eq!(r.diagnostics().iter().filter(|diagnostic| diagnostic.severity == Severity::Error).count(), 1);
-    assert_eq!(r.model.levels[0].net_labels.len(), 1);
-    assert!(!r.diagnostics().iter().any(|diagnostic| diagnostic.code == rnl_runtime::diag::codes::WIRE_TOO_FEW_POINTS));
-}

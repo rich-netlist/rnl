@@ -127,22 +127,6 @@ fn a_named_text_role_does_not_become_an_unconnected_pin() {
 }
 
 #[test]
-fn old_usage_symbol_bindings_are_unchanged() {
-    let r = read(
-        "0.3",
-        r#"
-        $S = @DEFINE-SYMBOL { (0,0) @PIN(terminal="r") };
-        $D = @DEFINE(roles=["r"]) {};
-        %u = #R1 @AS $D;
-        %u @SET-SYMBOL $S
-    "#,
-    );
-    assert!(!r.diagnostics().iter().any(|d| d.code == codes::ROLE_PIN_FILLED_WITH_OTHER_KIND));
-    assert_eq!(r.problems[0].usages.len(), 1);
-    assert!(r.problems[0].objects.iter().filter(|o| o.usage.is_some()).all(|o| o.symbol.is_some()));
-}
-
-#[test]
 fn a_late_rejected_symbol_drops_its_labels_and_checks_explicit_text_separately() {
     let r = read(
         "0.4",

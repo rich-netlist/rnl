@@ -80,7 +80,7 @@ fn interpret_with(
             ..Instance::default()
         });
     }
-    let records = format!("@RNL(type=\"header\") {{ @VERSION(\"0.2\"){header}}}\n@RNL {{ {statements} }}");
+    let records = format!("@RNL(type=\"header\") {{ @VERSION(\"0.4\"){header}}}\n@RNL {{ {statements} }}");
     main.records = scan_run(&package_lines(&records), "sets.sp", &mut sink);
     let dialect = Dialect { name: "spice".into(), case_sensitive: false, ground_aliases: vec!["gnd".into()] };
     let mut doc = HostDocument::new(main, dialect);
@@ -195,9 +195,12 @@ fn a_cycle_of_sets_holding_selections_fails_and_does_not_recurse() {
 
 #[test]
 fn a_cycle_across_two_levels_fails_in_the_level_where_it_closes() {
-    // the rule of the level above takes effect in the subcircuit too (10.3) and comes first there
-    // (8.5); in the level above there is no cycle
-    for (a, b) in [("{}", "{}"), ("{# @SELECT-NET(name=\"p\")}", "{# @SELECT-NET(name=\"n1\")}")] {
+    // the rule of the level above reaches the subcircuit through its sets, whose selections are
+    // recursive (10.1), and comes first there (8.5); in the level above there is no cycle
+    for (a, b) in [
+        ("{# @SELECT-NET(name=\"p\", recursive=true)}", "{# @SELECT-NET(name=\"n1\", recursive=true)}"),
+        ("{# @SELECT-NET(name=\"*\", recursive=true)}", "{# @SELECT-INSTANCE(recursive=true)}"),
+    ] {
         let main = format!("@USE-PACKAGE(name=\"house\") {{ $A = {a}; $B = {b} }}; $A @ADD-TO $B; #R1 @PLACE(0, 0)");
         let sub = "$B @ADD-TO $A; #R1 @PLACE(0, 0)";
         let r = interpret_in(&main, &[("core", ["p", "q"], sub)]);
@@ -212,10 +215,10 @@ fn edits_of_package_sets_in_two_levels_are_not_a_cycle() {
     // one level adds $SUPPLIES to $RAILS, the other $RAILS to $SUPPLIES: each level sees its own
     for (rails, supplies) in [("{}", "{}"), ("{# @SELECT-NET(name=\"a*\")}", "{# @SELECT-NET(name=\"v*\")}")] {
         let r = interpret_in(
-            &format!("@USE-PACKAGE(name=\"house\") {{ $RAILS = {rails}; $SUPPLIES = {supplies} }}; &n1 @ADD-TO $SUPPLIES; $SUPPLIES @ROUTE"),
+            &format!("@USE-PACKAGE(name=\"house\") {{ $RAILS = {rails}; $SUPPLIES = {supplies} }}; &n1 @ADD-TO $SUPPLIES; $SUPPLIES @ROUTE-NET"),
             &[
-                ("core", ["vdd", "out"], "$SUPPLIES @ADD-TO $RAILS; $RAILS @ROUTE"),
-                ("pad", ["vio", "x"], "&vio @ADD-TO $RAILS; $RAILS @ADD-TO $SUPPLIES; $SUPPLIES @ROUTE"),
+                ("core", ["vdd", "out"], "$SUPPLIES @ADD-TO $RAILS; $RAILS @ROUTE-NET"),
+                ("pad", ["vio", "x"], "&vio @ADD-TO $RAILS; $RAILS @ADD-TO $SUPPLIES; $SUPPLIES @ROUTE-NET"),
             ],
         );
         assert!(r.errors.is_empty(), "{:?}", r.errors);
@@ -237,7 +240,7 @@ fn a_package_used_after_an_edit_comes_after_it() {
 fn a_set_of_a_package_comes_where_the_package_is_used() {
     // used at the root, the package comes before the level's statements (8.5), although its set
     // is made before any level: the level's edit closes the cycle
-    let pk = "@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"pk\", version=\"1.0\") }\n@RNL { $B = {}; $A = {$B} }\n";
+    let pk = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"pk\", version=\"1.0\") }\n@RNL { $B = {}; $A = {$B} }\n";
     let provider = MemoryProvider::new().with("pk.rnl", pk);
     let header = "; @USE-PACKAGE(name=\"pk\", version=\"1.0\", path=\"pk.rnl\")";
     let s = "$A @ADD-TO $B; #R1 @ADD-TO $B; $B @PLACE(0, 0)";
@@ -283,7 +286,7 @@ fn an_edit_generated_at_an_earlier_place_comes_before_a_later_statement() {
 
 #[test]
 fn a_package_checked_on_its_own_has_its_cycles() {
-    let text = "@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"cyc\", version=\"1.0\") }\n@RNL {\n  $A = {# @SELECT-NET(name=\"a\")};\n  $B = {};\n  $A @ADD-TO $B;\n  $B @REMOVE-FROM $A\n}\n";
+    let text = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"cyc\", version=\"1.0\") }\n@RNL {\n  $A = {# @SELECT-NET(name=\"a\")};\n  $B = {};\n  $A @ADD-TO $B;\n  $B @REMOVE-FROM $A\n}\n";
     let r = check_package(
         "cyc.rnl",
         &MemoryProvider::new().with("cyc.rnl", text),

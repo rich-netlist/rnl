@@ -110,8 +110,3 @@ fn later_steps_follow_explicit_objects_even_when_the_rule_is_written_first() {
     let PointRef::Origin(first) = members[0] else { panic!("an instance expected") };
     assert_eq!(problem.objects[first].label, "#R2");
 }
-
-#[test]
-fn released_scene_annotations_keep_their_existing_order() {
-    assert_eq!(labels(&read("0.3", ANNOTATIONS)), ["CIRCLE", "first", "last"]);
-}

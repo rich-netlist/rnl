@@ -90,14 +90,6 @@ fn distinct_constant_points_are_static_errors_even_when_unused() {
 }
 
 #[test]
-fn released_definitions_keep_their_duplicate_name_diagnostic() {
-    for version in ["0.2", "0.3"] {
-        let r = read(version, r#"["r"]"#, "%x=?r; %x=?r", "#R1 @AS $D");
-        assert!(errors(&r).contains(&codes::DEFINE_LOCAL_NAME_TWICE), "{:?}", r.diagnostics());
-    }
-}
-
-#[test]
 fn a_statically_failed_member_reserves_none_of_its_names() {
     let r = read("0.4", r#"["r"]"#, "%a=(1,0); %x=(3,0) => %a; %x=(4,0); %x @CIRCLE(radius=1)", "#R1 @AS $D");
     assert_eq!(errors(&r), [codes::DEFINE_LOCAL_NAME_TWICE], "{:?}", r.diagnostics());
@@ -407,22 +399,21 @@ fn required_definition_slots_are_checked_without_resolving_the_definition() {
 }
 
 #[test]
-fn definitions_require_a_written_body_in_modern_files() {
+fn definitions_require_a_written_body() {
     for keyword in ["@DEFINE(roles=[])", "@DEFINE-SYMBOL", "@DEFINE-STYLE"] {
-        for version in ["0.3", "0.4"] {
-            for body in ["", " {}"] {
-                let source = format!("* bodies\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\n* @RNL {{ $S = {keyword}{body} }}\n");
-                let r = rnl_cli::interpret_file(
-                    Path::new("body.sp"),
-                    None,
-                    &MemoryProvider::new().with("body.sp", &source),
-                    &Options { std: false, ..Default::default() },
-                )
-                .unwrap();
-                let expected =
-                    if version == "0.4" && body.is_empty() { vec![codes::DEFINE_BODY_NOT_ONE_SET] } else { vec![] };
-                assert_eq!(errors(&r), expected, "{keyword} {version} {body}: {:?}", r.diagnostics());
-            }
+        for body in ["", " {}"] {
+            let source = format!(
+                "* bodies\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n* @RNL {{ $S = {keyword}{body} }}\n"
+            );
+            let r = rnl_cli::interpret_file(
+                Path::new("body.sp"),
+                None,
+                &MemoryProvider::new().with("body.sp", &source),
+                &Options { std: false, ..Default::default() },
+            )
+            .unwrap();
+            let expected = if body.is_empty() { vec![codes::DEFINE_BODY_NOT_ONE_SET] } else { vec![] };
+            assert_eq!(errors(&r), expected, "{keyword} {body}: {:?}", r.diagnostics());
         }
     }
 }

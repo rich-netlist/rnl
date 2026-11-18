@@ -25,10 +25,10 @@ impl Drop for Dir {
 }
 
 fn package(name: &str, version: &str, marker: &str) -> String {
-    format!("@RNL(type=\"header\") {{ @VERSION(\"0.3\"); @PACKAGE(name=\"{name}\", version=\"{version}\") }}\n@RNL {{ ${marker} = @DEFINE(roles=[\"a\"]) {{}} }}\n")
+    format!("@RNL(type=\"header\") {{ @VERSION(\"0.4\"); @PACKAGE(name=\"{name}\", version=\"{version}\") }}\n@RNL {{ ${marker} = @DEFINE(roles=[\"a\"]) {{}} }}\n")
 }
 fn netlist(version: &str) -> String {
-    format!("* top\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); @USE-PACKAGE(name=\"acme\", version=\"{version}\") }}\nR1 a 0 1k\n* @RNL {{ #R1 @AS $WANTED }}\n.end\n")
+    format!("* top\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\"); @USE-PACKAGE(name=\"acme\", version=\"{version}\") }}\nR1 a 0 1k\n* @RNL {{ #R1 @AS $WANTED }}\n.end\n")
 }
 fn ok(entry: &str, provider: &dyn Provider) -> rnl_view::Document {
     let d = build(entry, provider, &BuildOptions::default()).unwrap();
@@ -103,12 +103,12 @@ fn memory_pool_resolves_packages_includes_and_overrides_bundled_standard() {
     let files = MemoryProvider::new()
         .with("/work/top.sp", &netlist("1.0"))
         .with("/pool/different.rnl", &package("acme", "1.0", "WANTED"))
-        .with("/pool/rnl-std.rnl", &package("rnl-std", "0.3", "MY_STD"));
-    let paths = vec!["/pool/different.rnl".into(), "/pool/rnl-std.rnl".into()];
+        .with("/pool/rnl-std-all.rnl", &package("rnl-std-all", "0.4", "MY_STD"));
+    let paths = vec!["/pool/different.rnl".into(), "/pool/rnl-std-all.rnl".into()];
     let pool = FilePool { files: &files, paths: &paths };
     let r = rnl_cli::interpret_file(Path::new("/work/top.sp"), None, &pool, &Default::default()).unwrap();
     let names: Vec<_> = r.model.levels[0].packages.iter().map(|p| p.name.as_str()).collect();
-    assert!(names.contains(&"acme") && names.contains(&"rnl-std"));
+    assert!(names.contains(&"acme") && names.contains(&"rnl-std-all"));
     assert!(!names.contains(&"rnl-std-basic"), "the user standard replaces the bundled collection: {names:?}");
     let excluded = build("/work/top.sp", &files, &BuildOptions::default()).unwrap();
     assert!(excluded.diagnostics.iter().any(|d| d.message.contains("acme 1.0 cannot be found")));

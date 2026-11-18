@@ -55,21 +55,6 @@ fn a_failed_local_name_is_checked_once_and_does_not_hide_a_later_valid_binding()
     }
 }
 
-#[test]
-fn released_failed_names_keep_their_application_diagnostics() {
-    for version in ["0.2", "0.3"] {
-        for used in [false, true] {
-            let r = read(version, "%p=%missing;", "%p @CIRCLE(radius=1)", used);
-            assert_eq!(
-                errors(&r).iter().filter(|c| **c == codes::REF_FAILED).count(),
-                if used { 2 } else { 0 },
-                "{:?}",
-                r.diagnostics()
-            );
-        }
-    }
-}
-
 fn assert_causes(r: &Interpretation) {
     for diagnostic in r.diagnostics().into_iter().filter(|d| d.code == codes::REF_FAILED) {
         assert!(diagnostic.cause.is_some(), "{diagnostic:?}");
@@ -143,17 +128,14 @@ fn package_failed_helpers_are_checked_when_the_definition_is_unused() {
 }
 
 #[test]
-fn mixed_includes_check_failed_names_by_the_definition_source_version() {
-    for version in ["0.3", "0.4"] {
-        let files = MemoryProvider::new()
-            .with("main.sp", "* includes\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include \"defs.sp\"\n")
-            .with("defs.sp", &format!("* definitions\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\n* @RNL {{ %p=%missing; $D = @DEFINE(roles=[]) {{ %p }} }}\n"));
-        let r =
-            rnl_cli::interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Default::default() })
-                .unwrap();
-        assert_eq!(errors(&r).len(), if version == "0.4" { 2 } else { 1 }, "{version}: {:?}", r.diagnostics());
-        assert_causes(&r);
-    }
+fn included_definitions_check_their_failed_names() {
+    let files = MemoryProvider::new()
+        .with("main.sp", "* includes\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include \"defs.sp\"\n")
+        .with("defs.sp", "* definitions\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n* @RNL { %p=%missing; $D = @DEFINE(roles=[]) { %p } }\n");
+    let r = rnl_cli::interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Default::default() })
+        .unwrap();
+    assert_eq!(errors(&r).len(), 2, "{:?}", r.diagnostics());
+    assert_causes(&r);
 }
 
 #[test]

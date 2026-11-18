@@ -121,15 +121,6 @@ fn quoted_terminal_numbers_match_numbers_in_both_pin_and_map() {
 }
 
 #[test]
-fn earlier_files_reject_the_new_parameter_and_keep_their_assignment() {
-    for version in ["0.2", "0.3"] {
-        let r = spice(version, "$S = @DEFINE-SYMBOL { (-2,0) @PIN(terminal=1); (2,0) @PIN(terminal=2) }; #R1 @SET-SYMBOL $S; #R1 @SET-SYMBOL(terminals=[2,1]) $S");
-        assert!(r.diagnostics().iter().any(|d| d.code == codes::PARAM_UNKNOWN));
-        assert_eq!(nets(&r, "#R1"), [vec!["a"], vec!["b"]]);
-    }
-}
-
-#[test]
 fn short_and_empty_orders_leave_unlisted_symbol_terminals_unbound() {
     let r = spice("0.4", &format!("{PAIR} #R1 @SET-SYMBOL(terminals=[\"b\"]) $S; #R2 @SET-SYMBOL(terminals=[]) $S"));
     no_errors(&r);
@@ -170,22 +161,14 @@ fn generation_receives_its_mapping_in_the_second_symbol_queue() {
 }
 
 #[test]
-fn scoped_mapping_uses_the_version_of_the_source_statement() {
-    for (outer, inner) in [("0.4", "0.3"), ("0.3", "0.4")] {
-        let files = MemoryProvider::new()
-            .with("outer.sp", &format!("* outer\n* @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\n.include \"inner.sp\"\n* @RNL(scope=\"child\") {{ $S = @DEFINE-SYMBOL {{ (-2,0) @PIN(terminal=\"a\"); (2,0) @PIN(terminal=\"b\") }}; #R1 @SET-SYMBOL(terminals=[\"b\",\"a\"]) $S; #R1 @PLACE(0,0) }}\n.end\n"))
-            .with("inner.sp", &format!("* inner\n* @RNL(type=\"header\") {{ @VERSION(\"{inner}\") }}\n.subckt child a b\nR1 a b 1k\n.ends\n"));
-        let r =
-            interpret_file(Path::new("outer.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
-        let child = r.model.levels.iter().find(|lv| lv.items.iter().any(|item| item.id == "#R1")).unwrap();
-        if outer == "0.4" {
-            no_errors(&r);
-            assert_eq!(child.items[0].pin_nets, [vec!["b"], vec!["a"]]);
-        } else {
-            assert!(r.diagnostics().iter().any(|d| d.code == codes::PARAM_UNKNOWN));
-            assert_eq!(child.items[0].pin_nets, [vec!["a"], vec!["b"]]);
-        }
-    }
+fn a_scoped_mapping_applies_in_the_included_subcircuit() {
+    let files = MemoryProvider::new()
+        .with("outer.sp", "* outer\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include \"inner.sp\"\n* @RNL(scope=\"child\") { $S = @DEFINE-SYMBOL { (-2,0) @PIN(terminal=\"a\"); (2,0) @PIN(terminal=\"b\") }; #R1 @SET-SYMBOL(terminals=[\"b\",\"a\"]) $S; #R1 @PLACE(0,0) }\n.end\n")
+        .with("inner.sp", "* inner\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child a b\nR1 a b 1k\n.ends\n");
+    let r = interpret_file(Path::new("outer.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    let child = r.model.levels.iter().find(|lv| lv.items.iter().any(|item| item.id == "#R1")).unwrap();
+    no_errors(&r);
+    assert_eq!(child.items[0].pin_nets, [vec!["b"], vec!["a"]]);
 }
 
 #[test]

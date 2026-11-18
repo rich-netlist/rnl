@@ -49,9 +49,3 @@ fn later_styles_see_the_generated_graphics() {
     assert_eq!(result.model.levels[0].shapes.len(), 1);
     assert_eq!(result.model.levels[0].shapes[0].style["linecolor"].str(), Some("#ff0000"));
 }
-
-#[test]
-fn released_selections_keep_their_existing_generation_behavior() {
-    let body = format!("{DEFINITION}; # @SELECT-INSTANCE => @AS $D; # @SELECT-ANNOTATION => @AS $P");
-    assert_eq!(probes(&read("0.3", &body)), 1);
-}

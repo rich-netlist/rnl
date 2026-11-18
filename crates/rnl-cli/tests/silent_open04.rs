@@ -35,17 +35,6 @@ fn wire_to_wire_and_wire_to_pin_silent_opens_warn_in_04() {
 }
 
 #[test]
-fn released_versions_keep_silent_opens_as_hints() {
-    for version in ["0.2", "0.3"] {
-        let r = read(MemoryProvider::new().with("main.sp", &source(version, BODY)), true);
-        let hints = interpretation_hints(&r);
-        let opens: Vec<_> = hints[0].hints.iter().filter(|h| h.kind == Kind::SilentOpen).collect();
-        assert_eq!(opens.len(), 2, "{version}: {opens:?}");
-        assert!(opens.iter().all(|h| h.severity == Severity::Hint));
-    }
-}
-
-#[test]
 fn severity_does_not_require_a_solver_problem() {
     let r = read(MemoryProvider::new().with("main.sp", &source("0.4", BODY)), false);
     assert!(r.problems.is_empty());
@@ -63,14 +52,12 @@ fn shared_named_vertices_and_explicit_pins_are_connected() {
 }
 
 #[test]
-fn included_subcircuit_uses_its_own_files_version() {
-    for (outer, inner, severity) in [("0.3", "0.4", Severity::Warning), ("0.4", "0.3", Severity::Hint)] {
-        let main = format!("* main\n* @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\n.include child.sp\n");
-        let child = source(inner, BODY).replace("R1 a b 1k", ".subckt child a b\nR1 a b 1k") + ".ends child\n";
-        let r = read(MemoryProvider::new().with("main.sp", &main).with("child.sp", &child), true);
-        let hints = interpretation_hints(&r);
-        let opens: Vec<_> = hints.iter().flat_map(|h| &h.hints).filter(|h| h.kind == Kind::SilentOpen).collect();
-        assert_eq!(opens.len(), 2, "{outer}/{inner}: {opens:?}");
-        assert!(opens.iter().all(|h| h.severity == severity));
-    }
+fn an_included_subcircuit_warns_too() {
+    let main = "* main\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include child.sp\n";
+    let child = source("0.4", BODY).replace("R1 a b 1k", ".subckt child a b\nR1 a b 1k") + ".ends child\n";
+    let r = read(MemoryProvider::new().with("main.sp", main).with("child.sp", &child), true);
+    let hints = interpretation_hints(&r);
+    let opens: Vec<_> = hints.iter().flat_map(|h| &h.hints).filter(|h| h.kind == Kind::SilentOpen).collect();
+    assert_eq!(opens.len(), 2, "{opens:?}");
+    assert!(opens.iter().all(|h| h.severity == Severity::Warning));
 }

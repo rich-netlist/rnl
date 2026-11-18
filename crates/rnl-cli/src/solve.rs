@@ -1530,8 +1530,8 @@ mod tests {
     #[test]
     fn a_statement_is_named_by_its_usage_and_every_definition_it_is_in() {
         // %row is written in $PAIR, which $OUTER uses as %in, which the level uses as %o1: the line
-        // is of $PAIR, and both definitions are named, as for a fact (the draft 0.3, 8.5; 7.6)
-        let text = "* nested\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 b c 1k\n* @RNL {\n\
+        // is of $PAIR, and both definitions are named, as for a fact (8.5, 7.6)
+        let text = "* nested\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\nR1 a b 1k\nR2 b c 1k\n* @RNL {\n\
                     *   $PAIR = @DEFINE(roles=[\"a\", \"b\"]) { %row = {?a ?b} @ALIGN(\"y\") };\n\
                     *   $OUTER = @DEFINE(roles=[\"a\", \"b\"]) { %in = ?a(a) ?b(b) @AS $PAIR };\n\
                     *   %o1 = #R1(a) #R2(b) @AS $OUTER\n* }\n.end\n";

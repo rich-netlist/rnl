@@ -25,30 +25,22 @@ fn read(version: &str, keyword: &str, package: &str, inline: bool) -> Interpreta
 
 #[test]
 fn an_alias_package_does_not_need_an_alias_to_have_its_kind() {
-    for version in ["0.3", "0.4"] {
-        for aliases in [false, true] {
-            let package = package(version, aliases, false);
-            let result = read(version, "USE-PACKAGE", &package, false);
-            let errors: Vec<_> = result.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).collect();
-            if version == "0.4" || aliases {
-                assert_eq!(errors.len(), 1, "{:?}", result.diagnostics());
-                assert_eq!(errors[0].code, codes::USE_PACKAGE_ALIAS_PACKAGE);
-                assert_eq!(errors[0].loc.as_ref().unwrap().line, 2);
-            } else {
-                assert!(errors.is_empty(), "{errors:?}");
-            }
-            let result = read(version, "USE-ALIASES", &package, false);
-            assert!(!result.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", result.diagnostics());
-        }
+    for aliases in [false, true] {
+        let package = package("0.4", aliases, false);
+        let result = read("0.4", "USE-PACKAGE", &package, false);
+        let errors: Vec<_> = result.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).collect();
+        assert_eq!(errors.len(), 1, "{:?}", result.diagnostics());
+        assert_eq!(errors[0].code, codes::USE_PACKAGE_ALIAS_PACKAGE);
+        assert_eq!(errors[0].loc.as_ref().unwrap().line, 2);
+        let result = read("0.4", "USE-ALIASES", &package, false);
+        assert!(!result.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", result.diagnostics());
     }
 }
 
 #[test]
 fn empty_ordinary_records_and_inline_packages_keep_their_meaning() {
-    for version in ["0.3", "0.4"] {
-        for inline in [false, true] {
-            let result = read(version, "USE-PACKAGE", &package(version, false, true), inline);
-            assert!(!result.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", result.diagnostics());
-        }
+    for inline in [false, true] {
+        let result = read("0.4", "USE-PACKAGE", &package("0.4", false, true), inline);
+        assert!(!result.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", result.diagnostics());
     }
 }

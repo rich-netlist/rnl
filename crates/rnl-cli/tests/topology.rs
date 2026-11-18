@@ -140,14 +140,3 @@ fn in_a_definition_it_is_checked_for_each_application() {
     assert!(v.contains("@ASSERT-TOPOLOGY does not hold in %c, a usage of $CHAIN at t.sp:"), "{v}");
     assert_eq!(violations(&format!("{def} #R1(first) #R3(second) @AS(priority=\"disabled\") $CHAIN")), Vec::new());
 }
-
-#[test]
-fn files_of_0_3_have_no_topology_assertion() {
-    let r = read(&netlist("0.3", "{#R1 #R2} @ASSERT-TOPOLOGY(\"series\")"));
-    let e = of(&r, Severity::Error);
-    assert_eq!(e.len(), 1, "{e:?}");
-    assert!(
-        e[0].1.contains("unknown keyword @ASSERT-TOPOLOGY: the language 0.4 adds it, and this file is of 0.3"),
-        "{e:?}"
-    );
-}

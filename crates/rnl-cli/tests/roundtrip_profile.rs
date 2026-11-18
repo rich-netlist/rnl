@@ -1,5 +1,5 @@
-//! Solver-record roundtrips for 0.3 and 0.4, with independently reviewed references.
-//! RNL_BLESS_ROUNDTRIP and RNL_BLESS_ROUNDTRIP_0_4 update only their own corpus.
+//! Solver-record roundtrips of the corpus `tests/roundtrip-0.4`, with independently reviewed
+//! references. RNL_BLESS_ROUNDTRIP_0_4 updates them.
 
 use std::path::Path;
 
@@ -189,11 +189,6 @@ fn check_corpus(directory: &str, variable: &str, language: &str) {
             }
         }
     }
-}
-
-#[test]
-fn dedicated_cases_preserve_the_written_result_on_reread_and_replacement() {
-    check_corpus("roundtrip", "RNL_BLESS_ROUNDTRIP", "0.3");
 }
 
 #[test]

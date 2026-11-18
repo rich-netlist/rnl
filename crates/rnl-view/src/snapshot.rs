@@ -1215,12 +1215,9 @@ mod tests {
 
     #[test]
     fn text_snapshot_preserves_explicit_fixed_rotation_and_omits_unwritten_values() {
-        for (version, param, expected) in [
-            ("0.4", ", fix_rotate=true", Some(true)),
-            ("0.4", ", fix_rotate=false", Some(false)),
-            ("0.4", "", None),
-            ("0.3", "", None),
-        ] {
+        for (version, param, expected) in
+            [("0.4", ", fix_rotate=true", Some(true)), ("0.4", ", fix_rotate=false", Some(false)), ("0.4", "", None)]
+        {
             let source = format!("* text\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\nR1 a b 1k\n* @RNL {{ (2,3) @TEXT(\"ink\"{param}) }}\n.end\n");
             let files = MemoryProvider::new().with("t.sp", &source);
             let options =
@@ -1299,12 +1296,6 @@ mod tests {
         let name = text("id", "#R1::name");
         assert_eq!(name.get("visible"), Some(&json!(false)));
         assert_eq!(name["style"], json!({}));
-        // before 0.4 there is no textvisible, and no field
-        let old = model_of(
-            "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n* @RNL { (2, 3) @TEXT(\"x\") }\n.end\n",
-            false,
-        );
-        assert!(old["texts"].as_array().unwrap().iter().all(|t| t.get("visible").is_none()));
     }
 
     #[test]
@@ -1334,16 +1325,6 @@ mod tests {
     }
 
     #[test]
-    fn before_0_4_a_level_has_no_junction_and_its_definitions_no_percent() {
-        let source = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n\
-                      * @RNL { %w = @DEFINE(roles=[\"x\"]) { ?x @ORIENT(\"R90\") }; %v = #R1 @AS %w }\n.end\n";
-        let model = model_of(source, false);
-        assert!(model.get("junction").is_none());
-        let usage = model["objects"].as_array().unwrap().iter().find(|o| o["kind"] == "usage").unwrap();
-        assert_eq!(usage["definition"], "w");
-    }
-
-    #[test]
     fn text_snapshot_preserves_explicit_upright_and_arbitrary_rotation() {
         for (param, expected) in [("", None), (", upright=true", Some(true)), (", upright=false", Some(false))] {
             let source = format!("* text\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\nR1 a b 1k\n* @RNL {{ (2,3) @TEXT(\"ink\", rotate=30.5{param}) }}\n.end\n");
@@ -1363,46 +1344,39 @@ mod tests {
     }
 
     #[test]
-    fn pin_label_name_formats_in_the_snapshot_follow_the_file_version() {
-        for version in ["0.2", "0.3", "0.4"] {
-            let source = format!(
-                "* pins\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\n\
-                 .subckt leaf p n\n* @RNL {{\n\
-                 * %s = @DEFINE-SYMBOL {{ (0,0) @PIN(terminal=1, direction=\"left\", label=\"\\subdigits{{Vout1}}\") }};\n\
-                 * # @SET-SYMBOL %s\n* }}\n.ends leaf\nX1 a b leaf\n* @RNL {{ #X1 @PLACE(0,0) }}\n"
-            );
-            let options = BuildOptions {
-                runtime: rnl_runtime::Options { std: false, ..Default::default() },
-                ..Default::default()
-            };
-            let files = MemoryProvider::new().with("t.sp", &source);
-            let value = serde_json::to_value(
-                crate::snapshot("t.sp", &files, &options, Parts { drawing: false, host: false, model: true }).unwrap(),
-            )
+    fn pin_label_name_formats_in_the_snapshot_are_read() {
+        let source = String::from(
+            "* pins\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n\
+             .subckt leaf p n\n* @RNL {\n\
+             * %s = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1, direction=\"left\", label=\"\\subdigits{Vout1}\") };\n\
+             * # @SET-SYMBOL %s\n* }\n.ends leaf\nX1 a b leaf\n* @RNL { #X1 @PLACE(0,0) }\n",
+        );
+        let options =
+            BuildOptions { runtime: rnl_runtime::Options { std: false, ..Default::default() }, ..Default::default() };
+        let files = MemoryProvider::new().with("t.sp", &source);
+        let value = serde_json::to_value(
+            crate::snapshot("t.sp", &files, &options, Parts { drawing: false, host: false, model: true }).unwrap(),
+        )
+        .unwrap();
+        let label = value["levels"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|l| l["model"]["symbols"].as_array().unwrap())
+            .find_map(|s| s["definition"]["pins"][0].get("label"))
             .unwrap();
-            let label = value["levels"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .flat_map(|l| l["model"]["symbols"].as_array().unwrap())
-                .find_map(|s| s["definition"]["pins"][0].get("label"))
-                .unwrap();
-            assert_eq!(label["markup"], r"\subdigits{Vout1}");
-            let runs: Vec<_> = label["lines"][0]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|r| (r["text"].as_str().unwrap(), r["style"]["level"].as_i64().unwrap()))
-                .collect();
-            assert_eq!(
-                runs,
-                if version == "0.4" { vec![("Vout", 0), ("1", -1)] } else { vec![(r"\subdigits{Vout1}", 0)] }
-            );
-        }
+        assert_eq!(label["markup"], r"\subdigits{Vout1}");
+        let runs: Vec<_> = label["lines"][0]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| (r["text"].as_str().unwrap(), r["style"]["level"].as_i64().unwrap()))
+            .collect();
+        assert_eq!(runs, [("Vout", 0), ("1", -1)]);
     }
 
     const NETLIST: &str = r##"* snapshot
-* @RNL(type="header") { @VERSION("0.2")}
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")}
 .subckt amp in out VSS
 * @RNL {
 *   %amp = @DEFINE-SYMBOL(box=[-2, -2, 2, 2]) {
@@ -1432,7 +1406,7 @@ R2 a vdd! 2k
 *   #R2 @TEXT("R_{2}", key="name", textcolor="#ff0000");
 *   #R2 @TEXT("", key="value");
 *   %j1 = (5, 0);
-*   $JUNCTION @ATTACH %j1;
+*   $JUNCTION @ATTACH %j1 => @PLACE(5, 0);
 *   &a @WIRE(mode="straight") {#R2:1 %j1 #X1:in};
 *   (0, 6) @TEXT("note")
 * }
@@ -1447,17 +1421,19 @@ R2 a vdd! 2k
 
     #[test]
     fn a_set_role_gives_its_members() {
-        // ref and out of $CURRENT_MIRROR and tail of $DIFFERENTIAL_PAIR are set roles (9.4): each
-        // gives its members, none, one or several, and each member is an object the model lists
-        let text = "* sets\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n.model nch nmos level=1\n\
+        // ref and out of $CURRENT_MIRROR_N and tail of the file's $PAIR_AND_TAIL are set roles (9.4):
+        // each gives its members, none, one or several, and each member is an object the model lists
+        let text = "* sets\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); \
+                    @USE-PACKAGE(name=\"rnl-std-semantics\", version=\"0.4\") }\n.model nch nmos level=1\n\
                     M1 a g 0 0 nch\nM2 b g 0 0 nch\nM3 a g 0 0 nch\nM4 b g 0 0 nch\nM5 t c 0 0 nch\nM6 t c 0 0 nch\n\
                     * @RNL {\n\
-                    *   %m1 = #M1(ref) #M2(out) @AS $CURRENT_MIRROR;\n\
-                    *   %m2 = {#M1 #M3}(ref) {#M2 #M4}(out) @AS $CURRENT_MIRROR;\n\
-                    *   %m3 = #M2(out) @AS $CURRENT_MIRROR;\n\
-                    *   %dp1 = #M1(in_p) #M2(in_n) @AS $DIFFERENTIAL_PAIR;\n\
-                    *   %dp2 = #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR;\n\
-                    *   %dp3 = #M1(in_p) #M2(in_n) {#M5 #M6}(tail) @AS $DIFFERENTIAL_PAIR\n\
+                    *   $PAIR_AND_TAIL = @DEFINE(roles=[\"in_p\", \"in_n\", \"{tail}\"]) {};\n\
+                    *   %m1 = #M1(ref) #M2(out) @AS $CURRENT_MIRROR_N;\n\
+                    *   %m2 = {#M1 #M3}(ref) {#M2 #M4}(out) @AS $CURRENT_MIRROR_N;\n\
+                    *   %m3 = #M2(out) @AS $CURRENT_MIRROR_N;\n\
+                    *   %dp1 = #M1(in_p) #M2(in_n) @AS $PAIR_AND_TAIL;\n\
+                    *   %dp2 = #M1(in_p) #M2(in_n) #M5(tail) @AS $PAIR_AND_TAIL;\n\
+                    *   %dp3 = #M1(in_p) #M2(in_n) {#M5 #M6}(tail) @AS $PAIR_AND_TAIL\n\
                     * }\n.end\n";
         let files = MemoryProvider::new().with("/w/t.sp", text);
         let parts = Parts { drawing: false, host: false, model: true };
@@ -1484,16 +1460,28 @@ R2 a vdd! 2k
     #[test]
     fn the_host_circuit_and_the_model_by_ids() {
         let s = snap(Parts { drawing: false, host: true, model: true });
-        assert_eq!((&s["schema"], &s["language"], &s["dialect"]), (&json!(SCHEMA), &json!("0.2"), &json!("spice")));
+        assert_eq!((&s["schema"], &s["language"], &s["dialect"]), (&json!(SCHEMA), &json!("0.4"), &json!("spice")));
         assert!(s.get("drawing").is_none());
-        // as they are brought in: the standard package after the sub-packages it references (16.3)
+        // as they are brought in: the collection after the packages it references (16.3)
         let packages = s["packages"].as_array().unwrap();
         let names: Vec<&str> = packages.iter().map(|p| p["name"].as_str().unwrap()).collect();
-        let std = ["style", "symbols", "virtual", "core", "fill", "semantics", "layout"];
-        assert_eq!(names.len(), std.len() + 1);
+        let std = [
+            "style",
+            "basic",
+            "semiconductors",
+            "fill",
+            "semantics",
+            "functional",
+            "rf",
+            "logic",
+            "signal-flow",
+            "spice",
+            "spectre",
+        ];
+        assert_eq!(names.len(), std.len() + 1, "{names:?}");
         assert!(std.iter().zip(&names).all(|(p, n)| n.strip_prefix("rnl-std-") == Some(*p)), "{names:?}");
-        assert_eq!(names[std.len()], "rnl-std");
-        assert!(packages.iter().all(|p| p["version"] == "0.2"), "{packages:?}");
+        assert_eq!(names[std.len()], "rnl-std-all");
+        assert!(packages.iter().all(|p| p["version"] == "0.4"), "{packages:?}");
         let file = s["files"][0]["path"].as_str().unwrap().to_string();
         let ids: Vec<&str> = s["levels"].as_array().unwrap().iter().map(|l| l["id"].as_str().unwrap()).collect();
         assert_eq!(ids, [format!("file:{file}").as_str(), "subckt:amp"]);
@@ -1532,7 +1520,7 @@ R2 a vdd! 2k
         assert_eq!((&def["box"], &def["box_written"]), (&json!([-2.0, -2.0, 2.0, 2.0]), &json!(true)));
         assert_eq!(
             def["pins"][0],
-            json!({"terminals": ["in"], "at": [-2.0, 0.0], "dir": 180,
+            json!({"names": [], "bus": false, "terminals": ["in"], "at": [-2.0, 0.0], "dir": 180,
                    "label": {"markup": "in", "lines": [[{"kind": "text", "text": "in", "style": {"level": 0, "bold": false, "italic": false, "overline": false}}]]}})
         );
         assert_eq!(def["pins"][1]["label"], Value::Null);
@@ -1548,7 +1536,9 @@ R2 a vdd! 2k
         let r2 = object("#R2");
         assert_eq!((&r2["orient"]["value"], &r2["host"]), (&json!("R90"), &json!(["#R2"])));
         // the pins where they are drawn, the terminals by number
-        assert_eq!(r2["pins"][0], json!({"terminals": ["#R2:1"], "at": [-2.0, 0.0], "dir": 180, "nets": ["&a"]}));
+        let pin = &r2["pins"][0];
+        let fields = ["terminals", "at", "dir", "nets"].map(|k| pin[k].clone());
+        assert_eq!(fields, [json!(["#R2:1"]), json!([-2.0, 0.0]), json!(180), json!(["&a"])], "{pin}");
         // every id once
         let mut all: Vec<&str> = objects.iter().map(|o| o["id"].as_str().unwrap()).collect();
         let n = all.len();
@@ -1639,8 +1629,8 @@ R2 a vdd! 2k
         let no_std = BuildOptions { runtime: Options { std: false, ..Options::default() }, ..BuildOptions::default() };
         assert_ne!(rev(NETLIST, &no_std), r);
         // a version of the standard package asked for changes it
-        let v02 = Options { std_version: Some("0.2".into()), ..Options::default() };
-        assert_ne!(rev(NETLIST, &BuildOptions { runtime: v02, ..BuildOptions::default() }), r);
+        let v04 = Options { std_version: Some("0.4".into()), ..Options::default() };
+        assert_ne!(rev(NETLIST, &BuildOptions { runtime: v04, ..BuildOptions::default() }), r);
         let include_std = Options { include_std: true, ..Options::default() };
         assert_ne!(rev(NETLIST, &BuildOptions { runtime: include_std, ..BuildOptions::default() }), r);
         let spectre = BuildOptions { dialect: Some("spectre".into()), ..BuildOptions::default() };
@@ -1649,13 +1639,17 @@ R2 a vdd! 2k
 
     #[test]
     fn the_revision_counts_files_of_one_name_in_two_package_directories() {
-        // two packages whose files are both pk.rnl, in two package directories, as the files of two
-        // standard series are: the text of each counts
-        let netlist = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); \
+        // two packages whose files are both pk.rnl, in two package directories: the text of each
+        // counts
+        let netlist = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); \
                        @USE-PACKAGE(name=\"pa\", version=\"1.0\"); @USE-PACKAGE(name=\"pb\", version=\"1.0\")}\n\
                        R1 a 0 1k\n.end\n";
         let package = |name: &str, comment: &str| {
-            format!("/* {comment} */\n@RNL(type=\"header\") {{ @VERSION(\"0.3\"); @PACKAGE(name=\"{name}\", version=\"1.0\")}}\n")
+            // a package that defines something: one that only declares itself is an alias package (16.5)
+            format!(
+                "/* {comment} */\n@RNL(type=\"header\") {{ @VERSION(\"0.4\"); @PACKAGE(name=\"{name}\", version=\"1.0\")}}\n\
+                 @RNL {{ $MARK_{name} = @DEFINE(roles=[\"p\"]) {{}} }}\n"
+            )
         };
         let snapshot = |second: &str| {
             let mut files = MemoryProvider::new()
@@ -1706,7 +1700,8 @@ R2 a vdd! 2k
     /// Neither is a label to click.
     #[test]
     fn a_text_at_a_named_point_says_which() {
-        let text = "* points\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a b 1k\n\
+        let text = "* points\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); \
+                    @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\") }\nR1 a b 1k\n\
                     * @RNL {\n\
                     *   #R1 @PLACE(0, 0);\n\
                     *   %j1 = (10, 0); &b @WIRE {#R1:2 %j1}; %j1 @TEXT(\"VDD\", dx=-31, dy=1.5) => %t1;\n\
@@ -1740,8 +1735,8 @@ R2 a vdd! 2k
         assert_eq!(labels, 3, "{:?}", level.hits);
     }
 
-    /// The same in a document of 0.4, and a text at a point with no position yet, such as one with
-    /// an unknown coordinate, hangs on no point it can say.
+    /// The same without the standard series, and a text at a point with no position yet, such as one
+    /// with an unknown coordinate, hangs on no point it can say.
     #[test]
     fn a_text_at_a_point_says_where_in_0_4() {
         let text = "* points\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\nR1 a b 1k\n\

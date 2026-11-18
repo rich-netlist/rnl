@@ -1,4 +1,4 @@
-//! The SkyWater SKY130 PDK symbol package `pdk-sky130` 0.1 (`libraries/pdk/sky130`):
+//! The SkyWater SKY130 PDK symbol package `pdk-sky130` 0.2, written in the language 0.4:
 //! terminal declarations (`@DEVICE`), multi-terminal symbols (`$SKY130_*`), and model-to-symbol
 //! rules (`@SELECT-INSTANCE`) for `sky130_fd_pr` in both SPICE and Spectre dialects, tested both
 //! without PDK model files and with stubbed `.subckt` / `subckt` definitions.
@@ -14,7 +14,7 @@ use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 
 fn pdk_dir() -> PathBuf {
-    public_packages::package_dir("pdk-sky130")
+    public_packages::version_dir("pdk-sky130", "0.2")
 }
 
 fn package_file() -> PathBuf {
@@ -29,10 +29,11 @@ fn diags(r: &Interpretation) -> Vec<String> {
     r.diagnostics().iter().map(|d| r.sink.render(d)).collect()
 }
 
+/// The errors, the assertions that do not hold and the warnings.
 fn errors_and_warnings(r: &Interpretation) -> Vec<String> {
     r.diagnostics()
         .iter()
-        .filter(|d| matches!(d.severity, Severity::Error | Severity::Warning))
+        .filter(|d| matches!(d.severity, Severity::Error | Severity::Violation | Severity::Warning))
         .map(|d| r.sink.render(d))
         .collect()
 }
@@ -172,8 +173,10 @@ fn device_families_and_symbols_match_in_spice_and_spectre() {
         return;
     }
     let pkg_text = std::fs::read_to_string(package_file()).unwrap();
+    // every instance stands at one point, so the terminal names and the nets they reach are
+    // checked with ASSERT-TERMINAL (15.3), not drawn as wires over one another
     let spice = r#"* All SKY130 device families in SPICE
-* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="pdk-sky130", version="0.1") }
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-PACKAGE(name="pdk-sky130", version="0.2") }
 XM_N d g s 0 sky130_fd_pr__nfet_01v8 w=1 l=0.15
 XM_NVT d g s 0 sky130_fd_pr__nfet_05v0_nvt w=2 l=0.9
 XM_ND d g s 0 sky130_fd_pr__nfet_20v0 w=2 l=1
@@ -194,15 +197,15 @@ XD_PW 0 a sky130_fd_pr__diode_pw2nd_05v5
 XL_IND a b ct 0 sky130_fd_pr__ind_03_90
 * @RNL {
 *   # @SELECT-INSTANCE => @PLACE(0, 0);
-*   &d @WIRE {#XM_N:d #XM_NVT:d #XM_ND:d #XM_ISO:d #XM_P:d #XM_PD:d};
-*   &0 @WIRE {#XM_ISO:sub #XQ_N:s #XQ_P:s #XR_PO:b #XR_XPO:sub #XR_DIFF:b #XC_VAR:b #XC_VPP3:b #XC_VPP4:b #XL_IND:sub};
-*   &a @WIRE {#XR_PO:r0 #XR_XPO:r0 #XR_DIFF:t1 #XR_M1:r0 #XC_MIM:c0 #XC_VAR:c0 #XC_VPP3:c0 #XC_VPP4:c0 #XD_PW:k #XL_IND:a};
-*   &vdd @WIRE {#XC_VPP4:m5 #XM_P:b #XM_PD:b}
+*   {#XM_N:d #XM_NVT:d #XM_ND:d #XM_ISO:d #XM_P:d #XM_PD:d} @ASSERT-TERMINAL(net="d");
+*   {#XM_ISO:sub #XQ_N:s #XQ_P:s #XR_PO:b #XR_XPO:sub #XR_DIFF:b #XC_VAR:b #XC_VPP3:b #XC_VPP4:b #XL_IND:sub} @ASSERT-TERMINAL(net="0");
+*   {#XR_PO:r0 #XR_XPO:r0 #XR_DIFF:t1 #XR_M1:r0 #XC_MIM:c0 #XC_VAR:c0 #XC_VPP3:c0 #XC_VPP4:c0 #XD_PW:k #XL_IND:a} @ASSERT-TERMINAL(net="a");
+*   {#XC_VPP4:m5 #XM_P:b #XM_PD:b} @ASSERT-TERMINAL(net="vdd")
 * }
 .end
 "#;
     let spectre = r#"// SKY130 device families in Spectre (no X prefix)
-// @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="pdk-sky130", version="0.1") }
+// @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-PACKAGE(name="pdk-sky130", version="0.2") }
 M_N (d g s 0) sky130_fd_pr__nfet_01v8 w=1u l=0.15u
 M_P (d g s vdd) sky130_fd_pr__pfet_01v8_hvt w=2u l=0.15u
 Q_P (0 b e 0) sky130_fd_pr__pnp_05v5_W3p40L3p40
@@ -212,9 +215,9 @@ D_PW (0 a) sky130_fd_pr__diode_pw2nd_05v5
 L_IND (a b ct 0) sky130_fd_pr__ind_03_90
 // @RNL {
 //   # @SELECT-INSTANCE => @PLACE(0, 0);
-//   &d @WIRE {#M_N:d #M_P:d};
-//   &0 @WIRE {#Q_P:s #R_PO:b #L_IND:sub};
-//   &a @WIRE {#R_PO:r0 #C_MIM:c0 #D_PW:k #L_IND:a}
+//   {#M_N:d #M_P:d} @ASSERT-TERMINAL(net="d");
+//   {#Q_P:s #R_PO:b #L_IND:sub} @ASSERT-TERMINAL(net="0");
+//   {#R_PO:r0 #C_MIM:c0 #D_PW:k #L_IND:a} @ASSERT-TERMINAL(net="a")
 // }
 "#;
     let mut mem =

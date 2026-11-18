@@ -31,14 +31,3 @@ fn a_host_refusal_names_the_subcircuit_at_its_declaration() {
     assert!(stderr.contains("RNL9008") && stderr.contains("open_cell") && stderr.contains("out.sp:2"), "{stderr}");
     assert!(output.is_none());
 }
-
-#[test]
-fn released_write_commands_keep_the_existing_output_behavior() {
-    for version in [None, Some("0.3")] {
-        let (code, stderr, output) = run(".include\nR1 a b 1k\n", version, false);
-        assert_eq!(code, 0, "{stderr}");
-        assert!(stderr.is_empty());
-        let output = output.unwrap();
-        assert!(output.contains(".include\n") && output.contains("@VERSION(\"0.3\")"));
-    }
-}

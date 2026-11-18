@@ -269,18 +269,16 @@ fn generation_is_finished_before_constraints_read_selections() {
 }
 
 #[test]
-fn scoped_constraint_expansion_uses_the_source_file_version() {
-    for (outer, inner, count) in [("0.4", "0.3", 2), ("0.3", "0.4", 1)] {
-        let files = MemoryProvider::new()
-            .with("t.sp", &format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\n.include \"inc.sp\"\n* @RNL(scope=\"child\") {{ {{#R1 {{#R2 #R3}} #R4}} @ORDER(\"left-to-right\") }}\n.end\n"))
-            .with("inc.sp", &format!("* inc\n* @RNL(type=\"header\") {{ @VERSION(\"{inner}\") }}\n.subckt child a b\nR1 a b 1k\nR2 b c 1k\nR3 c d 1k\nR4 d 0 1k\n.ends\n"));
-        let r = interpret_file(Path::new("t.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
-        assert_eq!(errors(&r), []);
-        assert_eq!(
-            r.problems.iter().flat_map(|p| &p.facts).filter(|f| matches!(f.kind, FactKind::Order { .. })).count(),
-            count
-        );
-    }
+fn a_scoped_constraint_expands_its_sets_on_the_included_level() {
+    let files = MemoryProvider::new()
+        .with("t.sp", "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include \"inc.sp\"\n* @RNL(scope=\"child\") { {#R1 {#R2 #R3} #R4} @ORDER(\"left-to-right\") }\n.end\n")
+        .with("inc.sp", "* inc\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child a b\nR1 a b 1k\nR2 b c 1k\nR3 c d 1k\nR4 d 0 1k\n.ends\n");
+    let r = interpret_file(Path::new("t.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    assert_eq!(errors(&r), []);
+    assert_eq!(
+        r.problems.iter().flat_map(|p| &p.facts).filter(|f| matches!(f.kind, FactKind::Order { .. })).count(),
+        2
+    );
 }
 
 #[test]
@@ -291,23 +289,8 @@ fn a_selection_can_fill_the_two_slots_by_the_single_set_split() {
 }
 
 #[test]
-fn released_files_keep_composite_constraints() {
-    for version in ["0.2", "0.3"] {
-        let r = read(version, "{#R1 {#R2 #R3} #R4} @ORDER(\"left-to-right\"); {#R1 #R2} {#R3 #R4} @DISTANCE(\"left-to-right\", min=1); #R1 {#R2 #R3} @ORIENT-RELATION(\"R0\")");
-        assert_eq!(errors(&r), []);
-        assert_eq!(r.problems[0].facts.len(), 3);
-        assert!(r.problems[0]
-            .facts
-            .iter()
-            .any(|f| matches!(&f.kind, FactKind::Distance { from, to, .. } if from.len()==2 && to.len()==2)));
-    }
-}
-
-#[test]
 fn edits_of_pending_constraint_collections_survive_materialization() {
     assert!(rows("%extra = {#R3 #R4} @ORDER(\"left-to-right\"); %s = {#R2 #R3} @SELECT-INSTANCE; %c = {#R1 %s} @ORDER(\"left-to-right\"); %extra @ADD-TO %c; %c @PRIORITY(\"disabled\")").is_empty());
-    let r = read("0.3", "%s = {#R1} @UNION; #R2 @ADD-TO %s");
-    assert_eq!(errors(&r)[0].0, codes::SET_EDIT_TARGET_NOT_SET);
 }
 
 #[test]
@@ -335,8 +318,6 @@ fn the_position_of_a_set_is_the_position_of_each_member_in_0_4() {
         assert_eq!(orders(&r), expected, "{initial}");
     }
     assert_eq!(rows("{{#R1 {#R2}}::position #R3} @ORDER(\"left-to-right\")"), [["#R1", "#R3"], ["#R2", "#R3"]]);
-    let r = read("0.3", "%s = {#R1 #R2}; {%s::position #R3} @ALIGN(\"x\")");
-    assert_eq!(errors(&r), []);
 }
 
 #[test]

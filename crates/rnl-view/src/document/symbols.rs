@@ -326,50 +326,43 @@ mod tests {
     use crate::{build, BuildOptions, MemoryProvider};
 
     #[test]
-    fn name_formats_in_symbol_previews_follow_each_templates_source_version() {
-        for (main, package) in [("0.4", "0.4"), ("0.3", "0.3")] {
-            let source = format!(
-                "* preview\n* @RNL(type=\"header\") {{ @VERSION(\"{main}\"); @USE-PACKAGE(name=\"s\", path=\"s.rnl\") }}\n\
-                 .subckt leaf p n\n* @RNL {{ # @SET-SYMBOL $S }}\n.ends leaf\nX1 a b leaf\n"
-            );
-            let symbol = format!(
-                "@RNL(type=\"header\") {{ @VERSION(\"{package}\"); @PACKAGE(name=\"s\", version=\"1.0\") }}\n\
-                 @RNL {{ $S = @DEFINE-SYMBOL {{\n\
-                 (0,0) @PIN(terminal=1, direction=\"left\", label=\"\\subdigits{{R12}}\");\n\
-                 (1,2) @TEXT(\"\\subrest{{VDD}}\");\n\
-                 ? @TEXT(\"\\subrest{{${{name}}}}\", key=\"name\") => @PLACE(2,3)\n\
-                 }} }}\n"
-            );
-            let options = BuildOptions {
-                runtime: rnl_runtime::Options { std: false, ..Default::default() },
-                ..Default::default()
-            };
-            let preview = |symbol: &str| {
-                let files = MemoryProvider::new().with("t.sp", &source).with("s.rnl", symbol);
-                let d = build("t.sp", &files, &options).unwrap();
-                assert!(d.diagnostics.iter().all(|d| d.severity != "error"), "{:?}", d.diagnostics);
-                d.symbols[d.levels[1].symbol.unwrap()].svg.clone()
-            };
-            let svg = preview(&symbol);
-            if package == "0.4" {
-                let explicit = symbol
-                    .replace(r"\subdigits{R12}", "R_{12}")
-                    .replace(r"\subrest{VDD}", "V_{DD}")
-                    .replace(r"\subrest{${name}}", "n_{ame}");
-                assert_eq!(svg, preview(&explicit));
-                assert!(!svg.contains(r"\sub"));
-            } else {
-                assert!(svg.contains(r"\subdigits{R12}"), "{svg}");
-                assert!(svg.contains(r"\subrest{VDD}"), "{svg}");
-                assert!(svg.contains(r"\subrest{name}"), "{svg}");
-            }
-        }
+    fn name_formats_in_symbol_previews_are_read() {
+        let source = String::from(
+            "* preview\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"s\", path=\"s.rnl\") }\n\
+             .subckt leaf p n\n* @RNL { # @SET-SYMBOL $S }\n.ends leaf\nX1 a b leaf\n",
+        );
+        let symbol = String::from(
+            "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"s\", version=\"1.0\") }\n\
+             @RNL { $S = @DEFINE-SYMBOL {\n\
+             (0,0) @PIN(terminal=1, direction=\"left\", label=\"\\subdigits{R12}\");\n\
+             (1,2) @TEXT(\"\\subrest{VDD}\");\n\
+             ? @TEXT(\"\\subrest{${name}}\", key=\"name\") => @PLACE(2,3)\n\
+             } }\n",
+        );
+        let options =
+            BuildOptions { runtime: rnl_runtime::Options { std: false, ..Default::default() }, ..Default::default() };
+        let preview = |symbol: &str| {
+            let files = MemoryProvider::new().with("t.sp", &source).with("s.rnl", symbol);
+            let d = build("t.sp", &files, &options).unwrap();
+            assert!(d.diagnostics.iter().all(|d| d.severity != "error"), "{:?}", d.diagnostics);
+            d.symbols[d.levels[1].symbol.unwrap()].svg.clone()
+        };
+        let svg = preview(&symbol);
+        let explicit = symbol
+            .replace(r"\subdigits{R12}", "R_{12}")
+            .replace(r"\subrest{VDD}", "V_{DD}")
+            .replace(r"\subrest{${name}}", "n_{ame}");
+        assert_eq!(svg, preview(&explicit));
+        assert!(!svg.contains(r"\sub"));
     }
 
     #[test]
     fn symbols_follow_actual_assignments_and_keep_their_original_definitions() {
+        // a file without a header record: the reading adds the standard package (16.3)
         let text = include_str!("../../../../tests/viewer/inputs/symbol-inspector.sp");
-        let d = build("a.sp", &MemoryProvider::new().with("a.sp", text), &BuildOptions::default()).unwrap();
+        let runtime = rnl_runtime::Options { include_std: true, ..Default::default() };
+        let options = BuildOptions { runtime, ..Default::default() };
+        let d = build("a.sp", &MemoryProvider::new().with("a.sp", text), &options).unwrap();
         assert!(d.diagnostics.iter().all(|d| d.severity != "error"), "{:?}", d.diagnostics);
         assert_eq!(d.files[0].semantics, [14, 33]);
         let root = &d.levels[0];
@@ -408,12 +401,13 @@ mod tests {
 
     #[test]
     fn a_local_alias_keeps_the_package_origin_and_version() {
-        let text =
-            "* title\n.subckt leaf p n\n.ends\nX1 a 0 leaf\n* @RNL { %alias = $RESISTOR; #X1 @SET-SYMBOL %alias }\n";
+        let text = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-basic\", version=\"0.4\") }\n\
+                    .subckt leaf p n\n.ends\nX1 a 0 leaf\n* @RNL { %alias = $RESISTOR; #X1 @SET-SYMBOL %alias }\n";
         let d = build("a.sp", &MemoryProvider::new().with("a.sp", text), &BuildOptions::default()).unwrap();
         assert_eq!(d.symbols.len(), 1);
-        assert_eq!(d.symbols[0].origin, "Package rnl-std-basic 0.3");
-        assert_eq!(d.symbols[0].first_line, 15);
+        assert_eq!(d.symbols[0].origin, "Package rnl-std-basic 0.4");
+        // the line of $RESISTOR in the package file
+        assert_eq!(d.symbols[0].first_line, 21);
     }
 
     #[test]
@@ -456,6 +450,7 @@ mod tests {
         assert_eq!(s.labels[0].key.as_deref(), Some("outer"));
         assert!(s.svg.contains("nested ink"), "{}", s.svg);
         assert!(!s.svg.contains("inner label"));
-        assert!(s.svg.contains("rotate(-90"), "{}", s.svg);
+        // turned a quarter by the text's own transform
+        assert!(s.svg.contains("matrix(0.000000000 -1.000000000 1.000000000 0.000000000 "), "{}", s.svg);
     }
 }

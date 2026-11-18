@@ -12,11 +12,12 @@ use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::Options;
 
 /// The errors of declaring and applying the definitions below, in a file with a label `#R1::name`,
-/// a text `%t` at a point, a bundle `%b`, and the `extra` statements. The standard package's
-/// descriptions of R2 and R3 fail on their own, as they are in a bundle (11.8), and are left out.
+/// a text `%t` at a point, a bundle `%b`, and the `extra` statements. The label comes from the
+/// standard packages of symbols and their host rules; any description of R2 and R3 that fails on
+/// its own, as they are in a bundle (11.8), is left out.
 fn errors(extra: &str) -> Vec<String> {
     let net = format!(
-        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\")}}\nR1 a 0 1k\nR2 a b 1k\nR3 b 0 1k\n* @RNL {{\n\
+        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-basic\", version=\"0.4\"); @USE-PACKAGE(name=\"rnl-std-semiconductors\", version=\"0.4\"); @USE-PACKAGE(name=\"rnl-std-semantics\", version=\"0.4\"); @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\") }}\nR1 a 0 1k\nR2 a b 1k\nR3 b 0 1k\n* @RNL {{\n\
          *   $TEXT_OF = @DEFINE(roles=[[\"t\", \"text\"]]) {{}};\n\
          *   $LABEL_OF = @DEFINE(roles=[[\"t\", \"label\"]]) {{}};\n\
          *   $NOTE_OF = @DEFINE(roles=[[\"t\", \"annotation\"]]) {{}};\n\
@@ -52,13 +53,14 @@ fn a_role_takes_the_objects_of_its_kind() {
 
 #[test]
 fn a_role_refuses_the_objects_of_another_kind() {
-    for (statement, kind) in [
-        ("$LABEL_OF @ATTACH %t", "annotation"),
-        ("$NOTE_OF @ATTACH #R1::name", "label"),
-        ("$TEXT_OF @ATTACH #R1", "instance"),
-        ("$GROUP_OF @ATTACH #R1", "instance"),
+    // the error names the kind the role takes (9.4)
+    for (statement, takes) in [
+        ("$LABEL_OF @ATTACH %t", "takes label"),
+        ("$NOTE_OF @ATTACH #R1::name", "takes annotation"),
+        ("$TEXT_OF @ATTACH #R1", "takes text"),
+        ("$GROUP_OF @ATTACH #R1", "takes bundle"),
     ] {
         let e = errors(&format!(";\n*   {statement}"));
-        assert!(e.iter().any(|e| e.contains(&format!("({kind}) (9.4)"))), "{statement}: {e:?}");
+        assert!(e.iter().any(|e| e.contains("usage-role-wrong-kind") && e.contains(takes)), "{statement}: {e:?}");
     }
 }

@@ -1,14 +1,11 @@
-//! The order of overriding through nested usages (standard 9.4, 14.8, as the draft 0.3 makes it
-//! clear in its 7.3, in every version). A PRIORITY written through `::` in the body of an enclosing
+//! The order of overriding through nested usages (9.4, 14.8). A PRIORITY written through `::` in the body of an enclosing
 //! definition reaches the local from outside the inner usage only: it beats the inner usage's
 //! priority and is still subject to the priority of the enclosing usage. One written from outside
 //! directly on a local usage makes that usage the outermost one with a priority for what it
 //! expands to, over the usages around it; one that a selection reaches is an ordinary statement
 //! on its target, under the usages around it. Of the statements that are not subject to another
 //! priority, the one on the innermost object wins, and on one object the later. Constraints and
-//! groups follow the same order. Before, a statement written in an enclosing body counted as
-//! written outside every usage, and then the outermost usage with a priority decided, even over
-//! a statement from outside on a usage inside it.
+//! groups follow the same order.
 
 use std::path::Path;
 
@@ -36,7 +33,7 @@ fn solve(statements: &str) -> LevelProblem {
     for k in 1..=8 {
         text += &format!("R{k} n{k} n{} 1k\n", k + 1);
     }
-    text += "* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n* @RNL {\n";
+    text += "* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n* @RNL {\n";
     for line in statements.lines().filter(|l| !l.trim().is_empty()) {
         text += &format!("*   {}\n", line.trim());
     }
@@ -137,8 +134,8 @@ fn the_priority_of_a_usage_follows_the_same_order() {
 /// it as `%in` and orders its own roles as `%c`, followed by the statements of `body`.
 fn nested(body: &str) -> String {
     format!(
-        "$PAIR = @DEFINE(roles=[\"a\", \"b\"]) {{ %pair = {{?a ?b}} @GROUP; %row = {{?a ?b}} @ALIGN(\"y\"); %col = {{?a ?b}} @ORDER(\"x\") }};\n\
-         $OUTER = @DEFINE(roles=[\"a\", \"b\"]) {{ %in = ?a(a) ?b(b) @AS $PAIR; %c = {{?a ?b}} @ORDER(\"x\"){body} }};\n"
+        "$PAIR = @DEFINE(roles=[\"a\", \"b\"]) {{ %pair = {{?a ?b}} @GROUP; %row = {{?a ?b}} @ALIGN(\"y\"); %col = {{?a ?b}} @ORDER(\"left-to-right\") }};\n\
+         $OUTER = @DEFINE(roles=[\"a\", \"b\"]) {{ %in = ?a(a) ?b(b) @AS $PAIR; %c = {{?a ?b}} @ORDER(\"left-to-right\"){body} }};\n"
     )
 }
 
@@ -328,14 +325,14 @@ const MIXED: &str = "$MIXED = @DEFINE(roles=[\"a\", \"b\"]) { %low = {?a ?b} @AL
                      %high = {?a ?b} @ORDER(\"left-to-right\", priority=\"high\"); \
                      %plain = ?a ?b @DISTANCE(\"left-to-right\", min=2) }";
 
-/// The facts given to the solver of a file of `version` with R1 to R8, `$MIXED` and `statements` in
-/// a record whose head writes `head`, by label, with their priorities.
-fn in_record(version: &str, head: &str, statements: &str) -> Vec<(String, Priority)> {
+/// The facts given to the solver of a file with R1 to R8, `$MIXED` and `statements` in a record
+/// whose head writes `head`, by label, with their priorities.
+fn in_record(head: &str, statements: &str) -> Vec<(String, Priority)> {
     let mut text = String::from("* priority of the record\n");
     for k in 1..=8 {
         text += &format!("R{k} n{k} n{} 1k\n", k + 1);
     }
-    text += &format!("* @RNL(type=\"header\") {{ @VERSION(\"{version}\")}}\n* @RNL {{ {MIXED} }}\n");
+    text += &format!("* @RNL(type=\"header\") {{ @VERSION(\"0.4\")}}\n* @RNL {{ {MIXED} }}\n");
     text += &format!("* @RNL{head} {{\n*   {statements}\n* }}\n.end\n");
     let files = MemoryProvider::new().with("p.sp", &text);
     let r = interpret_file(Path::new("p.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
@@ -353,28 +350,26 @@ fn facts(of: &[(&str, Priority)]) -> Vec<(String, Priority)> {
 }
 
 #[test]
-fn in_0_3_the_head_of_a_record_gives_no_priority_to_a_usage() {
+fn the_head_of_a_record_gives_no_priority_to_a_usage() {
     // the priority of a record head is the default of the statements of the record that take one,
     // but not of AS and ATTACH, unless it is "disabled": a usage has a priority only when it writes
-    // one, or a PRIORITY statement gives it one, which overrides those of its body (14.8 of 0.3)
+    // one, or a PRIORITY statement gives it one, which overrides those of its body (14.8)
     let high = "(priority=\"high\")";
     let own = [("%high", Priority::High), ("%low", Priority::Low), ("%plain", Priority::Normal)];
-    assert_eq!(in_record("0.3", high, "#R1 #R2 @AS $MIXED"), facts(&own));
-    assert_eq!(in_record("0.3", high, "$MIXED @ATTACH #R1 #R2"), facts(&own));
+    assert_eq!(in_record(high, "#R1 #R2 @AS $MIXED"), facts(&own));
+    assert_eq!(in_record(high, "$MIXED @ATTACH #R1 #R2"), facts(&own));
     // the record's own statements still take its priority
     let mut with_own = facts(&own);
     with_own.push(("%row".to_string(), Priority::High));
     with_own.sort();
-    assert_eq!(in_record("0.3", high, "#R1 #R2 @AS $MIXED; %row = {#R3 #R4} @ALIGN(\"y\")"), with_own);
+    assert_eq!(in_record(high, "#R1 #R2 @AS $MIXED; %row = {#R3 #R4} @ALIGN(\"y\")"), with_own);
     // a priority written on the usage, or given by PRIORITY, overrides its body as before
     let all = |p: Priority| facts(&[("%high", p), ("%low", p), ("%plain", p)]);
-    assert_eq!(in_record("0.3", high, "#R1 #R2 @AS(priority=\"normal\") $MIXED"), all(Priority::Normal));
-    assert_eq!(in_record("0.3", "", "#R1 #R2 @AS(priority=\"high\") $MIXED"), all(Priority::High));
-    assert_eq!(in_record("0.3", high, "%m = #R1 #R2 @AS $MIXED; %m @PRIORITY(\"low\")"), all(Priority::Low));
+    assert_eq!(in_record(high, "#R1 #R2 @AS(priority=\"normal\") $MIXED"), all(Priority::Normal));
+    assert_eq!(in_record("", "#R1 #R2 @AS(priority=\"high\") $MIXED"), all(Priority::High));
+    assert_eq!(in_record(high, "%m = #R1 #R2 @AS $MIXED; %m @PRIORITY(\"low\")"), all(Priority::Low));
     // a record of priority "disabled" turns off everything in it, the bodies of its usages too
-    assert_eq!(in_record("0.3", "(priority=\"disabled\")", "#R1 #R2 @AS $MIXED"), []);
-    // a file of 0.2 keeps the rule of 0.2: the record's priority is the usage's too
-    assert_eq!(in_record("0.2", high, "#R1 #R2 @AS $MIXED"), all(Priority::High));
+    assert_eq!(in_record("(priority=\"disabled\")", "#R1 #R2 @AS $MIXED"), []);
 }
 
 #[test]
@@ -386,12 +381,14 @@ fn a_usage_that_a_rule_makes_keeps_the_priorities_of_its_body_through_a_solve() 
     // record of the rule is no priority of the usage's (10.5, 14.8). $MARK hangs a point under an
     // open pin and wires it, so that the pin is wired once it is written out and the rule does not
     // make it again
-    let netlist = "* rule-made\nR1 n1 n2 1k\nR2 n2 n3 1k\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n* @RNL {\n\
-                *   $MARK = @DEFINE(roles=[[\"t\", \"terminal\"]]) { %p = (_, _); ?t::net @WIRE {?t %p}; \
+    let netlist = "* rule-made\nR1 n1 n2 1k\nR2 n2 n3 1k\n\
+                * @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\") }\n\
+                * @RNL {\n\
+                *   $MARK = @DEFINE(roles=[[\"t\", \"pin\"]]) { %p = (_, _); ?t::net @WIRE {?t %p}; \
                 %low = {?t %p} @ALIGN(\"x\", priority=\"low\"); %high = %p ?t @DISTANCE(\"bottom-to-top\", min=2, priority=\"high\"); \
                 %plain = %p ?t @DISTANCE(\"bottom-to-top\", max=6) };\n\
                 *   $END_NETS = # @SELECT-NET(name=\"n3\");\n\
-                *   $OPEN = $END_NETS @SELECT-TERMINAL(wired=false)\n* }\n\
+                *   $OPEN = $END_NETS @SELECT-PIN(wired=false)\n* }\n\
                 * @RNLHEAD {\n*   MAKE\n* }\n.end\n";
     // the constraints of the level as a viewer reads it, with the record of the solver, by kind
     // and priority

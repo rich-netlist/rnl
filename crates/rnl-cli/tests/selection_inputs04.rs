@@ -64,13 +64,3 @@ fn objects_written_out_are_taken() {
     assert_eq!(codes_of(&r), Vec::<Code>::new());
     assert!(r.model.levels[0].items.iter().any(|i| i.kind == "bundle"));
 }
-
-#[test]
-fn a_file_of_0_3_reads_them_as_it_did() {
-    // a bundle made from a selection, with no error of this kind
-    let r = read("0.3", "# @SELECT-INSTANCE(name=\"XI0*\") => @BUNDLE => %b; %b @PLACE(0, 0)");
-    assert!(!codes_of(&r).contains(&codes::KEYWORD_BUNDLE_SELECTION), "{:?}", errors(&r));
-    assert!(r.model.levels[0].items.iter().any(|i| i.kind == "bundle"));
-    let r = read("0.3", "%s = # @SELECT-TERMINAL(net=\"a\"); &a @WIRE %s");
-    assert!(!codes_of(&r).contains(&codes::WIRE_SELECTION), "{:?}", errors(&r));
-}

@@ -44,17 +44,6 @@ fn alias_conflicts_keep_the_declaring_package_when_checked_or_imported() {
 }
 
 #[test]
-fn released_alias_conflicts_keep_their_existing_metadata() {
-    for version in ["0.2", "0.3"] {
-        for (code, header) in cases() {
-            let r = read(&MemoryProvider::new().with("p.rnl", &package(version, header)), "p.rnl");
-            let d = r.sink.all().iter().find(|d| d.code == code).unwrap();
-            assert!(d.in_package.is_empty());
-        }
-    }
-}
-
-#[test]
 fn file_alias_conflicts_are_not_misattributed_to_an_imported_package() {
     let (code, header) = cases()[0];
     let header = format!("@USE-PACKAGE(name=\"p\",path=\"p.rnl\"); {header}");
@@ -99,32 +88,11 @@ fn header_and_content_parameters_share_the_type_description() {
 }
 
 #[test]
-fn released_parameter_messages_remain_unchanged() {
-    for version in ["0.2", "0.3"] {
-        let r = read(
-            &MemoryProvider::new()
-                .with("main.sp", &source(version, "@USE-PACKAGE(name=1)", "(0,0) @CIRCLE(radius=\"bad\")")),
-            "main.sp",
-        );
-        let messages: Vec<_> =
-            r.sink.all().iter().filter(|d| d.code == codes::PARAM_WRONG_TYPE).map(|d| d.message.as_str()).collect();
-        assert_eq!(
-            messages,
-            ["the name of @USE-PACKAGE has the wrong type (5.3)", "the radius of @CIRCLE has the wrong type (5.3)"]
-        );
-    }
-}
-
-#[test]
-fn scoped_parameter_messages_follow_the_source_version() {
-    for (writer, level) in [("0.3", "0.4"), ("0.4", "0.3")] {
-        let main=format!("* mixed\n* @RNL(type=\"header\") {{ @VERSION(\"{writer}\") }}\n.include child.sp\n* @RNL(scope=\"child\") {{ (0,0) @CIRCLE(radius=\"bad\") }}\n");
-        let child = format!(
-            "* child\n* @RNL(type=\"header\") {{ @VERSION(\"{level}\") }}\n.subckt child a\nR1 a 0 1k\n.ends child\n"
-        );
-        let r = read(&MemoryProvider::new().with("main.sp", &main).with("child.sp", &child), "main.sp");
-        let d = r.sink.all().iter().find(|d| d.code == codes::PARAM_WRONG_TYPE).unwrap();
-        assert_eq!(d.message.contains("must be a number"), writer == "0.4");
-        assert_eq!(d.loc.as_ref().unwrap().file, "main.sp");
-    }
+fn scoped_parameter_messages_point_to_the_writing_file() {
+    let main="* main\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include child.sp\n* @RNL(scope=\"child\") { (0,0) @CIRCLE(radius=\"bad\") }\n";
+    let child = "* child\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child a\nR1 a 0 1k\n.ends child\n";
+    let r = read(&MemoryProvider::new().with("main.sp", main).with("child.sp", child), "main.sp");
+    let d = r.sink.all().iter().find(|d| d.code == codes::PARAM_WRONG_TYPE).unwrap();
+    assert!(d.message.contains("must be a number"), "{}", d.message);
+    assert_eq!(d.loc.as_ref().unwrap().file, "main.sp");
 }

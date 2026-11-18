@@ -1,6 +1,5 @@
 //! PLACE on the `::position` of a RECTANGLE, CIRCLE or ELLIPSE written with a centre (11.1, 13.4):
-//! in a file of 0.4 it moves the centre, as for any point; PLACE on the graphic itself fails. A file
-//! of 0.3 reads it as it did.
+//! in a file of 0.4 it moves the centre, as for any point; PLACE on the graphic itself fails.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -65,12 +64,4 @@ fn place_on_the_graphic_itself_fails() {
     let e = errors(&path);
     assert_eq!(e.len(), 1, "{e:?}");
     assert!(e[0].contains("RNL4300 place-not-taken: PLACE does not take CIRCLE"), "{e:?}");
-}
-
-#[test]
-fn a_file_of_0_3_reads_it_as_it_did() {
-    // accepted, and the centre drawn where it is written
-    let path = file("v03.sp", "0.3", "%c = @CIRCLE(radius=1) {(0, 0)}; %c::position @PLACE(3, 3)");
-    assert_eq!(errors(&path), Vec::<String>::new());
-    assert_eq!(shapes(&path), vec![("CIRCLE".to_string(), vec![[0.0, 0.0]])]);
 }

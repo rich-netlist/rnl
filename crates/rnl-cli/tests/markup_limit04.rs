@@ -30,16 +30,6 @@ fn text_limit_is_error_and_does_not_draw_but_sibling_survives() {
     assert!(!r.model.levels[0].texts.iter().any(|t| t.markup == f));
 }
 #[test]
-fn old_versions_keep_literal_math_without_a_limit_error() {
-    let f = formula(65);
-    for version in ["0.2", "0.3"] {
-        let r = read(version, &format!(r#"(0,0) @TEXT("{f}")"#));
-        assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error || d.code == codes::MARKUP_MATH_DEPTH));
-        let text = r.model.levels[0].texts.iter().find(|t| t.markup == f).unwrap();
-        assert_eq!(rnl_runtime::markup::plain(&text.lines[0]), f);
-    }
-}
-#[test]
 fn pin_label_limit_fails_only_pin_and_preserves_other_pin() {
     let f = formula(65);
     let r = read(
@@ -128,40 +118,32 @@ fn annotation_checks_dynamic_definition_text_before_materialization() {
 }
 
 #[test]
-fn forwarded_math_uses_the_version_that_wrote_the_string() {
+fn forwarded_math_is_limited_where_the_string_is_written() {
     let f = formula(65);
-    for (writer, definition) in [("0.4", "0.3"), ("0.3", "0.4")] {
-        let main = format!(
-            r#"* forwarded math
-* @RNL(type="header") {{ @VERSION("{writer}") }}
+    // the string written in the scope record of the main file, its definition in the included file
+    let main = format!(
+        r#"* forwarded math
+* @RNL(type="header") {{ @VERSION("0.4") }}
 .include "defs.inc"
 * @RNL(scope="cell") {{ #R1 @AS(s="{f}") $D }}
 .end
 "#
-        );
-        let defs = format!(
-            r#"* definition
-* @RNL(type="header") {{ @VERSION("{definition}") }}
+    );
+    let defs = format!(
+        r#"* definition
+* @RNL(type="header") {{ @VERSION("0.4") }}
 .subckt cell a b
 R1 a b 1k
 * @RNL {{ $S = @DEFINE-SYMBOL {{ (0,0) @CIRCLE(radius=1) }}; #R1 @SET-SYMBOL $S => @PLACE(0,0); $D = @DEFINE(roles=["r"],parameters=["s"]) {{ ?r @TEXT(?s) }} }}
 .ends cell
 "#
-        );
-        let files = MemoryProvider::new().with("main.sp", &main).with("defs.inc", &defs);
-        let r =
-            interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Default::default() }).unwrap();
-        let errors: Vec<_> = r.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).collect();
-        let level = r.model.levels.iter().find(|level| level.title == "cell").unwrap();
-        if writer == "0.4" {
-            assert_eq!(errors.len(), 1, "{:?}", r.diagnostics());
-            assert_eq!(errors[0].code, codes::MARKUP_MATH_DEPTH_LIMIT);
-            assert!(errors[0].loc.is_some());
-            assert!(!level.texts.iter().any(|t| t.markup == f));
-        } else {
-            assert!(errors.is_empty(), "{:?}", r.diagnostics());
-            let text = level.texts.iter().find(|t| t.markup == f).unwrap();
-            assert_eq!(rnl_runtime::markup::plain(&text.lines[0]), f);
-        }
-    }
+    );
+    let files = MemoryProvider::new().with("main.sp", &main).with("defs.inc", &defs);
+    let r = interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Default::default() }).unwrap();
+    let errors: Vec<_> = r.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).collect();
+    let level = r.model.levels.iter().find(|level| level.title == "cell").unwrap();
+    assert_eq!(errors.len(), 1, "{:?}", r.diagnostics());
+    assert_eq!(errors[0].code, codes::MARKUP_MATH_DEPTH_LIMIT);
+    assert!(errors[0].loc.is_some());
+    assert!(!level.texts.iter().any(|t| t.markup == f));
 }

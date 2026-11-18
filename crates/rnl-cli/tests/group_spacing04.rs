@@ -61,18 +61,6 @@ fn wrong_types_and_positional_values_are_rejected() {
 }
 
 #[test]
-fn source_version_controls_spacing_parameters() {
-    for version in ["0.2", "0.3"] {
-        let r = read(version, "{#R1 #R2} @GROUP(spacing_x=2)");
-        assert!(r.diagnostics().iter().any(|d| d.severity == Severity::Error));
-        assert!(spacings(&r).is_empty());
-        let r = read(version, "{#R1 #R2} @GROUP");
-        clean(&r);
-        assert_eq!(spacings(&r), [(None, None)]);
-    }
-}
-
-#[test]
 fn definition_parameters_and_rules_keep_spacing_with_final_members() {
     let r = read(
         "0.4",
@@ -131,18 +119,6 @@ fn public_constraint_json_omits_unwritten_spacings() {
 }
 
 #[test]
-fn scoped_records_keep_the_version_of_the_file_that_writes_them() {
-    for (main_version, child_version) in [("0.4", "0.3"), ("0.3", "0.4")] {
-        let main=format!("* mixed\n* @RNL(type=\"header\") {{ @VERSION(\"{main_version}\") }}\n.include extra.sp\n* @RNL(scope=\"child\") {{ {{#R1 #R2}} @GROUP(spacing_x=2) }}\n");
-        let extra = source(child_version, "{#R1 #R2} @GROUP(spacing_y=3)").replace("R1 a", ".subckt child a b\nR1 a")
-            + ".ends\n";
-        let r = read_files(&MemoryProvider::new().with("main.sp", &main).with("extra.sp", &extra));
-        assert!(r.diagnostics().iter().any(|d| d.severity == Severity::Error));
-        assert_eq!(spacings(&r), if main_version == "0.4" { vec![(Some(2.0), None)] } else { vec![(None, Some(3.0))] });
-    }
-}
-
-#[test]
 fn singleton_and_empty_groups_keep_settings_without_creating_positions() {
     for body in ["#R1 @GROUP(spacing_x=2)", "{} @GROUP(spacing_x=2)"] {
         let r = read("0.4", body);
@@ -170,41 +146,25 @@ fn snapshot_model_carries_spacing_and_omits_absent_axes() {
 }
 
 #[test]
-fn spacing_words_do_not_expand_released_file_alias_vocabulary() {
-    for version in ["0.2", "0.3", "0.4"] {
-        let aliases = r#"; @ALIAS("gap_x","spacing_x"); @ALIAS("gap_y","spacing_y")"#;
-        let text = source(version, "{#R1 #R2} @GROUP(gap_x=1,gap_y=2)")
-            .replace(&format!("@VERSION(\"{version}\")"), &format!("@VERSION(\"{version}\"){aliases}"));
-        let r = read_files(&MemoryProvider::new().with("main.sp", &text));
-        if version == "0.4" {
-            clean(&r);
-            assert_eq!(spacings(&r), [(Some(1.), Some(2.))]);
-        } else {
-            assert_eq!(r.diagnostics().iter().filter(|d| d.code == codes::ALIAS_ORIGINAL_NOT_STANDARD).count(), 2);
-        }
-    }
+fn spacing_words_can_be_aliased() {
+    let aliases = r#"; @ALIAS("gap_x","spacing_x"); @ALIAS("gap_y","spacing_y")"#;
+    let text = source("0.4", "{#R1 #R2} @GROUP(gap_x=1,gap_y=2)")
+        .replace("@VERSION(\"0.4\")", &format!("@VERSION(\"0.4\"){aliases}"));
+    let r = read_files(&MemoryProvider::new().with("main.sp", &text));
+    clean(&r);
+    assert_eq!(spacings(&r), [(Some(1.), Some(2.))]);
 }
 
 #[test]
-fn spacing_aliases_in_imports_and_packages_use_the_declared_version() {
-    for version in ["0.2", "0.3", "0.4"] {
-        let uses = r#"; @USE-ALIASES(name="alias"); @USE-PACKAGE(name="ordinary")"#;
-        let text = source(version, "{#R1 #R2} @GROUP(gap_x=1,gap_y=2)")
-            .replace(&format!("@VERSION(\"{version}\")"), &format!("@VERSION(\"{version}\"){uses}"));
-        let a=format!("@RNL(type=\"header\") {{ @VERSION(\"{version}\"); @PACKAGE(name=\"alias\",version=\"1.0\"); @ALIAS(\"gap_x\",\"spacing_x\"); @ALIAS(\"gap_y\",\"spacing_y\") }}\n");
-        let p=format!("@RNL(type=\"header\") {{ @VERSION(\"{version}\"); @PACKAGE(name=\"ordinary\",version=\"1.0\"); @ALIAS(\"gap\",\"spacing_y\") }}\n@RNL {{ $D = @DEFINE(roles=[\"p\"]) {{}} }}\n");
-        let mut f = MemoryProvider::new().with("main.sp", &text).with("pkg/a.rnl", &a).with("pkg/p.rnl", &p);
-        f.package_dirs.push("pkg".into());
-        let r = read_files(&f);
-        if version == "0.4" {
-            clean(&r);
-            assert_eq!(spacings(&r), [(Some(1.), Some(2.))]);
-        } else {
-            assert_eq!(
-                r.diagnostics().iter().filter(|d| d.code == codes::USE_ALIASES_ORIGINAL_NOT_IN_VERSION).count(),
-                2
-            );
-            assert!(r.diagnostics().iter().any(|d| d.code == codes::ALIAS_ORIGINAL_NOT_STANDARD));
-        }
-    }
+fn spacing_aliases_of_an_alias_package_reach_the_file() {
+    let uses = r#"; @USE-ALIASES(name="alias"); @USE-PACKAGE(name="ordinary")"#;
+    let text = source("0.4", "{#R1 #R2} @GROUP(gap_x=1,gap_y=2)")
+        .replace("@VERSION(\"0.4\")", &format!("@VERSION(\"0.4\"){uses}"));
+    let a = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"alias\",version=\"1.0\"); @ALIAS(\"gap_x\",\"spacing_x\"); @ALIAS(\"gap_y\",\"spacing_y\") }\n";
+    let p = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"ordinary\",version=\"1.0\"); @ALIAS(\"gap\",\"spacing_y\") }\n@RNL { $D = @DEFINE(roles=[\"p\"]) {} }\n";
+    let mut f = MemoryProvider::new().with("main.sp", &text).with("pkg/a.rnl", a).with("pkg/p.rnl", p);
+    f.package_dirs.push("pkg".into());
+    let r = read_files(&f);
+    clean(&r);
+    assert_eq!(spacings(&r), [(Some(1.), Some(2.))]);
 }

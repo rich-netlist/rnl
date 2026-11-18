@@ -1,11 +1,11 @@
 //! Terminals written with digits (6.4): in a file of 0.4 a terminal made only of digits is a number,
 //! also when it is quoted, wherever a terminal is named, and a number reaches a terminal by its place
-//! only, so in `.subckt amp 3 1 2` `#X1:1` is the port named 3. A file of 0.3 reads them as it did.
+//! only, so in `.subckt amp 3 1 2` `#X1:1` is the port named 3.
 
 use std::path::Path;
 
 use rnl_cli::interpret_file;
-use rnl_runtime::diag::{codes, Code, Severity};
+use rnl_runtime::diag::{Code, Severity};
 use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 
@@ -46,13 +46,4 @@ fn a_string_of_digits_in_the_terminal_condition_is_a_number() {
     assert!(holds("#X1 @SELECT-TERMINAL(terminal=3) => @ASSERT-TERMINAL(net=\"c\")"));
     assert!(holds("#X1:3 @ASSERT-TERMINAL(terminal=\"3\")"));
     assert!(!holds("#X1:1 @ASSERT-TERMINAL(terminal=\"3\")"));
-}
-
-#[test]
-fn a_file_of_0_3_reads_them_as_it_did() {
-    // a quoted terminal is a name there, and M1 has no terminal named 1
-    let e = of(&read("0.3", "#M1:\"1\" @CURRENT(\"in\")"), Severity::Error);
-    assert_eq!(e.len(), 1, "{e:?}");
-    assert_eq!(e[0].0, codes::REF_NO_TERMINAL);
-    assert_eq!(of(&read("0.4", "#M1:\"1\" @CURRENT(\"in\")"), Severity::Error), Vec::new());
 }

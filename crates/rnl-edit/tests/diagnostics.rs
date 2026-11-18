@@ -53,7 +53,7 @@ fn writer_failures_use_the_catalog_without_changing_legacy_messages() {
 }
 
 #[test]
-fn host_errors_keep_their_original_number_and_location_and_refuse_modern_writes() {
+fn host_errors_keep_their_original_number_and_location_and_refuse_the_write() {
     let mut req = request(json!([]));
     req.netlist = "title\n.include missing.sp\nR1 a 0 1k\n".into();
     let error = write_diagnosed(&req).unwrap_err();
@@ -63,15 +63,11 @@ fn host_errors_keep_their_original_number_and_location_and_refuse_modern_writes(
     assert_eq!(diagnostic.line, 2);
     assert!(diagnostic.full_path.ends_with("netlist.sp"));
     assert!(diagnostic.message.contains("missing.sp"));
-    req.language_version = None;
-    let legacy = write_diagnosed(&req).unwrap();
-    assert!(!legacy.diagnostics.is_empty());
-    assert_eq!(write(&req).unwrap(), legacy.text);
 }
 
 #[test]
 fn a_valid_edit_has_the_same_text_through_both_interfaces() {
-    for version in [None, Some("0.3"), Some("0.4")] {
+    for version in [None, Some("0.4")] {
         let mut req = request(json!([{"op":"set","level":"file","object":"#R1","at":[2,3]}]));
         req.language_version = version.map(String::from);
         let written = write_diagnosed(&req).unwrap();

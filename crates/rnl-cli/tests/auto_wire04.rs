@@ -40,10 +40,8 @@ fn owner_orientation_is_applied_to_pin_direction() {
 }
 
 #[test]
-fn old_versions_and_strict_manhattan_are_unchanged() {
+fn the_default_wire_is_auto_and_strict_manhattan_is_unchanged() {
     let simple = r#"&a @WIRE {(0,0) (4,3)}"#;
-    assert_eq!(paths(&read("0.2", simple))[0], [(0., 0.), (4., 3.)]);
-    assert_eq!(paths(&read("0.3", simple))[0], [(0., 0.), (4., 3.)]);
     assert_eq!(paths(&read("0.4", simple))[0], [(0., 0.), (4., 0.), (4., 3.)]);
     assert_eq!(
         paths(&read("0.4", r#"&a @WIRE(mode="manhattan") {(0,0) (4,3)}"#))[0],
@@ -68,21 +66,15 @@ fn coincident_distinct_waypoints_remain_in_via_and_do_not_reverse() {
 }
 
 #[test]
-fn source_file_version_not_target_level_controls_the_effective_wire() {
-    for (main, child, expected) in
-        [("0.4", "0.3", vec![(0., 0.), (4., 0.), (4., 3.)]), ("0.3", "0.4", vec![(0., 0.), (4., 3.)])]
-    {
-        let text=format!("* main\n* @RNL(type=\"header\") {{ @VERSION(\"{main}\") }}\n.include child.sp\n* @RNL(scope=\"cell\") {{ &a @WIRE {{(0,0) (4,3)}} }}\n.end\n");
-        let inc = format!(
-            "* child\n* @RNL(type=\"header\") {{ @VERSION(\"{child}\") }}\n.subckt cell a b\nR1 a b 1k\n.ends cell\n"
-        );
-        let files = MemoryProvider::new().with("main.sp", &text).with("child.sp", &inc);
-        let r =
-            interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
-        assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
-        assert_eq!(r.model.levels.iter().find(|l| l.title == "cell").unwrap().wires[0].points, expected);
-        assert_eq!(r.problems.iter().find(|p| p.name == "cell").unwrap().wires[0].default_auto, main == "0.4");
-    }
+fn a_scoped_wire_into_an_included_level_is_an_auto_wire() {
+    let text = "* main\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include child.sp\n* @RNL(scope=\"cell\") { &a @WIRE {(0,0) (4,3)} }\n.end\n";
+    let inc = "* child\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt cell a b\nR1 a b 1k\n.ends cell\n";
+    let files = MemoryProvider::new().with("main.sp", text).with("child.sp", inc);
+    let r = interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
+    let cell = r.model.levels.iter().find(|l| l.title == "cell").unwrap();
+    assert_eq!(cell.wires[0].points, [(0., 0.), (4., 0.), (4., 3.)]);
+    assert!(r.problems.iter().find(|p| p.name == "cell").unwrap().wires[0].default_auto);
 }
 
 #[test]
@@ -100,16 +92,13 @@ fn previous_generated_rewrite_uses_the_same_04_auto_path() {
 }
 
 #[test]
-fn effective_rewrite_source_version_controls_problem_marker() {
-    for (main, child, want) in [("0.4", "0.3", true), ("0.3", "0.4", false)] {
-        let text = format!("* main\n* @RNL(type=\"header\") {{ @VERSION(\"{main}\") }}\n.include child.sp\n* @RNL(scope=\"cell\") {{ %w @WIRE {{(0,0) (4,3)}} }}\n.end\n");
-        let child = format!("* child\n* @RNL(type=\"header\") {{ @VERSION(\"{child}\") }}\n.subckt cell a b\nR1 a b 1k\n* @RNL {{ %w = &a @WIRE {{(0,0) (4,3)}} }}\n.ends cell\n");
-        let files = MemoryProvider::new().with("main.sp", &text).with("child.sp", &child);
-        let r =
-            interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
-        assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
-        assert_eq!(r.problems.iter().find(|p| p.name == "cell").unwrap().wires[0].default_auto, want);
-    }
+fn a_scoped_rewrite_of_a_wire_of_an_included_level_is_an_auto_wire() {
+    let text = "* main\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include child.sp\n* @RNL(scope=\"cell\") { %w @WIRE {(0,0) (4,3)} }\n.end\n";
+    let child = "* child\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt cell a b\nR1 a b 1k\n* @RNL { %w = &a @WIRE {(0,0) (4,3)} }\n.ends cell\n";
+    let files = MemoryProvider::new().with("main.sp", text).with("child.sp", child);
+    let r = interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
+    assert!(r.problems.iter().find(|p| p.name == "cell").unwrap().wires[0].default_auto);
 }
 
 #[test]

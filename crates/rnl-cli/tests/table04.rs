@@ -159,15 +159,6 @@ fn digest_distinguishes_nesting_and_transposition() {
 }
 
 #[test]
-fn older_files_do_not_gain_table() {
-    for version in ["0.2", "0.3"] {
-        let r = read_version(version, "@TABLE {#R1 #R2}");
-        assert!(tables(&r.problems[0]).is_empty());
-        assert!(r.diagnostics().iter().any(|d| d.severity == Severity::Error && d.message.contains("TABLE")));
-    }
-}
-
-#[test]
 fn solver_keeps_or_discards_the_entire_table() {
     for priority in ["low", "high"] {
         let r = read(&format!(
@@ -301,25 +292,13 @@ fn table_check_uses_both_axes_and_keeps_group_after_conflict() {
 }
 
 #[test]
-fn table_availability_follows_the_record_writer_in_mixed_includes() {
-    for (main, child, count) in [("0.4", "0.3", 1), ("0.3", "0.4", 0)] {
-        let source=format!("* mixed\n* @RNL(type=\"header\") {{ @VERSION(\"{main}\") }}\n.inc child.sp\n* @RNL(scope=\"child\") {{ @TABLE {{#R1 #R2}} }}\n");
-        let included=format!("* included\n* @RNL(type=\"header\") {{ @VERSION(\"{child}\") }}\n.subckt child a b\nR1 a 0 1k\nR2 b 0 1k\n* @RNL {{ {SYMBOLS} }}\n.ends\n");
-        let files = MemoryProvider::new().with("main.sp", &source).with("child.sp", &included);
-        let r =
-            interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
-        assert_eq!(
-            tables(r.problems.iter().find(|p| p.title == "child").unwrap()).len(),
-            count,
-            "{:?}",
-            r.diagnostics()
-        );
-        if count == 1 {
-            clean(&r);
-        } else {
-            assert!(r.diagnostics().iter().any(|d| d.severity == Severity::Error && d.message.contains("TABLE")));
-        }
-    }
+fn a_scoped_table_applies_in_the_included_subcircuit() {
+    let source = "* scoped\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.inc child.sp\n* @RNL(scope=\"child\") { @TABLE {#R1 #R2} }\n";
+    let included=format!("* included\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n.subckt child a b\nR1 a 0 1k\nR2 b 0 1k\n* @RNL {{ {SYMBOLS} }}\n.ends\n");
+    let files = MemoryProvider::new().with("main.sp", source).with("child.sp", &included);
+    let r = interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    assert_eq!(tables(r.problems.iter().find(|p| p.title == "child").unwrap()).len(), 1, "{:?}", r.diagnostics());
+    clean(&r);
 }
 
 #[test]
@@ -361,87 +340,32 @@ fn failed_member_diagnostic_keeps_its_original_cause() {
 }
 
 #[test]
-fn new_table_words_do_not_expand_old_alias_originals() {
-    for version in ["0.2", "0.3", "0.4"] {
-        let head = r#"; @ALIAS("@T","@TABLE"); @ALIAS("flip","transpose")"#;
-        let text = source(version, "{#R1 #R2} @T(flip=true)")
-            .replace(&format!("@VERSION(\"{version}\")"), &format!("@VERSION(\"{version}\"){head}"));
-        let r = interpret_file(
-            Path::new("t.sp"),
-            None,
-            &MemoryProvider::new().with("t.sp", &text),
-            &Options { std: false, ..Options::solver() },
-        )
-        .unwrap();
-        if version == "0.4" {
-            clean(&r);
-            assert!(r.problems.iter().any(|p| p.facts.iter().any(|f| matches!(f.kind, FactKind::Table { .. }))));
-        } else {
-            assert_eq!(
-                r.diagnostics()
-                    .iter()
-                    .filter(|d| d.code == rnl_runtime::diag::codes::ALIAS_ORIGINAL_NOT_STANDARD)
-                    .count(),
-                2
-            );
-            assert!(r.diagnostics().iter().any(
-                |d| d.code == rnl_runtime::diag::codes::KEYWORD_UNKNOWN && d.message == "unknown keyword @T (16.4)"
-            ));
-        }
-    }
+fn table_words_can_be_alias_originals() {
+    let head = r#"; @ALIAS("@T","@TABLE"); @ALIAS("flip","transpose")"#;
+    let text =
+        source("0.4", "{#R1 #R2} @T(flip=true)").replace("@VERSION(\"0.4\")", &format!("@VERSION(\"0.4\"){head}"));
+    let r = interpret_file(
+        Path::new("t.sp"),
+        None,
+        &MemoryProvider::new().with("t.sp", &text),
+        &Options { std: false, ..Options::solver() },
+    )
+    .unwrap();
+    clean(&r);
+    assert!(r.problems.iter().any(|p| p.facts.iter().any(|f| matches!(f.kind, FactKind::Table { .. }))));
 }
 
 #[test]
-fn old_table_keyword_spelling_can_still_be_an_alias_and_unknown_text_is_unchanged() {
-    for version in ["0.2", "0.3"] {
-        let text = source(version, r#"(0,0) @TABLE("old alias")"#).replace(
-            &format!("@VERSION(\"{version}\")"),
-            &format!("@VERSION(\"{version}\"); @ALIAS(\"@TABLE\",\"@TEXT\")"),
-        );
-        let r = interpret_file(
-            Path::new("t.sp"),
-            None,
-            &MemoryProvider::new().with("t.sp", &text),
-            &Options { std: false, ..Options::solver() },
-        )
-        .unwrap();
-        clean(&r);
-        let r = read_version(version, "{#R1 #R2} @TABLE");
-        assert!(
-            r.diagnostics()
-                .iter()
-                .any(|d| d.code == rnl_runtime::diag::codes::KEYWORD_UNKNOWN
-                    && d.message == "unknown keyword @TABLE (16.4)"),
-            "{:?}",
-            r.diagnostics()
-        );
-    }
-}
-
-#[test]
-fn table_aliases_imported_and_declared_in_packages_keep_version_boundaries() {
-    for version in ["0.2", "0.3", "0.4"] {
-        let text = source(version, "{#R1 #R2} @T(flip=true)").replace(
-            &format!("@VERSION(\"{version}\")"),
-            &format!("@VERSION(\"{version}\"); @USE-ALIASES(name=\"alias\"); @USE-PACKAGE(name=\"ordinary\")"),
-        );
-        let a=format!("@RNL(type=\"header\") {{ @VERSION(\"{version}\"); @PACKAGE(name=\"alias\",version=\"1.0\"); @ALIAS(\"@T\",\"@TABLE\"); @ALIAS(\"flip\",\"transpose\") }}\n");
-        let p=format!("@RNL(type=\"header\") {{ @VERSION(\"{version}\"); @PACKAGE(name=\"ordinary\",version=\"1.0\"); @ALIAS(\"flip\",\"transpose\") }}\n@RNL {{ $D = @DEFINE(roles=[\"p\"]) {{}} }}\n");
-        let mut fs = MemoryProvider::new().with("t.sp", &text).with("pkg/a.rnl", &a).with("pkg/p.rnl", &p);
-        fs.package_dirs.push("pkg".into());
-        let r = interpret_file(Path::new("t.sp"), None, &fs, &Options { std: false, ..Options::solver() }).unwrap();
-        if version == "0.4" {
-            clean(&r);
-            assert!(r.problems.iter().any(|p| p.facts.iter().any(|f| matches!(f.kind, FactKind::Table { .. }))));
-        } else {
-            assert_eq!(
-                r.diagnostics()
-                    .iter()
-                    .filter(|d| d.code == rnl_runtime::diag::codes::USE_ALIASES_ORIGINAL_NOT_IN_VERSION)
-                    .count(),
-                2
-            );
-            assert!(r.diagnostics().iter().any(|d| d.code == rnl_runtime::diag::codes::ALIAS_ORIGINAL_NOT_STANDARD));
-        }
-    }
+fn table_aliases_imported_and_declared_in_packages_apply() {
+    let text = source("0.4", "{#R1 #R2} @T(flip=true)").replace(
+        "@VERSION(\"0.4\")",
+        "@VERSION(\"0.4\"); @USE-ALIASES(name=\"alias\"); @USE-PACKAGE(name=\"ordinary\")",
+    );
+    let a = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"alias\",version=\"1.0\"); @ALIAS(\"@T\",\"@TABLE\"); @ALIAS(\"flip\",\"transpose\") }\n";
+    let p = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"ordinary\",version=\"1.0\"); @ALIAS(\"flip\",\"transpose\") }\n@RNL { $D = @DEFINE(roles=[\"p\"]) {} }\n";
+    let mut fs = MemoryProvider::new().with("t.sp", &text).with("pkg/a.rnl", a).with("pkg/p.rnl", p);
+    fs.package_dirs.push("pkg".into());
+    let r = interpret_file(Path::new("t.sp"), None, &fs, &Options { std: false, ..Options::solver() }).unwrap();
+    clean(&r);
+    assert!(r.problems.iter().any(|p| p.facts.iter().any(|f| matches!(f.kind, FactKind::Table { .. }))));
 }

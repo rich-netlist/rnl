@@ -841,7 +841,7 @@ mod tests {
     const NETLIST: &str = "* untitled
 R1 a 0 1k
 C1 a 0 1p
-* @RNL(type=\"header\") { @VERSION(\"0.2\")}
+* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }
 * @RNL {
 *   #R1 @PLACE(0, 0);
 *   #C1 @PLACE(4, 0)
@@ -861,10 +861,10 @@ C1 a 0 1p
 
     #[test]
     fn file_pool_is_separate_from_open_files_and_resolves_packages_and_includes() {
-        let top = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\") }\n.include \"part.inc\"\n.end\n";
+        let top = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\") }\n.include \"part.inc\"\n.end\n";
         let files = json!({
             "/work/top.sp": top,
-            "/pool/custom.rnl": "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"acme\", version=\"1.0\") }",
+            "/pool/custom.rnl": "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"acme\", version=\"1.0\") }\n@RNL {}\n",
             "/pool/part.inc": "R1 a 0 1k\n"
         });
         let without = answer(json!({ "entry": "/work/top.sp", "files": files }));
@@ -901,15 +901,30 @@ C1 a 0 1p
 
     #[test]
     fn a_request_can_ask_for_a_version_of_the_standard_package() {
-        // a file of 0.3 that writes $GND of the series 0.2: an error, unless the request asks for it
-        let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\n* @RNL { $GND @ATTACH &a }\n.end\n";
+        // a file that names $RESISTOR of the standard series, added at its root by include_std
+        let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\nR1 a 0 1k\n* @RNL { #R1 @SET-SYMBOL $RESISTOR }\n.end\n";
         let errors = |request: Value| {
             let v = answer(request);
             let d = v["document"]["diagnostics"].as_array().unwrap().clone();
-            d.into_iter().filter(|d| d["severity"] == "error").count()
+            d.into_iter().filter(|d| d["severity"] == "error").map(|d| d["message"].clone()).collect::<Vec<_>>()
         };
-        assert_eq!(errors(json!({ "entry": "t.sp", "files": { "t.sp": text } })), 1);
-        assert_eq!(errors(json!({ "entry": "t.sp", "files": { "t.sp": text }, "std_version": "0.2" })), 0);
+        let request = json!({ "entry": "t.sp", "files": { "t.sp": text }, "include_std": true });
+        assert_eq!(errors(request.clone()), Vec::<Value>::new());
+        let mut asked = request.clone();
+        asked["std_version"] = json!("0.4");
+        assert_eq!(errors(asked), Vec::<Value>::new());
+        // a version that is not bundled is said, and the file is read without a standard package
+        let mut missing = request;
+        missing["std_version"] = json!("0.9");
+        let said = errors(missing);
+        assert!(
+            said.iter().any(|m| m
+                .as_str()
+                .unwrap()
+                .starts_with("the standard package rnl-std-all 0.9 that the reading asks for cannot be found")),
+            "{said:?}"
+        );
+        assert!(said.iter().any(|m| m.as_str().unwrap().contains("$RESISTOR")), "{said:?}");
     }
 
     #[test]
@@ -988,11 +1003,11 @@ C1 a 0 1p
         assert_eq!(off["document"]["files"].as_array().unwrap().len(), 1);
         let on = build("cell", cell, true);
         assert_eq!(on["document"]["files"].as_array().unwrap().len(), 2);
-        assert!(on["document"]["diagnostics"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|d| d["severity"] == "warning" && d["message"].as_str().unwrap().contains("added by Auto Include")));
+        assert!(
+            on["document"]["diagnostics"].as_array().unwrap().iter().any(|d| d["severity"] == "hint"
+                && d["message"] == "subcircuit cell was added from /cell.inc by Auto Include"),
+            "{on}"
+        );
         let replacement = cell.replace("cell", "replacement");
         answer(json!({ "library": {"reload": true}, "pool": ["/cell.inc"], "files": {"/cell.inc": replacement} }));
         let reloaded = build("replacement", &replacement, true);
@@ -1064,7 +1079,7 @@ C1 a 0 1p
     fn a_package_file_of_any_suffix_is_checked_on_its_own() {
         // the build gives the format "rnl" for it, by its first record; set to rnl, a file is found by
         // name as a package, whatever its suffix
-        let package = "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"acme\", version=\"1.0\")}\n@RNL {}\n";
+        let package = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"acme\", version=\"1.0\")}\n@RNL {}\n";
         let v = answer(json!({ "entry": "/w/acme.pkg", "files": { "/w/acme.pkg": package } }));
         let d = &v["document"];
         assert_eq!(
@@ -1072,7 +1087,7 @@ C1 a 0 1p
             (&json!("rnl"), &json!("rnl"), &json!("rnl"))
         );
         assert_eq!(d["diagnostics"], json!([]));
-        let top = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}\nR1 a 0 1k\n.end\n";
+        let top = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}\nR1 a 0 1k\n.end\n";
         let files = json!({ "/w/top.sp": top, "/lib/acme.pkg": package });
         let errors = |v: &Value| {
             let all = v["document"]["diagnostics"].as_array().unwrap().clone();
@@ -1088,11 +1103,15 @@ C1 a 0 1p
         let files = json!({ "chain.sp": "// t\nr1 (a 0) resistor r=1k\n" });
         let v = answer(json!({ "entry": "chain.sp", "files": files, "dialect": "spectre" }));
         assert_eq!(v["document"]["dialect"], "spectre");
-        let files = json!({ "a.sp": NETLIST });
-        let with = answer(json!({ "entry": "a.sp", "files": files }));
-        let without = answer(json!({ "entry": "a.sp", "files": files, "std": false }));
+        // a file that names no standard package: include_std adds it at the root, and std false
+        // turns that off
+        let bare = json!({ "a.sp": NETLIST.replace("; @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\")", "") });
+        let with = answer(json!({ "entry": "a.sp", "files": bare, "include_std": true }));
+        let without = answer(json!({ "entry": "a.sp", "files": bare, "include_std": true, "std": false }));
         let count = |v: &Value| v["document"]["diagnostics"].as_array().unwrap().len();
         assert_ne!(count(&with), count(&without));
+        assert_eq!(without, answer(json!({ "entry": "a.sp", "files": bare })));
+        let files = json!({ "a.sp": NETLIST });
         // the solve status only when asked for
         assert!(with["document"]["levels"][0].get("solve").is_none());
         let status = answer(json!({ "entry": "a.sp", "files": files, "status": true }));
@@ -1109,9 +1128,9 @@ C1 a 0 1p
         let native = BuildOptions { constraints: true, ..BuildOptions::default() };
         let native = rnl_view::build("a.sp", &MemoryProvider::new().with("a.sp", NETLIST), &native).unwrap();
         assert_eq!(constraints["document"], wire(native));
-        // a file of 0.3 is read without any switch; `draft`, which the core once accepted with no
+        // a file of 0.4 is read without any switch; `draft`, which the core once accepted with no
         // effect, is ignored as every field it does not know
-        let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
+        let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\nR1 a 0 1k\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
         let files = json!({ "t.sp": text });
         let plain = answer(json!({ "entry": "t.sp", "files": files }));
         assert_eq!(answer(json!({ "entry": "t.sp", "files": files, "draft": true })), plain);
@@ -1123,10 +1142,10 @@ C1 a 0 1p
     fn packages_are_found_by_name_in_the_package_directories() {
         let top = "* top
 R1 a 0 1k
-* @RNL(type=\"header\") { @VERSION(\"0.2\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}
+* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}
 .end
 ";
-        let package = "@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"acme\", version=\"1.0\")}";
+        let package = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"acme\", version=\"1.0\")}\n@RNL {}\n";
         let files = json!({ "/w/top.sp": top, "/w/packages/acme.rnl": package });
         let errors = |v: &Value| {
             let diagnostics = v["document"]["diagnostics"].as_array().unwrap();
@@ -1140,7 +1159,7 @@ R1 a 0 1k
     #[test]
     fn a_request_gives_the_same_answer_every_time() {
         // each build hashes with new keys, so an order taken from a hash map would show
-        let text = include_str!("../../../tests/conformance/cases/16-ties.sp");
+        let text = include_str!("../../../tests/conformance/cases-0.4/from-0.2/16-ties.sp");
         let request = json!({ "entry": "/w/16-ties.sp", "files": { "/w/16-ties.sp": text } });
         let first = answer(request.clone());
         for _ in 0..8 {
@@ -1208,7 +1227,7 @@ R1 a 0 1k
     #[test]
     fn a_write_answers_the_text_and_its_document() {
         let netlist = "\n.subckt rc VSS\nR1 in VSS 1k\n.ends rc\n";
-        let package = "@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"acme\", version=\"1.0\")}";
+        let package = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"acme\", version=\"1.0\")}\n@RNL {}\n";
         let ops = json!([
             {"level": "subckt:rc", "op": "use-package", "name": "acme", "version": "1.0"},
             {"level": "subckt:rc", "op": "set", "object": "#R1", "at": [2, 0]}
@@ -1222,7 +1241,7 @@ R1 a 0 1k
         let text = v["written"]["text"].as_str().unwrap();
         assert_eq!(
             text,
-            "\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}\n.subckt rc VSS\nR1 in VSS 1k\n* @RNL(author=\"test\") {\n*   #R1 @PLACE(2, 0)\n* }\n.ends rc\n"
+            "\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}\n.subckt rc VSS\nR1 in VSS 1k\n* @RNL(author=\"test\") {\n*   #R1 @PLACE(2, 0)\n* }\n.ends rc\n"
         );
         let d = &v["written"]["document"];
         assert_eq!(
@@ -1256,12 +1275,12 @@ R1 a 0 1k
         assert_eq!(v["written"]["document"]["path"], "/rnl-edit/top.net");
         assert_eq!(
             v["written"]["text"],
-            "* t\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.3\")}\nr1 (a 0) resistor r=1k\n"
+            "* t\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.4\")}\nr1 (a 0) resistor r=1k\n"
         );
         assert_eq!(errors(&v["written"]["document"]), 0, "{v}");
     }
 
-    const TOP: &str = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n.include \"amp.inc\"\nX1 a b amp\n.end\n";
+    const TOP: &str = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n.include \"amp.inc\"\nX1 a b amp\n.end\n";
     const AMP: &str = ".subckt amp in out\r\nR1 in out 1k\r\n* @RNL { #R1 @PLACE(0, 0) }\r\n.ends amp\r\n";
 
     #[test]
@@ -1350,14 +1369,14 @@ R1 a 0 1k
         assert_eq!(keys, ["catalog"]);
         let symbols = v["catalog"]["symbols"].as_array().unwrap();
         let resistor = symbols.iter().find(|s| s["symbol"] == "$RESISTOR").unwrap();
-        assert_eq!((&resistor["package"], &resistor["version"]), (&json!("rnl-std-basic"), &json!("0.3")));
-        assert_eq!(resistor["pins"][0], json!({"terminal": 1, "at": [0.0, 2.0], "direction": "up"}));
+        assert_eq!((&resistor["package"], &resistor["version"]), (&json!("rnl-std-basic"), &json!("0.4")));
+        assert_eq!(resistor["pins"][0], json!({"terminal": "p", "at": [0.0, 2.0], "direction": "up"}));
         // the catalog rnl-view lists
         let native = rnl_view::catalog(&MemoryProvider::new(), &CatalogOptions::default());
         assert_eq!(v["catalog"], wire(native));
         // the frontend's own packages with the bundled ones, by name, every version
-        let package = "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"acme\", version=\"1.0\")}";
-        let request = json!({ "catalog": { "packages": ["acme", "rnl-std", "rnl-std-all"], "all_versions": true },
+        let package = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"acme\", version=\"1.0\")}";
+        let request = json!({ "catalog": { "packages": ["acme", "rnl-std-all"], "all_versions": true },
                               "files": { "/p/acme.rnl": package }, "package_dirs": ["/p"] });
         let v = answer(request);
         let listed: Vec<(&str, &str)> = v["catalog"]["packages"]
@@ -1370,7 +1389,8 @@ R1 a 0 1k
         let bundled = rnl_view::bundled();
         let series: Vec<&str> = bundled.package_dirs.iter().map(|d| d.rsplit('/').next().unwrap()).collect();
         let mut want = vec![("acme", "1.0")];
-        want.extend(series.iter().map(|v| (if *v == "0.4" { "rnl-std-all" } else { "rnl-std" }, *v)));
+        assert_eq!(series, ["0.4"]);
+        want.extend(series.iter().map(|v| ("rnl-std-all", *v)));
         want.sort();
         assert_eq!(listed, want);
         // a catalog request of another shape is not valid

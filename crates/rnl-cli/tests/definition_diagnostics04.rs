@@ -82,16 +82,6 @@ fn argument_dependent_errors_still_report_each_bad_application() {
 }
 
 #[test]
-fn released_versions_keep_their_existing_repeated_diagnostics() {
-    for version in ["0.2", "0.3"] {
-        for &(body, _) in CASES {
-            let r = read(version, body, TWO);
-            assert_eq!(errors(&r).len(), 3, "{version}: {body}: {:?}", r.diagnostics());
-        }
-    }
-}
-
-#[test]
 fn distinct_members_and_definitions_keep_distinct_static_errors() {
     let body = "(?missing,0); (1,?missing); #R1 @PLACE(0,0); #R2 @PLACE(0,0)";
     let r = read("0.4", body, TWO);
@@ -118,16 +108,12 @@ fn package_errors_retain_the_definition_source() {
 }
 
 #[test]
-fn includes_use_the_definitions_source_version() {
-    for (outer, inner, count) in [("0.4", "0.3", 3), ("0.3", "0.4", 1)] {
-        let main = format!(
-            "* top\n* @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\n.include child.sp\nR1 a b 1k\nR2 a b 2k\n"
-        );
-        let child = format!(
-            "* child\n* @RNL(type=\"header\") {{ @VERSION(\"{inner}\") }}\n.subckt child a b\nR1 a b 1k\nR2 a b 2k\n* @RNL {{ {}; {TWO} }}\n.ends child\n",
-            definition("#R1 @PLACE(0,0)")
-        );
-        let r = files(MemoryProvider::new().with("main.sp", &main).with("child.sp", &child));
-        assert_eq!(errors(&r).len(), count, "{outer}/{inner}: {:?}", r.diagnostics());
-    }
+fn a_definition_in_an_included_file_reports_once() {
+    let main = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include child.sp\nR1 a b 1k\nR2 a b 2k\n";
+    let child = format!(
+        "* child\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n.subckt child a b\nR1 a b 1k\nR2 a b 2k\n* @RNL {{ {}; {TWO} }}\n.ends child\n",
+        definition("#R1 @PLACE(0,0)")
+    );
+    let r = files(MemoryProvider::new().with("main.sp", main).with("child.sp", &child));
+    assert_eq!(errors(&r).len(), 1, "{:?}", r.diagnostics());
 }

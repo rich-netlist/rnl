@@ -1,6 +1,6 @@
 //! The previous result of the solver as hints for a warm start, mapped onto the problem a solver
-//! reads, and the solve status of each level that a viewer asks for (the draft 0.3, 2.8, 5.9,
-//! 14.8, 17; decision 0008). A hand-made solution is written back as the record of the solver, and
+//! reads, and the solve status of each level that a viewer asks for (2.8, 5.9, 14.8, 17; decision
+//! 0008). A hand-made solution is written back as the record of the solver, and
 //! the file read again: the hints are what the record holds, by name, by number, and through the
 //! usages that rules make, and the status says whether the record is up to date.
 
@@ -19,46 +19,40 @@ use serde_json::Value;
 
 const OPTIONS: &str = "tolerance=0.000001";
 
-/// The example of the draft's 5.9 with a capacitor: an unnamed usage, a free point in a wire, a
+/// The example of 5.9 with a capacitor: an unnamed usage, a free point in a wire, a
 /// label on each of two instances, an "auto" wire between two pins, a named wire, and a text
 /// without a key that a rule makes on C1.
-fn amp(version: &str) -> String {
+fn amp() -> String {
     format!(
-        "* a round trip\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\"){}}}\n\
+        "* a round trip\n* @RNL(type=\"header\") {{ {ALL} }}\n\
          .subckt amp in out vdd vss\nM1 out in vss vss nch\nR1 vdd out 10k\nC1 out vss 1p\n\
          * @RNL {{\n\
          *   #M1 #R1 @ALIGN(\"x\");\n\
-         *   $GND @ATTACH &vss;\n\
+         *   $GROUND @ATTACH &vss;\n\
          *   &out @WIRE {{#M1:1 (_, _) #R1:2}};\n\
          *   {{#M1 #R1}} @TEXT(\"${{name}}\");\n\
          *   &vss @WIRE {{#M1:3 #C1:2}};\n\
          *   %w = &out @WIRE {{#R1:2 #C1:1}};\n\
          *   # @SELECT-INSTANCE(name=\"C*\") => @TEXT(\"${{value}}\")\n\
-         * }}\n.ends amp\n.end\n",
-        pin_02(version)
+         * }}\n.ends amp\n.end\n"
     )
 }
 
-/// Two grounded instances: the standard package grounds V1:n and R1:n with a `$GND_STUB` each,
+/// Two grounded instances: the standard package grounds V1:n and R1:n with a `$GROUND_STUB` each,
 /// whose wire is "auto" and has no name in its body.
-fn stubs(version: &str) -> String {
+fn stubs() -> String {
     format!(
-        "* stubs\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\"){}}}\nV1 a 0 1\nR1 a 0 1k\n\
-         * @RNL {{ (9, 9) @TEXT(\"note\") }}\n.end\n",
-        pin_02(version)
+        "* stubs\n* @RNL(type=\"header\") {{ {ALL} }}\nV1 a 0 1\nR1 a 0 1k\n\
+         * @RNL {{ (9, 9) @TEXT(\"note\") }}\n.end\n"
     )
 }
 
-/// A file of 0.3 uses the standard series 0.3 (16.3), whose names differ: these tests write and
-/// look for those of the series 0.2, such as $GND and $GND_STUB, so a file of 0.3 pins that series
-/// in its header record.
-fn pin_02(version: &str) -> &'static str {
-    if version == "0.3" {
-        "; @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")"
-    } else {
-        ""
-    }
-}
+/// The header of a file that uses the whole standard series.
+const ALL: &str = "@VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\")";
+
+/// The header of a file that draws its devices with the symbols of the standard series, with no
+/// fill.
+const SYMBOLS: &str = "@VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-spice\", version=\"0.4\")";
 
 /// Where the solutions put the instances: M1 and R1 on one x, as the ALIGN of `amp` asks.
 fn instance_at(label: &str) -> Option<Pt> {
@@ -167,10 +161,13 @@ impl Solved {
         self.written.unsolved.iter().any(|u| u.decision == decision)
     }
 
-    /// The positions and orientations that the record holds, as hints.
+    /// The positions and orientations that the record holds, as hints: not the point of a usage
+    /// that only helps the solve, such as the column of the port tags of the fill, which the record
+    /// does not write.
     fn placements(&self) -> Vec<Placement> {
+        let auxiliary = auxiliary_points(&self.p);
         let mut out: Vec<Placement> = Vec::new();
-        for pl in &self.solution.placements {
+        for pl in self.solution.placements.iter().filter(|pl| !auxiliary[pl.object]) {
             let at = pl.at().filter(|_| !self.unsolved(Decision::Position { object: pl.object, axis: None }));
             let orient = pl.orient.filter(|_| !self.unsolved(Decision::Orientation { object: pl.object }));
             if at.is_some() || orient.is_some() {
@@ -201,8 +198,8 @@ fn status(text: &str, title: &str) -> &'static str {
 }
 
 #[test]
-fn the_hints_of_a_level_of_the_draft_map_by_name_and_by_number() {
-    let s = solved(&amp("0.3"), "amp");
+fn the_hints_of_a_level_map_by_name_and_by_number() {
+    let s = solved(&amp(), "amp");
     let (p, previous) = hints(&s.text, "amp");
     assert_eq!(p, LevelProblem { end_line: p.end_line, ..s.p.clone() });
     let previous = previous.unwrap();
@@ -228,7 +225,7 @@ fn the_hints_of_a_level_of_the_draft_map_by_name_and_by_number() {
 
 #[test]
 fn the_hints_reach_through_a_usage_that_a_rule_makes() {
-    let s = solved(&stubs("0.3"), "t.sp");
+    let s = solved(&stubs(), "t.sp");
     assert!(s.written.unsolved.is_empty(), "{:?}", s.written.unsolved);
     let (p, previous) = hints(&s.text, "t.sp");
     let previous = previous.unwrap();
@@ -250,30 +247,10 @@ fn the_hints_reach_through_a_usage_that_a_rule_makes() {
 }
 
 #[test]
-fn in_a_file_of_0_2_the_hints_are_what_the_record_holds() {
-    let s = solved(&amp("0.2"), "amp");
-    let (p, previous) = hints(&s.text, "amp");
-    let previous = previous.unwrap();
-    // no numbers to check, and no rewrites
-    assert_eq!((previous.same_input, previous.numbering), (Some(true), None));
-    assert_eq!(previous.placements, s.placements());
-    assert!(previous.placements.iter().all(|pl| !matches!(p.objects[pl.object].reference, Reference::Number { .. })));
-    assert!(previous.wire_routes.is_empty() && previous.wires.is_empty());
-
-    // the grounds of the stubs, without the routes of their wires
-    let s = solved(&stubs("0.2"), "t.sp");
-    let (_, previous) = hints(&s.text, "t.sp");
-    let previous = previous.unwrap();
-    assert_eq!(previous.placements, s.placements());
-    assert_eq!(previous.placements.len(), 4);
-    assert!(previous.wire_routes.is_empty());
-}
-
-#[test]
 fn the_wires_written_for_route_are_hints_with_their_nets() {
-    let text = "* route\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a b 1k\nR2 b c 1k\nR3 b d 1k\n\
-                * @RNL { &b @ROUTE }\n.end\n";
-    let s = solved_with(text, "t.sp", |p| {
+    let text =
+        format!("* route\n* @RNL(type=\"header\") {{ {ALL} }}\nR1 a b 1k\nR2 b c 1k\nR3 b d 1k\n* @RNL {{ &b @ROUTE-NET }}\n.end\n");
+    let s = solved_with(&text, "t.sp", |p| {
         let mut solution = solve(p);
         assert_eq!(p.routes.len(), 1);
         let pins = p.routes[0].pins.clone();
@@ -303,7 +280,7 @@ fn the_wires_written_for_route_are_hints_with_their_nets() {
 
 #[test]
 fn a_change_to_the_authored_text_is_another_input_and_keeps_the_hints() {
-    let s = solved(&amp("0.3"), "amp");
+    let s = solved(&amp(), "amp");
     // the ALIGN changes the input, and no statement that makes an object without a name
     let changed = s.text.replace("#M1 #R1 @ALIGN(\"x\")", "#M1 #R1 @ALIGN(\"y\")");
     assert_ne!(changed, s.text);
@@ -319,7 +296,7 @@ fn a_change_to_the_authored_text_is_another_input_and_keeps_the_hints() {
 
 #[test]
 fn a_numbering_out_of_date_drops_the_hints_by_number() {
-    let s = solved(&amp("0.3"), "amp");
+    let s = solved(&amp(), "amp");
     let at = s.text.find("numbering=\"").unwrap() + "numbering=\"".len();
     let tampered = format!("{}0000000000000000{}", &s.text[..at], &s.text[at + 16..]);
     let (p, previous) = hints(&tampered, "amp");
@@ -338,18 +315,18 @@ fn a_numbering_out_of_date_drops_the_hints_by_number() {
 
 #[test]
 fn each_level_has_its_solve_status_when_asked() {
-    let one = |records: &str| {
-        format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\nR1 a b 1k\nR2 b c 1k\n{records}.end\n")
-    };
-    // nothing to decide: every slot fixed, no "auto" wire, no ROUTE, no constraint needing a solver
+    let one =
+        |records: &str| format!("* t\n* @RNL(type=\"header\") {{ {SYMBOLS} }}\nR1 a b 1k\nR2 b c 1k\n{records}.end\n");
+    // nothing to decide: every slot fixed, no "auto" wire, no ROUTE-NET, no constraint needing a
+    // solver
     let authored = "* @RNL { #R1 @PLACE(0, 0) => @ORIENT(\"R0\"); #R2 @PLACE(10, 0) => @ORIENT(\"R0\") }\n";
     let fixed = one(authored);
     assert_eq!(statuses(&fixed), [("t.sp".to_string(), Some("fixed"))]);
-    // a free orientation, an "auto" wire, a ROUTE, a constraint that comes before the coordinates
+    // a free orientation, an "auto" wire, a ROUTE-NET, a constraint that comes before the coordinates
     for open in [
         "* @RNL { #R1 @PLACE(0, 0) => @ORIENT(\"R0\"); #R2 @PLACE(10, 0) }\n",
         "* @RNL { #R1 @PLACE(0, 0) => @ORIENT(\"R0\"); #R2 @PLACE(10, 0) => @ORIENT(\"R0\"); &b @WIRE {#R1:2 #R2:1} }\n",
-        "* @RNL { #R1 @PLACE(0, 0) => @ORIENT(\"R0\"); #R2 @PLACE(10, 0) => @ORIENT(\"R0\"); &b @ROUTE }\n",
+        "* @RNL { #R1 @PLACE(0, 0) => @ORIENT(\"R0\"); #R2 @PLACE(10, 0) => @ORIENT(\"R0\"); &b @ROUTE-NET }\n",
         "* @RNL { #R1 @PLACE(0, 0) => @ORIENT(\"R0\"); #R2 @PLACE(10, 3) => @ORIENT(\"R0\");\n\
          *   #R1 #R2 @ALIGN(\"y\", priority=\"high\") }\n",
     ] {
@@ -366,13 +343,13 @@ fn each_level_has_its_solve_status_when_asked() {
     // a hash of another algorithm is not compared (17)
     assert_eq!(statuses(&moved.replace(&hash, "sig2:0")), [("t.sp".to_string(), Some("solved"))]);
 
-    // a level of the draft, before and after it is solved, and the level of the file around it
-    let text = amp("0.3");
+    // a subcircuit, before and after it is solved, and the level of the file around it
+    let text = amp();
     assert_eq!(statuses(&text), [("t.sp".to_string(), Some("fixed")), ("amp".to_string(), Some("unsolved"))]);
     let s = solved(&text, "amp");
     assert_eq!(statuses(&s.text), [("t.sp".to_string(), Some("fixed")), ("amp".to_string(), Some("solved"))]);
     // a record that uses no number needs no numbering: a wrong one leaves it solved (5.9)
-    let named = solved_with(&stubs("0.3"), "t.sp", |p| {
+    let named = solved_with(&stubs(), "t.sp", |p| {
         let at = |label: &str| p.objects.iter().position(|o| o.label == label).unwrap();
         let place =
             |k: usize| Placement { object: k, x: Some(k as f64 * 10.0), y: Some(0.0), orient: Some(Orient::R0) };
@@ -390,29 +367,24 @@ fn each_level_has_its_solve_status_when_asked() {
 #[test]
 fn a_text_on_what_has_no_coordinate_point_that_no_fact_reaches_is_the_viewers() {
     // a text attached to a wire or a net, which have no coordinate point (13.3), and that no fact
-    // reaches, a solver leaves free, and the viewer places it: nothing to decide, in 0.2 and in the
-    // draft 0.3, which numbers it (5.9). One that a fact reaches, and one on an instance, which the
+    // reaches, a solver leaves free, and the viewer places it: nothing to decide, though it is
+    // numbered (5.9). One that a fact reaches, and one on an instance, which the
     // solver puts beside it, are the solver's to place
-    let one = |version: &str, scene: &str| {
+    let one = |scene: &str| {
         format!(
-            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\")}}\nR1 a b 1k\nR2 b c 1k\n* @RNL {{\n\
+            "* t\n* @RNL(type=\"header\") {{ {SYMBOLS} }}\nR1 a b 1k\nR2 b c 1k\n* @RNL {{\n\
              *   #R1 @PLACE(0, 0) => @ORIENT(\"R0\"); #R2 @PLACE(10, 0) => @ORIENT(\"R0\");\n\
              *   %w = &b @WIRE(mode=\"straight\") {{#R1:2 #R2:1}}{scene}\n* }}\n.end\n"
         )
     };
     let file = |status: &'static str| [("t.sp".to_string(), Some(status))];
-    for version in ["0.2", "0.3"] {
-        assert_eq!(statuses(&one(version, "")), file("fixed"), "{version}");
-        for free in
-            [";\n*   &b @TEXT(\"on the net\")", ";\n*   %w @TEXT(\"on the wire\")", ";\n*   &c @TEXT(\"no wire\")"]
-        {
-            assert_eq!(statuses(&one(version, free)), file("fixed"), "{version}: {free}");
-        }
-        for open in
-            [";\n*   %t = &b @TEXT(\"aligned\");\n*   {%t #R1} @ALIGN(\"y\")", ";\n*   #R1 @TEXT(\"beside R1\")"]
-        {
-            assert_eq!(statuses(&one(version, open)), file("unsolved"), "{version}: {open}");
-        }
+    assert_eq!(statuses(&one("")), file("fixed"));
+    for free in [";\n*   &b @TEXT(\"on the net\")", ";\n*   %w @TEXT(\"on the wire\")", ";\n*   &c @TEXT(\"no wire\")"]
+    {
+        assert_eq!(statuses(&one(free)), file("fixed"), "{free}");
+    }
+    for open in [";\n*   %t = &b @TEXT(\"aligned\");\n*   {%t #R1} @ALIGN(\"y\")", ";\n*   #R1 @TEXT(\"beside R1\")"] {
+        assert_eq!(statuses(&one(open)), file("unsolved"), "{open}");
     }
 }
 
@@ -422,7 +394,7 @@ fn a_text_that_its_symbol_places_is_open_on_an_axis_that_an_offset_gives() {
     // coordinate there is the solver's to decide, as with offsets on both axes; a PLACE fixes it
     let one = |scene: &str| {
         format!(
-            "* t\nR1 a b 1k\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\n* @RNL {{\n\
+            "* t\nR1 a b 1k\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n* @RNL {{\n\
              *   $TAG = @DEFINE-SYMBOL(box=[-2, -0.5, 2, 0.5]) {{\n\
              *     (-2, 0) @PIN(terminal=1, direction=\"left\"); (2, 0) @PIN(terminal=2, direction=\"right\");\n\
              *     ? @TEXT(\"${{name}}\", key=\"name\") => @PLACE(1, 1)\n\
@@ -444,8 +416,8 @@ fn a_text_that_its_symbol_places_is_open_on_an_axis_that_an_offset_gives() {
 
 #[test]
 fn asking_for_the_status_changes_nothing_else_in_the_document() {
-    let s = solved(&amp("0.3"), "amp");
-    for text in [amp("0.2"), s.text.clone(), fixed_text()] {
+    let s = solved(&amp(), "amp");
+    for text in [amp(), s.text.clone(), fixed_text()] {
         let files = MemoryProvider::new().with("t.sp", &text);
         let plain = build("t.sp", &files, &BuildOptions::default()).unwrap();
         let options = BuildOptions { status: true, ..BuildOptions::default() };
@@ -472,7 +444,7 @@ fn rnl(name: &str, text: &str, args: &[&str]) -> Value {
 
 #[test]
 fn the_command_gives_the_hints_when_asked() {
-    let s = solved(&amp("0.3"), "amp");
+    let s = solved(&amp(), "amp");
     let (_, previous) = hints(&s.text, "amp");
     let previous = previous.unwrap();
     let v = rnl("previous-amp.sp", &s.text, &["problem", "--previous", "--level", "amp"]);
@@ -492,7 +464,7 @@ fn the_command_gives_the_hints_when_asked() {
 
 #[test]
 fn the_command_gives_the_status_when_asked() {
-    let s = solved(&amp("0.3"), "amp");
+    let s = solved(&amp(), "amp");
     let v = rnl("status-amp.sp", &s.text, &["view", "--no-svg", "--status"]);
     let solve: Vec<&Value> = v["levels"].as_array().unwrap().iter().map(|l| &l["solve"]).collect();
     assert_eq!(solve, ["fixed", "solved"]);

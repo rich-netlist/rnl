@@ -149,13 +149,6 @@ fn a_mirrored_relation_on_one_pin_can_hold_and_a_quarter_turn_cannot() {
 }
 
 #[test]
-fn old_terminal_orientation_remains_invalid() {
-    let r = read("0.3", "#R1:1 @ORIENT(\"R0\")");
-    assert!(r.diagnostics().iter().any(|d| d.code == codes::PLACE_ORIENT_NOT_TAKEN));
-    assert!(r.problems[0].facts.iter().all(|f| !matches!(f.kind, FactKind::PinOrient { .. })));
-}
-
-#[test]
 fn a_relation_list_keeps_later_choices_and_expands_a_set_member_by_member() {
     let r = checked(&symbol(
         "left",

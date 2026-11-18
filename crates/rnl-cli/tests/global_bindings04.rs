@@ -62,20 +62,6 @@ fn failed_modifiers_keep_their_valid_input_binding() {
 }
 
 #[test]
-fn released_versions_keep_failed_first_binding_behavior() {
-    for version in ["0.2", "0.3"] {
-        let r = read(version, "%p=%missing; %p=(4,0); %p @CIRCLE(radius=2)");
-        assert_eq!(
-            errors(&r),
-            [codes::REF_NOT_FOUND, codes::REF_FAILED, codes::NAME_BOUND_TWICE],
-            "{:?}",
-            r.diagnostics()
-        );
-        assert!(r.model.levels[0].shapes.is_empty());
-    }
-}
-
-#[test]
 fn a_prefix_and_an_intermediate_binding_are_compared_in_written_order() {
     let r = read("0.4", "%p=(0,0) => %p => @CIRCLE(radius=1); %p @CIRCLE(radius=2)");
     assert_eq!(errors(&r).len(), 2, "{:?}", r.diagnostics());
@@ -124,26 +110,14 @@ fn package_bindings_recover_before_forward_aliases_and_applications() {
 }
 
 #[test]
-fn included_bindings_follow_their_source_language_version() {
-    for (main, version) in [("0.3", "0.4"), ("0.4", "0.3")] {
-        let files=MemoryProvider::new()
-            .with("main.sp",&format!("* bindings\n* @RNL(type=\"header\") {{ @VERSION(\"{main}\") }}\n.include \"child.sp\"\n"))
-            .with("child.sp",&format!("* child\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\n.subckt child a b\nR1 a b 1k\n* @RNL {{ %p=%missing; %p=(4,0); %p @CIRCLE(radius=2) }}\n.ends child\n"));
-        let r =
-            rnl_cli::interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Default::default() })
-                .unwrap();
-        assert_eq!(
-            errors(&r),
-            if version == "0.4" {
-                vec![codes::REF_NOT_FOUND]
-            } else {
-                vec![codes::REF_NOT_FOUND, codes::REF_FAILED, codes::NAME_BOUND_TWICE]
-            },
-            "{version}: {:?}",
-            r.diagnostics()
-        );
-        assert_eq!(r.model.levels.iter().map(|l| l.shapes.len()).sum::<usize>(), usize::from(version == "0.4"));
-    }
+fn included_bindings_take_the_first_successful_binding() {
+    let files=MemoryProvider::new()
+        .with("main.sp","* bindings\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.include \"child.sp\"\n")
+        .with("child.sp","* child\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt child a b\nR1 a b 1k\n* @RNL { %p=%missing; %p=(4,0); %p @CIRCLE(radius=2) }\n.ends child\n");
+    let r = rnl_cli::interpret_file(Path::new("main.sp"), None, &files, &Options { std: false, ..Default::default() })
+        .unwrap();
+    assert_eq!(errors(&r), [codes::REF_NOT_FOUND], "{:?}", r.diagnostics());
+    assert_eq!(r.model.levels.iter().map(|l| l.shapes.len()).sum::<usize>(), 1);
 }
 
 #[test]

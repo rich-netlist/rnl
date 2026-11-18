@@ -92,9 +92,13 @@ fn include_standard_is_persisted_before_junction_resolution() {
     assert!(w.diagnostics.is_empty());
 }
 #[test]
-fn released_writer_keeps_existing_standard_dot_output() {
-    let w = write_diagnosed(&request("0.3", false)).unwrap();
-    assert!(w.text.contains("$JUNCTION @ATTACH %j"));
-    assert!(w.text.contains("$JUNCTION @ATTACH %k"));
-    assert!(w.diagnostics.is_empty());
+fn the_standard_series_used_in_the_header_gives_its_dot() {
+    // rnl-std-basic configures `junction="$JUNCTION"` (14.10); used through the header, its dot is
+    // attached in each target level
+    let mut req = request("0.4", false);
+    req.ops.push(json!({"op":"use-package","name":"rnl-std-basic","version":"0.4"}));
+    let w = write_diagnosed(&req).unwrap();
+    assert!(w.text.contains("$JUNCTION @ATTACH %j"), "{}", w.text);
+    assert!(w.text.contains("$JUNCTION @ATTACH %k"), "{}", w.text);
+    assert!(w.diagnostics.is_empty(), "{:?}", w.diagnostics);
 }
