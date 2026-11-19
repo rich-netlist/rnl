@@ -295,17 +295,17 @@ export async function loadManifest(json, { fetch = globalThis.fetch, readFile, o
   const total = manifest.files.length;
   let done = 0;
   onProgress?.(done, total);
+  // in the order of the manifest, whatever order the reads end in
   const files = {}, bytes = {}, urls = {};
   // the first file that fails stops the reads still running, as the caller's signal does
   const stop = new AbortController();
   const stopAll = () => stop.abort(signal?.reason);
   signal?.addEventListener("abort", stopAll, { once: true });
   try {
-    await inParallel(manifest.files, concurrency, async (file) => {
-      if (stop.signal.aborted) return;
+    const read = await inParallel(manifest.files, concurrency, async (file) => {
+      if (stop.signal.aborted) return null;
       let data;
       const url = file.url ?? (manifest.base === undefined ? null : new URL(file.path, manifest.base).href);
-      urls[root + file.path] = url;
       if (readFile) {
         data = await readFile(file.member ?? file.path);
         if (data == null) throw new ManifestError(`${file.member ?? file.path} is not in the archive.`, file.path);
@@ -313,9 +313,16 @@ export async function loadManifest(json, { fetch = globalThis.fetch, readFile, o
         data = await fetched(fetch, url, { name: file.path, signal: stop.signal });
       }
       await checked(data, { ...file, name: file.path });
-      bytes[root + file.path] = data;
-      files[root + file.path] = decodeText(data);
       onProgress?.(++done, total);
+      return { url, data };
+    });
+    // stopped by the caller between two reads: the files not read are not given as if there were none
+    if (stop.signal.aborted) throw stop.signal.reason;
+    manifest.files.forEach((file, at) => {
+      const path = root + file.path;
+      urls[path] = read[at].url;
+      bytes[path] = read[at].data;
+      files[path] = decodeText(read[at].data);
     });
   } catch (error) {
     if (signal?.aborted) throw signal.reason ?? error;
