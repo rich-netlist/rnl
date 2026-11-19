@@ -610,7 +610,50 @@ impl<'p> Interp<'p> {
     /// sets after a statement placed before it was evaluated (5.2.2): each run has the statements
     /// found so far fail from the start. `again` makes a new interpreter from the one that stopped.
     fn run_settled(self, again: impl Fn(Interp<'p>) -> Interp<'p>) -> Interpretation {
-        self.settled(again).finish()
+        let it = self.settled(&again);
+        #[cfg(debug_assertions)]
+        if it.places.idle_changed {
+            return it.finish_checked(&again);
+        }
+        it.finish()
+    }
+
+    /// Debug builds only: the output of a last run whose plans changed only in ways that read
+    /// nothing differently (`Places::idle_changed`), checked against the run again with those
+    /// plans that such a change made before: both must give the same drawing, diagnostics, failed
+    /// statements, problems and numbers.
+    #[cfg(debug_assertions)]
+    fn finish_checked(mut self, again: &impl Fn(Interp<'p>) -> Interp<'p>) -> Interpretation {
+        let (doc, provider) = (self.doc.clone(), self.provider);
+        let blank = || Interp::blank(doc.clone(), provider, &Options::default(), Sink::new(), NumberRun::default());
+        let mut held = blank();
+        Self::hand_over(&mut self, &mut held);
+        let first = self.finish();
+        // `again` makes the next run from the document of the interpreter it is given
+        let mut next = again(blank());
+        Self::hand_over(&mut held, &mut next);
+        let second = next.settled(again).finish();
+        debug_assert_eq!(
+            format!("{:?}", first.model),
+            format!("{:?}", second.model),
+            "a run whose plans changed only in ways that read nothing differently draws otherwise when run again"
+        );
+        debug_assert_eq!(first.sink.all(), second.sink.all());
+        debug_assert_eq!(first.failed, second.failed);
+        debug_assert_eq!(first.problems, second.problems);
+        debug_assert_eq!(first.numbering, second.numbering);
+        first
+    }
+
+    /// Give `to` what the run of `from` found that a next run must know: the statements that close
+    /// a cycle of sets, and the plans of the places, the bindings and the definition scenes.
+    #[cfg(debug_assertions)]
+    fn hand_over(from: &mut Interp<'p>, to: &mut Interp<'p>) {
+        to.closing = std::mem::take(&mut from.closing);
+        to.places.plans = std::mem::take(&mut from.places.plans);
+        to.bindings.plans = std::mem::take(&mut from.bindings.plans);
+        to.bindings.specific_names = std::mem::take(&mut from.bindings.specific_names);
+        to.definition_scenes.plans = std::mem::take(&mut from.definition_scenes.plans);
     }
 
     /// [`Self::run_settled`] without the output: the interpreter of the last run.
@@ -624,6 +667,8 @@ impl<'p> Interp<'p> {
             if restart.is_none() && !changed && !bindings_changed && !body_changed {
                 return self;
             }
+            #[cfg(test)]
+            places::tests::RUNS_AGAIN.with(|count| count.set(count.get() + 1));
             let mut closing = std::mem::take(&mut self.closing);
             if let Some((key, msg)) = restart {
                 closing.insert(key, msg);
