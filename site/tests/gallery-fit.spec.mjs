@@ -28,7 +28,7 @@ for (const width of [1440, 390]) {
           const vb = svg.viewBox.baseVal;
           const scale = Math.min(svg.getBoundingClientRect().width / vb.width, svg.getBoundingClientRect().height / vb.height);
           for (const el of svg.querySelectorAll("path,rect,circle,ellipse,line,polyline,polygon,text")) {
-            if (!el.getClientRects().length || !el.checkVisibility()) continue;
+            if (el.classList.contains("g-grid") || !el.getClientRects().length || !el.checkVisibility()) continue; // the dotted grid of a card is meant to fill it
             const local = el.getBBox(), style = getComputedStyle(el);
             const matrix = svg.getCTM().inverse().multiply(el.getCTM());
             const corners = [[local.x,local.y], [local.x+local.width,local.y+local.height]].map(([x,y]) => new DOMPoint(x,y).matrixTransform(matrix));
@@ -65,7 +65,7 @@ for (const width of [1440, 390]) {
         if (!row.hidden) expect(row.badge).toBe(`Shown at ×${row.ratio.toFixed(2)}`);
       }
     }
-    await page.goto("/en/packages.html?series=eda-symbol&package=eda-symbol");
+    await page.goto("/en/packages.html?series=eda-symbol-0.2&package=eda-symbol");
     const osc = page.locator('.gl-card[data-sym="$OSC"]');
     // The previous group kept the origin setting in localStorage.
     await expect(page.locator('[data-show="origin"]')).toHaveAttribute("aria-pressed", "true");
@@ -73,7 +73,7 @@ for (const width of [1440, 390]) {
     await osc.click();
     await expect(page.locator("#gl-dlg")).toBeVisible();
     const boxes = await page.locator(".gl-dlg-fig svg").evaluate(svg => {
-      const vb = svg.viewBox.baseVal, b = svg.getBBox();
+      const vb = svg.viewBox.baseVal, all = [...svg.children].filter(el => !el.classList.contains("g-grid") && el.tagName !== "defs").map(el => el.getBBox()), x0 = Math.min(...all.map(r => r.x)), y0 = Math.min(...all.map(r => r.y)), x1 = Math.max(...all.map(r => r.x + r.width)), y1 = Math.max(...all.map(r => r.y + r.height)), b = { x: x0, y: y0, width: x1 - x0, height: y1 - y0 }; // the dotted grid fills the card on purpose
       return { inside: b.x >= vb.x && b.y >= vb.y && b.x+b.width <= vb.x+vb.width && b.y+b.height <= vb.y+vb.height };
     });
     expect(boxes.inside).toBe(true);

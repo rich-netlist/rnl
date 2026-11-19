@@ -8,6 +8,10 @@
   "The symbols of diodes, MOS transistors, BJTs and JFETs.": "二极管、MOS 晶体管、BJT 与 JFET 的符号。",
   "The symbol rules of SPICE netlists: by element letter first, then by model type.": "SPICE 网表的符号规则：先按元件字母，再按模型类型。",
   "The symbol rules of Spectre netlists: primitives by master, instances of model cards by model type.": "Spectre 网表的符号规则：内置器件按 master，模型卡元件按模型类型。",
+  "The one collection of the series 0.4: it has no content of its own and brings in the styles, symbols, fill, semantics, domain packages and the rules of the host dialect. A file of 0.4 names it in its header record, or names the packages it wants one by one.": "标准系列 0.4 唯一的包集合：它本身不含内容，而是引入样式、符号、补位、语义、领域包以及宿主网表的方言规则。0.4 版的文件可在头段记录中写明使用该集合，或逐个列出所需的包。",
+  "45-degree symbols for bridges, cross-coupled pairs, diagonal windings and 45-degree wires. Optional: not in rnl-std-all.": "用于电桥、交叉耦合对、斜向绕组与 45 度导线的 45 度符号。按需选用：不包含在 rnl-std-all 中。",
+  "The semantic definitions of circuit structures and their default drawings, all of priority low: differential pairs and current mirrors of N and P devices, cascodes, branches, mirrored pairs and more.": "电路结构的语义定义及其默认画法，优先级均为 low：包含 N 型与 P 型差分对与电流镜、共源共栅（cascode）、分支、镜像对等。",
+  "The Chinese alias package: Chinese spellings of the standard words and of the names of the standard packages, loaded with @USE-ALIASES in the header record.": "中文代称包：提供标准词汇与各标准包名称的中文拼写，在头段记录中通过 @USE-ALIASES 加载。",
   "The automatic fill: a ground or supply for every unwired pin on such a net, a port tag for every port net; and the sets a file edits.": "自动补位：为地与电源网络上每个未接线的引脚补上接地或电源符号，为每个端口网络补上端口标签；以及供文件增删的集合。",
   "Automatic fill rules: adds a ground or supply symbol for every unwired terminal on a ground or supply net, adds a port tag for every port net except ground and supply nets, and draws the net name under ground symbols on non-0 ground nets such as vss. Also defines the sets a file can edit.": "自动补位规则：为地或电源网络上每个未接线的端子补上接地或电源符号；为除地与电源网络外的每个端口网络补上端口标签；在名称非 0 的地网络（如 vss）的接地符号下方显示网络名。此外还定义了可供文件编辑的集合。",
   "Semantic definitions, such as a differential pair or a current mirror: roles only, nothing drawn.": "语义定义，例如差分对或电流镜：仅包含角色，不绘制任何图形。",
@@ -34,6 +38,8 @@
   "; terminal {t}{m} pointing {d}": "；端子 {t}{m} 朝{d}",
   "Brought in by rnl-std: every netlist has it by default": "由 rnl-std 引入：每份网表默认皆有",
   "by default": "默认加载",
+  "Brought in by rnl-std-all, which a file of 0.4 names in its header record": "由 rnl-std-all 引入；0.4 版文件需在头段记录中写明使用它",
+  "in rnl-std-all": "包含于 rnl-std-all",
   "A file has it when its header record names it with USE-PACKAGE": "文件在头段记录中以 USE-PACKAGE 指名时才会加载",
   "on demand": "按需加载",
   "language {v}": "语言 {v}",
@@ -79,5 +85,6 @@
   "Labels": "标签",
   "Drawn from": "组成部件",
   "Given by": "指定规则",
-  "The definition": "定义原文"
+  "The definition": "定义原文",
+  "The automatic fill: a ground, supply or bias stub for every unwired pin on such a net, a net label for the other unwired pins, and a port tag for every port net in $PORT_FILL_SET.": "自动补位规则：为接地、电源或偏置网络上每个未接线的引脚补上相应短桩，为其余未接线引脚补上网络标签，并为 $PORT_FILL_SET 中的每个端口网络补上端口标签。"
 }

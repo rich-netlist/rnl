@@ -30,7 +30,7 @@ for (const language of ['zh', 'en']) for (const theme of ['light', 'dark']) for 
     await expect(more).toHaveText(language === 'zh' ? '完整时间线' : 'Full timeline');
     await expect(more).toHaveAttribute('href', 'timeline.html');
     expect(await timeline.locator(':scope > li').evaluateAll(items => items.map(item => item.className))).toEqual(
-      ['', '', 'now', 'tl-more', 'tl-sep', ...Array(NEXT).fill('next')]);
+      ['', '', 'now', 'tl-more', ...(NEXT ? ['tl-sep', ...Array(NEXT).fill('next')] : [])]);
     const dates = await datesOf(timeline);
     expect(dates.every((date, index) => !index || dates[index - 1] <= date)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);

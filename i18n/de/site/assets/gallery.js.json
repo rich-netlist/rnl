@@ -79,5 +79,12 @@
   "Labels": "Beschriftungen",
   "Drawn from": "Zusammengesetzt aus",
   "Given by": "Zugewiesen durch",
-  "The definition": "Die Definition"
+  "The definition": "Die Definition",
+  "The one collection of the series 0.4: it has no content of its own and brings in the styles, symbols, fill, semantics, domain packages and the rules of the host dialect. A file of 0.4 names it in its header record, or names the packages it wants one by one.": "Die einzige Sammlung der Serie 0.4: Sie enthält keinen eigenen Inhalt, sondern bindet Stile, Symbole, Ergänzung, Semantik, Fachpakete und die Regeln des Host-Dialekts ein. Eine 0.4-Datei nennt sie in ihrem Kopfeintrag oder führt die gewünschten Pakete einzeln auf.",
+  "45-degree symbols for bridges, cross-coupled pairs, diagonal windings and 45-degree wires. Optional: not in rnl-std-all.": "45-Grad-Symbole für Brücken, kreuzgekoppelte Paare, diagonale Wicklungen und 45-Grad-Leitungen. Optional: nicht in rnl-std-all enthalten.",
+  "The semantic definitions of circuit structures and their default drawings, all of priority low: differential pairs and current mirrors of N and P devices, cascodes, branches, mirrored pairs and more.": "Die semantischen Definitionen von Schaltungsstrukturen und ihren Standardzeichnungen, alle mit Priorität low: Differenzpaare und Stromspiegel aus N- und P-Bauteilen, Kaskoden, Verzweigungen, gespiegelte Paare und mehr.",
+  "The Chinese alias package: Chinese spellings of the standard words and of the names of the standard packages, loaded with @USE-ALIASES in the header record.": "Das chinesische Alias-Paket: chinesische Schreibweisen der Standardwörter und der Namen der Standardpakete, geladen über @USE-ALIASES im Kopfeintrag.",
+  "Brought in by rnl-std-all, which a file of 0.4 names in its header record": "Eingebunden durch rnl-std-all, das eine 0.4-Datei in ihrem Kopfeintrag nennt",
+  "in rnl-std-all": "in rnl-std-all",
+  "The automatic fill: a ground, supply or bias stub for every unwired pin on such a net, a net label for the other unwired pins, and a port tag for every port net in $PORT_FILL_SET.": "Die automatische Ergänzung: ein Masse-, Versorgungs- oder Bias-Stub für jeden unverdrahteten Pin an einem solchen Netz ein Netz-Label für die übrigen unverdrahteten Pins und eine Port-Markierung für jedes Portnetz in $PORT_FILL_SET."
 }

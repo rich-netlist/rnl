@@ -27,7 +27,7 @@
         '<en>When only RNL changes, the netlist body and ordinary comments are kept as is</en>'
       ],
       form: '<en>rnl-host-spice, rnl-host-spectre (Rust)</en>',
-      st: ['chip chip-ok', '<en>In 0.1</en>']
+      st: ['chip chip-ok', '<en>Since 0.1</en>']
     },
     runtime: {
       nm: '<en>Runtime</en>', sub: 'Runtime',
@@ -39,7 +39,7 @@
         '<en>Writes back to the file, preserving the original formatting</en>'
       ],
       form: '<en>rnl-runtime (Rust, compiles to WASM); npm package @rich-netlist/runtime</en>',
-      st: ['chip chip-ok', '<en>In 0.1 · without solving</en>']
+      st: ['chip chip-ok', '<en>Since 0.1 · without solving</en>']
     },
     solver: {
       nm: '<en>Solver</en>', sub: 'Solver',
@@ -50,8 +50,8 @@
         '<en>Delivers better results as it computes, and can be canceled at any time</en>',
         '<en>Same input and same work budget give exactly the same result</en>'
       ],
-      form: '<en>rnl-solver (pure Rust, compiles to WASM); @rich-netlist/solver</en>',
-      st: ['chip chip-warn', '<en>First version · CLI and desktop</en>']
+      form: '<en>rnl-solver (pure Rust, compiles to WASM)</en>',
+      st: ['chip chip-ok', '<en>In the CLI and both viewers</en>']
     },
     render: {
       nm: '<en>Renderer</en>', sub: 'Renderer',
@@ -62,7 +62,7 @@
         '<en>The viewer and the CLI draw exactly the same picture</en>'
       ],
       form: '<en>rnl-render (Rust, part of the shared core with the runtime)</en>',
-      st: ['chip chip-ok', '<en>In 0.1</en>']
+      st: ['chip chip-ok', '<en>Since 0.1</en>']
     },
     viewer: {
       nm: '<en>Viewer</en>', sub: 'Viewer',
@@ -75,7 +75,7 @@
         '<en>No built-in component library; symbols come from the standard package and RNL libraries</en>'
       ],
       form: '<en>apps/web and apps/desktop, sharing the page apps/viewer-ui</en>',
-      st: ['chip chip-ok', '<en>Since 0.1 · edits; desktop solves</en>']
+      st: ['chip chip-ok', '<en>Since 0.1 · edits and solves</en>']
     },
     editor: {
       nm: '<en>Editor</en>', sub: 'Editor',
@@ -94,8 +94,7 @@
       li: [
         '<en>Checks syntax, references and the basic validity of each statement</en>',
         '<en>Solves semantics and intent into coordinates and writes them back</en>',
-        '<en>Exports SVG or PDF</en>',
-        '<en>Migrates old syntax versions to new ones</en>'
+        '<en>Exports SVG or PNG</en>'
       ],
       form: '<en>rnl-cli (Rust, prebuilt for each platform)</en>',
       st: ['chip chip-ok', '<en>Since 0.1 · checks, renders, solves</en>']
@@ -105,11 +104,11 @@
       role: '<en>Symbols are data too.</en>',
       li: [
         '<en>The standard package: symbols, styles, semantic and layout definitions and fill rules, itself written in RNL</en>',
-        '<en>Alias packages, such as the Chinese rnl-zh</en>',
+        '<en>Alias packages, such as the Chinese alias-zh</en>',
         '<en>Released and versioned separately from the engines; a definition of the same name in a file overrides it</en>'
       ],
-      form: '<en>@rich-netlist/stdlib (data-only package)</en>',
-      st: ['chip chip-ok', '<en>Series 0.2 and 0.3</en>']
+      form: '<en>RNL files in libraries/standard, built into the CLI and the viewers</en>',
+      st: ['chip chip-ok', '<en>Series 0.4</en>']
     }
   };
 

@@ -90,6 +90,7 @@ test("origin is off by default, accepts old settings and persists across reloads
 });
 
 test("three registration points agree with the generated coordinates in cards and enlarged views", async ({ page }) => {
+  test.setTimeout(120_000); // the standard 0.4 has 164 cards; WebKit takes about 45 s alone, more beside the other tests
   await page.goto("/en/packages.html");
   await page.locator('[data-show="origin"]').click();
   for (const name of ["$RESISTOR", "$NMOS", "$ARROW_SYMBOL"]) {

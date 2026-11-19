@@ -79,5 +79,12 @@
   "Labels": "標籤",
   "Drawn from": "組成組件",
   "Given by": "指定規則",
-  "The definition": "定義原文"
+  "The definition": "定義原文",
+  "The one collection of the series 0.4: it has no content of its own and brings in the styles, symbols, fill, semantics, domain packages and the rules of the host dialect. A file of 0.4 names it in its header record, or names the packages it wants one by one.": "標準系列 0.4 唯一的套件集合：它本身沒有內容，而是匯入樣式、符號、自動補齊、語義、領域套件以及宿主網表的方言規則。0.4 版檔案可在檔頭記錄中寫明使用它，或逐一列出所需的套件。",
+  "45-degree symbols for bridges, cross-coupled pairs, diagonal windings and 45-degree wires. Optional: not in rnl-std-all.": "用於橋式電路、交叉耦合對、斜向繞組與 45 度連線的 45 度符號。可依需求選用：不包含在 rnl-std-all 中。",
+  "The semantic definitions of circuit structures and their default drawings, all of priority low: differential pairs and current mirrors of N and P devices, cascodes, branches, mirrored pairs and more.": "電路結構的語義定義及其預設畫法，優先順序皆為 low：包含 N 型與 P 型器件的差動對與電流鏡、疊接級（cascode）、分支、鏡像對等。",
+  "The Chinese alias package: Chinese spellings of the standard words and of the names of the standard packages, loaded with @USE-ALIASES in the header record.": "中文別名套件：提供標準詞彙與各標準套件名稱的中文拼寫，在檔頭記錄中透過 @USE-ALIASES 載入。",
+  "Brought in by rnl-std-all, which a file of 0.4 names in its header record": "由 rnl-std-all 匯入；0.4 版檔案需在檔頭記錄中寫明使用它",
+  "in rnl-std-all": "包含於 rnl-std-all",
+  "The automatic fill: a ground, supply or bias stub for every unwired pin on such a net, a net label for the other unwired pins, and a port tag for every port net in $PORT_FILL_SET.": "自動補齊規則：為接地、電源或偏壓網路上每個未連線的接腳補上相應短樁，為其餘未連線的接腳補上網路標籤，並為 $PORT_FILL_SET 中的每個連接埠網路補上連接埠標記。"
 }

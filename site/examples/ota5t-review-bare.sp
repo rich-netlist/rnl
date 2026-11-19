@@ -1,7 +1,7 @@
 * Five-transistor OTA
 .model nch nmos level=1 vto=0.5 kp=100u lambda=0.05
 .model pch pmos level=1 vto=-0.5 kp=100u lambda=0.05
-* @RNL(type="header") { @VERSION("0.3")}
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")}
 .subckt ota5t inp inn out vdd vss vbias
 M1 x    inp   tail vss nch W=2u L=0.5u
 M2 out  inn   tail vss nch W=2u L=0.5u
@@ -9,16 +9,10 @@ M3 x    x     vdd  vdd pch W=4u L=0.5u
 M4 out  x     vdd  vdd pch W=4u L=0.5u
 M5 tail vbias vss  vss nch W=4u L=1u
 * @RNL {
-*   %dp1 = #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR;
-*   %cm1 = #M3(ref) #M4(out) @AS $CURRENT_MIRROR;
-*   {#M1 #M2 #M5} @SET-SYMBOL $NMOS;
-*   {#M3 #M4} @SET-SYMBOL $PMOS;
+*   %dp1 = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;
+*   %cm1 = #M3(ref) #M4(out) @AS $CURRENT_MIRROR_P;
 *   &vdd @ADD-TO $SUPPLY_NET_SET;
 *   &vss @ADD-TO $GROUND_NET_SET;
-*   %ax = (_, _);
-*   %sym12 = #M1 #M2 %ax @AS $MIRRORED;
-*   %sym34 = #M3 #M4 %ax @AS $MIRRORED;
-*   {#M5 #M1 #M3} @ORDER("bottom-to-top");
 *   #M5:d @CURRENT("in")
 * }
 * @RNL(type="generated") {
@@ -41,8 +35,7 @@ M5 tail vbias vss  vss nch W=4u L=1u
 *   &out @WIRE {%jo %po:p};  &vbias @WIRE {#M5:g %pb:p};
 *   %vdd1 = $SUPPLY_STUB @ATTACH #M3:s;  %vdd1::s @PLACE(12, 20);
 *   %vdd2 = $SUPPLY_STUB @ATTACH #M4:s;  %vdd2::s @PLACE(28, 20);
-*   %gnd = $GROUND_STUB @ATTACH #M5:s;  %gnd::g @PLACE(20, -4);
-*   %ax @PLACE(20, 8)
+*   %gnd = $GROUND_STUB @ATTACH #M5:s;  %gnd::g @PLACE(20, -4)
 * }
 .ends ota5t
 .end

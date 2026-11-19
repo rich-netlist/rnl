@@ -16,35 +16,38 @@
     free: ['<en>Free text</en>', '<en>“Input pair:”, “and” and “treated” are for people; machines do not read them. Following the standard sentences, a statement reads as a sentence.</en>'],
     name: ['%dp1 =', '<en>Naming: the object this statement makes (a usage) is called dp1. Names starting with % are visible only on this level, and each is bound once per level.</en>'],
     inst: ['<en>#M1, #M2</en>', '<en>References instances in the netlist. Everything starting with # is a netlist object; RNL references it and never creates it.</en>'],
-    role: ['<en>(in_p), (in_n)</en>', '<en>Roles: parentheses right after an object say which role of the definition it fills. A statement marks every role or none; without marks, objects fill the roles in order.</en>'],
-    kw: ['@AS', '<en>Keyword: AS applies the definition after it to the objects before it, meaning they form a differential pair together. A statement has at most one keyword.</en>'],
-    def: ['$DIFFERENTIAL_PAIR', '<en>Definition: $DIFFERENTIAL_PAIR comes from the standard package. It has roles and a body that puts the tail under the middle of the pair, at low priority, but no symbol: it says what something is, and leaves how to draw it to the layout.</en>'],
+    role: ['<en>(left), (right)</en>', '<en>Roles: parentheses right after an object say which role of the definition it fills. A statement marks every role or none; without marks, objects fill the roles in order.</en>'],
+    kw: ['@AS', '<en>Keyword: AS applies the definition after it to the objects before it, meaning they form an N-type differential pair together. A statement has at most one keyword.</en>'],
+    def: ['$DIFFERENTIAL_PAIR_N', '<en>Definition: $DIFFERENTIAL_PAIR_N comes from the standard package. It has roles and a body that puts the tail under the middle of the pair, at low priority, but no symbol: it says what something is, and leaves how to draw it to the layout.</en>'],
     semi: [';', '<en>A semicolon ends the statement. Each statement takes effect, or fails, on its own.</en>']
   };
 
   var FAMS = [
-    ['<en>Placement</en>', ['PLACE', 'ORIENT', 'LAYER', 'GROUP']],
-    ['<en>Constraints</en>', ['ALIGN', 'ORDER', 'DISTRIBUTE', 'DISTANCE', 'ORIENT-RELATION', 'PRIORITY']],
-    ['<en>Appearance</en>', ['SET-SYMBOL', 'SET-STYLE', 'DEFINE-SYMBOL', 'DEFINE-STYLE']],
-    ['<en>Primitives</en>', ['PIN', 'LINE', 'RECTANGLE', 'CIRCLE', 'ELLIPSE', 'ARC', 'BEZIER', 'TEXT']],
-    ['<en>Wires</en>', ['WIRE', 'ROUTE', 'BUNDLE']],
-    ['<en>Definitions</en>', ['DEFINE', 'AS', 'ATTACH', 'CURRENT']],
-    ['<en>Selection</en>', ['SELECT-INSTANCE', 'SELECT-TERMINAL', 'SELECT-NET', 'SELECT-WIRE', 'SELECT-LABEL', 'SELECT-ANNOTATION', 'SELECT-USAGE', 'SELECT-ANCESTOR-USAGE']],
-    ['<en>Sets</en>', ['ADD-TO', 'REMOVE-FROM', 'UNION']],
-    ['<en>Header</en>', ['VERSION', 'ALIAS', 'USE-ALIASES', 'DEVICE', 'USE-PACKAGE', 'PACKAGE']]
+    ['<en>Header records and packages</en>', ['VERSION', 'PACKAGE', 'USE-PACKAGE', 'ALIAS', 'USE-ALIASES', 'DEVICE']],
+    ['<en>Definitions</en>', ['DEFINE-SYMBOL', 'DEFINE-STYLE', 'DEFINE']],
+    ['<en>Symbol content and graphics</en>', ['PIN', 'LINE', 'RECTANGLE', 'CIRCLE', 'ELLIPSE', 'ARC', 'BEZIER', 'ANNOTATION', 'TEXT']],
+    ['<en>Placement and appearance</en>', ['PLACE', 'ORIENT', 'LAYER', 'SET-SYMBOL', 'SET-STYLE']],
+    ['<en>Selections</en>', ['SELECT-INSTANCE', 'SELECT-TERMINAL', 'SELECT-PIN', 'SELECT-NET', 'SELECT-WIRE', 'SELECT-LABEL', 'SELECT-ANNOTATION', 'SELECT-USAGE', 'SELECT-ANCESTOR-USAGE']],
+    ['<en>Applying definitions</en>', ['AS', 'ATTACH']],
+    ['<en>Wires</en>', ['WIRE', 'ROUTE-NET', 'ROUTE-OBJECT', 'UNROUTE-NET', 'UNROUTE-OBJECT']],
+    ['<en>Sets, groups and bundles</en>', ['BUNDLE', 'GROUP', 'ADD-TO', 'REMOVE-FROM', 'UNION']],
+    ['<en>Constraints and priority</en>', ['ALIGN', 'ORDER', 'DISTRIBUTE', 'DISTANCE', 'ORIENT-RELATION', 'TABLE', 'SOLVER-CONFIG', 'PRIORITY']],
+    ['<en>Electrical semantics</en>', ['CURRENT', 'ASSERT-INSTANCE', 'ASSERT-TERMINAL', 'ASSERT-NET', 'ASSERT-USAGE', 'ASSERT-IN', 'ASSERT-TOPOLOGY']]
   ];
 
   /* keyword: [description, English standard sentence] */
   var KW = {
     'PLACE': ['<en>Puts the origin at (x, y); one axis may be left to the solver. x points right and y up.</en>', '#M1 is at @PLACE(10, 20)'],
-    'ORIENT': ['<en>Orientation, one of eight codes: R0, R90 (90° counterclockwise), R180, R270, MY (flipped left-right), MX (flipped upside down), MYR90, MXR90. Without it, the solver chooses.</en>', '#M2 @ORIENT("MY"), i.e., flipped left-right'],
+    'ORIENT': ['<en>Orientation of an object, one of eight codes: R0, R90 (90° counterclockwise), R180, R270, MY (flipped left-right), MX (flipped upside down), MYR90, MXR90; a list of codes lets the solver choose among them. A pin takes a direction instead: left, down, right or up. Without it, the solver chooses.</en>', '#M2 @ORIENT("MY"), i.e., flipped left-right'],
     'LAYER': ['<en>The drawing layer: bottom, middle (the default) or top.</en>', '#C1 is on @LAYER("bottom")'],
     'GROUP': ['<en>The solver keeps this set together as one block; its name still refers to the set.</en>', '%s1_set = {#M1 #M2 #M5} as a @GROUP'],
     'ALIGN': ['<en>Equal coordinates on one axis: "y" puts the members in a row, "x" in a column.</en>', '{#M1 #M2} @ALIGN("y"), i.e., same y'],
-    'ORDER': ['<en>Strictly ordered in a direction, which must be written; "x" or "y" fixes only the axis, either way round.</en>', '{#M1 #M2 #M3} are in @ORDER("left-to-right")'],
-    'DISTRIBUTE': ['<en>Equal steps along an axis.</en>', 'the x of {#R1 #R2 #R3} @DISTRIBUTE("x"), i.e., in equal steps'],
-    'DISTANCE': ['<en>The distance between two objects or groups, with min, max or exact. A direction fixes which comes first; "x" or "y" does not.</en>', 'from #M1 to #M2, they have @DISTANCE("bottom-to-top", min=4)'],
+    'ORDER': ['<en>Strictly ordered in a direction, which must be written: left-to-right, right-to-left, bottom-to-top or top-to-bottom.</en>', '{#M1 #M2 #M3} are in @ORDER("left-to-right")'],
+    'DISTRIBUTE': ['<en>Following one another in a direction, in equal steps.</en>', '{#R1 #R2 #R3} are in @DISTRIBUTE("left-to-right"), i.e., in equal steps'],
+    'DISTANCE': ['<en>The distance from the first object or group to the second in a direction, with min, max or exact.</en>', 'from #M1 to #M2, they have @DISTANCE("bottom-to-top", min=4)'],
     'ORIENT-RELATION': ['<en>An orientation relation: the second’s orientation is the first’s with this transform applied. "MY" makes them mirror images without saying which way either faces.</en>', 'from #M1 to #M2, they have @ORIENT-RELATION("MY"), i.e., flipped left-right'],
+    'TABLE': ['<en>Lays objects out as a table of nested sets: rows from top to bottom, each nested list at right angles to the one around it. The table is one group.</en>', '@TABLE layout: {{#M1 #M2 #M3} {#M4 {#M5 #M6} #M7}}'],
+    'SOLVER-CONFIG': ['<en>Settings of the solver kept in the file, such as the spacing between objects; the solver defines the other keys.</en>', '@SOLVER-CONFIG(spacing_x=2, spacing_y=1)'],
     'PRIORITY': ['<en>Changes the priority of a constraint or usage afterwards: disabled, low, normal or high. In a conflict the lower one gives way.</en>', '%c1 has @PRIORITY("disabled")'],
     'SET-SYMBOL': ['<en>Uses a symbol. What is written directly on an object beats what a rule gives; on # inside a subcircuit, it sets the block symbol.</en>', '{#M1 #M2} @SET-SYMBOL to $NMOS'],
     'SET-STYLE': ['<en>Uses a style, merged property by property: a style changes only the properties it defines.</en>', '{#CC #RZ} @SET-STYLE to $orange'],
@@ -57,34 +60,45 @@
     'ELLIPSE': ['<en>An ellipse: a center with width and height, or two corners of its box.</en>', 'centered at (0, 0), an @ELLIPSE(width=4, height=2)'],
     'ARC': ['<en>An arc through three points.</en>', 'an @ARC running through {(0, 2) (2, 0) (0, -2)}'],
     'BEZIER': ['<en>A Bézier curve with 3n+1 control points.</en>', 'a @BEZIER with control points {(0, 0) (1, 1) (2, 1) (3, 0)}'],
+    'ANNOTATION': ['<en>Gathers the graphics of a symbol or a definition into one annotation at a point, turned by any angle; its pins are left out.</en>', 'at (40, 20) there is an @ANNOTATION(rotate=30) of $ARROW_SYMBOL'],
     'TEXT': ['<en>Text: on an object it is a label that moves with it; on a point it is an annotation. key names it, and a later text with the same key replaces an earlier one.</en>', 'on #M1 there is a @TEXT("W/L = ${w}/${l}", key="wl", dy=-3)'],
     'WIRE': ['<en>One wire: a net and an ordered list of points; wires connect only by sharing a point or terminal. mode sets the path style.</en>', 'net &n1 has a @WIRE connecting {#R1:2 %j #R2:1}'],
-    'ROUTE': ['<en>Draws a whole net as wires; the solver decides branches, paths and junction dots.</en>', 'nets {&a &b} are fully @ROUTE'],
+    'ROUTE-NET': ['<en>Draws a whole net as wires; the solver decides branches, paths and junction dots.</en>', 'net &n1 is drawn with @ROUTE-NET'],
+    'ROUTE-OBJECT': ['<en>Draws the pins of the objects as wires, such as the members of a structure, without naming their net.</en>', 'the pins of {#M1 #M2 #M5} are joined with @ROUTE-OBJECT'],
+    'UNROUTE-NET': ['<en>Leaves the pins of a net out of the trees of ROUTE-NET and ROUTE-OBJECT, as the standard package does for supply and ground nets.</en>', 'net &vdd is left out with @UNROUTE-NET(priority="high")'],
+    'UNROUTE-OBJECT': ['<en>Leaves the pins of some objects out of the trees of ROUTE-NET and ROUTE-OBJECT.</en>', 'the pins of #M3 are left out with @UNROUTE-OBJECT'],
     'BUNDLE': ['<en>A bundle: several instances drawn as one symbol, such as a group XI<3:0>; each of its pins stands for the members’ terminals of that name.</en>', '#XI<3:0> is drawn as a @BUNDLE => named %xi'],
     'DEFINE': ['<en>A definition: roles, parameters and a body, applied with AS or ATTACH. With an empty body it only records what something is.</en>', '$PAIR = a definition, @DEFINE(roles=["a", "b"], parameters=[["gap", 2]]) {…}'],
-    'AS': ['<en>Applies a definition to objects that together form it, such as a differential pair or a mirrored pair. Makes a usage, which can be named and selected.</en>', '#M1(in_p) and #M2(in_n) are treated @AS $DIFFERENTIAL_PAIR'],
+    'AS': ['<en>Applies a definition to objects that together form it, such as a differential pair or a mirrored pair. Makes a usage, which can be named and selected.</en>', '#M1(left) and #M2(right) are treated @AS $DIFFERENTIAL_PAIR_N'],
     'ATTACH': ['<en>Applies a definition written first, adding it onto objects, such as a ground, a port tag, a junction dot or a no-connect mark.</en>', '$GROUND is @ATTACH to &vss => it is at @PLACE(24, 38) => named %g0'],
-    'CURRENT': ['<en>The current direction at a terminal: in, out or unspecified; it affects only the drawing, with no circuit analysis.</en>', '#M5:1 has @CURRENT("in")'],
-    'SELECT-INSTANCE': ['<en>Selects instances by name, model or type; from a net, it selects the instances with a pin on it.</en>', 'among the instances at each level in # and below, @SELECT-INSTANCE(model="nch") => they @SET-SYMBOL to $NMOS'],
-    'SELECT-TERMINAL': ['<en>Selects terminals by name, by net, or by whether they are wired.</en>', 'among the terminals connected to $GROUND_NET_SET, @SELECT-TERMINAL(wired=false) => $GROUND_STUB is @ATTACH to them'],
-    'SELECT-NET': ['<en>Selects nets by name, port, or whether they are wired; from instances or terminals, it selects their nets.</en>', 'among the nets connected to #M1:g, @SELECT-NET => they are fully @ROUTE'],
-    'SELECT-WIRE': ['<en>Selects wires; bus=true picks only buses.</en>', 'among the wires at each level in # and below, @SELECT-WIRE(bus=true) => they @SET-STYLE to $bus'],
+    'CURRENT': ['<en>The direction of the current at a terminal, or at a pin or port standing for one: in, out or unspecified. It draws nothing; the solver lays out the current paths by it, and a net whose terminals all move current one way is a violation.</en>', '#M5:1 has @CURRENT("in")'],
+    'ASSERT-INSTANCE': ['<en>Checks that instances meet conditions, or have the same or different attributes, such as matched devices; it only reports.</en>', '{#M1 #M2} have @ASSERT-INSTANCE(same=["model", "w", "l"])'],
+    'ASSERT-TERMINAL': ['<en>Checks terminals in the same way, such as that two are on one net; it only reports.</en>', '{#M1:s #M2:s} have @ASSERT-TERMINAL(same=["net"])'],
+    'ASSERT-NET': ['<en>Checks nets in the same way, such as that they are ports; it only reports.</en>', '{&inp &inn} have @ASSERT-NET(port=true)'],
+    'ASSERT-USAGE': ['<en>Checks that usages are usages of a definition; it only reports.</en>', '%dp1 is, by @ASSERT-USAGE, a usage of $DIFFERENTIAL_PAIR_N'],
+    'ASSERT-IN': ['<en>Checks that every member is in a set; it only reports.</en>', '{&vss} is, by @ASSERT-IN, in $GROUND_NET_SET'],
+    'ASSERT-TOPOLOGY': ['<en>Checks that members are connected in series, in parallel, as a star or as one loop; a usage or a set counts as a black box. It only reports.</en>', '{#R1 #R2 #R3} are connected as @ASSERT-TOPOLOGY("series")'],
+    'SELECT-INSTANCE': ['<en>Selects instances by name, model or type; from a net, it selects the instances with a pin on it. Like every selection, it works on its own level only, unless recursive=true takes it to each level below.</en>', 'among the instances at each level in # and below, @SELECT-INSTANCE(model="nch", recursive=true) => they @SET-SYMBOL to $NMOS'],
+    'SELECT-TERMINAL': ['<en>Selects terminals by name, net or current, with a pin or not.</en>', 'among the terminals at each level in # and below, @SELECT-TERMINAL(net="vss", recursive=true) => they have @ASSERT-TERMINAL(same=["net"])'],
+    'SELECT-PIN': ['<en>Selects the pins of drawn objects, by terminal, net or whether they are wired; the standard fill finds the unwired pins with it.</en>', 'among the pins in # only, @SELECT-PIN(wired=false) => on them there is a @TEXT("${net}", key="netname")'],
+    'SELECT-NET': ['<en>Selects nets by name, port, global or whether they are wired; from instances or terminals, it selects their nets.</en>', 'among the nets at each level in # and below, @SELECT-NET(port=true, recursive=true) => $IO_PORT is @ATTACH to them'],
+    'SELECT-WIRE': ['<en>Selects wires; bus=true picks only buses.</en>', 'among the wires at each level in # and below, @SELECT-WIRE(bus=true, recursive=true) => they @SET-STYLE to $bus'],
     'SELECT-LABEL': ['<en>Selects labels, optionally by key.</en>', 'among the labels attached to #M1, @SELECT-LABEL => they @SET-STYLE to $grey'],
-    'SELECT-ANNOTATION': ['<en>Selects annotations: text on points and graphics in the drawing.</en>', 'among the annotations at each level in # and below, @SELECT-ANNOTATION => they @SET-STYLE to $base'],
-    'SELECT-USAGE': ['<en>Selects the usages of a definition, looking inward; without a definition, all usages.</en>', 'among the usages at each level in # and below, @SELECT-USAGE of $DIFFERENTIAL_PAIR => they have @PRIORITY("disabled")'],
-    'SELECT-ANCESTOR-USAGE': ['<en>Selects the usages that have these objects as members, looking outward.</en>', 'among the usages containing #M1, @SELECT-ANCESTOR-USAGE of $DIFFERENTIAL_PAIR => named %dp_set'],
-    'ADD-TO': ['<en>Adds members to a named set, such as vdd to the supply nets, so the standard package adds supply symbols for it.</en>', '&vdd @ADD-TO $SUPPLY_NET_SET'],
-    'REMOVE-FROM': ['<en>Removes members from a named set—for example, removing vss from $NAMED_GROUND_NET_SET so its ground symbols do not show the net name.</en>', '&vss @REMOVE-FROM $NAMED_GROUND_NET_SET'],
+    'SELECT-ANNOTATION': ['<en>Selects annotations: text on points and graphics in the drawing.</en>', 'among the annotations at each level in # and below, @SELECT-ANNOTATION(recursive=true) => they @SET-STYLE to $base'],
+    'SELECT-USAGE': ['<en>Selects the usages of a definition, looking inward; without a definition, all usages.</en>', 'among the usages at each level in # and below, @SELECT-USAGE(recursive=true) of $DIFFERENTIAL_PAIR_N => they have @PRIORITY("disabled")'],
+    'SELECT-ANCESTOR-USAGE': ['<en>Selects the usages that have these objects as members, looking outward.</en>', 'among the usages containing #M1, @SELECT-ANCESTOR-USAGE of $DIFFERENTIAL_PAIR_N => named %dp_set'],
+    'ADD-TO': ['<en>Adds members to a named set, such as vdd to the supply nets, so the standard package adds supply stubs for it.</en>', '&vdd @ADD-TO $SUPPLY_NET_SET'],
+    'REMOVE-FROM': ['<en>Removes members from a named set—for example, taking vdd out of $PORT_FILL_SET so it gets no port tag.</en>', '&vdd @REMOVE-FROM $PORT_FILL_SET'],
     'UNION': ['<en>A union without duplicates.</en>', '%u_set = %a_set and %b_set @UNION'],
-    'VERSION': ['<en>The language version of the file. Only in the header record; without it, the tool’s default version applies.</en>', '* @RNL(type="header") { @VERSION("0.3")}'],
+    'VERSION': ['<en>The language version of the file. Only in the header record; without it, the tool’s default version applies.</en>', '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")}'],
     'ALIAS': ['<en>Declares another spelling (an alias) for a standard word or a $ name, alias first. Only in the header record.</en>'/*zh-CN*/, '@ALIAS("@位于", "@PLACE")'/*/zh-CN*/],
-    'USE-ALIASES': ['<en>Loads an alias package, such as the Chinese package rnl-zh. Only in the header record.</en>', '@USE-ALIASES(name="rnl-zh", version="0.3")'],
+    'USE-ALIASES': ['<en>Loads an alias package, such as the Chinese package alias-zh. Only in the header record.</en>', '@USE-ALIASES(name="alias-zh", version="0.4")'],
     'DEVICE': ['<en>Names the terminals of devices the netlist does not define, such as PDK devices, so #XM1:d works. Only in the header record.</en>', '@DEVICE(name="XM*", model="sky130_fd_pr__nfet_*", terminals=["d", "g", "s", "b"])'],
     'USE-PACKAGE': ['<en>Uses a package: a set of symbols, styles, definitions and rules, such as a company’s drawing style.</en>', '@USE-PACKAGE(name="acme-style", version="1.2")'],
     'PACKAGE': ['<en>A package file declares its name and version in its header record; not needed when describing a circuit.</en>', '@PACKAGE(name="acme-style", version="1.2")']
   };
 
-  /* The Chinese standard sentence and alias of each keyword, from the alias package rnl-zh. The header
+  /* The Chinese standard sentence and alias of each keyword, from the alias package alias-zh. The header
      keywords have none: the header record is always read in standard spelling. Only the Chinese pages
      have them. */
   var KW_ZH = {};
@@ -96,9 +110,11 @@
     'GROUP': ['%s1_set = {#M1 #M2 #M5} 视作一个 @分组', '@分组'],
     'ALIGN': ['{#M1 #M2} @对齐("y")，即 y 坐标相同', '@对齐'],
     'ORDER': ['{#M1 #M2 #M3} 按 @顺序("从左到右") 排列', '@顺序'],
-    'DISTRIBUTE': ['{#R1 #R2 #R3} 的 x 坐标 @等距("x")', '@等距'],
+    'DISTRIBUTE': ['{#R1 #R2 #R3} @等距("从左到右")，即等步长排列', '@等距'],
     'DISTANCE': ['#M1 到 #M2 有 @距离("从下到上", 最小值=4)', '@距离'],
     'ORIENT-RELATION': ['#M1 到 #M2 的 @朝向关系("MY")，即左右镜像', '@朝向关系'],
+    'TABLE': ['@表格 布局：{{#M1 #M2 #M3} {#M4 {#M5 #M6} #M7}}', '@表格'],
+    'SOLVER-CONFIG': ['@求解配置(横向间距=2, 纵向间距=1)', '@求解配置'],
     'PRIORITY': ['%c1 的 @优先级("停用")', '@优先级'],
     'SET-SYMBOL': ['{#M1 #M2} @使用符号 $NMOS', '@使用符号'],
     'SET-STYLE': ['{#CC #RZ} @使用样式 $orange', '@使用样式'],
@@ -111,24 +127,35 @@
     'ELLIPSE': ['以 (0, 0) 为中心的 @椭圆(宽度=4, 高度=2)', '@椭圆'],
     'ARC': ['一条 @圆弧 经过 {(0, 2) (2, 0) (0, -2)}', '@圆弧'],
     'BEZIER': ['一条 @贝塞尔 曲线，控制点为 {(0, 0) (1, 1) (2, 1) (3, 0)}', '@贝塞尔'],
+    'ANNOTATION': ['在 (40, 20) 有一个 @标注(旋转=30)，内容为 $"箭头符号"', '@标注'],
     'TEXT': ['#M1 上有 @文本("W/L = ${w}/${l}", 引用名="wl", dy=-3)', '@文本'],
     'WIRE': ['网络 &n1 的 @导线 连接了 {#R1:2 %j #R2:1}', '@导线'],
-    'ROUTE': ['网络 {&a &b} 全部 @布线', '@布线'],
+    'ROUTE-NET': ['网络 &n1 用 @布线网络 画成导线', '@布线网络'],
+    'ROUTE-OBJECT': ['{#M1 #M2 #M5} 的引脚用 @布线对象 连接', '@布线对象'],
+    'UNROUTE-NET': ['网络 &vdd 用 @不布线网络(优先级="高") 留出', '@不布线网络'],
+    'UNROUTE-OBJECT': ['#M3 的引脚用 @不布线对象 留出', '@不布线对象'],
     'BUNDLE': ['#XI<3:0> @叠画 => 记作 %xi', '@叠画'],
     'DEFINE': ['$PAIR = 一个普通定义， @定义(角色表=["a", "b"], 参数表=[["gap", 2]]) {…}', '@定义'],
-    'AS': ['#M1(正输入) 和 #M2(负输入) @视作 $"差分对"', '@视作'],
+    'AS': ['#M1(左) 和 #M2(右) @视作 $"N型差分对"', '@视作'],
     'ATTACH': ['$"地" @附着 在 &vss 上 => 其 @位于(24, 38) => 记作 %g0', '@附着'],
     'CURRENT': ['#M5:1 有 @电流("流入")', '@电流'],
-    'SELECT-INSTANCE': ['从本层 # 及以下每一层的元件中 @选出元件(模型="nch") => 其 @使用符号 $NMOS', '@选出元件'],
-    'SELECT-TERMINAL': ['从接在 $"地网络集" 上的端子中 @选出端子(已接线=否) => $"接地桩" @附着 在其上', '@选出端子'],
-    'SELECT-NET': ['从 #M1:g 所在的网络中 @选出网络 => 其全部 @布线', '@选出网络'],
-    'SELECT-WIRE': ['从本层 # 及以下每一层的导线中 @选出导线(总线=是) => 其 @使用样式 $"总线"', '@选出导线'],
+    'ASSERT-INSTANCE': ['{#M1 #M2} 有 @断言元件(相同=["model", "w", "l"])', '@断言元件'],
+    'ASSERT-TERMINAL': ['{#M1:s #M2:s} 有 @断言端子(相同=["net"])', '@断言端子'],
+    'ASSERT-NET': ['{&inp &inn} 有 @断言网络(端口=是)', '@断言网络'],
+    'ASSERT-USAGE': ['%dp1 经 @断言用例 是 $"N型差分对" 的一个用例', '@断言用例'],
+    'ASSERT-IN': ['{&vss} 经 @断言属于 在 $"地网络集" 中', '@断言属于'],
+    'ASSERT-TOPOLOGY': ['{#R1 #R2 #R3} 按 @断言拓扑("串联") 连接', '@断言拓扑'],
+    'SELECT-INSTANCE': ['从本层 # 及以下每一层的元件中 @选出元件(模型="nch", 含下层=是) => 其 @使用符号 $NMOS', '@选出元件'],
+    'SELECT-TERMINAL': ['从本层 # 及以下每一层的端子中 @选出端子(网络="vss", 含下层=是) => 其 @断言端子(相同=["net"])', '@选出端子'],
+    'SELECT-PIN': ['从本层 # 的引脚中 @选出引脚(已接线=否) => 其上有 @文本("${net}", 引用名="netname")', '@选出引脚'],
+    'SELECT-NET': ['从本层 # 及以下每一层的网络中 @选出网络(端口=是, 含下层=是) => $"端口" @附着 在其上', '@选出网络'],
+    'SELECT-WIRE': ['从本层 # 及以下每一层的导线中 @选出导线(总线=是, 含下层=是) => 其 @使用样式 $"总线"', '@选出导线'],
     'SELECT-LABEL': ['从附着在 #M1 上的标签中 @选出标签 => 其 @使用样式 $"灰色"', '@选出标签'],
-    'SELECT-ANNOTATION': ['从本层 # 及以下每一层的标注中 @选出标注 => 其 @使用样式 $"基础"', '@选出标注'],
-    'SELECT-USAGE': ['从本层 # 及以下每一层的用例中 @选出用例 $"差分对" => 其 @优先级("停用")', '@选出用例'],
-    'SELECT-ANCESTOR-USAGE': ['从包含 #M1 的用例中 @选出所处用例 $"差分对" => 记作 %dp_set', '@选出所处用例'],
+    'SELECT-ANNOTATION': ['从本层 # 及以下每一层的标注中 @选出标注(含下层=是) => 其 @使用样式 $"基础"', '@选出标注'],
+    'SELECT-USAGE': ['从本层 # 及以下每一层的用例中 @选出用例(含下层=是) $"N型差分对" => 其 @优先级("停用")', '@选出用例'],
+    'SELECT-ANCESTOR-USAGE': ['从包含 #M1 的用例中 @选出所处用例 $"N型差分对" => 记作 %dp_set', '@选出所处用例'],
     'ADD-TO': ['&vdd @加入 $"电源网络集"', '@加入'],
-    'REMOVE-FROM': ['&vss @移出 $"带标签地网络集"', '@移出'],
+    'REMOVE-FROM': ['&vdd @移出 $"端口补位集"', '@移出'],
     'UNION': ['%u_set = %a_set 和 %b_set 的 @并集', '@并集'],
     'USE-PACKAGE': ['@使用包(名字="acme-style", 版本="1.2")', '@使用包']
   };
@@ -139,8 +166,9 @@
     ['<en>Names</en>', '<en>Resolves #, &, %, $ references, allowing use before definition; evaluates the bodies of symbols and styles.</en>'],
     ['<en>Objects</en>', '<en>Points, wires, text, primitives, constraints, usages and sets; the bodies applied by AS and ATTACH are expanded. Selections are not evaluated yet.</en>'],
     ['<en>Symbols</en>', '<en>SET-SYMBOL takes effect in order: the standard package’s rules first, the file’s after; what is written directly on an object beats what a rule gives.</en>'],
-    ['<en>Generate</en>', '<en>AS and ATTACH applied to selections run once per object, at each level, such as the standard package adding a ground for every unwired ground terminal.</en>'],
-    ['<en>New symbols</en>', '<en>The same symbol queue runs again for the objects just generated.</en>'],
+    ['<en>Trees</en>', '<en>ROUTE-NET, ROUTE-OBJECT, UNROUTE-NET and UNROUTE-OBJECT, rules included, decide which pins of each net are to be joined by wires.</en>'],
+    ['<en>Generate</en>', '<en>AS and ATTACH applied to selections run once per object, such as the standard package adding a ground stub for every unwired pin on a ground net. A selection reaches the levels below only with recursive=true.</en>'],
+    ['<en>New symbols</en>', '<en>The same symbol queue runs again for the objects just generated, and the assertions are checked.</en>'],
     ['<en>Geometry</en>', '<en>PLACE, ORIENT and constraints are taken one by one, by priority and then by order, dropping any that conflict; objects without a position go to the solver.</en>'],
     ['<en>Styles</en>', '<en>SET-STYLE merges property by property; colors and widths a symbol leaves open get their values only now.</en>'],
     ['<en>Render</en>', '<en>Draws the final effective description.</en>']
@@ -182,12 +210,12 @@
       var fam = FAMS[+b.getAttribute('data-f')][0];
       card.innerHTML = '<h4>@' + k + '</h4>' +
         '<div class="kw-chips"><span class="chip chip-rnl">' + fam + '</span>' +
-        (zh ? '<span class="chip" title="rnl-zh"><span class="muted"><en>Chinese alias</en></span> <code lang="zh-CN">' + zh[1] + '</code></span>' :
+        (zh ? '<span class="chip" title="alias-zh"><span class="muted"><en>Chinese alias</en></span> <code lang="zh-CN">' + zh[1] + '</code></span>' :
           // the header keywords, where the pages show the aliases
           Object.keys(KW_ZH).length ? '<span class="chip chip-mute"><en>The header is read in standard spelling, without aliases</en></span>' : '') + '</div>' +
         '<p>' + info[0] + '</p>' +
         (info[1] ? '<div class="kw-ex"><span class="kw-ex-k"><en>Standard sentence</en></span><div class="minicode">' + C.hlAuto(info[1]) + '</div></div>' : '') +
-        (zh ? '<div class="kw-ex"><span class="kw-ex-k"><en>Chinese (rnl-zh)</en></span><div class="minicode" lang="zh-CN">' + C.hlAuto(zh[0]) + '</div></div>' : '');
+        (zh ? '<div class="kw-ex"><span class="kw-ex-k"><en>Chinese (alias-zh)</en></span><div class="minicode" lang="zh-CN">' + C.hlAuto(zh[0]) + '</div></div>' : '');
     }
     kws.forEach(function (b) { b.addEventListener('click', function () { pick(b); }); });
     pick(kws.filter(function (b) { return b.textContent === '@AS'; })[0] || kws[0]);
@@ -306,7 +334,7 @@
           setStyle(s);
           m.view.setScene(SC.rlcScene(s), { animate: true, duration: 700 });
         });
-        cap.innerHTML = '<en>One statement: <code>$CHAIN</code> says what it is, a chain V1 → {R1 L1} → C1 from source to load, whose middle role, chain, takes a set; it also carries a default drawing, source, chain and load from left to right, of priority low, so what the author writes comes first. The standard package adds the grounds, one per grounded terminal; switch to “merged” at the top right to see the three lines the file needs for a single ground.</en>';
+        cap.innerHTML = '<en>One statement: <code>@ORDER("left-to-right")</code> puts the chain V1, R1, L1, C1 from source to load in a row. It is a fact of the file, so it comes before whatever the standard package draws by default. The standard package adds the grounds, one per grounded terminal; switch to “merged” at the top right to see the three lines the file needs for a single ground.</en>';
       },
       e2: function () {
         file.textContent = 'ota5t_tb.sp';
@@ -360,14 +388,14 @@
             timers.push(setTimeout(function () {
               m.view.setScene(SC.fillScene(n), { animate: true, duration: 450 });
               rows.forEach(function (r) { r.classList.remove('is-hot'); });
-              var gen = n === 1 ? 'gnd' : 'port';
+              var gen = n === 1 ? 'stub' : 'port';
               lines.forEach(function (l, i) { if (l.gen === gen && rows[i]) rows[i].classList.add('is-hot'); });
             }, 900 + k * 1300));
           });
           timers.push(setTimeout(function () { rows.forEach(function (r) { r.classList.remove('is-hot'); }); }, 900 + 2 * 1300 + 900));
         }
         $('#ex-replay').addEventListener('click', replay);
-        cap.innerHTML = '<en>The file has one line about grounds: V1’s negative terminal has <code>$GROUND @ATTACH #V1:2</code>, a ground drawn right on the pin. For every other unwired terminal on net 0, the standard package adds a ground on a short wire (gray); it skips V1’s, which has one. The unwired gate gets a port from a rule in the file: <code>$PORT_STUB</code> is a definition written here, with a wire and two constraints.</en>';
+        cap.innerHTML = '<en>The file puts vdd in the supply nets and takes it out of the port tags, writes the tag of in itself and asks for the port nets as wires; the standard package adds the rest (gray). M1’s source and C1’s lower pin are on net 0, so each gets a ground stub, and R1’s pin on vdd gets a supply stub. out is a port net with no tag written, so it gets one in the column of port tags, and the solver wires it with the rest of out.</en>';
       },
       e5: function () {
         file.textContent = 'ota5t.sp';

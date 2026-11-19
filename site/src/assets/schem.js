@@ -67,7 +67,7 @@
   }
 
   /* ---------- Symbols ---------- */
-  /* Local coordinates, y up. Pins follow the standard series 0.3: MOS gate (-3, 0), NMOS drain
+  /* Local coordinates, y up. Pins follow the standard series 0.4: MOS gate (-3, 0), NMOS drain
      (0, 2) and source (0, -2), bulk (1, 0); R, L, C and sources (0, ±2); op-amp + (-4, 1), − (-4, -1),
      output (3, 0); ground, supply and port tag on (0, 0). */
 
@@ -147,7 +147,7 @@
       ],
       label: [1.8, 0.6], value: [1.8, -0.8]
     },
-    /* a ground; with a label, the name of its net under it, as 0.3 draws a ground net other than 0 */
+    /* a ground; with a label, the name of its net under it, as 0.4 draws a ground net other than 0 */
     gnd: {
       pins: { p: [0, 0] },
       box: [-1, -1.5, 1, 0],

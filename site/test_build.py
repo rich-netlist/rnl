@@ -234,8 +234,8 @@ class SiteExamples(unittest.TestCase):
         self.assertEqual(build.check_ota(files, ex), [])
         # a statement of the English file, one of the notation, one of the Chinese file, a line of the netlist
         for name, old, new, where in (
-                ("ota5t-review.sp", "%cm1 = #M3(ref) and #M4(out) treated @AS $CURRENT_MIRROR;", "%cm1 = #M3(ref) and #M4(out) treated @AS $MIRRORED;", "T[cm1]"),
-                ("ota5t-review-bare.sp", "{#M5 #M1 #M3} @ORDER(\"bottom-to-top\");", "{#M5 #M1 #M3} @ORDER(\"top-to-bottom\");", "T[ord]"),
+                ("ota5t-review.sp", "%cm1 = #M3(ref) and #M4(out) treated @AS $CURRENT_MIRROR_P;", "%cm1 = #M3(ref) and #M4(out) treated @AS $MIRRORED_LAYOUT;", "T[cm1]"),
+                ("ota5t-review-bare.sp", "%dp1 = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;", "%dp1 = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_P;", "T[dp]"),
                 ("ota5t-review-zh.sp", "#M5:d 有 @电流(\"流入\")", "#M5:d 有 @电流(\"流出\")", "TZ[cur]"),
                 ("ota5t-review.sp", "M5 tail vbias vss  vss nch W=4u L=1u", "M5 tail vbias vss  vss nch W=8u L=1u", "lines")):
             self.assertIn(old, ex[name])

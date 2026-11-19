@@ -92,15 +92,18 @@ test("existing deep links and the full-width introduction hero remain usable", a
 
 test("gallery: directory categories, search, disclosure, packages, history and shared URLs", async ({ page }) => {
   test.skip(!hasPublicPackages, "Run python scripts/packages.py download");
+  test.setTimeout(120_000); // the standard 0.4 has 164 cards; WebKit takes about 45 s alone, more beside the other tests
   for (const g of index.groups) {
-    expect(g.kind).toBe(g.dir.startsWith("libraries/standard/") ? "standard" : g.dir.startsWith("libraries/pdk/") ? "pdk" : "extension");
+    expect(g.kind).toBe(g.dir.startsWith("libraries/standard/") ? "standard" : /^libraries\/pdk[-/]/.test(g.dir) ? "pdk" : "extension");
   }
   const versions = index.groups.filter(g => g.kind === "standard").map(g => g.series);
   expect(versions).toEqual([...versions].sort((a, b) => b.localeCompare(a, undefined, { numeric: true })));
   await page.goto("/zh/packages.html");
   await expect(page.locator(".gl-group")).toHaveCount(index.groups.length);
   await expect(page.locator('.gl-fold[aria-expanded="true"]')).toHaveCount(1);
-  await expect(page.locator(".gl-readonly")).toHaveText("只读");
+  // the archived standard series, 0.3 and 0.2, are read-only
+  const archived = index.groups.filter(g => g.kind === "standard" && ["0.2", "0.3"].includes(g.series)).length;
+  await expect(page.locator(".gl-readonly")).toHaveText(Array(archived).fill("只读"));
   const current = index.groups[0];
   const fold = page.locator(`[data-fold="${current.id}"]`);
   await fold.click();

@@ -3,7 +3,7 @@
  * The circuits come from examples used in the RNL language discussion (5T OTA, RC/RLC, the fill
  * example). Coordinates are RNL coordinates (x right, y up) and match the solver and editor records
  * shown in the files; they are placed by hand for this page, not computed by a solver. The RNL follows
- * language standard 0.3 and the standard series 0.3, and reads with the rnl command.
+ * language standard 0.4 and the standard series 0.4, and reads with the rnl command.
  */
 (function (global) {
   'use strict';
@@ -33,7 +33,7 @@
     P_vss: { sym: 'port', label: 'vss', virtual: true },
     VDD1: { sym: 'supply', label: 'vdd', virtual: true },
     VDD2: { sym: 'supply', label: 'vdd', virtual: true },
-    /* vss is a ground net not named 0, so the standard series 0.3 writes its name under the ground */
+    /* vss is a ground net not named 0, so the standard series 0.4 writes its name under the ground */
     GND: { sym: 'gnd', label: 'vss', virtual: true }
   };
 
@@ -176,32 +176,20 @@
   /* Step-by-step refinement: the full file at each step, in one of three writing styles.
      bare: the formal notation only; en: the standard sentences. */
   var U = {
-    u1: ['%dp1 = #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR;', '%dp1 = #M1(in_p), #M2(in_n) and #M5(tail) treated @AS $DIFFERENTIAL_PAIR;'],
-    u2: ['%cm1 = #M3(ref) #M4(out) @AS $CURRENT_MIRROR', '%cm1 = #M3(ref) and #M4(out) treated @AS $CURRENT_MIRROR'],
-    u4: ['{#M1 #M2 #M5} @SET-SYMBOL $NMOS;', '{#M1 #M2 #M5} @SET-SYMBOL to $NMOS;'],
-    u5: ['{#M3 #M4} @SET-SYMBOL $PMOS;', '{#M3 #M4} @SET-SYMBOL to $PMOS;'],
+    u1: ['%dp1 = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;', '%dp1 = #M1(left), #M2(right) and #M5(tail) treated @AS $DIFFERENTIAL_PAIR_N;'],
+    u2: ['%cm1 = #M3(ref) #M4(out) @AS $CURRENT_MIRROR_P', '%cm1 = #M3(ref) and #M4(out) treated @AS $CURRENT_MIRROR_P'],
     u6: ['&vdd @ADD-TO $SUPPLY_NET_SET;', '&vdd @ADD-TO $SUPPLY_NET_SET;'],
     u7: ['&vss @ADD-TO $GROUND_NET_SET;', '&vss @ADD-TO $GROUND_NET_SET;'],
-    u9: ['%ax = (_, _);', '%ax = (_, _);'],
-    u10: ['%sym12 = #M1 #M2 %ax @AS $MIRRORED;', '%sym12 = #M1(a), #M2(b) and %ax(axis) treated @AS $MIRRORED;'],
-    u11: ['%sym34 = #M3 #M4 %ax @AS $MIRRORED;', '%sym34 = #M3(a), #M4(b) and %ax(axis) treated @AS $MIRRORED;'],
-    u13: ['{#M5 #M1 #M3} @ORDER("bottom-to-top");', '{#M5 #M1 #M3} are in @ORDER("bottom-to-top");'],
     u14: ['#M5:d @CURRENT("in")', '#M5:d has @CURRENT("in")']
   };
-  /* zh: the Chinese standard sentences, written with the alias package rnl-zh; only the Chinese pages have them */
+  /* zh: the Chinese standard sentences, written with the alias package alias-zh; only the Chinese pages have them */
   var UZ = {};
   /*zh-CN*/
   UZ = {
-    u1: '%dp1 = #M1(正输入)、#M2(负输入) 和 #M5(尾管) @视作 $"差分对";',
-    u2: '%cm1 = #M3(参考管) 和 #M4(输出管) @视作 $"电流镜"',
-    u4: '{#M1 #M2 #M5} @使用符号 $NMOS;',
-    u5: '{#M3 #M4} @使用符号 $PMOS;',
+    u1: '%dp1 = #M1(左)、#M2(右) 和 #M5(尾管) @视作 $"N型差分对";',
+    u2: '%cm1 = #M3(参考管) 和 #M4(输出管) @视作 $"P型电流镜"',
     u6: '&vdd @加入 $"电源网络集";',
     u7: '&vss @加入 $"地网络集";',
-    u9: '%ax = (_, _);',
-    u10: '%sym12 = #M1(甲)、#M2(乙) 和 %ax(轴) @视作 $"镜像对称";',
-    u11: '%sym34 = #M3(甲)、#M4(乙) 和 %ax(轴) @视作 $"镜像对称";',
-    u13: '{#M5 #M1 #M3} 按 @顺序("从下到上") 排列;',
     u14: '#M5:d 有 @电流("流入")'
   };
   /*/zh-CN*/
@@ -223,7 +211,9 @@
     add('h0', '* 5T OTA');
     add('h1', '.model nch nmos level=1 vto=0.5');
     add('h2', '.model pch pmos level=1 vto=-0.5');
-    if (k === 2 && stage >= 1) add('hz', '* @RNL(type="header") { @VERSION("0.3"); @USE-ALIASES(name="rnl-zh", version="0.3")}');
+    if (stage >= 1) add('hz', k === 2
+      ? '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-ALIASES(name="alias-zh", version="0.4")}'
+      : '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")}');
     add('h3', '.subckt ota5t inp inn out vdd vss vbias', stage <= 1 ? 'P_inp P_inn P_out P_vb P_vdd P_vss' : 'P_inp P_inn P_out P_vb');
     add('m1', 'M1 x    inp   tail vss nch W=2u L=0.5u', 'M1');
     add('m2', 'M2 out  inn   tail vss nch W=2u L=0.5u', 'M2');
@@ -232,17 +222,11 @@
     add('m5', 'M5 tail vbias vss  vss nch W=4u L=1u', 'M5');
     if (stage >= 1) {
       add('u0', '* @RNL {');
-      u('u1', stage >= 2 ? 'M1 M2 M5 ov:dp1 ov:c1' : 'M1 M2 M5 ov:dp1');
+      u('u1', stage >= 2 ? 'M1 M2 M5 ov:dp1 ov:c1 ov:ax ov:ord' : 'M1 M2 M5 ov:dp1');
       u('u2', 'M3 M4 ov:cm1');
       if (stage >= 2) {
-        u('u4', 'M1 M2 M5');
-        u('u5', 'M3 M4');
         u('u6', 'VDD1 VDD2');
         u('u7', 'GND');
-        u('u9', 'ov:ax');
-        u('u10', 'M1 M2 ov:ax');
-        u('u11', 'M3 M4 ov:ax');
-        u('u13', 'M5 M1 M3 ov:ord');
         u('u14', 'M5 ov:cur');
       }
       add('u15', '* }');
@@ -295,6 +279,9 @@
 
   var E5_LINES = [
     { t: '* 5T OTA' },
+    { t: '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")}' },
+    { t: '.model nch nmos level=1 vto=0.5' },
+    { t: '.model pch pmos level=1 vto=-0.5' },
     { t: '.subckt ota5t inp inn out vdd vss vbias' },
     { t: 'M1 x    inp   tail vss nch W=2u L=0.5u', r: 'M1' },
     { t: 'M2 out  inn   tail vss nch W=2u L=0.5u', r: 'M2' },
@@ -302,9 +289,7 @@
     { t: 'M4 out  x     vdd  vdd pch W=4u L=0.5u', r: 'M4' },
     { t: 'M5 tail vbias vss  vss nch W=4u L=1u', r: 'M5' },
     { t: '* @RNL {' },
-    { t: '*   %dp1 = #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR;', r: 'M1 M2 M5 ov:c1', d: 'conflict' },
-    { t: '*   %ax = (_, _);', r: 'ov:ax', d: 'ok' },
-    { t: '*   %sym12 = #M1 #M2 %ax @AS $MIRRORED;', r: 'M1 M2 ov:ax', d: 'ok' },
+    { t: '*   %dp1 = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;', r: 'M1 M2 M5 ov:c1 ov:ax', d: 'conflict' },
     { t: '*   {#M1 #M2 #M9} @ALIGN("y")', cls: 'is-err', d: 'm9' },
     { t: '* }' },
     { t: '* @RNL(type="generated", priority="high", author="rnl-solver", hash="sig1:4c1f") {', d: 'fp' },
@@ -324,7 +309,7 @@
     { k: 'err', id: 'bad', icon: 'cross', html: '<en><code>#M4 @PLACE(2O, 16, …)</code>: a number cannot be followed by a letter, and “2O” contains the letter O. Only this statement fails; M4 keeps the solver’s (28, 16).</en>', refs: ['M4'] },
     { k: 'warn', id: 'conflict', icon: 'warn', html: '<en>The editor’s <code>#M2 @PLACE(x=30, …)</code> is high and written later, so it overrides the solver’s x = 28, which is discarded. The midpoint of the two sources moves to x = 21 while M5 stays at 20: the tail centering that <code>%dp1</code> carries is low, conflicts with these high coordinates and gives way, so the tail is no longer centered. A low constraint giving way is expected and noted no further.</en>', refs: ['M2', 'M5', 'ov:c1'] },
     { k: 'info', id: 'fp', icon: 'info', html: '<en>The solver record’s <code>hash</code> no longer matches the current input: the editor added a record after solving. The viewer suggests solving again; the old result still displays.</en>', refs: [] },
-    { k: 'ok', id: 'ok', icon: 'check', html: '<en>Everything else takes effect: the differential pair and its tail; the symmetry (low as well, but the axis is a free point that moves to x = 21, so it still holds); the other coordinates.</en>', refs: ['M1', 'M2', 'ov:ax'] }
+    { k: 'ok', id: 'ok', icon: 'check', html: '<en>Everything else takes effect: the differential pair and its tail; the mirror symmetry the pair carries (low as well, but its axis is free and moves to x = 21, so it still holds); the other coordinates.</en>', refs: ['M1', 'M2', 'ov:ax'] }
   ];
 
   /* ================= Hero: RC low-pass ================= */
@@ -354,7 +339,7 @@
     },
     overlays: function (P, S, B, mode) {
       if (mode !== 'flow') return [];
-      return [{ id: 'flow', kind: 'arrow', pts: [[2.6, 15], [20, 15]], label: '$FLOW · left-to-right', labelAt: [11.3, 15], anchor: 'middle', mono: true }];
+      return [{ id: 'flow', kind: 'arrow', pts: [[2.6, 15], [20, 15]], label: '@ORDER · left-to-right', labelAt: [11.3, 15], anchor: 'middle', mono: true }];
     }
   };
 
@@ -365,7 +350,7 @@
     { t: 'C1 out 0 10n', r: 'C1 G2', sim: 'use', view: 'draw', note: '<en><b>Netlist</b>: a 10 nF capacitor from out to ground; the standard package adds its ground symbol too.</en>' },
     { t: '.ac dec 20 10 1meg', cls: 'is-analysis', sim: 'use', view: 'skip', plot: true, note: '<en><b>Simulation command</b>: sweep from 10 Hz to 1 MHz. The viewer does not need it to draw.</en>' },
     { t: '* @RNL {', sim: 'skip', view: 'meta', note: '<en><b>Start of an RNL record</b>. To the simulator, this is just a comment line starting with *.</en>' },
-    { t: '*   {#V1 #R1 #C1} are treated @AS $FLOW;', r: 'V1 R1 C1 ov:flow', mode: 'flow', sim: 'skip', view: 'draw', note: '<en><b>RNL</b>: V1, R1 and C1 follow the signal flow, left to right by default. “are treated” is free text, there only so the line reads as a sentence; machines skip it.</en>' },
+    { t: '*   #V1, #R1 and #C1 are in @ORDER("left-to-right");', r: 'V1 R1 C1 ov:flow', mode: 'flow', sim: 'skip', view: 'draw', note: '<en><b>RNL</b>: V1, R1 and C1 run from left to right, the way the signal flows. “are in” is free text, there only so the line reads as a sentence; machines skip it.</en>' },
     { t: '*   #R1 @ORIENT("R90");', r: 'R1', sim: 'skip', view: 'draw', note: '<en><b>RNL</b>: R1 turns 90° counterclockwise and lies flat.</en>' },
     { t: '*   on &out there is a @TEXT("V_{out}")', r: 'net:out', sim: 'skip', view: 'draw', note: '<en><b>RNL</b>: label net out as V<sub>out</sub>; <code>_{…}</code> makes a subscript.</en>' },
     { t: '* }', sim: 'skip', view: 'meta', note: '<en><b>End of the RNL record</b>.</en>' },
@@ -412,10 +397,7 @@
       overlays: function (P, S, B, mode) {
         if (mode === 'chain') {
           return [
-            { id: 'flow', kind: 'arrow', pts: [[1.5, 16.6], [25.5, 16.6]], label: '$CHAIN · left-to-right, low', labelAt: [13.5, 16.6], anchor: 'middle', mono: true },
-            { id: 'r-src', ref: 'roles', kind: 'tag', at: [3, -0.4], anchor: 'middle', text: 'source' },
-            { id: 'r-ser', ref: 'roles', kind: 'tag', at: [12, 15.1], anchor: 'middle', text: '{chain}' },
-            { id: 'r-load', ref: 'roles', kind: 'tag', at: [23, -0.4], anchor: 'middle', text: 'load' }
+            { id: 'flow', kind: 'arrow', pts: [[1.5, 16.6], [25.5, 16.6]], label: '@ORDER · left-to-right', labelAt: [13.5, 16.6], anchor: 'middle', mono: true }
           ];
         }
         return [];
@@ -427,18 +409,19 @@
     var merged = style === 'merged';
     var L = [
       { t: '* RLC low-pass' },
+      { t: '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")}' },
       { t: 'V1 in 0 AC 1', r: 'V1' },
       { t: 'R1 in mid 50', r: 'R1' },
       { t: 'L1 mid out 1m', r: 'L1' },
       { t: 'C1 out 0 100n', r: 'C1' },
       { t: '* @RNL {' },
-      { t: '*   #V1, {#R1 #L1} and #C1 are treated @AS $CHAIN;', r: 'V1 R1 L1 C1 ov:roles ov:flow', mode: 'chain' },
+      { t: '*   #V1, #R1, #L1 and #C1 are in @ORDER("left-to-right");', r: 'V1 R1 L1 C1 ov:flow', mode: 'chain' },
       { t: '*   {#R1 #L1} @ORIENT("R90")' + (merged ? ';' : ''), r: 'R1 L1' }
     ];
     if (merged) {
       L.push({ t: '*   &0 @REMOVE-FROM $GROUND_NET_SET;', r: 'G', mark: 'is-add' });
       L.push({ t: '*   $GROUND is @ATTACH to &0 => named %g;', r: 'G', mark: 'is-add' });
-      L.push({ t: '*   net &0 is fully @ROUTE', r: 'G net:0', mark: 'is-add' });
+      L.push({ t: '*   net &0 is @ROUTE-NET', r: 'G net:0', mark: 'is-add' });
     }
     L.push({ t: '* }' }, { t: '.end' });
     return L;
@@ -493,6 +476,7 @@
 
   var E2_LINES = [
     { t: '* 5T OTA testbench' },
+    { t: '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")}' },
     { t: '.subckt ota5t inp inn out vdd vss vbias' },
     { t: '* <en>(M1 … M5 as before, left out)</en>' },
     { t: '* @RNL {', r: 'XU1' },
@@ -517,7 +501,7 @@
     { t: 'CL  out 0 1p', r: 'CL G6' },
     { t: '* @RNL {' },
     { t: '*   #XU1 is at @PLACE(20, 14);', r: 'XU1' },
-    { t: '*   nets {&inp &inn &out &vdd &vb} are fully @ROUTE;', r: 'net:inp net:inn net:out net:vdd net:vb' },
+    { t: '*   nets {&inp &inn &out &vdd &vb} are @ROUTE-NET;', r: 'net:inp net:inn net:out net:vdd net:vb' },
     { t: '*   at (-0.5, 24) there is a @TEXT("5T OTA testbench") => it @SET-STYLE to $note', r: 'ov:note' },
     { t: '* }' },
     { t: '.end' }
@@ -526,6 +510,8 @@
   /* ================= Example 3: custom symbol ================= */
 
   var E3_LINES = [
+    { t: '* A symbol of one\'s own' },
+    { t: '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")}' },
     { t: '* @RNL {' },
     { t: '*   $MY_NMOS = @DEFINE-SYMBOL {', r: 'box' },
     { t: '*     (0, 2) @PIN(terminal="d", label="D", direction="up");', r: 'pin-d' },
@@ -539,7 +525,7 @@
     { t: '*     @LINE(fill="linecolor") {(-0.2, -1) (-0.7, -0.7) (-0.7, -1.3) (-0.2, -1)};', r: 'poly' },
     { t: '*     ? @TEXT("${name}", key="name") => @PLACE(0.6, 1.2)', r: 'text' },
     { t: '*   };', r: 'box' },
-    { t: '*   # @SELECT-INSTANCE(model="nch") => @SET-SYMBOL $MY_NMOS', r: 'rule' },
+    { t: '*   # @SELECT-INSTANCE(model="nch", recursive=true) => @SET-SYMBOL $MY_NMOS', r: 'rule' },
     { t: '* }' }
   ];
 
@@ -555,82 +541,218 @@
     l5: '<en>The source lead.</en>',
     poly: '<en>A closed polyline with <code>fill="linecolor"</code> is filled with the line color: this is the NMOS arrow.</en>',
     text: '<en>A lone <code>?</code> means the instance drawn with this symbol: its name (<code>${name}</code>) is shown next to it.</en>',
-    rule: '<en>A <b>rule</b>: every instance whose model is nch uses this symbol. It is evaluated on the level it is written in, and once more on each level below.</en>',
+    rule: '<en>A <b>rule</b>: every instance whose model is nch uses this symbol. It is evaluated on the level it is written in and, with <code>recursive=true</code>, once more on each level below; without it, on its own level only.</en>',
     idle: '<en>Hover over any line on the left to see which stroke of the symbol it draws.</en>'
   };
 
   /* ================= Example 4: rules and fill ================= */
 
   function fillScene(n) {
+    var gen = 'is-gen';
     var dev = {
-      V1: { sym: 'vsrc', x: -3, y: 10, label: 'V1', value: '1.8', lab: [-2.1, 0.6, 'end'], val: [-2.1, -0.8, 'end'] },
       R1: { sym: 'res', x: 10, y: 14, label: 'R1', value: '10k' },
       M1: { sym: 'nmos', x: 10, y: 6, label: 'M1' },
       C1: { sym: 'cap', x: 18, y: 6, label: 'C1', value: '1p' },
-      Gv: { sym: 'gnd', x: -3, y: 8, virtual: true }
+      Pin: { sym: 'port', x: 4, y: 6, label: 'in', virtual: true }
     };
     if (n >= 1) {
-      dev.Gm = { sym: 'gnd', x: 10, y: 2, virtual: true, cls: 'is-gen' };
-      dev.Gc = { sym: 'gnd', x: 18, y: 2, virtual: true, cls: 'is-gen' };
+      dev.Gm = { sym: 'gnd', x: 10, y: 2, virtual: true, cls: gen };
+      dev.Gc = { sym: 'gnd', x: 18, y: 2, virtual: true, cls: gen };
+      dev.Sv = { sym: 'supply', x: 10, y: 18, label: 'vdd', virtual: true, cls: gen };
     }
-    if (n >= 2) dev.Pin = { sym: 'port', x: 5, y: 6, label: 'in', virtual: true, cls: 'is-gen' };
+    if (n >= 2) dev.Pout = { sym: 'port', x: 4, y: 10, label: 'out', virtual: true, cls: gen };
     return {
       rk: 'fill' + n,
-      box: [-7.6, 0, 23, 19.5],
+      box: [-1.6, 0, 23, 19.5],
       devices: dev,
       route: function (P) {
         var w = [
-          { net: 'vdd', pts: [P('V1.p'), [-3, 16], P('R1.p')] },
-          { net: 'out', pts: [P('R1.n'), P('M1.d')] },
+          { net: 'in', pts: [P('Pin.p'), P('M1.g')] },
+          { net: 'out', pts: [P('R1.n'), [10, 10], P('M1.d')] },
           { net: 'out', pts: [[10, 10], [18, 10], P('C1.p')] }
         ];
         if (n >= 1) {
-          w.push({ net: '0', pts: [P('M1.s'), P('Gm.p')], cls: 'is-gen' });
-          w.push({ net: '0', pts: [P('C1.n'), P('Gc.p')], cls: 'is-gen' });
+          w.push({ net: '0', pts: [P('M1.s'), P('Gm.p')], cls: gen });
+          w.push({ net: '0', pts: [P('C1.n'), P('Gc.p')], cls: gen });
+          w.push({ net: 'vdd', pts: [P('R1.p'), P('Sv.p')], cls: gen });
         }
-        if (n >= 2) w.push({ net: 'in', pts: [P('M1.g'), P('Pin.p')], cls: 'is-gen' });
-        return { wires: w, dots: [[10, 10, 'out']], labels: [{ text: 'vdd', at: [5, 16.75], net: 'vdd' }, { text: 'out', at: [14, 10.75], net: 'out' }] };
-      },
-      overlays: function () {
-        return [{ id: 'own', ref: 'Gv', kind: 'text', at: [-3, 5.4], text: '<en>on the pin</en>', anchor: 'middle', tone: 'mute' }];
+        if (n >= 2) w.push({ net: 'out', pts: [P('Pout.p'), [10, 10]], cls: gen });
+        return { wires: w, dots: [[10, 10, 'out']] };
       }
     };
   }
 
   var E4_LINES = [
-    { t: '* <en>Fill: grounds from the standard package, the port from a rule</en>' },
+    { t: '* <en>Rules and fill: stubs and port tags from the standard package</en>' },
+    { t: '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")}' },
     { t: '.model nch nmos level=1' },
-    { t: 'V1 vdd 0 1.8', r: 'V1 Gv' },
-    { t: 'R1 vdd out 10k', r: 'R1' },
-    { t: 'M1 out in 0 0 nch', r: 'M1 Gm', gen: 'gnd' },
-    { t: 'C1 out 0 1p', r: 'C1 Gc', gen: 'gnd' },
+    { t: '.subckt cs in out vdd' },
+    { t: 'R1 vdd out 10k', r: 'R1 Sv' },
+    { t: 'M1 out in 0 0 nch', r: 'M1 Gm' },
+    { t: 'C1 out 0 1p', r: 'C1 Gc' },
     { t: '* @RNL {' },
-    { t: '*   $PORT_STUB = @DEFINE(roles=[["t", "terminal"]]) {', r: 'Pin' },
-    { t: '*     %p = $IO_PORT @ATTACH ?t::net;', r: 'Pin' },
-    { t: '*     ?t::net @WIRE {%p:p ?t};', r: 'Pin net:in' },
-    { t: '*     {?t %p:p} @ALIGN("y");', r: 'Pin' },
-    { t: '*     %p:p ?t @DISTANCE("left-to-right", exact=2)', r: 'Pin' },
-    { t: '*   };', r: 'Pin' },
-    { t: '*   # @SELECT-TERMINAL(terminal="g", wired=false) => $PORT_STUB @ATTACH;', r: 'Pin net:in', gen: 'port' },
-    { t: '*   #M1 @SET-SYMBOL $NMOS;', r: 'M1' },
-    { t: '*   $GROUND @ATTACH #V1:2', r: 'Gv ov:own' },
+    { t: '*   &vdd @ADD-TO $SUPPLY_NET_SET;', r: 'Sv net:vdd', gen: 'stub' },
+    { t: '*   &vdd @REMOVE-FROM $PORT_FILL_SET;', r: 'net:vdd', gen: 'port' },
+    { t: '*   %tin = $IO_PORT @ATTACH &in;', r: 'Pin net:in' },
+    { t: '*   # @SELECT-NET(port=true) => @ROUTE-NET', r: 'net:in net:out', gen: 'port' },
     { t: '* }' },
     { t: '* @RNL(author="rnl-editor") {' },
-    { t: '*   #V1 @PLACE(-3, 10);  #R1 @PLACE(10, 14);  #M1 @PLACE(10, 6);  #C1 @PLACE(18, 6);', r: 'V1 R1 M1 C1' },
-    { t: '*   %j = (10, 10);', r: 'net:out' },
-    { t: '*   &vdd @WIRE(mode="vertical-horizontal") {#V1:1 #R1:1};', r: 'net:vdd' },
-    { t: '*   &out @WIRE {#R1:2 %j #M1:d};', r: 'net:out' },
-    { t: '*   &out @WIRE(mode="horizontal-vertical") {%j #C1:1};', r: 'net:out' },
-    { t: '*   $JUNCTION @ATTACH %j', r: 'net:out' },
+    { t: '*   #R1 @PLACE(10, 14);  #M1 @PLACE(10, 6);  #C1 @PLACE(18, 6);  %tin @PLACE(4, 6)', r: 'R1 M1 C1 Pin' },
     { t: '* }' },
-    { t: '.end' }
+    { t: '.ends cs' }
   ];
 
+  /* ================= Tour T3: the common-emitter stage ================= */
+
+  /* The file at each preset: 0 only the header record, 1 the supply and ground sets, 2 vdd and vss
+     taken out of $PORT_FILL_SET */
+  function ceLines(p) {
+    var L = ['* Common-emitter stage', '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")}', '.model npn1 npn bf=100',
+      '.subckt ce in out vdd vss', 'Q1 out in vss npn1', 'RC vdd out 5k', 'CL out vss 1p'];
+    if (p >= 1) {
+      L.push('* @RNL {');
+      L.push('*   &vdd @ADD-TO $SUPPLY_NET_SET;');
+      L.push('*   &vss @ADD-TO $GROUND_NET_SET' + (p >= 2 ? ';' : ''));
+      if (p >= 2) L.push('*   {&vdd &vss} @REMOVE-FROM $PORT_FILL_SET');
+      L.push('* }');
+    }
+    L.push('.ends ce');
+    return L.map(function (s) { return { t: s }; });
+  }
+
+  /* ================= Tour: the other complete files ================= */
+
+  var HEADER_LINE = '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")}';
+  function rows(arr) { return arr.map(function (l) { return typeof l === 'string' ? { t: l } : l; }); }
+
+  /* T2: a pair matched, and laid out as mirror images when on */
+  function mpLines(on) {
+    var L = rows([
+      '* Differential pair', HEADER_LINE, '.model nch nmos level=1',
+      { t: 'M1 a b c c nch', r: 'M1' },
+      { t: 'M2 d e c c nch', r: 'M2' },
+      '* @RNL {',
+      { t: '*   %dp = {#M1 #M2} treated @AS $MATCHED' + (on ? ';' : ''), r: 'M1 M2 ov:dp' }
+    ]);
+    if (on) {
+      L.push({ t: '*   %ax = (_, _);', r: 'ov:di' });
+      L.push({ t: '*   %sym = #M1(left), #M2(right) and %ax(axis) treated @AS $MIRRORED_LAYOUT', r: 'M1 M2 ov:al ov:di ov:or' });
+    }
+    L.push({ t: '* }' });
+    return L;
+  }
+
+  /* T2: a definition with a parameter, applied with gap g */
+  function pairLines(g) {
+    return rows([
+      '* Two resistors', HEADER_LINE, 'R1 a b 1k', 'R2 b c 1k', '* @RNL {',
+      '*   $PAIR = @DEFINE(roles=["a", "b"], parameters=[["gap", 2]]) {',
+      '*     {?a ?b} @ALIGN("y");',
+      '*     ?a ?b @DISTANCE("left-to-right", min=?gap)',
+      '*   };',
+      { t: g === 2 ? '*   #R1(a) #R2(b) @AS $PAIR   /* gap = 2 */' : '*   #R1(a) #R2(b) @AS(gap=' + g + ') $PAIR', id: 'as' },
+      '* }'
+    ]);
+  }
+
+  /* T5: three wires that meet at one named point, or at three points that only share coordinates */
+  function teeLines(shared) {
+    var L = rows(['* Three resistors', HEADER_LINE, 'RA n1 0 1k', 'RB n1 0 1k', 'RC n1 0 1k', '* @RNL {']);
+    if (shared) {
+      L.push({ t: '*   %j = (6, 0);' }, { t: '*   &n1 @WIRE {#RA:1 %j #RB:1};', r: 'RA RB net:n1' }, { t: '*   &n1 @WIRE {%j #RC:1};', r: 'RC net:n1' }, { t: '*   $JUNCTION @ATTACH %j', r: 'net:n1' });
+    } else {
+      L.push({ t: '*   &n1 @WIRE {#RA:1 (6, 0) #RB:1};', r: 'RA RB net:n1' }, { t: '*   &n1 @WIRE {(6, 0) #RC:1}', r: 'RC net:n1' });
+    }
+    L.push({ t: '* }' });
+    return L;
+  }
+
+  /* T5: a bus of two bits */
+  var BUS_LINES = rows([
+    '* Two inverters on a bus', HEADER_LINE,
+    '.subckt inv a y vdd vss', 'M1 y a vdd vdd pch', 'M2 y a vss vss nch', '.ends inv',
+    '.model nch nmos level=1', '.model pch pmos level=1',
+    { t: 'XI<1> D<1> Y<1> vdd 0 inv', r: 'XI' },
+    { t: 'XI<0> D<0> Y<0> vdd 0 inv', r: 'XI' },
+    { t: 'R1 D<1> 0 1k', r: 'R1' },
+    { t: 'R0 D<0> 0 1k', r: 'R0' },
+    '* @RNL {',
+    { t: '*   #XI<1:0> @BUNDLE => %xi;', r: 'XI' },
+    { t: '*   %s = (_, _); %t1 = (_, _); %t0 = (_, _);', r: 'net:D' },
+    { t: '*   %bus = &D<1:0> @WIRE {%s %t1 %t0 %xi:a};', r: 'net:D XI' },
+    { t: '*   &D<1> @WIRE {%t1 #R1:1};', r: 'net:D1 R1' },
+    { t: '*   &D<0> @WIRE {%t0 #R0:1};', r: 'net:D0 R0' },
+    { t: '*   %bus @TEXT("D<1:0>")', r: 'net:D' },
+    '* }', '.end'
+  ]);
+
+  /* T6: a label of M1 and an annotation of a point */
+  function txLines(moved, keyed) {
+    var L = rows([
+      '* Label and annotation', HEADER_LINE, '.model nch nmos level=1',
+      { t: 'M1 d g s s nch W=2u L=0.5u', r: 'M1' },
+      '* @RNL {',
+      { t: '*   #M1 @PLACE(' + (moved ? 12 : 4) + ', 4);', r: 'M1', id: 'place' },
+      { t: '*   #M1 @TEXT("W/L = ${w}/${l}", key="wl", dy=-3);', r: 'M1 ov:wl' },
+      { t: '*   (2, 9) @TEXT("bias branch")' + (keyed ? ';' : ''), r: 'ov:an' }
+    ]);
+    if (keyed) L.push({ t: '*   #M1 @TEXT("${w}/${l}", key="wl", dy=-3)', r: 'M1 ov:wl' });
+    L.push({ t: '* }' });
+    return L;
+  }
+
+  /* T8: a transistor of a PDK whose model the netlist does not define; DEVICE names its terminals */
+  function devLines(on) {
+    return rows([
+      '* PDK example',
+      { t: on ? '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4"); @DEVICE(name="XM*", model="sky130_fd_pr__nfet_*", terminals=["d", "g", "s", "b"])}' : HEADER_LINE, mark: 'is-chg' },
+      'XM1 out in 0 0 sky130_fd_pr__nfet_01v8 w=1 l=0.15',
+      'RL vdd out 10k',
+      '* @RNL {',
+      { t: '*   #XM1:d @CURRENT("in")', cls: on ? '' : 'is-err' },
+      '* }', '.end'
+    ]);
+  }
+
+  /* ================= Every complete file the pages show ================= */
+
+  /* Each file the pages show whole, in every style and step they show it in: site/build.py --check reads
+     them through site/inline-files.mjs and checks each with rnl check, so that none has an error, a violation
+     or a warning, but the ones shown with errors on purpose (expect: 'errors'), which must have one. */
+  function files() {
+    var F = [];
+    function add(name, lines, expect) { F.push({ name: name, lines: lines, expect: expect || 'clean' }); }
+    STYLES.forEach(function (style) { add('tour-ota-' + style + '.sp', otaCode(2, style)); });
+    [0, 1, 2].forEach(function (p) { add('tour-ce-' + p + '.sp', ceLines(p)); });
+    [false, true].forEach(function (on) { add('tour-pair-' + (on ? 'mirrored' : 'matched') + '.sp', mpLines(on)); });
+    [2, 4].forEach(function (g) { add('tour-pair-gap-' + g + '.sp', pairLines(g)); });
+    [true, false].forEach(function (s) { add('tour-tee-' + (s ? 'shared' : 'apart') + '.sp', teeLines(s)); });
+    add('tour-bus.sp', BUS_LINES);
+    [[false, false], [true, true]].forEach(function (v) { add('tour-text-' + (v[0] ? 'moved' : 'first') + '.sp', txLines(v[0], v[1])); });
+    add('tour-device.sp', devLines(true));
+    add('tour-device-unknown.sp', devLines(false), 'errors');
+    add('example1-rlc.sp', e1Lines('plain'));
+    add('example1-rlc-merged.sp', e1Lines('merged'));
+    add('example2-testbench.sp', E2_LINES);
+    add('example3-symbol.sp', E3_LINES);
+    add('example4-fill.sp', E4_LINES);
+    add('example5-errors.sp', E5_LINES, 'errors');
+    return F;
+  }
+
   global.RNLScenes = {
+    files: files,
     OTA_BOX: OTA_BOX,
     STYLES: STYLES,
     otaScene: otaScene,
     otaCode: otaCode,
+    ceLines: ceLines,
+    mpLines: mpLines,
+    pairLines: pairLines,
+    teeLines: teeLines,
+    BUS_LINES: BUS_LINES,
+    txLines: txLines,
+    devLines: devLines,
     ownerScene: ownerScene,
     e5Scene: e5Scene,
     E5_LINES: E5_LINES,

@@ -4,10 +4,8 @@
   "Skip to content": "跳至主要內容",
   "On this page": "本頁目錄",
   "Switch color theme": "切換色彩主題",
-  "Draft · names may change": "草案 · 名稱仍可能調整",
   "Standard packages": "標準套件",
   "What the standard packages hold: every symbol as it is drawn, and the text that defines it": "標準套件的內容：每個符號繪製出的外觀，以及定義它的原文",
-  "Every netlist has the standard package <code>rnl-std</code> at its root by default: it gives elements their symbols and objects their styles, and fills in grounds and supplies for unwired pins. It is made of sub-packages; a file can drop any of them, and add packages that are used on demand. This page lists every package with what it is for, what it references and the text that defines it; the symbols are drawn by the RNL core when the site is built, as the viewers draw them.": "每份網表的根層級預設皆載入標準套件 <code>rnl-std</code>：它為實例指定符號、為物件設定樣式，並為未連線的接腳補上接地與電源符號。它由多個子套件組成；檔案可以移除其中任一子套件，也可以加入按需使用的套件。本頁列出每個套件的用途、引用關係與定義原文；所有符號皆於網站建置時由 RNL 核心繪製，與檢視器中呈現的結果完全一致。",
   "Package facts": "套件資訊",
   "Content": "內容",
   "Packages": "套件",
@@ -38,5 +36,7 @@
   ": section 16.3 is about the standard package": "：第 16.3 節說明標準套件",
   "Web viewer": "網頁版檢視器",
   ": draw a netlist as a schematic": "：將網表繪製為原理圖",
-  "Source files:": "原始檔："
+  "Source files:": "原始檔：",
+  "A file of 0.4 uses no package unless its header record names it. <code>rnl-std-all</code> is the one collection of the series: it brings in the sub-packages that give elements their symbols and objects their styles, define the circuit structures, and fill in grounds, supplies and net labels for unwired pins. A file may name the sub-packages one by one instead, and add packages that are used on demand, such as <code>rnl-std-45deg</code> for 45-degree symbols. (In the series 0.3 and 0.2, <code>rnl-std</code> is at the root of every netlist by default.) This page lists every package with what it is for, what it references and the text that defines it; the symbols are drawn by the RNL core when the site is built, as the viewers draw them.": "0.4 版檔案除非在檔頭記錄中寫明，否則不會使用任何套件。<code>rnl-std-all</code> 是該系列唯一的套件集合：它匯入多個子套件，分別為實例指定符號、為物件設定樣式、定義電路結構，並為未連線的接腳補上接地、電源與網路標籤。檔案也可以改為逐一寫明子套件，並依需求加入其他套件（例如用於 45 度符號的 <code>rnl-std-45deg</code>）。（在 0.3 與 0.2 系列中，每份網表的根層級預設皆使用 <code>rnl-std</code>。）本頁列出每個套件的用途、引用關係與定義原文；所有符號皆於網站建置時由 RNL 核心繪製，與檢視器中呈現的結果完全一致。",
+  "Series 0.4": "系列 0.4"
 }

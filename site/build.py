@@ -323,7 +323,9 @@ def timeline_html(data=None, tags=None, full=False):
     if len(shown) < len(events):
         rows.append('        <li class="tl-more"><a href="timeline.html">'
                     + localized({code: I18N.message(code, "timeline_all") for code in CODES}) + '</a></li>')
-    rows.append('        <li class="tl-sep">' + localized({code: I18N.message(code, "timeline_next") for code in CODES}) + '</li>')
+    if data.get("next"):
+        # the "Next" row heads the planned items; with none planned there is no such row
+        rows.append('        <li class="tl-sep">' + localized({code: I18N.message(code, "timeline_next") for code in CODES}) + '</li>')
     for event in data.get("next", []):
         title = localized(localized_values(event["title"], "next milestone title"))
         description = localized(localized_values(event["description"], "next milestone description"), html=True)
@@ -671,8 +673,8 @@ def check_ota(files, ex):
             if line not in fixed and not (line.startswith("*   ") and line[4:] in statements):
                 errors.append("examples/%s: the line %r is not among the lines of src/assets/ota.js" % (name, line))
     # the same file with the two public packages, and the core's drawings of the two, which say which file they are of
-    header = '* @RNL(type="header") { @VERSION("0.3")}'
-    packages = '; @USE-PACKAGE(name="eda-symbol", version="0.1"); @USE-PACKAGE(name="eda-style", version="0.1")'
+    header = '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")}'
+    packages = '; @USE-PACKAGE(name="eda-symbol", version="0.2"); @USE-PACKAGE(name="eda-style", version="0.2")'
     if eda != en.replace(header, header.replace('")}', '")' + packages + "}")):
         errors.append("examples/ota5t-review-eda.sp: is not examples/ota5t-review.sp with the USE-PACKAGE lines of eda-symbol and eda-style in its header")
     if packages not in script:
@@ -745,6 +747,8 @@ def check_examples_rnl(rnl):
             # (python scripts/packages.py download)
             paths = []
             for name, version in re.findall(r'@USE-PACKAGE\(name="([\w-]+)", version="([\d.]+)"\)', path.read_text(encoding="utf-8")):
+                if (ROOT / "libraries" / "standard" / version / (name + ".rnl")).is_file():
+                    continue   # a package of the standard series, which the core carries
                 folder = ROOT / ".rnl-packages" / name / version
                 if not folder.is_dir():
                     errors.append("%s: the package %s %s is not in .rnl-packages/: run python scripts/packages.py download" % (rel, name, version))
@@ -764,6 +768,42 @@ def check_examples_rnl(rnl):
                                  capture_output=True, text=True, encoding="utf-8")
             if rnd.returncode != 0 or not list(out_dir.glob("*.svg")):
                 errors.append("%s: rnl render failed:\n%s%s" % (rel, rnd.stdout, rnd.stderr))
+    return errors
+
+
+def check_inline_rnl(rnl):
+    """Check every complete file the pages show (RNLScenes.files() in src/assets/scenes.js, read by
+    inline-files.mjs) with `rnl check`: 0 errors, 0 violations and 0 warnings, or at least one error for a file
+    shown with errors on purpose."""
+    try:
+        listed = subprocess.run(["node", str(HERE / "inline-files.mjs")], capture_output=True, text=True,
+                                encoding="utf-8", check=True).stdout
+    except (OSError, subprocess.CalledProcessError) as error:
+        return ["inline-files.mjs: %s" % getattr(error, "stderr", None) or error]
+    errors = []
+    with tempfile.TemporaryDirectory() as tmp:
+        for file in json.loads(listed):
+            where = "the page file " + file["name"]
+            # a file of 0.4 uses no package it does not name: one that says the standard package draws it
+            # has to name the standard series in its header record
+            if not re.search(r'@RNL\(type="header"\)\s*\{[^}]*@USE-PACKAGE\(name="rnl-std-all", version="0\.4"\)',
+                             file["text"]):
+                errors.append("%s: no header record with @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\")" % where)
+            path = Path(tmp) / file["name"]
+            path.write_text(file["text"], encoding="utf-8", newline="\n")
+            chk = subprocess.run([str(rnl), "check", str(path)], capture_output=True, text=True, encoding="utf-8")
+            m = COUNTS.search(chk.stdout)
+            if not m:
+                errors.append("%s: rnl check printed no summary:\n%s%s" % (where, chk.stdout, chk.stderr))
+                continue
+            n_err, n_vio, n_warn = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            found = "\n".join(l for l in chk.stdout.splitlines() if l.startswith(("error", "violation", "warning")))
+            if file["expect"] == "errors":
+                if not n_err:
+                    errors.append("%s: shown with errors on purpose, but rnl check finds none" % where)
+            elif n_err or n_vio or n_warn:
+                errors.append("%s: rnl check finds %d errors, %d violations and %d warnings:\n%s"
+                              % (where, n_err, n_vio, n_warn, found))
     return errors
 
 
@@ -1059,7 +1099,7 @@ def main():
         result = build(version, incubating=args.incubating or args.check, online=args.online)
         if args.rnl is not None:
             rnl = find_rnl(args.rnl)
-            rnl_errors = check_examples_rnl(rnl)
+            rnl_errors = check_examples_rnl(rnl) + check_inline_rnl(rnl)
             if rnl_errors:
                 raise BuildError("\n".join(rnl_errors))
     except BuildError as e:
@@ -1070,7 +1110,7 @@ def main():
     if args.check:
         msg = "ok: %d text groups, each in %s, and %d example files" % (groups, " and ".join(CODES), len(examples()))
         if args.rnl is not None:
-            msg += " (checked and rendered with rnl)"
+            msg += " (checked and rendered with rnl), and the files the pages show (checked with rnl)"
         print(msg)
         return 0
     out = args.out.resolve()

@@ -461,7 +461,7 @@ button.hero-logo { padding: 3px; box-sizing: border-box; border: 0; background: 
 .sc-dev.is-gen .sp { stroke: var(--ink-3); }
 .sc-dev.is-gen .sp.fill { fill: var(--ink-3); }
 .sc-wire.is-gen { stroke: var(--ink-3); }
-.sc-label.is-gen { fill: var(--ink-3); }
+.sc-label.is-gen, .sc-netlabel.is-gen { fill: var(--ink-3); }
 .sc-wire.is-signal { stroke: var(--signal); stroke-width: .22; }
 
 .sc.has-hl .sc-dev:not(.is-hl), .sc.has-hl .sc-label:not(.is-hl), .sc.has-hl .sc-value:not(.is-hl),

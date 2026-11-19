@@ -26,7 +26,7 @@ for (const language of ['en', 'zh']) {
   test(`review: an item lights up its devices, its statements and their lines, ${language}`, async ({ page }) => {
     await open(page, `/${language}/index.html`);
     const items = page.locator('#rv-items .rv-item');
-    await expect(items).toHaveCount(5);
+    await expect(items).toHaveCount(3);
     const lit = page.locator('#rv-stage svg [data-dev].is-lit');
     const devices = new Set();
     const litDevices = async () => new Set(await lit.evaluateAll(els => els.map(el => el.getAttribute('data-dev'))));
@@ -47,17 +47,17 @@ for (const language of ['en', 'zh']) {
     await expect(items.nth(1)).toHaveAttribute('aria-pressed', 'true');
     await page.mouse.move(5, 5);
     await expect.poll(async () => [...await litDevices()].sort()).toEqual(['M3', 'M4']);
-    await expect(page.locator('#rv-code .cl.is-hot')).toContainText('$CURRENT_MIRROR');
+    await expect(page.locator('#rv-code .cl.is-hot')).toContainText('$CURRENT_MIRROR_P');
     await items.nth(1).click();
     await expect(lit).toHaveCount(0);
 
     // a statement of the file picks its item
-    await page.locator('#rv-code .cl', { hasText: '@ORDER' }).first().hover();
-    await expect.poll(async () => [...await litDevices()].sort()).toEqual(['M1', 'M3', 'M5']);
-    // the symmetry: two statements, the four devices and the axis
+    await page.locator('#rv-code .cl', { hasText: '@CURRENT' }).first().hover();
+    await expect.poll(async () => [...await litDevices()].sort()).toEqual(['M5']);
+    // the tail current: one statement, the tail device
     await items.nth(2).hover();
-    await expect.poll(async () => [...await litDevices()].sort()).toEqual(['M1', 'M2', 'M3', 'M4']);
-    await expect(hot).toHaveCount(3);
+    await expect.poll(async () => [...await litDevices()].sort()).toEqual(['M5']);
+    await expect(hot).toHaveCount(1);
     devices.clear();
 
     // a device of the drawing marks its lines in the file
@@ -74,14 +74,14 @@ test('review: the look switch redraws the same circuit with the packages, the fi
   const standard = await stage.innerHTML();
   const names = await devices();
   expect(names).toEqual(expect.arrayContaining(['M1', 'M2', 'M3', 'M4', 'M5', 'PB', 'PI', 'PN', 'PO', 'VDD', 'VSS']));
-  await expect(page.locator('#rv-code')).not.toContainText('@USE-PACKAGE');
+  await expect(page.locator('#rv-code')).not.toContainText('eda-symbol');
   await expect(page.locator('#rv-open')).toHaveAttribute('href', /ota5t-review\.sp/);
 
   await page.locator('#rv-look [data-look="eda"]').click();
   expect(await stage.innerHTML()).not.toBe(standard);
   expect(await devices()).toEqual(names);
-  await expect(page.locator('#rv-code .cl.is-diff')).toContainText('@USE-PACKAGE(name="eda-symbol", version="0.1")');
-  await expect(page.locator('#rv-code .cl.is-diff')).toContainText('@USE-PACKAGE(name="eda-style", version="0.1")');
+  await expect(page.locator('#rv-code .cl.is-diff')).toContainText('@USE-PACKAGE(name="eda-symbol", version="0.2")');
+  await expect(page.locator('#rv-code .cl.is-diff')).toContainText('@USE-PACKAGE(name="eda-style", version="0.2")');
   await expect(page.locator('#rv-open')).toHaveAttribute('href', /ota5t-review-eda\.sp/);
   // the traditional look is drawn on black, the standard one on white
   await expect(page.locator('#rv-stage')).toHaveCSS('background-color', 'rgb(0, 0, 0)');
@@ -118,16 +118,16 @@ test('review: the writing style of the file, Chinese sentences only on the Chine
   await expect(page.locator('#rv-style button')).toHaveCount(2);
   await page.locator('#rv-style [data-style="bare"]').click();
   await expect(page.locator('#rv-code')).not.toContainText('treated');
-  await expect(page.locator('#rv-code')).toContainText('%dp1 = #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR;');
+  await expect(page.locator('#rv-code')).toContainText('%dp1 = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;');
   await expect(page.locator('#rv-open')).toHaveAttribute('href', /ota5t-review-bare\.sp/);
   await page.locator('#rv-style [data-style="en"]').click();
-  await expect(page.locator('#rv-code')).toContainText('treated @AS $DIFFERENTIAL_PAIR;');
+  await expect(page.locator('#rv-code')).toContainText('treated @AS $DIFFERENTIAL_PAIR_N;');
   expect(han.test(await page.locator('#rv-code').textContent())).toBe(false);
 
   await open(page, '/zh/index.html');
   await expect(page.locator('#rv-style button')).toHaveCount(3);
   await page.locator('#rv-style [data-style="zh"]').click();
-  await expect(page.locator('#rv-code')).toContainText('@视作 $"差分对";');
+  await expect(page.locator('#rv-code')).toContainText('@视作 $"N型差分对";');
   // the checklist is in the page's own language, whatever the style of the file
   expect(han.test(await page.locator('#rv-items').textContent())).toBe(true);
   await page.locator('#rv-style [data-style="en"]').click();

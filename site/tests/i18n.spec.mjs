@@ -116,7 +116,8 @@ test('third locale inherits English content and switches without changing source
   await expect(page.locator('.ai-notice a').first()).toHaveAttribute('href', /^https:\/\/github\.com\/rich-netlist\/rnl\/issues\/new\?labels=translation&title=Translation%20%28Japanese%29%3A%20index\.html&/);
   // and, as the language has a glossary, that the English terms are normative, with a link to it (decision 0016)
   await expect(page.locator('.ai-notice a').nth(1)).toHaveAttribute('href', 'glossary.html');
-  await expect(page.locator('#status .tl')).toContainText('Release notes');
+  // the timeline, untranslated in this locale, shows the English link labels: a release's or a milestone's
+  await expect(page.locator('#status .tl')).toContainText(/Release notes|Learn more/);
   await page.locator('.language-menu > summary').click();
   // the fixture's Japanese in place of the repository's own, if that is published
   const japanese = registry.languages.some(entry => entry.code === 'ja' && entry.status === 'published');
@@ -188,6 +189,8 @@ const han = /[\u3400-\u9fff\uf900-\ufaff]/;
 for (const language of registry.languages.filter(entry => entry.code === registry.default || entry.status === 'published').map(entry => entry.code)) {
   const examples = language === chinese;
   test(`Chinese examples are ${examples ? '' : 'not '}on the ${language} pages`, async ({ page }) => {
+    // about 8 s in WebKit on CI, but one run stalled on a click past 30 s beside the other tests
+    test.setTimeout(60_000);
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     // content marked as Chinese, apart from the language menu's name of the language

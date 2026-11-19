@@ -4,7 +4,7 @@
   "Skip to content": "Aller au contenu",
   "Switch color theme": "Changer de thème de couleur",
   "Timeline": "Chronologie",
-  "The <a href=\"./#status\">introduction</a> shows only the latest few, and what comes next.": "L’<a href=\"./#status\">introduction</a> ne présente que les plus récents, ainsi que ce qui vient ensuite.",
+  "The <a href=\"./#status\">introduction</a> shows only the latest few.": "L’<a href=\"./#status\">introduction</a> ne présente que les plus récents.",
   "Dates are in Shanghai time (UTC+8). Each release links to its release notes on GitHub.": "Les dates sont indiquées à l’heure de Shanghai (UTC+8). Chaque version renvoie vers ses notes de version sur GitHub.",
   "See also": "Voir aussi",
   "Introduction": "Introduction",

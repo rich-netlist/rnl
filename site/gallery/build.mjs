@@ -296,7 +296,7 @@ function draw(pkg, symbols) {
     x1 += MARGIN;
     y1 += MARGIN;
     const svg = card(level.svg, scale, [x0, y0, x1, y1], box, pins);
-    return { svg, thumb, origin, width: num((x1 - x0) * SCALE_UNIT), height: num((y1 - y0) * SCALE_UNIT), box, pins, problems };
+    return { svg, scale, thumb, origin, width: num((x1 - x0) * SCALE_UNIT), height: num((y1 - y0) * SCALE_UNIT), box, pins, problems };
   });
 }
 
@@ -376,6 +376,8 @@ function groupData(group) {
   const names = byName(group);
   // the packages that using rnl-std brings in, which every document of the series has (16.3)
   const implicit = new Set(names.has("rnl-std") ? expansion(group, "rnl-std") : []);
+  // series 0.4 has no implicit package: the packages that the collection rnl-std-all brings in are marked as its own
+  const inAll = new Set(names.has("rnl-std-all") ? expansion(group, "rnl-std-all") : []);
   const referencedBy = new Map();
   for (const p of group.packages) {
     for (const r of p.header.references) {
@@ -388,7 +390,7 @@ function groupData(group) {
   for (const p of group.packages) for (const s of p.statements) if (s.kind === "symbol" && !all.has(s.name)) all.set(s.name, s);
   const counts = { packages: 0, symbols: 0 };
   const order = [];
-  for (const top of ["rnl-std", "rnl-std-full"]) {
+  for (const top of ["rnl-std", "rnl-std-all", "rnl-std-full"]) {
     if (!names.has(top)) continue;
     for (const n of [top, ...expansion(group, top).slice(0, -1)]) if (!order.includes(n)) order.push(n);
   }
@@ -413,6 +415,7 @@ function groupData(group) {
       path: pkg.path,
       ...(pkg.source ? { source: pkg.source, summary: pkg.summary } : {}),
       implicit: implicit.has(pkg.header.name),
+      inAll: inAll.has(pkg.header.name),
       references: pkg.header.references,
       referencedBy: referencedBy.get(pkg.header.name) || [],
       expansion: expansion(group, pkg.header.name),

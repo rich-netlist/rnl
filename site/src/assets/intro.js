@@ -93,8 +93,8 @@
       'M1 x inp tail vss nch W=2u L=0.5u',
       'M2 out inn tail vss nch W=2u L=0.5u',
       '* @RNL {',
-      '*   %dp1 = #M1 #M2 @AS $DIFFERENTIAL_PAIR;',
-      '*   %cm1 = #M3 #M4 @AS $CURRENT_MIRROR',
+      '*   %dp1 = #M1 #M2 @AS $DIFFERENTIAL_PAIR_N;',
+      '*   %cm1 = #M3 #M4 @AS $CURRENT_MIRROR_P',
       '* }'
     ]).map(function (h) { return '<div>' + h.html + '</div>'; }).join('');
     var nodes = $$('.hub-node', hub);
