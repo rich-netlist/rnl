@@ -1086,20 +1086,68 @@ impl Interp<'_> {
         if points.is_empty() {
             return out;
         }
-        for w in self.scenes[s].wires.clone() {
-            if self.is_obj_failed(w) {
-                continue;
-            }
-            let ObjData::Wire { nets, points: through, .. } = self.o(w).clone() else { continue };
-            if through.into_iter().any(|v| points.contains(&self.scene_value(v))) {
-                for n in nets {
-                    if !out.contains(&n) {
-                        out.push(n);
-                    }
+        if self.scenes[s].wires_through.is_none() {
+            let index = self.wires_through(s);
+            self.scenes[s].wires_through = Some(index);
+        }
+        let through = self.scenes[s].wires_through.as_ref().expect("made above");
+        let mut wires: Vec<usize> = points.iter().filter_map(|p| through.get(p)).flatten().copied().collect();
+        wires.sort_unstable();
+        wires.dedup();
+        #[cfg(test)]
+        tests::WIRES_LOOKED_AT.with(|count| count.set(count.get() + wires.len()));
+        #[cfg(debug_assertions)]
+        let scanned = self.wires_scanned(s, &points);
+        #[cfg(debug_assertions)]
+        debug_assert_eq!(
+            wires.iter().map(|&k| self.scenes[s].wires[k]).collect::<Vec<_>>(),
+            scanned,
+            "the wires through the points of {o:?}, from the index, are not those a scan finds"
+        );
+        for k in wires {
+            let ObjData::Wire { nets, .. } = self.o(self.scenes[s].wires[k]) else { continue };
+            for n in nets {
+                if !out.contains(n) {
+                    out.push(*n);
                 }
             }
         }
         out
+    }
+
+    /// The wires of the scene `s` that are drawn, by each point they pass through: their indexes
+    /// in the scene's wires, in order, each once for a point.
+    fn wires_through(&self, s: SceneId) -> HashMap<ObjId, Vec<usize>> {
+        let mut index: HashMap<ObjId, Vec<usize>> = HashMap::new();
+        for (k, &w) in self.scenes[s].wires.iter().enumerate() {
+            if self.is_obj_failed(w) {
+                continue;
+            }
+            let ObjData::Wire { points, .. } = self.o(w) else { continue };
+            for &v in points {
+                let wires = index.entry(self.scene_value(v)).or_default();
+                if wires.last() != Some(&k) {
+                    wires.push(k);
+                }
+            }
+        }
+        index
+    }
+
+    /// Debug builds only: the drawn wires of the scene `s` through any of `points`, in order, found
+    /// by scanning them all, which the index of [`Self::wires_through`] must agree with.
+    #[cfg(debug_assertions)]
+    fn wires_scanned(&self, s: SceneId, points: &[ObjId]) -> Vec<ObjId> {
+        self.scenes[s]
+            .wires
+            .iter()
+            .copied()
+            .filter(|&w| !self.is_obj_failed(w))
+            .filter(|&w| match self.o(w) {
+                ObjData::Wire { points: through, .. } => through.iter().any(|v| points.contains(&self.scene_value(*v))),
+                _ => false,
+            })
+            .collect()
     }
 
     /// The objects of the editor interface, drawn or not, and the named points, with the ids unique
@@ -1623,5 +1671,77 @@ impl Interp<'_> {
             view,
             symbols: views,
         })
+    }
+}
+
+#[cfg(test)]
+pub(super) mod tests {
+    use std::cell::Cell;
+
+    use crate::diag::{Severity, Sink};
+    use crate::host::{Dialect, HostDocument, Instance, Level, LevelKind};
+    use crate::records::{package_lines, scan_run};
+    use crate::source::MemoryProvider;
+    use crate::{interpret, Options};
+
+    thread_local! {
+        /// How many wires the output looked at for the nets of usages attached to points, on this
+        /// thread.
+        pub(in crate::interp) static WIRES_LOOKED_AT: Cell<usize> = const { Cell::new(0) };
+    }
+
+    /// The wires looked at while R1 a b is read with `marks` marks, each attached to a point of
+    /// its own with a wire of its own from that point to R1's first terminal.
+    fn wires_looked_at(marks: usize) -> usize {
+        let mut sink = Sink::new();
+        let mut main = Level::new(LevelKind::File, "marks.sp", "marks.sp", "marks.sp");
+        main.circuit = true;
+        main.instances.push(Instance {
+            name: "R1".into(),
+            letter: Some('R'),
+            nodes: vec!["a".into(), "b".into()],
+            value: Some("1k".into()),
+            file: "marks.sp".into(),
+            line: 1,
+            order: 0,
+            default_terminals: Some(vec!["p".into(), "n".into()]),
+            ..Instance::default()
+        });
+        let mut statements = String::from(
+            "  $MARK = @DEFINE(roles=[[\"at\", \"point\"]]) {};\n  \
+             $MARK_SYM = @DEFINE-SYMBOL {(0, 0) @CIRCLE(radius=0.35)};\n  \
+             # @SELECT-USAGE $MARK => @SET-SYMBOL $MARK_SYM;\n  #R1 @PLACE(0, 0);\n",
+        );
+        for k in 0..marks {
+            statements.push_str(&format!(
+                "  %p{k} = ({x}, 4);\n  &a @WIRE {{%p{k} #R1:1}};\n  $MARK @ATTACH %p{k} => @PLACE({x}, 6);\n",
+                x = 2 * k + 2
+            ));
+        }
+        let records = format!("@RNL(type=\"header\") {{ @VERSION(\"0.4\")}}\n@RNL {{\n{statements}}}");
+        main.records = scan_run(&package_lines(&records), "marks.sp", &mut sink);
+        let dialect = Dialect { name: "spice".into(), case_sensitive: false, ground_aliases: vec![] };
+        WIRES_LOOKED_AT.with(|count| count.set(0));
+        let read = interpret(
+            HostDocument::new(main, dialect),
+            &MemoryProvider::new(),
+            &Options { std: false, ..Options::default() },
+            sink,
+        );
+        let errors: Vec<_> = read.sink.all().iter().filter(|d| d.severity == Severity::Error).collect();
+        assert!(errors.is_empty(), "{errors:?}");
+        let level = &read.model.levels[0];
+        let on_a = level.items.iter().filter(|item| item.kind == "usage" && item.attached_nets == ["a"]).count();
+        assert_eq!(on_a, marks, "every mark is on net a, through its wire");
+        WIRES_LOOKED_AT.with(Cell::get)
+    }
+
+    #[test]
+    fn the_wires_of_a_usage_on_a_point_are_found_without_looking_at_every_wire() {
+        let (four, sixteen) = (wires_looked_at(4), wires_looked_at(16));
+        // each mark looks at its own wire: four times the marks, four times the wires looked at,
+        // where looking at every wire for every mark would be sixteen times
+        assert_eq!(four, 4);
+        assert_eq!(sixteen, 16);
     }
 }

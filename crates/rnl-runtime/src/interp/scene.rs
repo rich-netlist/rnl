@@ -185,6 +185,10 @@ pub struct Scene {
     /// The pins of usages, whose nets follow their roles, are not kept. Debug builds check every
     /// kept value against the nets found again.
     pub pin_nets: HashMap<(ObjId, usize), Vec<ObjId>>,
+    /// The wires drawn through each point, as indexes into `wires` in their order, for the nets
+    /// the output gives a usage attached to points. Made when the output first asks: by then every
+    /// phase of the level has run, and making the output adds no wire and fails none.
+    pub wires_through: Option<HashMap<ObjId, Vec<usize>>>,
     pub pins: HashMap<(ObjId, usize), ObjId>,
     pub at: Vec<Fact>,
     /// The indexes in `at` of each object's facts, in order; `add_at` keeps it.
@@ -326,6 +330,7 @@ impl Scene {
             keytexts: HashMap::new(),
             named_subobjects: HashMap::new(),
             pin_nets: HashMap::new(),
+            wires_through: None,
             pins: HashMap::new(),
             at: Vec::new(),
             at_by_target: HashMap::new(),
