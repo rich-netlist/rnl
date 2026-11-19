@@ -178,6 +178,31 @@ test("a file whose name in the archive is not its path is read by that name, and
   assert.throws(() => checkManifest({ ...written, files: [written.files[0], { ...written.files[1], member: "top.sp" }] }, { archive: true }), /names a file of the archive twice/);
 });
 
+test("the files are given in the order of the manifest, whatever order their reads end in", async () => {
+  const encode = (text) => new TextEncoder().encode(text);
+  const texts = { "top.sp": ".include \"a.inc\"\n.end\n", "a.inc": "R1 a 0 1k\n", "b.inc": "R2 b 0 1k\n", "c.inc": "R3 c 0 1k\n" };
+  const written = await writeManifest({ archive: true, entry: "top.sp", files: Object.entries(texts).map(([path, text]) => ({ path, bytes: encode(text) })) });
+  const order = Object.keys(texts);
+  // each read ends after the reads of the files after it: the last file's first, the first file's last
+  const ended = [];
+  const readFile = (path) => new Promise((resolve) => setTimeout(() => { ended.push(path); resolve(encode(texts[path])); }, 10 * (order.length - order.indexOf(path))));
+  const read = await loadManifest(written, { readFile, root: "/p/" });
+  assert.deepEqual(ended, [...order].reverse());
+  const paths = order.map((path) => `/p/${path}`);
+  assert.deepEqual(Object.keys(read.files), paths);
+  assert.deepEqual(Object.keys(read.bytes), paths);
+  assert.deepEqual(Object.keys(read.urls), paths);
+  // and so with the files fetched: the first answer comes last
+  const base = "https://example.test/d/";
+  const fetch = (url) => new Promise((resolve) => {
+    const path = new URL(url).pathname.slice("/d/".length);
+    setTimeout(() => resolve(new Response(encode(texts[path]))), 10 * (order.length - order.indexOf(path)));
+  });
+  const fetchedRead = await loadManifest({ ...written, base }, { fetch, root: "/p/" });
+  assert.deepEqual(Object.keys(fetchedRead.files), paths);
+  assert.deepEqual(Object.keys(fetchedRead.urls), paths);
+});
+
 test("writeManifest gives a manifest that reads back to the same files", async () => {
   const encode = (text) => new TextEncoder().encode(text);
   const written = await writeManifest({ archive: true, entry: "top.scs", level: "(top)", pool: ["models/nmos.lib"], formats: { "top.scs": "spectre" },
