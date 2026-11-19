@@ -304,6 +304,8 @@ class Languages(unittest.TestCase):
         finally:
             if old is None:
                 del build.LANGS["de"]
+            else:
+                build.LANGS["de"] = old
 
     def test_the_table_of_contents_has_the_title_of_the_language(self):
         text = self.spectools.assemble("front\n", ["## 1 One\n"], "de", "Inhaltsverzeichnis")
