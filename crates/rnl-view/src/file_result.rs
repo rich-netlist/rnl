@@ -6,6 +6,7 @@
 
 use std::collections::{BTreeSet, HashSet};
 
+use rnl_runtime::diag::codes;
 use rnl_runtime::host::{dialect_key, HostDocument, LevelKind};
 use rnl_runtime::model::BlockSymbol;
 use rnl_runtime::numbering::{hex, sha256};
@@ -83,6 +84,10 @@ pub struct FileInputs {
     /// The facts of the whole document the result depends on: where the names the file's levels
     /// instantiate are defined, and the global nets.
     pub outline: FileOutline,
+    /// Whether the result depends on the Library: Auto Include added the definition of a name the
+    /// file's levels instantiate, or one of those names is not defined in the document, which a
+    /// definition in the Library may come to define.
+    pub library: bool,
 }
 
 /// A file or package a reading of one file depends on.
@@ -94,7 +99,8 @@ pub struct FileInput {
     /// one; "package", a package file read.
     #[cfg_attr(test, ts(type = "\"body\" | \"context\" | \"symbol\" | \"package\""))]
     pub role: &'static str,
-    /// The file as the document names it (`SourceFile::path`); a package by its file name.
+    /// The file as the document names it (`SourceFile::path`); a package by its path as the files
+    /// given name it, a bundled one under `<bundled>/`, such as `<bundled>/0.4/rnl-std-all.rnl`.
     pub path: String,
     /// The first 16 hexadecimal digits of the SHA-256 of its text, as `OutlineFile::text_hash`.
     pub hash: String,
@@ -274,20 +280,23 @@ pub(crate) fn file_result(entry: &str, file: &str, r: &Interpretation, mut d: Do
         }
     }
     // the packages read, as a frontend can tell those it has from those bundled with the core
-    let host_files: HashSet<&str> = doc.sources.iter().map(|(p, _)| p.as_str()).collect();
-    let bundled: HashSet<&str> = crate::bundled_texts();
-    for (name, text) in r.sources.iter().filter(|(p, _)| !host_files.contains(p.as_str())) {
-        let input = FileInput {
+    let bundled = format!("{}/", crate::BUNDLED_DIR);
+    for (path, text) in &r.package_files {
+        inputs.push(FileInput {
             role: "package",
-            path: name.clone(),
+            path: path.clone(),
             hash: hash(text),
             narrow: None,
-            bundled: bundled.contains(text.as_str()),
-        };
-        if !inputs.contains(&input) {
-            inputs.push(input);
-        }
+            bundled: path.starts_with(&bundled),
+        });
     }
+    // a name not defined, or defined by what Auto Include added from the Library
+    let added = r
+        .sink
+        .all()
+        .iter()
+        .any(|g| g.code == codes::VIEW_AUTOINCLUDE_ADDED && g.loc.as_ref().is_some_and(|l| l.file == file));
+    let library = added || children.iter().any(|c| c.host.is_none());
 
     // the diagnostics of reading the document that are about files it does not depend on are left
     // out: the outline gives them
@@ -321,6 +330,7 @@ pub(crate) fn file_result(entry: &str, file: &str, r: &Interpretation, mut d: Do
         file: file.to_string(),
         files: inputs,
         outline: FileOutline { calls, globals: globals.into_iter().collect() },
+        library,
     };
     FileResult { document: d, file: file.to_string(), children, inputs }
 }

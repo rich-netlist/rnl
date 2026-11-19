@@ -1383,6 +1383,12 @@ export type FileInputs = {
    * instantiate are defined, and the global nets.
    */
   outline: FileOutline,
+  /**
+   * Whether the result depends on the Library: Auto Include added the definition of a name the
+   * file's levels instantiate, or one of those names is not defined in the document, which a
+   * definition in the Library may come to define.
+   */
+  library: boolean,
 };
 
 /**
@@ -1396,7 +1402,8 @@ export type FileInput = {
    */
   role: "body" | "context" | "symbol" | "package",
   /**
-   * The file as the document names it (`SourceFile::path`); a package by its file name.
+   * The file as the document names it (`SourceFile::path`); a package by its path as the files
+   * given name it, a bundled one under `<bundled>/`, such as `<bundled>/0.4/rnl-std-all.rnl`.
    */
   path: string,
   /**

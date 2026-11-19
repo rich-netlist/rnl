@@ -4,6 +4,8 @@
 
 import { requestText } from "./core.js";
 
+export { coreVersion, fileResultFormat } from "./version.js";
+
 /**
  * The core, running in a Worker.
  *

@@ -146,6 +146,13 @@ fn a_file_read_alone_gives_its_levels_where_its_children_are_and_what_it_depends
     let packages: Vec<&serde_json::Value> =
         v["inputs"]["files"].as_array().unwrap().iter().filter(|i| i["role"] == "package").collect();
     assert!(!packages.is_empty() && packages.iter().all(|p| p["bundled"] == true), "{packages:?}");
+    assert!(packages.iter().any(|p| p["path"] == "<bundled>/0.4/rnl-std-all.rnl"), "{packages:?}");
+    // every name it instantiates is defined in the document, so the Library does not matter
+    assert_eq!(v["inputs"]["library"], false);
+    let undefined = workspace(OTHER).with("/w/cells.inc", &CELLS.replace("X8 p n leaf", "X8 p n nowhere"));
+    let r = rnl_view::build_file("/w/top.sp", "cells.inc", &undefined, &options).unwrap();
+    assert!(r.inputs.library);
+    assert_eq!((r.children[1].master.as_str(), r.children[1].host), ("nowhere", None));
     assert_eq!(
         v["inputs"]["outline"]["calls"],
         serde_json::json!([{ "master": "leaf", "file": "leaf.inc", "title": "leaf" }])

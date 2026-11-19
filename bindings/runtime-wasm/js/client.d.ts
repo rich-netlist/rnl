@@ -59,6 +59,8 @@ export type {
   Written,
 } from "./core.js";
 
+export { coreVersion, fileResultFormat } from "./version.js";
+
 /** The core, running in a Worker. */
 export interface CoreWorker {
   /** Build the Document of a request; rejects with the core's message when there is none. */

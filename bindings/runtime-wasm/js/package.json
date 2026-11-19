@@ -18,6 +18,7 @@
     "./core": { "types": "./core.d.ts", "default": "./core.js" },
     "./worker": "./worker.js",
     "./manifest": { "types": "./manifest.d.ts", "default": "./manifest.js" },
+    "./version": { "types": "./version.d.ts", "default": "./version.js" },
     "./package.json": "./package.json"
   },
   "publishConfig": { "access": "public", "tag": "next" }

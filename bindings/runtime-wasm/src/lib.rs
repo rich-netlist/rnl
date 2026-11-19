@@ -1048,15 +1048,8 @@ C1 a 0 1p
 
     #[test]
     fn a_file_request_and_a_symbols_request_answer_what_rnl_view_gives() {
-        let top = "* top
-.include \"lib/parts.inc\"
-X1 a b part
-.end
-";
-        let parts = ".subckt part p q
-R1 p q 1k
-.ends
-";
+        let top = "* top\n.include \"lib/parts.inc\"\nX1 a b part\n.end\n";
+        let parts = ".subckt part p q\nR1 p q 1k\n.ends\n";
         let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/lib/parts.inc", parts);
         let native = rnl_view::build_file("/w/top.sp", "lib/parts.inc", &files, &BuildOptions::default()).unwrap();
         let sent = json!({ "/w/top.sp": top, "/w/lib/parts.inc": parts });

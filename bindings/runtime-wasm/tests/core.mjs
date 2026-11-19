@@ -20,7 +20,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const dist = pathToFileURL(`${resolve(process.argv[2] ?? resolve(here, "../dist"))}/`);
 const { loadCore } = await import(new URL("core.js", dist));
-const { collect, collectFile, collectOutline, decodeText, startCore } = await import(new URL("client.js", dist));
+const { collect, collectFile, collectOutline, coreVersion, decodeText, fileResultFormat, startCore } = await import(
+  new URL("client.js", dist)
+);
 const wasm = new URL("rnl_runtime_wasm.wasm", dist);
 const char = (...codes) => String.fromCharCode(...codes);
 
@@ -192,22 +194,9 @@ test("collectOutline reads what is missing as collect does, and interprets nothi
 
 test("collectFile reads what is missing as collect does, and reads one file in the context of the entry", async () => {
   const disk = new Map([
-    ["/w/top.sp", `* top
-.include "a.inc"
-X1 p q a
-.end
-`],
-    ["/w/a.inc", `* a
-.include "b.inc"
-.subckt a p q
-X1 p q b
-.ends
-`],
-    ["/w/b.inc", `* b
-.subckt b p q
-R1 p q 1k
-.ends
-`],
+    ["/w/top.sp", `* top\n.include "a.inc"\nX1 p q a\n.end\n`],
+    ["/w/a.inc", `* a\n.include "b.inc"\n.subckt a p q\nX1 p q b\n.ends\n`],
+    ["/w/b.inc", `* b\n.subckt b p q\nR1 p q 1k\n.ends\n`],
   ]);
   const read = async (path) => disk.get(path) ?? null;
   const { result, files } = await collectFile(core, { entry: "/w/top.sp", file: "a.inc" }, read);
@@ -223,6 +212,9 @@ R1 p q 1k
   const symbols = core.symbols({ entry: "/w/top.sp", files, symbols: "b.inc" });
   assert.deepEqual(symbols.subckts.map((s) => [s.title, s.ports, s.symbol]), [["b", ["p", "q"], null]]);
   assert.equal(result.inputs.files.find((i) => i.path === "b.inc").narrow, symbols.hash);
+  // what keys a reading is known without the module
+  assert.deepEqual([result.inputs.core, result.inputs.format], [coreVersion, fileResultFormat]);
+  assert.match(coreVersion, /^\d+\.\d+\.\d+ \(\w+\)$/);
   // the same in the Worker
   const worker = startCore();
   try {

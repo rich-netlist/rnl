@@ -25,7 +25,7 @@ mod snapshot;
 mod types;
 
 use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use rnl_runtime::diag::Sink;
 use rnl_runtime::host::format::Reading;
@@ -87,11 +87,6 @@ pub fn bundled() -> MemoryProvider {
         }
     }
     p
-}
-
-/// The texts of the bundled packages.
-fn bundled_texts() -> HashSet<&'static str> {
-    BUNDLED.iter().map(|&(_, text)| text).collect()
 }
 
 /// The bundled package files of a draft series, by their paths in [`bundled`]: those written in a language version newer than the tool's default

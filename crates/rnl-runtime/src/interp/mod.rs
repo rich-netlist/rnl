@@ -197,6 +197,9 @@ pub struct Interpretation {
     /// [`Options::symbols_only`], else those of every file that defines a subcircuit the file's
     /// levels instantiate. Empty otherwise.
     pub block_symbols: Vec<(LevelId, Option<crate::model::BlockSymbol>)>,
+    /// The package files read, each once, by their paths as the provider names them (normalized),
+    /// with their texts, in the order read.
+    pub package_files: Vec<(String, String)>,
     /// The numbers of the objects without a name of each drawing level, with their checks, whatever
     /// its version (5.9); empty for a package file checked on its own. See [`crate::numbering`].
     pub numbering: Vec<LevelNumbering>,
@@ -255,6 +258,8 @@ pub struct Interp<'p> {
     pub(crate) rec_chars: Vec<Option<Rc<[char]>>>,
     pub(crate) pkg_levels: Vec<Level>,
     pub(crate) pkg_sources: Vec<(String, String)>,
+    /// The package files read, by their paths as the provider names them, with their texts.
+    pub(crate) package_files: Vec<(String, String)>,
     /// The packages read, by name and version, the version in its numeric form
     /// ([`unit::package_cache_key`], 16.2).
     pub(crate) packages: HashMap<(String, String), UnitId>,
@@ -462,6 +467,7 @@ impl<'p> Interp<'p> {
             rec_chars: Vec::new(),
             pkg_levels: Vec::new(),
             pkg_sources: Vec::new(),
+            package_files: Vec::new(),
             packages: HashMap::new(),
             pkg_files: HashMap::new(),
             pkg_headers: HashMap::new(),
@@ -1187,6 +1193,7 @@ impl<'p> Interp<'p> {
             problems,
             read: self.read,
             block_symbols,
+            package_files: std::mem::take(&mut self.package_files),
             numbering,
             unsupported,
             imported_aliases,
