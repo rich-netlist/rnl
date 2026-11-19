@@ -3,7 +3,10 @@
 # current user and an MSI for the machine; the installers carry the public packages as a part of their
 # own, which the user chooses. On Linux: the AppImage and a second one with the public packages among its
 # resources, a Debian package and a small one of the public packages; on macOS two disk images for each
-# architecture, the second with the packages among the app's resources. The Tauri command
+# architecture, the second with the packages among the app's resources. With them, the local viewer for older
+# enterprise Linux (apps/local, at the Viewer's version): its two packages, the second with Mozilla's official
+# Firefox ESR, unmodified, which local-linux.yml builds and tests in containers of CentOS 7, Rocky 8 and Rocky 9;
+# a release is made with the newest Firefox ESR, which the validation checks. The Tauri command
 # line that apps/desktop/package.json pins builds them on GitHub's Windows runner, whose MSVC
 # toolchain links the WebView2 loader into the executable. The workflow checks that the executable
 # imports no WebView2Loader.dll, smoke-tests it alone in a directory, and installs both installers,
@@ -48,6 +51,23 @@ jobs:
           args=()
           if [ -n "$tag" ]; then args+=(--tag "$tag"); fi
           python scripts/release.py validate viewer --require-notes "${args[@]}"
+      # Mozilla's policy for unaltered software asks for the most recent version: the local viewer's package with
+      # Firefox is released with the newest ESR only
+      - name: firefox.lock names the newest Firefox ESR
+        run: |
+          . apps/local/ci/firefox.lock
+          newest=$(curl -fsS --proto '=https' --tlsv1.2 https://product-details.mozilla.org/1.0/firefox_versions.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["FIREFOX_ESR"])')
+          echo "the lock: $FIREFOX_VERSION; Mozilla's newest ESR: $newest"
+          if [ "$FIREFOX_VERSION" != "$newest" ]; then
+            echo "apps/local/ci/firefox.lock is not the newest Firefox ESR: set it to $newest, with Mozilla's checksum, and let local-linux.yml test it"
+            exit 1
+          fi
+
+  # the local viewer for older enterprise Linux: built static, packaged, and tested in the three containers
+  local:
+    needs: validate
+    uses: ./.github/workflows/local-linux.yml
+
   build:
     needs: validate
     runs-on: windows-latest
@@ -508,26 +528,36 @@ jobs:
           retention-days: 14
 
   assets:
-    needs: [build, build-linux, build-macos]
+    needs: [build, build-linux, build-macos, local]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: rnl-viewer-${{ needs.build.outputs.version }}-*
           path: incoming
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: local-packages
+          path: incoming/local
       - name: Verify all platforms and combine their checksums
         env:
           VERSION: ${{ needs.build.outputs.version }}
+          LOCAL_VERSION: ${{ needs.local.outputs.version }}
         run: |
+          [ "$LOCAL_VERSION" = "$VERSION" ] || { echo "the local viewer is $LOCAL_VERSION, the Viewer $VERSION"; exit 1; }
           mkdir assets
           for platform in windows-x64 linux-x86_64 macos-arm64 macos-x86_64; do
             dir="incoming/rnl-viewer-$VERSION-$platform"
             (cd "$dir" && sha256sum --check SHA256SUMS.txt)
             find "$dir" -maxdepth 1 -type f ! -name SHA256SUMS.txt -exec cp {} assets/ \;
           done
+          (cd incoming/local && sha256sum --check SHA256SUMS.txt)
+          for name in "rnl-viewer-local-$VERSION-linux-x86_64.tar.gz" "rnl-viewer-local-$VERSION-linux-x86_64-with-firefox.tar.gz"; do
+            cp "incoming/local/$name" assets/
+          done
           cd assets
-          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 12
-          sha256sum RNL-Viewer-* > SHA256SUMS.txt
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 14
+          sha256sum RNL-Viewer-* rnl-viewer-local-* > SHA256SUMS.txt
           sha256sum --check SHA256SUMS.txt
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

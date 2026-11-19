@@ -27,6 +27,14 @@ def versions(root=ROOT):
     config = json.loads((root / "apps/desktop/tauri.conf.json").read_text("utf-8"))["version"]
     if viewer != config:
         raise ValueError(f"Viewer manifest version {viewer} differs from Tauri version {config}")
+    # the local viewer for older Linux (apps/local) is released with the Viewer, at its version
+    local = tomllib.loads((root / "apps/local/Cargo.toml").read_text("utf-8"))["package"]["version"]
+    if local != viewer:
+        raise ValueError(f"Local viewer version {local} (apps/local/Cargo.toml) differs from Viewer version {viewer}")
+    locked = [p.get("version") for p in tomllib.loads((root / "apps/local/Cargo.lock").read_text("utf-8")).get("package", [])
+              if p.get("name") == "rnl-viewer-local"]
+    if locked != [viewer]:
+        raise ValueError(f"apps/local/Cargo.lock locks rnl-viewer-local at {locked}, not the Viewer version {viewer}")
     for version in (core, viewer):
         if not SEMVER.fullmatch(version):
             raise ValueError(f"Invalid release version: {version}")

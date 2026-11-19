@@ -19,6 +19,10 @@ class ReleaseVersions(unittest.TestCase):
         (self.root / "Cargo.toml").write_text('[workspace.package]\nversion = "0.2.0"\n')
         (self.root / "apps/desktop/Cargo.toml").write_text('[package]\nversion = "0.1.5"\n')
         (self.root / "apps/desktop/tauri.conf.json").write_text(json.dumps({"version": "0.1.5"}))
+        (self.root / "apps/local").mkdir(parents=True)
+        (self.root / "apps/local/Cargo.toml").write_text('[package]\nname = "rnl-viewer-local"\nversion = "0.1.5"\n')
+        (self.root / "apps/local/Cargo.lock").write_text(
+            'version = 4\n\n[[package]]\nname = "rnl-viewer-local"\nversion = "0.1.5"\n\n[[package]]\nname = "other"\nversion = "1.0.0"\n')
 
     def test_independent_versions_and_tags(self):
         self.assertEqual(versions(self.root), {"core": "0.2.0", "viewer": "0.1.5"})
@@ -34,6 +38,15 @@ class ReleaseVersions(unittest.TestCase):
     def test_viewer_config_mismatch_fails(self):
         (self.root / "apps/desktop/tauri.conf.json").write_text('{"version":"0.2.0"}')
         with self.assertRaises(ValueError):
+            validate("viewer", root=self.root)
+
+    def test_local_viewer_takes_the_viewer_version(self):
+        (self.root / "apps/local/Cargo.toml").write_text('[package]\nname = "rnl-viewer-local"\nversion = "0.1.0"\n')
+        with self.assertRaisesRegex(ValueError, "Local viewer version 0.1.0"):
+            validate("viewer", root=self.root)
+        (self.root / "apps/local/Cargo.toml").write_text('[package]\nname = "rnl-viewer-local"\nversion = "0.1.5"\n')
+        (self.root / "apps/local/Cargo.lock").write_text('version = 4\n\n[[package]]\nname = "rnl-viewer-local"\nversion = "0.1.0"\n')
+        with self.assertRaisesRegex(ValueError, "Cargo.lock"):
             validate("viewer", root=self.root)
 
     def test_notes_are_required_for_each_line(self):
