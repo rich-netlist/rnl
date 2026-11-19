@@ -34,9 +34,13 @@ for (const language of ['en', 'zh']) {
     await expect(lit).toHaveCount(0);
 
     // the differential pair: M1, M2 and the tail M5, in the drawing and in the netlist, and its statement
-    await items.nth(0).hover();
-    await expect.poll(async () => [...await litDevices()].sort()).toEqual(['M1', 'M2', 'M5']);
-    await expect(devs).toHaveCount(3);
+    // hovered again from outside while it is not all shown: a layout shift can leave the pointer on the code
+    // panel, whose own hover lights a line's devices without marking their lines
+    await expect.poll(async () => {
+      const state = { lit: [...await litDevices()].sort(), devs: await devs.count() };
+      if (state.devs !== 3) { await page.mouse.move(5, 5); await items.nth(0).hover(); }
+      return state;
+    }).toEqual({ lit: ['M1', 'M2', 'M5'], devs: 3 });
     await expect(hot).toHaveCount(1);
     await expect(hot).toContainText('$DIFFERENTIAL_PAIR');
     await expect(page.locator('#rv-stage .rv-note.is-on')).toHaveCount(1);
