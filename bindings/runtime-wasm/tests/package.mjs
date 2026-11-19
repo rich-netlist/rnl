@@ -7,7 +7,8 @@
 // modules with their declarations, the README and the licenses, and nothing else. Its package.json must name @rich-netlist/runtime at VERSION, not be
 // private, be public on npm, name the repository that npm's provenance checks, give the license of
 // what the package holds, and export files that are in it. The build must bring no packages of its
-// own, as build.mjs --packages would: the core bundles the standard packages.
+// own, as build.mjs --packages would: the core bundles the standard packages. version.js must give
+// the core's version and the format of a reading of one file, which build.mjs writes.
 
 import { execFileSync, execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -59,6 +60,8 @@ const expected = [
   "snapshot.d.ts",
   "solver.d.ts",
   "solver.js",
+  "version.d.ts",
+  "version.js",
   "worker.js",
 ];
 want("solver.js as ./solver", pkg.exports?.["./solver"]?.default === "./solver.js");
@@ -76,6 +79,11 @@ want("no PNG writer in the solver's module, whose crates the package's license d
 // no packages of the build's own: the core bundles them
 const packages = readFileSync(join(dir, "packages.js"), "utf8");
 want("no packages in packages.js (a build without --packages)", /export const files = \{\};/.test(packages) && /export const packageDirs = \[\];/.test(packages));
+
+// the version of the core and of the shape of its readings of one file, written by build.mjs
+const versions = readFileSync(join(dir, "version.js"), "utf8");
+want("the core's version in version.js", /export const coreVersion = "\d+\.\d+\.\d+ \(\w+\)";/.test(versions));
+want("the format of a reading of one file in version.js", /export const fileResultFormat = \d+;/.test(versions));
 
 if (problems.length) {
   for (const p of problems) console.error(`FAIL ${p}`);
