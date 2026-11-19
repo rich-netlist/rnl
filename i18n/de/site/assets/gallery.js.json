@@ -86,5 +86,5 @@
   "The Chinese alias package: Chinese spellings of the standard words and of the names of the standard packages, loaded with @USE-ALIASES in the header record.": "Das chinesische Alias-Paket: chinesische Schreibweisen der Standardwörter und der Namen der Standardpakete, geladen über @USE-ALIASES im Kopfeintrag.",
   "Brought in by rnl-std-all, which a file of 0.4 names in its header record": "Eingebunden durch rnl-std-all, das eine 0.4-Datei in ihrem Kopfeintrag nennt",
   "in rnl-std-all": "in rnl-std-all",
-  "The automatic fill: a ground, supply or bias stub for every unwired pin on such a net, a net label for the other unwired pins, and a port tag for every port net in $PORT_FILL_SET.": "Die automatische Ergänzung: ein Masse-, Versorgungs- oder Bias-Stub für jeden unverdrahteten Pin an einem solchen Netz ein Netz-Label für die übrigen unverdrahteten Pins und eine Port-Markierung für jedes Portnetz in $PORT_FILL_SET."
+  "The automatic fill: a ground, supply or bias stub for every unwired pin on such a net, a net label for the other unwired pins, and a port tag for every port net in $PORT_FILL_SET.": "Die automatische Ergänzung: ein Masse-, Versorgungs- oder Bias-Stub für jeden unverdrahteten Pin an einem solchen Netz, ein Netz-Label für die übrigen unverdrahteten Pins und eine Port-Markierung für jedes Portnetz in $PORT_FILL_SET."
 }

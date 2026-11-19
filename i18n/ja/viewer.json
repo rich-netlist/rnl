@@ -10,7 +10,7 @@
   "E or Enter: Open Subcircuit. Ctrl+E or Backspace: Up to Parent Level.": "E または Enter：サブサーキットを開く。Ctrl+E または Backspace：親レベルへ戻る。",
   "Shift+E or Shift+Enter: Open Subcircuit in New Window. Hold Shift during any circuit navigation to open its target in a new window.": "Shift+E または Shift+Enter：新しいウィンドウでサブサーキットを開く。回路ナビゲーション操作中にShiftを押したままにすると、移動先を新しいウィンドウで開きます。",
   "Ctrl+Q: Edit Text (the physical Control key on macOS too). Ctrl+Enter: Apply and Exit Editing.": "Ctrl+Q：テキストを編集（macOSでも物理Controlキーを使用）。Ctrl+Enter：適用して編集を終了。",
-  "In Edit Text: Enter in a comment begins the next line with its * or //, Shift+Enter does not. Tab indents and Shift+Tab outdents; Esc, then Tab, leaves the text.": "テキストの編集中：コメント内でEnterを押すと次の行が同じ * または // で始まり、Shift+Enterでは始まらない。Tabでインデント、Shift+Tabでインデント解除。Escの後にTabでテキストから抜ける。",
+  "In Edit Text: Enter in a comment begins the next line with its * or //, Shift+Enter does not. Tab indents and Shift+Tab outdents; Esc, then Tab, leaves the text.": "［テキストを編集］では、コメント内でEnterを押すと次の行が同じ * または // で始まります（Shift+Enterでは始まりません）。Tabでインデントし、Shift+Tabでインデントを解除します。Escの後にTabを押すとテキストから抜けます。",
   "Ctrl+F: Find in Netlist, including offscreen text. Enter / Shift+Enter: next / previous match.": "Ctrl+F：ネットリスト内を検索（画面外のテキストも含む）。Enter / Shift+Enter：次／前の候補。",
   "Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; ": "Rich Netlist（RNL）レコードを含むネットリストを描画します。テキストを編集して変更を適用できますが、",
   "nothing is written to a file until you save.": "保存するまでファイルには書き込まれません。",
