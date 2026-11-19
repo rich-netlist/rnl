@@ -57,6 +57,9 @@ struct Read {
     source: ObjId,
     seen: HashSet<Site>,
     deep: bool,
+    /// The read already took its source to depend on a selection, so a plan that says so reads it
+    /// the same way: such a plan alone is no reason to read again.
+    selected: bool,
 }
 
 #[derive(Clone)]
@@ -76,6 +79,14 @@ pub(super) struct Places {
     tasks: HashMap<Site, Task>,
     active: HashSet<Site>,
     shape_changed: bool,
+    /// A plan changed in a way that reads nothing differently, so it is no reason to run again:
+    /// - a constraint's result is found to be a set where it had no plan, and a run without one
+    ///   makes it a set already (`planned_constraint_set`);
+    /// - a read learns that its source depends on a selection where the read found that itself,
+    ///   and the plan's selection would only say what it acted on (`Read::selected`).
+    ///
+    /// Debug builds run again anyway and check the run gives the same result.
+    pub(super) idle_changed: bool,
 }
 
 impl Interp<'_> {
@@ -206,7 +217,11 @@ impl Interp<'_> {
             }
             if selection && !plan.selection {
                 plan.selection = true;
-                changed = true;
+                if read.selected {
+                    self.places.idle_changed = true;
+                } else {
+                    changed = true;
+                }
             }
         }
         changed
@@ -242,6 +257,9 @@ impl Interp<'_> {
         };
         let plan = self.places.plans.get(&key).cloned().unwrap_or_default();
         let (already, selection) = self.place_dependencies(source, ctx.scene, false, false);
+        // with a selection found before the edits, the edits are not made and the read fails, as
+        // with a plan that has the selection
+        let selected = selection;
         if !plan.selection && !selection {
             let mut edits: Vec<_> = plan.edits.difference(&already).cloned().collect();
             edits.sort_by(|a, b| (&a.pos, &a.member).cmp(&(&b.pos, &b.member)));
@@ -250,7 +268,7 @@ impl Interp<'_> {
             }
         }
         let (seen, selection) = self.place_dependencies(source, ctx.scene, false, false);
-        self.places.reads.push(Read { key, source, seen, deep: false });
+        self.places.reads.push(Read { key, source, seen, deep: false, selected });
         if plan.selection || selection {
             return self.fail(
                 ctx,
@@ -312,7 +330,10 @@ impl Interp<'_> {
             }
         }
         let (seen, selection) = self.place_dependencies(source, ctx.scene, true, ordinary_only);
-        self.places.reads.push(Read { key, source, seen, deep: true });
+        // the edits are made whatever the plan says unless only selections are replayed, and the
+        // answer has the selection found here
+        let selected = !selection_only && selection;
+        self.places.reads.push(Read { key, source, seen, deep: true, selected });
         Ok(plan.selection || selection || source == LEVEL)
     }
 
@@ -342,10 +363,16 @@ impl Interp<'_> {
     }
 
     pub(super) fn remember_constraint_set(&mut self, key: Query, is_set: bool) {
+        let planned = self.planned_constraint_set(&key);
         let plan = self.places.plans.entry(key).or_default();
         if plan.result_set != Some(is_set) {
             plan.result_set = Some(is_set);
-            self.places.shape_changed = true;
+            // a run reads again only when the shape it took differs: one without a plan took a set
+            if planned == is_set {
+                self.places.idle_changed = true;
+            } else {
+                self.places.shape_changed = true;
+            }
         }
     }
 
@@ -426,5 +453,72 @@ impl Interp<'_> {
         }
         busy.remove(&obj);
         out
+    }
+}
+
+#[cfg(test)]
+pub(super) mod tests {
+    use std::cell::Cell;
+
+    use crate::diag::{Severity, Sink};
+    use crate::host::{Dialect, HostDocument, Instance, Level, LevelKind};
+    use crate::records::{package_lines, scan_run};
+    use crate::source::MemoryProvider;
+    use crate::{interpret, Options};
+
+    thread_local! {
+        /// How many times a reading ran again for a change of its plans, on this thread.
+        pub(in crate::interp) static RUNS_AGAIN: Cell<usize> = const { Cell::new(0) };
+    }
+
+    /// The times R1 a b, R2 b c and R3 c d, with `statements` in one record of the main file, are
+    /// read again for a change of plans.
+    fn runs_again(statements: &str) -> usize {
+        let mut sink = Sink::new();
+        let mut main = Level::new(LevelKind::File, "plans.sp", "plans.sp", "plans.sp");
+        main.circuit = true;
+        for (k, (name, a, b)) in [("R1", "a", "b"), ("R2", "b", "c"), ("R3", "c", "d")].into_iter().enumerate() {
+            main.instances.push(Instance {
+                name: name.into(),
+                letter: Some('R'),
+                nodes: vec![a.into(), b.into()],
+                value: Some("1k".into()),
+                file: "plans.sp".into(),
+                line: k as u32 + 1,
+                order: k,
+                default_terminals: Some(vec!["p".into(), "n".into()]),
+                ..Instance::default()
+            });
+        }
+        let records = format!("@RNL(type=\"header\") {{ @VERSION(\"0.4\")}}\n@RNL {{\n{statements}}}");
+        main.records = scan_run(&package_lines(&records), "plans.sp", &mut sink);
+        let dialect = Dialect { name: "spice".into(), case_sensitive: false, ground_aliases: vec![] };
+        RUNS_AGAIN.with(|count| count.set(0));
+        let read = interpret(
+            HostDocument::new(main, dialect),
+            &MemoryProvider::new(),
+            &Options { std: false, ..Options::default() },
+            sink,
+        );
+        let errors: Vec<_> = read.sink.all().iter().filter(|d| d.severity == Severity::Error).collect();
+        assert!(errors.is_empty(), "{errors:?}");
+        RUNS_AGAIN.with(Cell::get)
+    }
+
+    #[test]
+    fn a_constraint_rule_whose_result_is_a_set_is_read_once() {
+        // The rule's result is a set, as a run without a plan made it, and its inputs are
+        // selections, as the run found: the plans that say so read nothing differently.
+        let statements = "  %first = # @SELECT-INSTANCE(name=\"R1\");\n  %all = # @SELECT-INSTANCE;\n  \
+                          %first %all @DISTANCE(\"left-to-right\", min=1);\n";
+        assert_eq!(runs_again(statements), 0);
+    }
+
+    #[test]
+    fn a_set_edited_after_it_is_read_is_read_again() {
+        // The edit comes after the read: the read takes it only in a run that knows of it (5.2.2).
+        let statements = "  $TP = @DEFINE(roles=[[\"t\", [\"net\", \"terminal\"]]]) {};\n  $S = {};\n  \
+                          %pins = $S @SELECT-PIN;\n  $TP @ATTACH %pins;\n  # @SELECT-NET(name=\"a\") => @ADD-TO $S;\n";
+        assert_eq!(runs_again(statements), 1);
     }
 }
