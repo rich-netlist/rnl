@@ -534,6 +534,8 @@ impl Interp<'_> {
 
     /// The terminals of an owner: (index from 1, name).
     pub(crate) fn owner_terms(&mut self, s: SceneId, owner: ObjId) -> Vec<(u32, Option<String>)> {
+        #[cfg(test)]
+        super::scene_pins::tests::OWNER_TERMS_TAKEN.with(|count| count.set(count.get() + 1));
         match self.o(owner).clone() {
             ObjData::Inst { .. } => {
                 let n = self.inst_of(owner).nodes.len();
@@ -2068,14 +2070,25 @@ impl Interp<'_> {
     /// independent, only the first.
     pub(crate) fn pins_for(&mut self, s: SceneId, owner: ObjId, t: ObjId) -> Vec<usize> {
         let Some(&sym) = self.scenes[s].symbol.get(&owner) else { return Vec::new() };
-        let ObjData::Term { index, .. } = self.o(t).clone() else { return Vec::new() };
+        let ObjData::Term { index, .. } = *self.o(t) else { return Vec::new() };
         let terms = self.owner_terms(s, owner);
+        self.pins_bound(sym, owner, &terms, index)
+    }
+
+    /// [`Self::pins_for`] of the terminal numbered `index` of `owner`, whose terminals are `terms`
+    /// and whose symbol is `sym`: taken once, they serve each terminal of the owner.
+    pub(crate) fn pins_bound(
+        &self,
+        sym: ObjId,
+        owner: ObjId,
+        terms: &[(u32, Option<String>)],
+        index: u32,
+    ) -> Vec<usize> {
         let cs = self.host_case(owner);
         let independent = self.symbol(sym).independent_pins;
         let by_number = !independent || !matches!(self.o(owner), ObjData::Usage(_));
-        let pins = self.symbol(sym).pins.clone();
         let mut bound = Vec::new();
-        for (k, pin) in pins.iter().enumerate() {
+        for (k, pin) in self.symbol(sym).pins.iter().enumerate() {
             let matches = pin.terms.iter().any(|key| match key {
                 TermKey::Num(n) => by_number && *n == index,
                 TermKey::Name(name) => terms.iter().any(|(idx, tn)| {
