@@ -15,6 +15,7 @@ pub mod markup;
 pub mod model;
 pub mod numbering;
 mod parameter_errors;
+pub mod per_file;
 pub mod previous;
 pub mod problem;
 pub mod records;

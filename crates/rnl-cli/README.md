@@ -44,6 +44,12 @@ options:
                       error only for the files that do not pin one. rnl solve does not take it
   --no-generated      read the netlist without its type="generated" records, as a solver does (2.8)
   --dialect NAME      spice, spectre, rnl or text, instead of guessing from the file
+dump options:
+  --file F            build only the levels written in the file F of the document, as the reading of
+                      the whole document builds them; the rest is read as for the whole document
+  --each-file         read each file of the document alone, as --file does, and compare it with the
+                      reading of the whole document, both with what a solver reads of the levels:
+                      print the differences and the times as JSON, and exit 1 on any difference
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
