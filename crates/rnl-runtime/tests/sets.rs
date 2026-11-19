@@ -30,6 +30,8 @@ fn resistor(name: &str, a: &str, b: &str, order: usize) -> Instance {
 struct Outcome {
     errors: Vec<String>,
     unplaced: Vec<Vec<String>>,
+    /// What the texts of each level are attached to.
+    attached: Vec<Vec<String>>,
 }
 
 impl Outcome {
@@ -43,6 +45,12 @@ impl Outcome {
                 .map(|d| r.sink.render(d))
                 .collect(),
             unplaced: r.model.levels.iter().map(|l| l.unplaced.clone()).collect(),
+            attached: r
+                .model
+                .levels
+                .iter()
+                .map(|l| l.texts.iter().filter_map(|t| t.attach.clone()).collect())
+                .collect(),
         }
     }
 }
@@ -328,4 +336,24 @@ fn long_chain() {
     let r = interpret_main(&s);
     assert_eq!(r.errors.len(), 1, "{:?}", r.errors);
     assert!(r.errors[0].contains(&format!("a cycle of sets: %s0 depends on %s{n} here, %s{n} on %s{} at", n - 1)));
+}
+
+/// A set made by a selection that reaches the main level alone reaches a subcircuit through a
+/// statement written in the main level that adds to it the results of a selection with
+/// recursive=true (10.1): that statement is evaluated again in the subcircuit, with its objects
+/// (10.3), and the rules that use the set take them there; a subcircuit with none takes nothing.
+#[test]
+fn an_add_to_written_above_with_recursive_true_makes_the_set_reach_the_levels_below() {
+    let main = concat!(
+        "%n = # @SELECT-NET(name=\"n1\"); # @SELECT-NET(name=\"a\", recursive=true) => @ADD-TO %n; %n @TEXT(\"on\"); ",
+        "%i = # @SELECT-INSTANCE(name=\"R2\"); # @SELECT-INSTANCE(name=\"R1\", recursive=true) => @ADD-TO %i; %i @PLACE(0, 0)",
+    );
+    let r = interpret_in(main, &[("sub", ["a", "b"], ""), ("other", ["c", "d"], "")]);
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    let nets = |level: &[String]| level.iter().filter(|o| o.starts_with('&')).cloned().collect::<Vec<_>>();
+    assert_eq!(nets(&r.attached[0]), ["&n1"]);
+    assert_eq!(nets(&r.attached[1]), ["&a"], "sub has a net a");
+    assert!(nets(&r.attached[2]).is_empty(), "other has no net a");
+    assert_eq!(r.unplaced[0], ["#R3", "#X0", "#X1"]);
+    assert!(r.unplaced[1].is_empty() && r.unplaced[2].is_empty(), "R1 of each subcircuit is placed: {:?}", r.unplaced);
 }
