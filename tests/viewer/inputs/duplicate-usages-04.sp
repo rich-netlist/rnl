@@ -1,6 +1,6 @@
 * Usages of the same devices (0.4): %pair makes %match of its two devices and %one of the first; %quad makes a %pair of its two;
 * %dp is a %pair and %m, written after it, a %match of the same devices; %m2, a %match, is written before %dp2, a %pair of the same devices; %q is a %quad;
-* %pa and %pb have R7 and a pin of it each: not the same objects; %pp and %pr have R8 and the point %px, %pq R8 and %py
+* %pa and %pb have R7 and a pin of it each: the same leaf, R7; %pp and %pr have R8 and the point %px, %pq R8 and %py: the same leaf, R8
 * @RNL(type="header") { @VERSION("0.4")}
 R1 a b 1k
 R2 b 0 1k
