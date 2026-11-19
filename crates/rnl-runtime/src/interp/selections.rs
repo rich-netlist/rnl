@@ -373,10 +373,20 @@ impl Interp<'_> {
         params: &BTreeMap<String, Lit>,
         snapshot: bool,
     ) -> Vec<ObjId> {
+        // The pins of every drawable object of the level, in the order of selection: taken only
+        // when they are needed, for no pool or a net in it. Sorting the drawables is the larger
+        // part of a selection, and a pool of usages or instances, as each stub's selection of its
+        // pin has, needs none of it.
+        let needs_all =
+            pool.as_ref().is_none_or(|pool| pool.iter().any(|object| matches!(self.o(*object), ObjData::Net { .. })));
         let mut all = Vec::new();
-        for owner in self.selection_drawables(scene, snapshot) {
-            all.extend(self.owner_pins(scene, owner));
+        if needs_all {
+            for owner in self.selection_drawables(scene, snapshot) {
+                all.extend(self.owner_pins(scene, owner));
+            }
         }
+        #[cfg(test)]
+        tests::LEVEL_PINS_TAKEN.with(|count| count.set(count.get() + all.len()));
         let mut candidates = Vec::new();
         if let Some(pool) = pool {
             // The pins of each net, in the order of `all`, found once for the whole pool: a pool
@@ -463,5 +473,64 @@ impl Interp<'_> {
                     .is_none_or(|want| (self.wired(scene, *pin, &ends) || self.routing_pin_wired(scene, *pin)) == want)
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+pub(super) mod tests {
+    use std::cell::Cell;
+
+    use crate::diag::{Severity, Sink};
+    use crate::host::{Dialect, HostDocument, Instance, Level, LevelKind};
+    use crate::records::{package_lines, scan_run};
+    use crate::source::MemoryProvider;
+    use crate::{interpret, Options};
+
+    thread_local! {
+        /// How many pins SELECT-PIN took from every drawable object of the level, on this thread.
+        pub(in crate::interp) static LEVEL_PINS_TAKEN: Cell<usize> = const { Cell::new(0) };
+    }
+
+    /// The pins of the whole level that SELECT-PIN takes while a level of `n` instances of five
+    /// terminals is read with `rule`, which attaches a definition to the pins it selects.
+    fn level_pins_taken(n: usize, selection: &str) -> usize {
+        let mut sink = Sink::new();
+        let mut main = Level::new(LevelKind::File, "row.sp", "row.sp", "row.sp");
+        main.circuit = true;
+        for k in 0..n {
+            main.instances.push(Instance {
+                name: format!("X{}", k + 1),
+                letter: Some('X'),
+                nodes: vec![format!("n{k}"), format!("n{}", k + 1), format!("n{}", k + 2), "vdd".into(), "vss".into()],
+                file: "row.sp".into(),
+                line: k as u32 + 1,
+                order: k,
+                default_terminals: Some(["a", "b", "y", "vdd", "vss"].map(String::from).to_vec()),
+                ..Instance::default()
+            });
+        }
+        let records = format!(
+            "@RNL(type=\"header\") {{ @VERSION(\"0.4\")}}\n@RNL {{\n  $TP = @DEFINE(roles=[[\"t\", [\"net\", \"terminal\"]]]) {{}};\n  %pins = {selection};\n  $TP @ATTACH %pins\n}}"
+        );
+        main.records = scan_run(&package_lines(&records), "row.sp", &mut sink);
+        let dialect = Dialect { name: "spice".into(), case_sensitive: false, ground_aliases: vec![] };
+        LEVEL_PINS_TAKEN.with(|count| count.set(0));
+        let read = interpret(
+            HostDocument::new(main, dialect),
+            &MemoryProvider::new(),
+            &Options { std: false, ..Options::default() },
+            sink,
+        );
+        let errors: Vec<_> = read.sink.all().iter().filter(|d| d.severity == Severity::Error).collect();
+        assert!(errors.is_empty(), "{errors:?}");
+        LEVEL_PINS_TAKEN.with(Cell::get)
+    }
+
+    #[test]
+    fn selecting_pins_of_instances_does_not_take_the_pins_of_the_whole_level() {
+        // A pool of instances gives their own pins: the level's other pins are not needed.
+        assert_eq!(level_pins_taken(40, "# @SELECT-INSTANCE => @SELECT-PIN(terminal=\"a\")"), 0);
+        // A pool of nets takes the pins of the level, to keep their order.
+        assert!(level_pins_taken(40, "# @SELECT-NET(name=\"vdd\") => @SELECT-PIN") >= 40 * 5);
     }
 }
