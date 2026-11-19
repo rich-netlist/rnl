@@ -95,7 +95,7 @@
   "The port tags of vdd and vss are gone: the two nets are no longer in $PORT_FILL_SET.": "Las etiquetas de puerto de vdd y vss desaparecen: las dos redes ya no están en $PORT_FILL_SET.",
   "The supply, the grounds and the tags of in and out stay: the textbook look, from three lines in the file.": "La alimentación, las tierras y las etiquetas de in y out se mantienen: el aspecto clásico de libro de texto, con solo tres líneas en el archivo.",
   "a stub for each unwired pin on ground and supply nets": "un tramo corto por cada pin sin cablear en redes de tierra y alimentación",
-  "a net-label stub for every other pin without a wire": "un tramo corto de etiqueta de red para cada otro pin sin cable",
+  "a net-label stub for every other pin without a wire": "un tramo corto de etiqueta de red para cada uno de los demás pines sin cable",
   "a port tag on each port net left in the set, in one column": "una etiqueta de puerto en cada red de puerto que queda en el conjunto, en una columna",
   "3 pins": "3 pines",
   "Pins on net 0 with no wire yet, on this level: the sources of M2, M3 and M4. Their bulk terminals are on net 0 too, but a three-terminal symbol has no bulk pin, so they are not picked. The standard package finds where to add ground stubs in the same way.": "Pines en la red 0 que aún no tienen cable, en este nivel: las fuentes de M2, M3 y M4. Sus terminales de sustrato también están en la red 0, pero un símbolo de tres terminales no tiene pin de sustrato, así que no se eligen. El paquete estándar encuentra del mismo modo dónde añadir tramos cortos de tierra.",

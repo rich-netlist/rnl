@@ -102,7 +102,7 @@
   "Leaves the pins of a net out of the trees of ROUTE-NET and ROUTE-OBJECT, as the standard package does for supply and ground nets.": "あるネットのピンをROUTE-NETとROUTE-OBJECTのツリーから外します。標準パッケージは電源ネットとグラウンドネットにこれを行います。",
   "Leaves the pins of some objects out of the trees of ROUTE-NET and ROUTE-OBJECT.": "一部のオブジェクトのピンをROUTE-NETとROUTE-OBJECTのツリーから外します。",
   "The direction of the current at a terminal, or at a pin or port standing for one: in, out or unspecified. It draws nothing; the solver lays out the current paths by it, and a net whose terminals all move current one way is a violation.": "端子（または端子を表すピンやポート）における電流の向き：in、out、またはunspecified。何も描画しませんが、ソルバーはこれに従って電流経路を配置し、すべての端子が電流を一方向にしか流さないネットは違反になります。",
-  "Checks that instances meet conditions, or have the same or different attributes, such as matched devices; it only reports.": "インスタンスが条件を満たすか、同じ（または異なる）属性を持つか（マッチングしたデバイスなど）を検査します。報告するだけです。",
+  "Checks that instances meet conditions, or have the same or different attributes, such as matched devices; it only reports.": "インスタンスが条件を満たすか、同じ（または異なる）属性を持つか（マッチングした素子など）を検査します。報告するだけです。",
   "Checks terminals in the same way, such as that two are on one net; it only reports.": "同じ方法で端子を検査します（2つが同じネットにあるかなど）。報告するだけです。",
   "Checks nets in the same way, such as that they are ports; it only reports.": "同じ方法でネットを検査します（ポートであるかなど）。報告するだけです。",
   "Checks that usages are usages of a definition; it only reports.": "適用オブジェクトがある定義の適用オブジェクトであるかを検査します。報告するだけです。",
