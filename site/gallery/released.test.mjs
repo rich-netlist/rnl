@@ -49,6 +49,13 @@ test("a series without its standard released is shown only with --drafts, and a 
 });
 
 test("--spec names the spec/ directory, instead of the one beside the libraries", () => {
-  // the repository's own spec/ has 0.3 released and no 0.4
-  assert.deepEqual(shown([], () => ["--spec", join(root, "spec")]), ["standard-0.3", "extension"]);
+  // a spec/ elsewhere with only 0.4 released; the one beside the libraries has none
+  const spec = mkdtempSync(join(tmpdir(), "rnl-gallery-spec-"));
+  try {
+    mkdirSync(join(spec, "0.4"));
+    writeFileSync(join(spec, "0.4", "RELEASED"), "released\n");
+    assert.deepEqual(shown([], () => ["--spec", spec]), ["standard-0.4", "extension"]);
+  } finally {
+    rmSync(spec, { recursive: true, force: true });
+  }
 });

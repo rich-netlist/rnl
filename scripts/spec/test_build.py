@@ -28,6 +28,16 @@ def folder(root: Path, v: str, released: bool, zh: bool = True) -> None:
         (root / v / build.RELEASED).write_text("released\n", encoding="utf-8")
 
 
+def as_of_0_3(spec: Path) -> None:
+    """Take a copy of spec/ back to the time when 0.3 was the newest version: without 0.4 and with 0.2 and 0.3 not
+    archived, so that the tests of the pages below keep the versions they were written for."""
+    shutil.rmtree(spec / "0.4", ignore_errors=True)
+    for p in spec.glob("rnl-0.4*.md"):
+        p.unlink()
+    for v in ("0.2", "0.3"):
+        (spec / v / build.ARCHIVED).unlink(missing_ok=True)
+
+
 class Selection(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
@@ -98,7 +108,7 @@ class Selection(unittest.TestCase):
 
     def test_the_versions_published_so_far_have_the_file(self):
         # not every folder: a draft in spec/ has none until it is released. Add a version here when it is.
-        for v in ("0.2", "0.3"):
+        for v in ("0.2", "0.3", "0.4"):
             self.assertTrue(build.released(REPO_SPEC, v), f"spec/{v}/{build.RELEASED}: the file that marks it as released")
 
 
@@ -156,6 +166,7 @@ class Site(unittest.TestCase):
         root = Path(cls.dir.name)
         cls.spec = root / "spec"
         shutil.copytree(REPO_SPEC, cls.spec)
+        as_of_0_3(cls.spec)
         (cls.spec / "0.3" / build.RELEASED).unlink()
         cls.root = root
 
@@ -209,6 +220,7 @@ class EnglishOnly(unittest.TestCase):
         root = Path(cls.dir.name)
         spec = root / "spec"
         shutil.copytree(REPO_SPEC, spec)
+        as_of_0_3(spec)
         shutil.rmtree(spec / "0.3" / "zh")
         (spec / "rnl-0.3.zh.md").unlink()
         (spec / "rnl-0.3-guide.zh.md").unlink()

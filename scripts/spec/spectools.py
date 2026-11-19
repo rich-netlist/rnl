@@ -39,6 +39,10 @@ def heading_re(levels: str) -> re.Pattern:
     """A heading of the given levels, such as `#{2,4}`, whose number or annex letter comes after the annex word, if any."""
     return re.compile(r"^(" + levels + ") (?:(?:" + "|".join(re.escape(w) for w in annex_words()) + r") )?(\S+)")
 
+# A code span: a run of backticks and the same run again, so that `` `ifdef `` is one span, as in CommonMark.
+CODE_SPAN = re.compile(r"(`+)(?!`)(.+?)(?<!`)\1(?!`)")
+
+
 def parts(names: list[str]) -> list[str]:
     """The parts of one version, in order, from the names of its files: the chapters ch01.md, ch02.md, …
     by number, then the annexes annex-a.md, annex-b.md, … by letter. front.md is not a part."""
@@ -127,7 +131,7 @@ def sections(text: str, by_position: bool = False) -> dict:
             cur = {"code": [], "inline": Counter(), "items": 0, "rows": 0, "paras": 0, "heading": line}
             out[key] = cur
             continue
-        cur["inline"].update(re.findall(r"`[^`\n]+`", line))
+        cur["inline"].update(m.group(0) for m in CODE_SPAN.finditer(line))
         if re.match(r"^\s*([-*]|\d+\.) ", line):
             cur["items"] += 1
         elif line.lstrip().startswith("|"):
@@ -173,6 +177,49 @@ def compare(en_text: str, zh_text: str, part: str, by_position: bool = False, la
 # has them (decision 0015, step 4); {…} marks what the word list fills in. A language without the templates has its
 # Annex A written by hand, and the build compares it with the English one section by section instead.
 
+# What Annex A says beyond the structure of the word list, in the words of the annex: for a keyword, its "where", "slots",
+# "params" or "result" cell as a whole; for "KEYWORD.param", what follows the position and "required" of that parameter.
+# They belong to one version of the word list, under "versions" (below), and each language with templates has the
+# same keys in its "notes" there.
+EN_ANNEX_A_NOTES = {"0.4": {
+    "DEVICE.type": "string",
+    "PIN.terminal": "terminal, or a non-empty array of terminals; may be left out",
+    "ANNOTATION": {
+        "slots": "`at`: one (locatable); `source`: one (a symbol, a general definition or a usage), written last",
+        "params": "`rotate` (number, degrees counterclockwise; default `0`), `mirror` (bool; default `false`), style properties, "
+                  "and the parameters of a symbol or general definition given as `source`, by name (9.4)"},
+    "TEXT.rotate": "number, degrees counterclockwise; default `0`",
+    "ORIENT.code": '`"R0"`, `"R90"`, `"R180"`, `"R270"`, `"MX"`, `"MY"`, `"MXR90"`, `"MYR90"`, or the words `"left"`, `"down"`, '
+                   '`"right"`, `"up"` for the first four; or a non-empty array of them',
+    "SET-SYMBOL.terminals": "array of terminal names, or of pairs",
+    "SELECT-INSTANCE.symbol": "string: a `$` name, with `*`",
+    "SELECT-USAGE.symbol": "string: a `$` name, with `*`",
+    "WIRE": {"slots": "`net`: any (net, or the empty node); `points`: set (point, pin; a terminal stands for its pin, 5.2.4)"},
+    "ROUTE-OBJECT.mode": "as ROUTE-NET",
+    "ORIENT-RELATION": {"slots": "`from`: one (orientable, or pin); `to`: one (orientable, or pin, as `from`)"},
+    "ORIENT-RELATION.relation": "the eight codes of ORIENT, not its words, or a non-empty array of them",
+    "TABLE": {"slots": "`rows`: set (locatable; nested sets are the lists of the table)"},
+    "SOLVER-CONFIG": {
+        "where": "header record without `language`, header record of a package file, and level",
+        "params": "named parameters of the solver: numbers, strings, truth values and arrays of these; `spacing_x`, `spacing_y` "
+                  "(number, whole) and `junction` (string: a `$` name; in a level record also a `%` name of the level; or empty) "
+                  "are named by the standard; the other keys are those of the solver",
+        "result": "no object; settings of the solver"},
+    "ASSERT-INSTANCE": {
+        "params": "the conditions of SELECT-INSTANCE but `role` and `recursive`, `has` (array of attribute names), `same` (array "
+                  "of attribute names), `different` (array of attribute names), `message`",
+        "result": "no object; a check"},
+    "ASSERT-TERMINAL": {"params": "the conditions of SELECT-TERMINAL but `role` and `recursive`, `same`, `different`, `message`",
+                        "result": "no object; a check"},
+    "ASSERT-NET": {"params": "the conditions of SELECT-NET but `role` and `recursive`, `same`, `different`, `message`",
+                   "result": "no object; a check"},
+    "ASSERT-USAGE": {"params": "`symbol`, `drawn` (bool), `same`, `different` (arrays; only `\"definition\"`), `message`",
+                     "result": "no object; a check"},
+    "ASSERT-IN": {"result": "no object; a check"},
+    "ASSERT-TOPOLOGY": {"result": "no object; a check"},
+    "ASSERT-TOPOLOGY.exclude": "array of pairs: type, terminal",
+}}
+
 EN_ANNEX_A = {
     "title": "## Annex A Keyword signatures (normative)",
     "intro": "This annex is generated from the word list `rnl-words-{version}.json` (5.3); where the two differ, it is an "
@@ -207,7 +254,7 @@ EN_ANNEX_A = {
     "optional": ", optional",
     "role_slots": "{note} (`definition`, written {at})",
     "all_style": "style properties (9.3)",
-    "position": "position {n}", "required": "required", "default": "default `{d}`",
+    "position": "position {n}", "required": "required", "default": "default `{d}`", "whole": "{t}, whole",
     "bits_sep": "; ", "parts_sep": ", ",
     "or_array": ", or a non-empty array of {t}s",
     "definition_params": "the parameters of the definition (by position in the order of its parameter list, or by name; 9.4)",
@@ -228,6 +275,7 @@ EN_ANNEX_A = {
                    "symbol": "symbol bodies only", "also-header": "also in header records", "also-symbol": "also in symbol bodies"},
     "priority_old": "without it the priority of the record head applies (14.8).",
     "priority_new": "without it the priority of the record head applies, except that AS and ATTACH take only `\"disabled\"` from it (14.8).",
+    "versions": {v: {"notes": n} for v, n in EN_ANNEX_A_NOTES.items()},
     "words": {}, "keys": {}, "groups": {}, "takes": {}, "pseudo_kinds": {}, "kind_text": {
         "any": "any object", "level": "`#`", "owner": "`?`", "position": "`::position`",
         "general": "a general definition", "symbol": "a symbol", "style": "a style"},
@@ -238,6 +286,9 @@ def md_params(e, A) -> str:
     w = lambda x: A["words"].get(x, x)
     if e.get("style") == "all":
         return A["all_style"]
+    note = A.get("notes", {}).get(e["keyword"], {}).get("params")
+    if note:
+        return note
     parts = []
     pos = e.get("positional", [])
     for p in e["params"]:
@@ -247,7 +298,10 @@ def md_params(e, A) -> str:
             bits.append(A["position"].format(n=pos.index(p["name"]) + 1))
         if p.get("required"):
             bits.append(A["required"])
-        if p["type"] == "enum":
+        own = A.get("notes", {}).get(f"{e['keyword']}.{p['name']}")
+        if own:
+            bits.append(own)
+        elif p["type"] == "enum":
             vals = A["list_sep"].join(f'`{json.dumps(v, ensure_ascii=False)}`' for v in p["values"])
             if p["name"] != "priority":
                 bits.append(vals)
@@ -255,19 +309,23 @@ def md_params(e, A) -> str:
             t = w(p["type"])
             if "items" in p and p["type"] != "array":
                 t += A["or_array"].format(t=t)
+            if p.get("whole"):
+                t = A["whole"].format(t=t)
             bits.append(t)
-        if "default" in p:
+        if "default" in p and not own:
             bits.append(A["default"].format(d=json.dumps(p["default"], ensure_ascii=False)))
         if bits:
             s += A["paren"].format(A["bits_sep"].join(bits))
         parts.append(s)
     if e.get("definition_params"):
         parts.insert(0, A["definition_params"])
-    if e.get("style") and e["style"] != "all":
-        parts.append(A["style_params"].format(style=e["style"]))
+    if e.get("style") and e["style"] != "all":  # before `priority`, which comes last
+        at = next((i for i, p in enumerate(e["params"]) if p["name"] == "priority"), len(e["params"]))
+        parts.insert(at + bool(e.get("definition_params")), A["style_params"].format(style=e["style"]))
     extra = []
-    if e.get("at_least_one"):
-        extra.append(A["at_least_one"].format(names=A["names_sep"].join(f"`{n}`" for n in e["at_least_one"])))
+    groups = e.get("at_least_one", [])
+    for g in [groups] if groups and isinstance(groups[0], str) else groups:  # one group (0.3) or a list of groups (0.4)
+        extra.append(A["at_least_one"].format(names=A["names_sep"].join(f"`{n}`" for n in g)))
     for g in e.get("together", []):
         extra.append(A["together"].format(names=A["together_sep"].join(f"`{n}`" for n in g)))
     for g in e.get("exclusive", []):
@@ -279,6 +337,9 @@ def md_params(e, A) -> str:
 
 
 def md_slots(e, A) -> str:
+    note = A.get("notes", {}).get(e["keyword"], {}).get("slots")
+    if note:
+        return note
     if e.get("role_slots"):
         at = e["slots"][0]["at"]
         return A["role_slots"].format(note=A["role_note"][e["keyword"]], at=A["at"][at])
@@ -296,13 +357,16 @@ def md_slots(e, A) -> str:
 
 
 def md_result(e, A) -> str:
+    note = A.get("notes", {}).get(e["keyword"], {}).get("result")
+    if note:
+        return note
     w = lambda x: A["words"].get(x, x)
     kind = w(e.get("output_kind", ""))
     out = {"none": A["none"], "same": A["same"], "target": A["target"],
            "new": A["new"].format(kind=kind), "definition": A["definition"].format(kind=kind)}[e["output"]]
     if e.get("selects"):
         out += A["selects"].format(sel=w(e["selects"]))
-    if e["group"] == "Symbol content and graphics" and e["keyword"] not in ("PIN", "TEXT"):
+    if e["group"] == "Symbol content and graphics" and e["keyword"] not in ("PIN", "TEXT") and "symbol" in e["where"]:
         out = A["graphic"]
     if e.get("key_subobject"):
         out += A["key_subobject"]
@@ -339,6 +403,16 @@ def priority_default(words, A) -> str:
     return A["priority_new"]
 
 
+def for_version(A: dict, version: str) -> dict:
+    """The templates for one version of the word list: those under "versions" for it, over the common ones; a table of
+    phrases, such as "takes" or "groups", is merged entry by entry. Earlier versions keep the common templates."""
+    A = dict(A)
+    for k, v in A.pop("versions", {}).get(version, {}).items():
+        A[k] = {**A[k], **v} if isinstance(v, dict) and isinstance(A.get(k), dict) else v
+    A.setdefault("notes", {})
+    return A
+
+
 def annex_a_phrases(lang: str) -> dict | None:
     """The templates of Annex A of a language, or None when it has none (its Annex A is written by hand)."""
     p = phrases(lang)
@@ -347,6 +421,7 @@ def annex_a_phrases(lang: str) -> dict | None:
 
 def annex_a(words, lang="en", A=None) -> str:
     A = A or annex_a_phrases(lang)
+    A = for_version(A, words["version"])
     sep = A["list_sep"]
     takes = {t["name"]: A["takes"].get(t["name"], t.get("meaning")) for t in words["takes"]}
     pseudo = {k["name"]: A["pseudo_kinds"].get(k["name"], k.get("meaning")) for k in words["pseudo_kinds"]}
@@ -373,7 +448,7 @@ def annex_a(words, lang="en", A=None) -> str:
         for e in words["keywords"]:
             if e["group"] != group:
                 continue
-            where = where_note(e["where"], A)
+            where = A.get("notes", {}).get(e["keyword"], {}).get("where") or where_note(e["where"], A)
             name = f"`@{e['keyword']}`" + (A["paren"].format(where) if where else "")
             L.append(f"| {name} | {md_slots(e, A)} | {md_params(e, A)} | {md_result(e, A)} | {e['section']} |")
         n += 1
