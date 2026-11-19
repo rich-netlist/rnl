@@ -4,10 +4,19 @@
 // next to this file.
 
 import type { Catalog } from "./catalog.js";
-import type { Diagnostic, Document, FormatInfo, UnplacedDrawing } from "./document.js";
+import type {
+  Diagnostic,
+  Document,
+  FormatInfo,
+  Outline,
+  OutlineCall,
+  OutlineFile,
+  OutlineLevel,
+  UnplacedDrawing,
+} from "./document.js";
 import type { Snapshot } from "./snapshot.js";
 
-export type { Catalog, Document, FormatInfo, Snapshot, UnplacedDrawing };
+export type { Catalog, Document, FormatInfo, Outline, OutlineCall, OutlineFile, OutlineLevel, Snapshot, UnplacedDrawing };
 
 /** Error thrown when a write request is refused: the kind's number, `RNLnnnn`, and its name. */
 export interface EditError extends Error {
@@ -110,6 +119,11 @@ export interface Request {
    * with the Document as its `drawing` unless `drawing` is false.
    */
   parts?: { drawing?: boolean; host?: boolean; model?: boolean };
+  /**
+   * Give the outline of the entry instead of its Document: what reading its files gives before any
+   * RNL is interpreted. The fields that say how to draw are ignored; false when not given.
+   */
+  outline?: boolean;
 }
 
 export type Point = [number, number];
@@ -463,6 +477,12 @@ export interface Core {
   build(request: Request | string): Document;
   /** Build the snapshot of a request with `parts`, as build builds the Document. */
   snapshot(request: Request | string): Snapshot;
+  /**
+   * The outline of a request's entry: its files, levels and the subcircuits each calls, the language
+   * version and packages of each file, and the diagnostics of reading the netlist, with no RNL
+   * interpreted. A request given as text must ask for `outline` itself.
+   */
+  outline(request: Request | string): Outline;
   /** Write the ops and build them. A refusal throws EditError with a code and host diagnostics. */
   write(request: WriteRequest | string): Written;
   /**
@@ -495,6 +515,7 @@ export interface Core {
       | string,
   ):
     | { document: Document }
+    | { outline: Outline }
     | { snapshot: Snapshot }
     | { written: Written }
     | { replaced: Replaced }

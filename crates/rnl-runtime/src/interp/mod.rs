@@ -1212,6 +1212,25 @@ pub fn resolve_host_diagnostics(doc: HostDocument, default_version: &str, sink: 
     (it.doc, it.sink)
 }
 
+/// What reading a host document gives before any RNL is interpreted: the host reader's diagnostics,
+/// with those of each file or section resolved by its language version as an interpretation
+/// resolves them, and the language version of each file level, None for the other levels. This
+/// reads the version declarations only: it evaluates no other RNL and loads no package.
+pub fn read_file_versions(doc: HostDocument, sink: Sink) -> (HostDocument, Sink, Vec<Option<String>>) {
+    let provider = crate::source::MemoryProvider::new();
+    let options = Options { std: false, ..Options::default() };
+    let mut it = Interp::blank(doc, &provider, &options, sink, NumberRun::default());
+    // as Interp::new_run starts an interpretation
+    it.init_host_units();
+    it.read_file_versions();
+    it.check_host_diagnostics();
+    it.check_host_input_diagnostics();
+    let versions = (0..it.doc.levels.len())
+        .map(|lv| (it.doc.levels[lv].kind == LevelKind::File).then(|| it.version_of(Some(it.level_unit[lv]))))
+        .collect();
+    (it.doc, it.sink, versions)
+}
+
 /// Check a package file on its own (2.7).
 pub fn check_package(path: &str, provider: &dyn Provider, options: &Options) -> Interpretation {
     Interp::new_package(path, provider, options).run_settled(|_| Interp::new_package(path, provider, options))

@@ -1,5 +1,6 @@
-//! The core for WebAssembly (decision 0008): [`rnl_view::build`], [`rnl_edit::write`] with a build
-//! of what it wrote, [`rnl_edit::replace::replace_records`], [`rnl_view::catalog`], and the drawings
+//! The core for WebAssembly (decision 0008): [`rnl_view::build`], [`rnl_view::outline`],
+//! [`rnl_edit::write`] with a build of what it wrote, [`rnl_edit::replace::replace_records`],
+//! [`rnl_view::catalog`], and the drawings
 //! of the objects a build lists without a position, on request, behind a small C-style interface
 //! over linear memory,
 //! a JSON request in and a JSON response out. It needs no generated glue: the module imports
@@ -31,7 +32,7 @@ use std::sync::{Mutex, MutexGuard, Once, PoisonError};
 
 use rnl_runtime::source::{normalize, LibraryDefinition, LibraryLookup, MemoryProvider, Provider};
 use rnl_runtime::Options;
-use rnl_view::{BuildOptions, Catalog, CatalogOptions, Document, Drawings, Parts, Snapshot, UnplacedDrawing};
+use rnl_view::{BuildOptions, Catalog, CatalogOptions, Document, Drawings, Outline, Parts, Snapshot, UnplacedDrawing};
 use serde::{Deserialize, Serialize};
 
 /// What to build: the workspace and how. Fields the core does not know are ignored, so that a
@@ -110,6 +111,11 @@ pub struct Request {
     /// The parts of the editor interface's snapshot to give: with them, the answer is a
     /// [`rnl_view::Snapshot`] instead of a Document.
     pub parts: Option<PartsRequest>,
+    /// Give the outline of the entry instead of its Document: what reading its files gives before
+    /// any RNL is interpreted ([`rnl_view::outline`]). The fields that say how to draw are
+    /// ignored; false when not given.
+    #[serde(default)]
+    pub outline: bool,
     /// Panic with this message, to test that the caller still gets an answer.
     #[cfg(feature = "test-panic")]
     pub panic: Option<String>,
@@ -294,7 +300,7 @@ pub struct FormatList {
     pub detected: BTreeMap<String, String>,
 }
 
-/// The answer to a request: `{"document": ...}`, `{"snapshot": ...}`, `{"written": ...}`,
+/// The answer to a request: `{"document": ...}`, `{"outline": ...}`, `{"snapshot": ...}`, `{"written": ...}`,
 /// `{"replaced": ...}`, `{"catalog": ...}`, `{"drawings": ...}`, `{"formats": ...}` or
 /// `{"error": "..."}`.
 #[derive(Serialize, Debug)]
@@ -303,6 +309,8 @@ pub enum Response {
     Library(Vec<String>),
     /// The Document of the entry.
     Document(Box<Document>),
+    /// The outline of the entry, when the request asks for `outline`.
+    Outline(Box<Outline>),
     /// The snapshot of the entry, when the request asks for `parts`.
     Snapshot(Box<Snapshot>),
     /// The netlist a [`WriteRequest`] wrote, and its Document.
@@ -490,6 +498,12 @@ pub fn respond(request: &[u8]) -> Response {
         constraints: request.constraints,
         bind: request.bind,
     };
+    if request.outline {
+        return match rnl_view::outline(&request.entry, &files, &options) {
+            Ok(o) => Response::Outline(Box::new(o)),
+            Err(e) => Response::Error(e),
+        };
+    }
     if let Some(p) = request.parts {
         let parts = Parts { drawing: p.drawing, host: p.host, model: p.model };
         return match rnl_view::snapshot(&request.entry, &files, &options, parts) {
@@ -968,6 +982,26 @@ C1 a 0 1p
         assert_eq!(d["files"][0]["text"], NETLIST);
         assert_eq!(d["missing"], json!([]));
         assert_eq!(d["levels"][0]["empty"], false);
+    }
+
+    #[test]
+    fn an_outline_request_answers_the_outline_rnl_view_gives() {
+        let top = "* top\n.include \"lib/parts.inc\"\nX1 a b part\n.end\n";
+        let parts = ".subckt part p q\nR1 p q 1k\n.ends\n";
+        let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/lib/parts.inc", parts);
+        let native = rnl_view::outline("/w/top.sp", &files, &BuildOptions::default()).unwrap();
+        let request = json!({ "outline": true, "entry": "/w/top.sp", "svg": false,
+            "files": { "/w/top.sp": top, "/w/lib/parts.inc": parts } });
+        let v = answer(request);
+        let keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
+        assert_eq!(keys, ["outline"]);
+        assert_eq!(v["outline"], wire(native));
+        assert_eq!(v["outline"]["levels"][0]["calls"][0]["level"], 2, "{v}");
+        // a missing include is listed, as a build lists it
+        let v = answer(json!({ "outline": true, "entry": "/w/top.sp", "files": { "/w/top.sp": top } }));
+        assert_eq!(v["outline"]["missing"], json!(["/w/lib/parts.inc"]));
+        let v = answer(json!({ "outline": true, "entry": "/w/none.sp", "files": {} }));
+        assert_eq!(v["error"], "cannot read /w/none.sp");
     }
 
     #[test]

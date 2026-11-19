@@ -11,6 +11,7 @@ use crate::{
 use crate::{CurrentArrow, UsageFrame};
 use crate::{FormatInfo, InspectedLabel, InspectedPin, InspectedSymbol, SourceInclude, Usage, UsageRole};
 use crate::{GroupView, LevelHint, MemberOf, NetLabel, RoleOf, RuleAt, UsageOf};
+use crate::{Outline, OutlineCall, OutlineFile, OutlineLevel};
 use std::path::Path;
 
 use crate::snapshot::{AnnotationGraphic, AnnotationView, JunctionView};
@@ -171,6 +172,10 @@ fn all() -> Vec<(String, String)> {
         one::<RuleAt>(&cfg),
         one::<Span>(&cfg),
         one::<Diagnostic>(&cfg),
+        one::<Outline>(&cfg),
+        one::<OutlineFile>(&cfg),
+        one::<OutlineLevel>(&cfg),
+        one::<OutlineCall>(&cfg),
         one::<Primitive>(&cfg),
         one::<Layer>(&cfg),
         one::<Shape>(&cfg),

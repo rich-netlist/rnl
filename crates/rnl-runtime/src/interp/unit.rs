@@ -42,6 +42,29 @@ pub(crate) fn declared_record_version(text: &str) -> Option<(String, usize)> {
     }
 }
 
+/// The names of the packages a header record uses: the `name` of each correctly formed USE-PACKAGE
+/// of its body, in the order written, without reporting diagnostics (16.2). This lists them before
+/// the file is interpreted; whether each is found, and in which version, the interpretation says.
+pub fn header_packages(text: &str) -> Vec<String> {
+    let ast = syntax::parse_record(text);
+    if ast.error.is_some() || ast.header.as_ref().and_then(|h| h.get("type")) != Some(&Value::Str("header".into())) {
+        return Vec::new();
+    }
+    let Some(body) = ast.body else { return Vec::new() };
+    let mut names = Vec::new();
+    for member in &body.members {
+        if member.error.is_some() || member.segments.len() != 1 || member.bind().is_some() {
+            continue;
+        }
+        let Some(call) = member.segments[0].call.as_ref().filter(|call| call.kw == "USE-PACKAGE") else { continue };
+        let Ok(params) = params_by_name("USE-PACKAGE", call.params.as_ref(), true, str::to_string) else { continue };
+        if let Some(name) = str_val(params.get("name")) {
+            names.push(name);
+        }
+    }
+    names
+}
+
 /// The versions of the language this implementation reads (16.1): 0.4 only. A file of 0.2 or 0.3
 /// is a file of a version it does not read, none of whose RNL is interpreted; the cores of 0.5.x
 /// read those versions, and their `rnl upgrade` writes such a file in 0.4 ([`unsupported_version`]).
