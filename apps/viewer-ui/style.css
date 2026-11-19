@@ -1311,6 +1311,8 @@ body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
 .settings-label { display: flex; align-items: center; gap: 8px; }
 .settings-label .name { min-width: 8em; }
 .dialog-body .dialog-form .settings-label input[type="number"] { width: 9em; }
+/* a setting's own check box (a boolean), not the width of a text box, which WebKit shrinks to nothing in the row */
+.dialog-body .dialog-form .settings-label > input[type="checkbox"] { width: auto; flex: none; padding: 0; }
 .settings-hint { color: var(--muted); font-size: 12px; }
 .settings-text { color: var(--muted); font-size: 12px; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace, var(--ui-cjk); }
 .settings-restore { padding: 3px 12px; border-color: var(--line); background: var(--tab); }

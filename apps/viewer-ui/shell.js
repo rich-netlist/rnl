@@ -88,6 +88,9 @@
  *   `rnl solver-defaults --json` prints it (docs/solver-settings-table.md): its groups, each setting with
  *   its type, bounds, default and a line that says what it does, and its objectives, for Solve > Settings to
  *   draw its dialog from (solve-settings.js); the page keeps no setting of its own. Offered with `solve`.
+ * @property {Record<string, unknown>} [solverDefaults] The shell's own defaults over the solver's, by key, such as
+ *   `{ reroute_nets: true }`: Solve > Settings shows them as the defaults, and a solve is given them where the user did
+ *   not change them, as a setting of the tool (solve-settings.js). Each is one the default layout takes.
  * @property {(config: string) => Promise<CheckedSettings>} [checkSettings] What the solver says of settings
  *   written as RNL named parameters, as `rnl solve --solver-config` takes them, with no file: what
  *   `rnl solve --check --json` prints, a level with the problems of each setting by its `key`. Rejects
