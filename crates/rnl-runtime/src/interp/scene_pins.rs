@@ -139,12 +139,20 @@ impl Interp<'_> {
                     }
                 }
             }
-        } else {
-            for terminal in self.terms_of(scene, owner) {
-                if self.pins_for(scene, owner, terminal).contains(&index) {
+        } else if let Some(&symbol) = self.scenes[scene].symbol.get(&owner) {
+            // The owner's terminals and its symbol's pins are taken once for all its terminals,
+            // as `terms_of` and `pins_for` would take them again for each (9.2.4).
+            let terms = self.owner_terms(scene, owner);
+            let terminals: Vec<ObjId> =
+                terms.iter().map(|(number, name)| self.term_obj(scene, owner, *number, name.clone())).collect();
+            for (terminal, &(number, _)) in terminals.into_iter().zip(&terms) {
+                if self.pins_bound(symbol, owner, &terms, number).contains(&index) {
                     nets.extend(self.term_nets(scene, terminal));
                 }
             }
+        } else {
+            // no symbol: no pin is bound to a terminal, as `pins_for` gives none
+            let _ = self.terms_of(scene, owner);
         }
         visiting.remove(&(owner, index));
         nets
@@ -846,6 +854,8 @@ pub(super) mod tests {
     thread_local! {
         /// How many times a pin was asked for its nets, on this thread.
         pub(in crate::interp) static PIN_NET_LOOKUPS: Cell<usize> = const { Cell::new(0) };
+        /// How many times the terminals of an owner were taken, on this thread.
+        pub(in crate::interp) static OWNER_TERMS_TAKEN: Cell<usize> = const { Cell::new(0) };
     }
 
     /// The lookups of pins' nets that reading a level of `n` instances of five terminals takes,
@@ -895,5 +905,52 @@ pub(super) mod tests {
         // Twice the instances, twice the pins and twice the nets: a lookup per pin doubles, a
         // lookup per pin and net, as before, would grow four times.
         assert!(large <= small * 5 / 2, "{small} lookups for 60 instances, {large} for 120");
+    }
+
+    /// The times the terminals of an owner are taken while a level of 30 instances of `terminals`
+    /// terminals each, every terminal on a net of its own, is read with a rule that selects the
+    /// pins of every net, as the standard fill does.
+    fn owner_terms_taken(terminals: usize) -> usize {
+        let mut sink = Sink::new();
+        let mut main = Level::new(LevelKind::File, "wide.sp", "wide.sp", "wide.sp");
+        main.circuit = true;
+        for k in 0..30 {
+            main.instances.push(Instance {
+                name: format!("X{}", k + 1),
+                letter: Some('X'),
+                nodes: (0..terminals).map(|j| format!("n{k}_{j}")).collect(),
+                file: "wide.sp".into(),
+                line: k as u32 + 1,
+                order: k,
+                default_terminals: Some((0..terminals).map(|j| format!("t{j}")).collect()),
+                ..Instance::default()
+            });
+        }
+        let records = r#"@RNL(type="header") { @VERSION("0.4")}
+@RNL {
+  $TP = @DEFINE(roles=[["t", ["net", "terminal"]]]) {};
+  %pins = # @SELECT-NET(recursive=true) => @SELECT-PIN(recursive=true);
+  $TP @ATTACH %pins
+}"#;
+        main.records = scan_run(&package_lines(records), "wide.sp", &mut sink);
+        let dialect = Dialect { name: "spice".into(), case_sensitive: false, ground_aliases: vec![] };
+        OWNER_TERMS_TAKEN.with(|count| count.set(0));
+        let read = interpret(
+            HostDocument::new(main, dialect),
+            &MemoryProvider::new(),
+            &Options { std: false, ..Options::default() },
+            sink,
+        );
+        let errors: Vec<_> = read.sink.all().iter().filter(|d| d.severity == Severity::Error).collect();
+        assert!(errors.is_empty(), "{errors:?}");
+        OWNER_TERMS_TAKEN.with(Cell::get)
+    }
+
+    #[test]
+    fn the_nets_of_a_pin_take_its_owners_terminals_once() {
+        let (narrow, wide) = (owner_terms_taken(4), owner_terms_taken(16));
+        // Four times the terminals, four times the pins: the terminals taken once for each pin
+        // grow four times, taken again for each terminal of the owner, as before, about 14 times.
+        assert!(wide <= narrow * 6, "{narrow} for 4 terminals, {wide} for 16");
     }
 }
