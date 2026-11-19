@@ -1,8 +1,9 @@
 // Drives a Firefox that was started with Marionette on port 2828, over Marionette's own protocol (length-prefixed JSON on TCP),
 // so that no geckodriver is needed. The Firefox is the one the local program started itself (its launcher, with the Firefox of the
 // package beside it) on the page it printed: the driver only looks at the tab that is open: waits for the document named on the
-// program's command line, checks the drawing, asks for a solve (done in the program, through its solver service) and for the
-// preview, and writes a screenshot and a JSON summary.
+// program's command line, checks the drawing, asks for a solve (done in the program, through its solver service: by the Solve of
+// the question that opening a netlist with components not drawn asks, or else by Solve › Solve) and for the preview, and writes
+// a screenshot and a JSON summary.
 //
 //   node apps/local/ci/drive.mjs OUT_DIR LABEL EXPECTED_PATH_SUFFIX
 
@@ -118,8 +119,22 @@ try {
     const state = "return JSON.stringify({ body: document.body.className, note: (document.getElementById('note') || {}).textContent, status: (document.getElementById('status') || {}).textContent })";
     summary.beforeSolve = await client.script(state).catch((e) => e.message);
     console.log("before the solve:", summary.beforeSolve);
-    // a solve in the program, through its solver service
-    await client.script("window.wrappedJSObject.viewer.command('solve'); return true");
+    // a solve in the program, through its solver service. A netlist with components not drawn, as this one, is asked about
+    // when it is opened (apps/viewer-ui/solve-on-open.js): its Solve, the dialog's default button, solves, and while the
+    // dialog is up a solve asked for otherwise is not heard. Without the question (it may be turned off), Solve › Solve.
+    const asking = "var d = document.querySelector('dialog.dialog[open]'); var t = d && d.querySelector('.dialog-title'); return !!t && t.textContent.trim() === 'Solve the Netlist?'";
+    const asked = await until(client, asking, 30);
+    summary.asked = asked === true;
+    if (asked === true) {
+      summary.question = await client.script("return document.querySelector('dialog.dialog[open]').innerText").catch((e) => e.message);
+      console.log("asked:", JSON.stringify(summary.question));
+      await client.script("document.querySelector('dialog.dialog[open] button.default').click(); return true");
+      const gone = await until(client, "return !document.querySelector('dialog.dialog')", 30);
+      check("the question to solve on opening is answered with Solve", gone === true, String(gone));
+    } else {
+      console.log("not asked to solve on opening; Solve › Solve");
+      await client.script("window.wrappedJSObject.viewer.command('solve'); return true");
+    }
     const solved = await until(client, "return document.body.classList.contains('preview') && !document.body.classList.contains('solving')", 300);
     check("a solve shows its preview", solved === true, String(solved));
     summary.afterSolve = await client.script(state).catch((e) => e.message);
