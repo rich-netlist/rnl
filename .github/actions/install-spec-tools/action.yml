@@ -1,6 +1,7 @@
 # Installs what scripts/spec/build.py needs besides Python: pinned pandoc and Typst, and the CJK fonts
-# for the Chinese PDF (decision 0007). Used by pages.yml and spec-release.yml.
-# The fonts are the six files the PDF uses (Noto Sans, Serif and Sans Mono CJK SC, regular and bold)
+# for the Chinese, Japanese and Korean PDFs (decision 0007). Used by pages.yml and spec-release.yml.
+# The fonts are the 24 files the PDFs use (Noto Sans, Serif and Sans Mono CJK, regular and bold, in SC for
+# zh, JP for ja, KR for ko and TC for zh-hant, as scripts/spec/build.py chooses them by language)
 # from the pinned noto-cjk tags on GitHub, checked by SHA-256 and kept by actions/cache. They used to
 # come from the Ubuntu package fonts-noto-cjk, whose mirror stalled for over 15 minutes on 2026-10-23.
 name: Install the tools of the standard's build
@@ -22,8 +23,8 @@ runs:
         mkdir -p "$dir"
         # GitHub's raw files first, then the same file at the same tag from jsDelivr, which serves the repository too: the
         # downloads of an Actions run have been answered 504 by GitHub for hours. Whichever answers, the file must have the
-        # SHA-256 below, or the step fails. (jsDelivr serves files of up to 20 MB: the two Serif files, 24 MB, answer 403
-        # there and come from GitHub only.)
+        # SHA-256 below, or the step fails. (jsDelivr serves files of up to 20 MB: the eight Serif files, 23 to 24 MB, answer
+        # 403 there and come from GitHub only.)
         get() { # URL, file, SHA-256
           curl -fsSL "${curl_net[@]}" -o "$2" "$1" && echo "$3  $2" | sha256sum --check --strict
         }
@@ -39,6 +40,24 @@ runs:
         Sans2.004/Sans/Mono/NotoSansMonoCJKsc-Bold.otf a452fedfc0619e43e080b7b861ce34cbd3ec4fbcea495bf8c402a5a02a5dcbdc
         Serif2.003/Serif/OTF/SimplifiedChinese/NotoSerifCJKsc-Regular.otf 2a2eae2628df83556c54018c41e20fa532c1b862c5256ae8b3f23feb918d12ca
         Serif2.003/Serif/OTF/SimplifiedChinese/NotoSerifCJKsc-Bold.otf 8af07d4b6c2e82bcc72a30e066eaf295f11b9424f4aad2eaa9fe0e9c3b38fc73
+        Sans2.004/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf 68a3fc98800b2a27b371f2fb79991daf3633bd89309d4ffaa6946fd587f375b5
+        Sans2.004/Sans/OTF/Japanese/NotoSansCJKjp-Bold.otf e53dcb0dcb2922e45d01aae1ebd2f382bb81d4229b18b6b883bd170678af1f76
+        Sans2.004/Sans/Mono/NotoSansMonoCJKjp-Regular.otf 4d01725be822d144cf9a56ade981e6fb920cd7a610b8fc24cc601a920beea5b9
+        Sans2.004/Sans/Mono/NotoSansMonoCJKjp-Bold.otf dfdffe149bc6cbf52860dabd8b8dadbca40ae87a4fbe143b55c0258db2dadfb8
+        Serif2.003/Serif/OTF/Japanese/NotoSerifCJKjp-Regular.otf d9854c7a8ef170b5a7932558856fd64eb8de0b007cd823fed6f9f514ad2803d3
+        Serif2.003/Serif/OTF/Japanese/NotoSerifCJKjp-Bold.otf 861a2b2c0e24b23745c262be8c3fdef63f12628f0492fb120ee51aa55c503af8
+        Sans2.004/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf 6bcb2a0703aa137e874fc2dffa85f6c21ba9a67fa329e81b8c801663af7e992a
+        Sans2.004/Sans/OTF/Korean/NotoSansCJKkr-Bold.otf 26d0c6748500a0444844280b308f5b62c7ae92ac6c6ac88148e502dd211eb52a
+        Sans2.004/Sans/Mono/NotoSansMonoCJKkr-Regular.otf d5afed9988a28ae96afb0f4791754d3c9f4f08d08477eb1a7d6e2d905679a472
+        Sans2.004/Sans/Mono/NotoSansMonoCJKkr-Bold.otf 8b82692e9d54205655efd620ab6ff4ad55df94e149021d99529d95e1120621e4
+        Serif2.003/Serif/OTF/Korean/NotoSerifCJKkr-Regular.otf 77b4b741f864d27f15e90f275b17106dde90b2ad28f82bab72dc95805db5fb42
+        Serif2.003/Serif/OTF/Korean/NotoSerifCJKkr-Bold.otf 10cc03741178ad6d2747df8497d911e34b167d0474a826fb9d866c402cbe3d8f
+        Sans2.004/Sans/OTF/TraditionalChinese/NotoSansCJKtc-Regular.otf dce08bd4fd91aa8aa76ed8fea4b694c2dfb8550f67871e326843212ddbeb88b4
+        Sans2.004/Sans/OTF/TraditionalChinese/NotoSansCJKtc-Bold.otf 3ee160e5015106e3ec1a394301df54fa9bbbf8a251519984aec5c0abc50840c0
+        Sans2.004/Sans/Mono/NotoSansMonoCJKtc-Regular.otf 82a040aed900bba51b5990bc158a86b264c8ad5071a2d8911e8696350e0794b3
+        Sans2.004/Sans/Mono/NotoSansMonoCJKtc-Bold.otf 5ea3414e255133ce51aae21bb1e0e428968158bddaaee2597fdfc30cc84bb39a
+        Serif2.003/Serif/OTF/TraditionalChinese/NotoSerifCJKtc-Regular.otf 234301038e76e7c35c43113785024700c4e4fe7bdce1d1fbbc42fca7e6683798
+        Serif2.003/Serif/OTF/TraditionalChinese/NotoSerifCJKtc-Bold.otf a4441a76dbf56719600c5dcbd5b5e5a068a20944cc41c959487a657133576ee6
         EOF
     - shell: bash
       # the SHA-256 of each download, as its GitHub release gives it, which the file must have
@@ -64,6 +83,8 @@ runs:
         sudo install "$RUNNER_TEMP/typst-x86_64-unknown-linux-musl/typst" /usr/local/bin/typst
         pandoc --version | head -n 1
         typst --version
-        for family in "Noto Serif CJK SC" "Noto Sans CJK SC" "Noto Sans Mono CJK SC"; do
-          typst fonts | grep -qx "$family" || { echo "::error::Typst does not find $family"; exit 1; }
+        for script in SC JP KR TC; do
+          for family in "Noto Serif CJK $script" "Noto Sans CJK $script" "Noto Sans Mono CJK $script"; do
+            typst fonts | grep -qx "$family" || { echo "::error::Typst does not find $family"; exit 1; }
+          done
         done
