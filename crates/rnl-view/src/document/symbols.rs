@@ -50,6 +50,9 @@ pub struct InspectedLabel {
     pub at: Option<Pt>,
 }
 
+/// What a default block symbol is made of: the terminals and the label of each pin.
+type DefaultKey = Vec<(Vec<String>, Option<String>)>;
+
 /// The symbols of a reading as a viewer inspects them, each once.
 struct Inspector<'r> {
     r: &'r Interpretation,
@@ -57,7 +60,7 @@ struct Inspector<'r> {
     seen: HashMap<u32, usize>,
     // default_symbol() is determined only by terminal order and names. Its runtime object is
     // per instance; thousands of identical defaults need only one inspector entry.
-    defaults: HashMap<Vec<(Vec<String>, Option<String>)>, usize>,
+    defaults: HashMap<DefaultKey, usize>,
     sources: HashMap<&'r str, &'r str>,
     // Split only files whose definition is actually displayed, once per file.
     lines: HashMap<String, Vec<&'r str>>,

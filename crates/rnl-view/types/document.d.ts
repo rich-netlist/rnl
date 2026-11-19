@@ -1252,7 +1252,13 @@ export type OutlineCall = {
 };
 
 /**
- * The reading of one file of a document in the context of its entry ([`crate::build_file`]).
+ * The reading of one file of a document in the context of its entry ([`crate::build_file`]): the
+ * Document of the file's levels, with the subcircuits they instantiate and what it depends on.
+ * Its `levels` are the file's, each with its `host` as the outline numbers the levels; its `files`
+ * are all the files of the document, in the order of the outline's, but only the file read has its
+ * text, records and failed statements; its objects and spans are those of the file's levels,
+ * numbered for this result alone; its diagnostics are those of the file's levels, and those of
+ * reading the document that are about the file or the files it depends on ([`FileInputs`]).
  */
 export type FileResult = {
   /**
@@ -1388,7 +1394,7 @@ export type FileInput = {
    * (10.1); "symbol", a file that defines a subcircuit it instantiates, or a file above that
    * one; "package", a package file read.
    */
-  role: string,
+  role: "body" | "context" | "symbol" | "package",
   /**
    * The file as the document names it (`SourceFile::path`); a package by its file name.
    */
