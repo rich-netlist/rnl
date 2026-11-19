@@ -1649,7 +1649,7 @@ impl Interp<'_> {
 
     /// The symbol a subcircuit gives itself with `# @SET-SYMBOL`, the later one when it is written
     /// more than once (9.2.6, 8.3).
-    fn block_symbol_of(&mut self, lv: usize) -> Option<BlockSymbol> {
+    pub(super) fn block_symbol_of(&mut self, lv: usize) -> Option<BlockSymbol> {
         let level = &self.doc.levels[lv];
         if level.kind != LevelKind::Subckt {
             return None;

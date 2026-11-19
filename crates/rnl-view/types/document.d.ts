@@ -420,9 +420,16 @@ export type Child = {
   master: string,
   /**
    * The level that draws the subcircuit, an index into `Document::levels`; None when the
-   * netlist does not define it.
+   * netlist does not define it, and in a reading of one file ([`crate::build_file`]) when
+   * another file defines it.
    */
   level: number | null,
+  /**
+   * In a reading of one file ([`crate::build_file`]), the level that defines the subcircuit, by
+   * its index in the document's levels as `Level::host` and the outline's levels give it; left
+   * out otherwise, and when the netlist does not define it.
+   */
+  host?: number,
   /**
    * When the netlist does not define it and Auto Include found it defined more than once in
    * the Library, so included none, those definitions, in the Library's order, for a viewer to
@@ -1242,6 +1249,229 @@ export type OutlineCall = {
    * netlist; left out otherwise.
    */
   instances?: Array<string>,
+};
+
+/**
+ * The reading of one file of a document in the context of its entry ([`crate::build_file`]).
+ */
+export type FileResult = {
+  /**
+   * The file read, as the document names it (`SourceFile::path`).
+   */
+  file: string,
+  /**
+   * The subcircuits the file's levels instantiate, each name once, in the order first
+   * instantiated.
+   */
+  children: Array<FileChild>,
+  /**
+   * What the result depends on.
+   */
+  inputs: FileInputs,
+  /**
+   * Symbols used by subcircuit instances or defined by subcircuits, once per runtime identity.
+   */
+  symbols: Array<InspectedSymbol>,
+  /**
+   * The entry as the frontend named it, for building again.
+   */
+  path: string,
+  /**
+   * Its file name, for the title bar.
+   */
+  name: string,
+  /**
+   * The format of the main file, "spice" or "spectre"; "rnl" for a package file, checked on its
+   * own; or "text" for a file that is not a netlist, such as a Verilog-A model, which is not read.
+   */
+  dialect: string,
+  /**
+   * The formats a file can be read with, as `rnl_view::formats` lists them.
+   */
+  formats: Array<FormatInfo>,
+  levels: Array<Level>,
+  diagnostics: Array<Diagnostic>,
+  /**
+   * Why the document could not be interpreted at all, such as an unsupported language version.
+   */
+  failed: string | null,
+  /**
+   * The host files: the opened file first, then the files it includes.
+   */
+  files: Array<SourceFile>,
+  /**
+   * The instances, nets and drawn usages of every level.
+   */
+  objects: Array<Object>,
+  /**
+   * The places in the files that name an object.
+   */
+  spans: Array<Span>,
+  /**
+   * The files the core asked for by path and did not get, such as an include or a package
+   * file named by `path=` that is not in the workspace: each once, as the provider was asked
+   * for it, in the order first asked. A frontend that can read them adds them to the
+   * workspace and builds again. The bundled packages are never missing, and neither is a
+   * package found by name: that comes only from the provider's package directories (16.2).
+   */
+  missing: Array<string>,
+};
+
+/**
+ * A subcircuit that a file's levels instantiate.
+ */
+export type FileChild = {
+  /**
+   * Its name, as the first instance writes it.
+   */
+  master: string,
+  /**
+   * The level that defines it, by its index in the document's levels, as `Level::host` and the
+   * outline's levels give it; None when nothing defines it.
+   */
+  host: number | null,
+  /**
+   * The file that defines it, as the document names it; None when nothing defines it.
+   */
+  file: string | null,
+  /**
+   * The title of the level that defines it; None when nothing defines it.
+   */
+  title: string | null,
+  /**
+   * When nothing defines it and Auto Include found it defined more than once in the Library,
+   * those definitions, as `Child::candidates` gives them; left out otherwise.
+   */
+  candidates?: Array<AutoIncludeCandidate>,
+};
+
+/**
+ * What a reading of one file depends on: with the core, its version and the options of the
+ * reading, a reading with the same inputs gives the same result.
+ */
+export type FileInputs = {
+  /**
+   * The version of the core, with its commit: "0.6.1 (d96a7a66)".
+   */
+  core: string,
+  /**
+   * The version of the shape of the result ([`FILE_RESULT_FORMAT`]).
+   */
+  format: number,
+  /**
+   * The entry, as the request names it.
+   */
+  entry: string,
+  /**
+   * The file read, as the document names it.
+   */
+  file: string,
+  /**
+   * The files and packages the result depends on, each once: the file read, the files above
+   * it, the files that define the subcircuits it instantiates and the files above those, and
+   * the packages read.
+   */
+  files: Array<FileInput>,
+  /**
+   * The facts of the whole document the result depends on: where the names the file's levels
+   * instantiate are defined, and the global nets.
+   */
+  outline: FileOutline,
+};
+
+/**
+ * A file or package a reading of one file depends on.
+ */
+export type FileInput = {
+  /**
+   * "body", the file read; "context", a file above it, whose rules and definitions reach it
+   * (10.1); "symbol", a file that defines a subcircuit it instantiates, or a file above that
+   * one; "package", a package file read.
+   */
+  role: string,
+  /**
+   * The file as the document names it (`SourceFile::path`); a package by its file name.
+   */
+  path: string,
+  /**
+   * The first 16 hexadecimal digits of the SHA-256 of its text, as `OutlineFile::text_hash`.
+   */
+  hash: string,
+  /**
+   * What of the file the result depends on, when it is less than its text: of a file above,
+   * the hash of its records (`OutlineFile::records_hash`); of a file that defines a subcircuit
+   * instantiated, the hash of the symbols of its subcircuits (`FileSymbols::hash`). Not to be
+   * relied on before a format version says so; left out for the others.
+   */
+  narrow?: string,
+  /**
+   * A package bundled with the core, which only a version of the core changes; left out
+   * otherwise.
+   */
+  bundled?: boolean,
+};
+
+/**
+ * The facts of the whole document a reading of one file depends on.
+ */
+export type FileOutline = {
+  /**
+   * Where each subcircuit the file's levels instantiate is defined, as [`FileChild`] gives it.
+   */
+  calls: Array<FileCall>,
+  /**
+   * The global nets, as `Outline::globals` gives them.
+   */
+  globals: Array<string>,
+};
+
+/**
+ * Where a name a file's levels instantiate is defined.
+ */
+export type FileCall = { master: string, file: string | null, title: string | null };
+
+/**
+ * The symbols the subcircuits of a file give themselves (9.2.6) ([`crate::symbols`]).
+ */
+export type FileSymbols = {
+  /**
+   * The file, as the document names it.
+   */
+  file: string,
+  /**
+   * Its subcircuits, in the order of the file.
+   */
+  subckts: Array<SubcktSymbol>,
+  /**
+   * The hash of all of them, as `FileInput::narrow` gives it for a file that defines a
+   * subcircuit instantiated.
+   */
+  hash: string,
+  /**
+   * The files the core asked for and did not get, as `Document::missing`.
+   */
+  missing: Array<string>,
+};
+
+/**
+ * What the levels that instantiate a subcircuit use of it.
+ */
+export type SubcktSymbol = {
+  title: string,
+  /**
+   * Its level, by its index in the document's levels.
+   */
+  host: number,
+  ports: Array<string>,
+  /**
+   * The symbol it gives itself with `# @SET-SYMBOL`, as `Document::symbols` gives a symbol;
+   * None when it gives itself none, and its instances are drawn with a default block symbol.
+   */
+  symbol: InspectedSymbol | null,
+  /**
+   * The first 16 hexadecimal digits of the SHA-256 of its title, its ports and its symbol.
+   */
+  hash: string,
 };
 
 /**

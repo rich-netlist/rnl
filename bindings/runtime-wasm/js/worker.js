@@ -1,6 +1,7 @@
 // The core in a module Worker: it loads core.js and the module next to it, and answers each message
 // { id, request } with { id, document } for a build, { id, snapshot } for a build with parts,
-// { id, outline } for an outline request, { id, written } for a write, { id, replaced } for a
+// { id, outline } for an outline request, { id, file } for the reading of one file, { id, symbols }
+// for the symbols of a file, { id, written } for a write, { id, replaced } for a
 // replace-records request, { id, catalog } for a catalog request, { id, drawings } for the drawings
 // of objects the last build kept, { id, formats } for a formats request, or { id, error },
 // in the order they came. The request is an object or, as client.js sends it, its JSON text. Every request gets

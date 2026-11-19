@@ -99,6 +99,24 @@ gives what reading the files of a document gives before any RNL is interpreted, 
 
 A package file is not read: its outline is the file alone. The WebAssembly core gives the outline for a request with `outline` set.
 
+## One file of a document
+
+```rust
+pub fn build_file(entry: &str, file: &str, files: &dyn Provider, options: &BuildOptions) -> Result<FileResult, String>
+pub fn symbols(entry: &str, file: &str, files: &dyn Provider, options: &BuildOptions) -> Result<FileSymbols, String>
+```
+
+`build_file` reads one file of the document `entry`, named as the document names it (`SourceFile.path`, `OutlineFile.path`), in the context of the entry: the runtime's `Options::only_file` (see [rnl-runtime](../rnl-runtime/README.md#reading-one-file-of-a-document)). It gives a `FileResult`, for a frontend that builds and keeps the levels of a document file by file:
+
+- The Document of the file's levels. Each level is the one `build` gives with the same options, drawn the same, with its `host` the index of its level in the outline. `files` are those of the outline, in its order, but only the file read has its `text`, `records` and `failed`. `objects` and `spans` are those of the file's levels, numbered in this result. The diagnostics are those of the file's levels, and those of reading the document that are about the files the result depends on; the outline gives the others. `missing` is the whole document's, as `build` gives it, since the whole document is read.
+- In a level's `children`, `level` is null for a subcircuit another file defines, and `host` is its level in the outline.
+- `file`, and `children`: the subcircuits the file's levels instantiate, one for each name, with the level, the file and the title that define it, or the candidates of Auto Include.
+- `inputs`: what the result depends on, for keeping it. `core` is the version of the core with its commit, `format` the version of the shape of the result (`FILE_RESULT_FORMAT`), `entry` and `file` the request's. `files` lists the file read (`"body"`), the files above it (`"context"`), the files that define the subcircuits it instantiates and the files above those (`"symbol"`), and the packages read (`"package"`, by file name, `bundled` for those the core bundles). Each has `hash`, the first 16 hexadecimal digits of the SHA-256 of its text, as `OutlineFile.text_hash`. A file above also has `narrow`, its `records_hash`, and a file that defines a subcircuit instantiated has the hash `symbols` gives for it: what of them the result depends on, which a frontend does not rely on before a version of the format says so. `outline` gives where each name instantiated is defined and the global nets, which a frontend compares with the outline.
+
+`symbols` gives what the levels that instantiate the subcircuits of a file use of them, read in the context of the entry without building any level (`Options::symbols_only`): for each subcircuit its title, its level, its ports, the symbol it gives itself with `# @SET-SYMBOL` as `Document.symbols` gives a symbol, or none, and a hash of them; and the hash of the file's.
+
+The WebAssembly core gives them for a request with `file` or `symbols` set to the file.
+
 ## Drawings
 
 A level's drawing comes in the outputs the frontend asks for. A level has an `svg` field only when the SVG was asked for, and a `primitives` field only when the primitives were; its `scale` is always there.
@@ -109,7 +127,7 @@ A level's drawing comes in the outputs the frontend asks for. A level has an `sv
 
 ## Type definitions
 
-[`types/document.d.ts`](types/document.d.ts) declares the Document and everything in it in TypeScript, for frontends and their checks; the page in [`apps/viewer-ui`](../../apps/viewer-ui/README.md) refers to it. [`types/snapshot.d.ts`](types/snapshot.d.ts) declares the snapshot, and [`types/catalog.d.ts`](types/catalog.d.ts) the catalog. The outline is declared in `types/document.d.ts` too. They are generated from the Rust types by [ts-rs](https://crates.io/crates/ts-rs), which the types derive in the tests only, and laid out by the test to be read. The test fails when the file is not what the types give; after a change to them that is meant, write it with:
+[`types/document.d.ts`](types/document.d.ts) declares the Document and everything in it in TypeScript, for frontends and their checks; the page in [`apps/viewer-ui`](../../apps/viewer-ui/README.md) refers to it. [`types/snapshot.d.ts`](types/snapshot.d.ts) declares the snapshot, and [`types/catalog.d.ts`](types/catalog.d.ts) the catalog. The outline, the reading of one file and the symbols of a file are declared in `types/document.d.ts` too. They are generated from the Rust types by [ts-rs](https://crates.io/crates/ts-rs), which the types derive in the tests only, and laid out by the test to be read. The test fails when the file is not what the types give; after a change to them that is meant, write it with:
 
 ```bash
 RNL_BLESS=1 cargo test -p rnl-view types

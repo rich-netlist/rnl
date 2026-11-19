@@ -20,7 +20,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const dist = pathToFileURL(`${resolve(process.argv[2] ?? resolve(here, "../dist"))}/`);
 const { loadCore } = await import(new URL("core.js", dist));
-const { collect, collectOutline, decodeText, startCore } = await import(new URL("client.js", dist));
+const { collect, collectFile, collectOutline, decodeText, startCore } = await import(new URL("client.js", dist));
 const wasm = new URL("rnl_runtime_wasm.wasm", dist);
 const char = (...codes) => String.fromCharCode(...codes);
 
@@ -188,6 +188,49 @@ test("collectOutline reads what is missing as collect does, and interprets nothi
   const { document } = await collect(core, { entry: "/w/top.sp", files }, read);
   assert.deepEqual(document.files.map((f) => f.path), outline.files.map((f) => f.path));
   assert.deepEqual(core.respond({ entry: "/w/top.sp", files, outline: true }), { outline });
+});
+
+test("collectFile reads what is missing as collect does, and reads one file in the context of the entry", async () => {
+  const disk = new Map([
+    ["/w/top.sp", `* top
+.include "a.inc"
+X1 p q a
+.end
+`],
+    ["/w/a.inc", `* a
+.include "b.inc"
+.subckt a p q
+X1 p q b
+.ends
+`],
+    ["/w/b.inc", `* b
+.subckt b p q
+R1 p q 1k
+.ends
+`],
+  ]);
+  const read = async (path) => disk.get(path) ?? null;
+  const { result, files } = await collectFile(core, { entry: "/w/top.sp", file: "a.inc" }, read);
+  assert.deepEqual(Object.keys(files), ["/w/top.sp", "/w/a.inc", "/w/b.inc"]);
+  assert.equal(result.file, "a.inc");
+  assert.deepEqual(result.levels.map((l) => l.title), ["a"]);
+  assert.deepEqual(result.files.map((f) => f.text === ""), [true, false, true]);
+  assert.deepEqual(result.children, [{ master: "b", host: result.levels[0].children[0].host, file: "b.inc", title: "b" }]);
+  assert.deepEqual(
+    result.inputs.files.filter((i) => i.role !== "package").map((i) => [i.role, i.path]),
+    [["body", "a.inc"], ["context", "top.sp"], ["symbol", "b.inc"]],
+  );
+  const symbols = core.symbols({ entry: "/w/top.sp", files, symbols: "b.inc" });
+  assert.deepEqual(symbols.subckts.map((s) => [s.title, s.ports, s.symbol]), [["b", ["p", "q"], null]]);
+  assert.equal(result.inputs.files.find((i) => i.path === "b.inc").narrow, symbols.hash);
+  // the same in the Worker
+  const worker = startCore();
+  try {
+    assert.deepEqual(await worker.buildFile({ entry: "/w/top.sp", files, file: "a.inc" }), result);
+    assert.deepEqual(await worker.symbols({ entry: "/w/top.sp", files, symbols: "b.inc" }), symbols);
+  } finally {
+    worker.terminate();
+  }
 });
 
 test("the core runs in a Worker", async () => {

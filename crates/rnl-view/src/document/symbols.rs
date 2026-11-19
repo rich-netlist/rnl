@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use rnl_runtime::geom::{Orient, Pt};
 use rnl_runtime::markup;
-use rnl_runtime::model::{ItemView, Layer, LevelView, Style, SymbolOrigin, SymbolView, TextView};
+use rnl_runtime::model::{BlockSymbol, ItemView, Layer, LevelView, Style, SymbolOrigin, SymbolView, TextView};
 use rnl_runtime::Interpretation;
 use serde::Serialize;
 
@@ -50,32 +50,49 @@ pub struct InspectedLabel {
     pub at: Option<Pt>,
 }
 
-pub(super) fn inspect(r: &Interpretation, levels: &mut [Level]) -> Vec<InspectedSymbol> {
-    let mut out = Vec::new();
-    let mut seen = HashMap::new();
+/// The symbols of a reading as a viewer inspects them, each once.
+struct Inspector<'r> {
+    r: &'r Interpretation,
+    out: Vec<InspectedSymbol>,
+    seen: HashMap<u32, usize>,
     // default_symbol() is determined only by terminal order and names. Its runtime object is
     // per instance; thousands of identical defaults need only one inspector entry.
-    let mut defaults = HashMap::new();
+    defaults: HashMap<Vec<(Vec<String>, Option<String>)>, usize>,
+    sources: HashMap<&'r str, &'r str>,
     // Split only files whose definition is actually displayed, once per file.
-    let sources: HashMap<_, _> = r.sources.iter().map(|(p, s)| (p.as_str(), s.as_str())).collect();
-    let mut lines: HashMap<String, Vec<&str>> = HashMap::new();
-    let mut add = |symbols: &[SymbolView], root: usize| {
+    lines: HashMap<String, Vec<&'r str>>,
+}
+
+impl<'r> Inspector<'r> {
+    fn new(r: &'r Interpretation) -> Inspector<'r> {
+        Inspector {
+            r,
+            out: Vec::new(),
+            seen: HashMap::new(),
+            defaults: HashMap::new(),
+            sources: r.sources.iter().map(|(p, s)| (p.as_str(), s.as_str())).collect(),
+            lines: HashMap::new(),
+        }
+    }
+
+    /// The symbol `root` of `symbols`, by its index in the symbols inspected.
+    fn add(&mut self, symbols: &[SymbolView], root: usize) -> usize {
         let s = &symbols[root];
-        if let Some(&k) = seen.get(&s.id) {
+        if let Some(&k) = self.seen.get(&s.id) {
             return k;
         }
         let default_key =
             s.default.then(|| s.pins.iter().map(|p| (p.terminals.clone(), p.label.clone())).collect::<Vec<_>>());
-        if let Some(k) = default_key.as_ref().and_then(|key| defaults.get(key)).copied() {
-            seen.insert(s.id, k);
+        if let Some(k) = default_key.as_ref().and_then(|key| self.defaults.get(key)).copied() {
+            self.seen.insert(s.id, k);
             return k;
         }
         let mut detail = preview(symbols, root);
         if let Some((a, b)) = &s.source {
             detail.file = Some(a.file.clone());
             detail.first_line = a.line;
-            if let Some(text) = sources.get(a.file.as_str()) {
-                let text = lines.entry(a.file.clone()).or_insert_with(|| text.lines().collect());
+            if let Some(text) = self.sources.get(a.file.as_str()) {
+                let text = self.lines.entry(a.file.clone()).or_insert_with(|| text.lines().collect());
                 detail.source = text
                     .iter()
                     .enumerate()
@@ -96,19 +113,31 @@ pub(super) fn inspect(r: &Interpretation, levels: &mut [Level]) -> Vec<Inspected
                 format!("Package {p} {version}").trim_end().to_string()
             }
             SymbolOrigin::Level(lv) => {
-                r.doc.levels.get(*lv).map(|l| format!("Defined in {}", l.name)).unwrap_or_default()
+                self.r.doc.levels.get(*lv).map(|l| format!("Defined in {}", l.name)).unwrap_or_default()
             }
             SymbolOrigin::None if s.default => "Default block symbol".into(),
             SymbolOrigin::None => "Inline symbol".into(),
         };
-        let k = out.len();
-        seen.insert(s.id, k);
+        let k = self.out.len();
+        self.seen.insert(s.id, k);
         if let Some(key) = default_key {
-            defaults.insert(key, k);
+            self.defaults.insert(key, k);
         }
-        out.push(detail);
+        self.out.push(detail);
         k
-    };
+    }
+}
+
+/// The symbol a subcircuit gives itself, as [`inspect`] gives it.
+pub(crate) fn inspect_block(r: &Interpretation, block: &BlockSymbol) -> InspectedSymbol {
+    let mut inspector = Inspector::new(r);
+    inspector.add(&block.symbols, 0);
+    inspector.out.pop().expect("one symbol inspected")
+}
+
+pub(super) fn inspect(r: &Interpretation, levels: &mut [Level]) -> Vec<InspectedSymbol> {
+    let mut inspector = Inspector::new(r);
+    let mut add = |symbols: &[SymbolView], root: usize| inspector.add(symbols, root);
     for (lv, target) in r.model.levels.iter().zip(levels) {
         if let Some(block) = &lv.block_symbol {
             target.symbol = Some(add(&block.symbols, 0));
@@ -129,7 +158,7 @@ pub(super) fn inspect(r: &Interpretation, levels: &mut [Level]) -> Vec<Inspected
             }
         }
     }
-    out
+    inspector.out
 }
 
 // Show template keys, as in the package gallery, without pretending to have an instance value.

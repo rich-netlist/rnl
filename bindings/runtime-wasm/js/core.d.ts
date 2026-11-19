@@ -7,16 +7,42 @@ import type { Catalog } from "./catalog.js";
 import type {
   Diagnostic,
   Document,
+  FileCall,
+  FileChild,
+  FileInput,
+  FileInputs,
+  FileOutline,
+  FileResult,
+  FileSymbols,
   FormatInfo,
   Outline,
   OutlineCall,
   OutlineFile,
   OutlineLevel,
+  SubcktSymbol,
   UnplacedDrawing,
 } from "./document.js";
 import type { Snapshot } from "./snapshot.js";
 
-export type { Catalog, Document, FormatInfo, Outline, OutlineCall, OutlineFile, OutlineLevel, Snapshot, UnplacedDrawing };
+export type {
+  Catalog,
+  Document,
+  FileCall,
+  FileChild,
+  FileInput,
+  FileInputs,
+  FileOutline,
+  FileResult,
+  FileSymbols,
+  FormatInfo,
+  Outline,
+  OutlineCall,
+  OutlineFile,
+  OutlineLevel,
+  Snapshot,
+  SubcktSymbol,
+  UnplacedDrawing,
+};
 
 /** Error thrown when a write request is refused: the kind's number, `RNLnnnn`, and its name. */
 export interface EditError extends Error {
@@ -124,6 +150,16 @@ export interface Request {
    * RNL is interpreted. The fields that say how to draw are ignored; false when not given.
    */
   outline?: boolean;
+  /**
+   * Read only this file of the document, as the document names it (`SourceFile.path`,
+   * `OutlineFile.path`), in the context of the entry, and give its reading instead of the Document.
+   */
+  file?: string;
+  /**
+   * Give the symbols the subcircuits of this file give themselves, as the document names it,
+   * instead of a Document. The fields that say how to draw are ignored.
+   */
+  symbols?: string;
 }
 
 export type Point = [number, number];
@@ -483,6 +519,10 @@ export interface Core {
    * interpreted. A request given as text must ask for `outline` itself.
    */
   outline(request: Request | string): Outline;
+  /** The reading of the request's `file`, one file of the document, in the context of its entry. */
+  buildFile(request: (Request & { file: string }) | string): FileResult;
+  /** The symbols the subcircuits of the request's `symbols`, a file of the document, give themselves. */
+  symbols(request: (Request & { symbols: string }) | string): FileSymbols;
   /** Write the ops and build them. A refusal throws EditError with a code and host diagnostics. */
   write(request: WriteRequest | string): Written;
   /**
@@ -516,6 +556,8 @@ export interface Core {
   ):
     | { document: Document }
     | { outline: Outline }
+    | { file: FileResult }
+    | { symbols: FileSymbols }
     | { snapshot: Snapshot }
     | { written: Written }
     | { replaced: Replaced }

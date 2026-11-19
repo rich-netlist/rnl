@@ -17,6 +17,13 @@ import { requestText } from "./core.js";
  *   request's entry: its files, levels and the subcircuits each calls, the language version and
  *   packages of each file, and the diagnostics of reading the netlist, with no RNL interpreted
  *   (`Outline` of document.d.ts).
+ * @property {(request: import("./core.js").Request) => Promise<object>} buildFile The reading of the
+ *   request's `file`, one file of the document, in the context of its entry (`FileResult` of
+ *   document.d.ts). Packages the Worker classified for an earlier request are read again; keep one
+ *   Worker for a run of them all the same, as later versions keep them.
+ * @property {(request: import("./core.js").Request) => Promise<object>} symbols The symbols the
+ *   subcircuits of the request's `symbols`, a file of the document, give themselves (`FileSymbols`
+ *   of document.d.ts).
  * @property {(request: import("./core.js").WriteRequest) => Promise<{ text: string, document: object }>}
  *   write Write the ops of a request into its netlist, and build what was written: the netlist
  *   written and its Document, whose diagnostics say how it reads. Rejects with the core's message
@@ -106,6 +113,8 @@ export function startCore(options = {}) {
     build: (request) => send(request, "document"),
     snapshot: (request) => send(request, "snapshot"),
     outline: (request) => send({ ...request, outline: true }, "outline"),
+    buildFile: (request) => send(request, "file"),
+    symbols: (request) => send(request, "symbols"),
     write: (request) => send(request, "written"),
     replaceRecords: (request) => send(request, "replaced"),
     catalog: (request) => send(request, "catalog"),
@@ -178,6 +187,25 @@ export async function collect(core, request, read) {
 export async function collectOutline(core, request, read) {
   const { answer: outline, files } = await gather((r) => core.outline(r), request, read);
   return { outline, files };
+}
+
+/**
+ * The reading of one file of a document with the files it needs, read as `collect` reads them: ask
+ * for the request's `file`, read what `FileResult.missing` lists that was not tried yet, and ask
+ * again, until nothing new can be read.
+ *
+ * @param {{ buildFile(request: import("./core.js").Request): object | Promise<object> }} core The core:
+ *   from startCore, or from core.js's loadCore.
+ * @param {import("./core.js").Request} request What to read, with its `file`; its `files` are the
+ *   files known so far.
+ * @param {(path: string) => Promise<string | null>} read Read a file by the path the core asked for,
+ *   as for `collect`.
+ * @returns {Promise<{ result: object, files: Record<string, string> }>} The last reading, and the
+ *   files it was made from.
+ */
+export async function collectFile(core, request, read) {
+  const { answer: result, files } = await gather((r) => core.buildFile(r), request, read);
+  return { result, files };
 }
 
 /**

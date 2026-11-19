@@ -32,7 +32,10 @@ use std::sync::{Mutex, MutexGuard, Once, PoisonError};
 
 use rnl_runtime::source::{normalize, LibraryDefinition, LibraryLookup, MemoryProvider, Provider};
 use rnl_runtime::Options;
-use rnl_view::{BuildOptions, Catalog, CatalogOptions, Document, Drawings, Outline, Parts, Snapshot, UnplacedDrawing};
+use rnl_view::{
+    BuildOptions, Catalog, CatalogOptions, Document, Drawings, FileResult, FileSymbols, Outline, Parts, Snapshot,
+    UnplacedDrawing,
+};
 use serde::{Deserialize, Serialize};
 
 /// What to build: the workspace and how. Fields the core does not know are ignored, so that a
@@ -116,6 +119,13 @@ pub struct Request {
     /// ignored; false when not given.
     #[serde(default)]
     pub outline: bool,
+    /// Read only this file of the document, as the document names it (`SourceFile::path`), in the
+    /// context of the entry, and give its [`FileResult`] instead of the Document
+    /// ([`rnl_view::build_file`]); with `lazy_unplaced`, the drawings are kept as for a Document.
+    pub file: Option<String>,
+    /// Give the symbols the subcircuits of this file give themselves, as the document names it,
+    /// instead of a Document ([`rnl_view::symbols`]). The fields that say how to draw are ignored.
+    pub symbols: Option<String>,
     /// Panic with this message, to test that the caller still gets an answer.
     #[cfg(feature = "test-panic")]
     pub panic: Option<String>,
@@ -300,7 +310,8 @@ pub struct FormatList {
     pub detected: BTreeMap<String, String>,
 }
 
-/// The answer to a request: `{"document": ...}`, `{"outline": ...}`, `{"snapshot": ...}`, `{"written": ...}`,
+/// The answer to a request: `{"document": ...}`, `{"outline": ...}`, `{"file": ...}`, `{"symbols": ...}`,
+/// `{"snapshot": ...}`, `{"written": ...}`,
 /// `{"replaced": ...}`, `{"catalog": ...}`, `{"drawings": ...}`, `{"formats": ...}` or
 /// `{"error": "..."}`.
 #[derive(Serialize, Debug)]
@@ -311,6 +322,10 @@ pub enum Response {
     Document(Box<Document>),
     /// The outline of the entry, when the request asks for `outline`.
     Outline(Box<Outline>),
+    /// The reading of one file of the entry, when the request names a `file`.
+    File(Box<FileResult>),
+    /// The symbols of the subcircuits of a file, when the request names a file for `symbols`.
+    Symbols(Box<FileSymbols>),
     /// The snapshot of the entry, when the request asks for `parts`.
     Snapshot(Box<Snapshot>),
     /// The netlist a [`WriteRequest`] wrote, and its Document.
@@ -501,6 +516,33 @@ pub fn respond(request: &[u8]) -> Response {
     if request.outline {
         return match rnl_view::outline(&request.entry, &files, &options) {
             Ok(o) => Response::Outline(Box::new(o)),
+            Err(e) => Response::Error(e),
+        };
+    }
+    if let Some(file) = &request.symbols {
+        return match rnl_view::symbols(&request.entry, file, &files, &options) {
+            Ok(s) => Response::Symbols(Box::new(s)),
+            Err(e) => Response::Error(e),
+        };
+    }
+    if let Some(file) = &request.file {
+        let built = if request.lazy_unplaced {
+            rnl_view::build_file_drawn(&request.entry, file, &files, &options).map(|(f, d)| (f, Some(d)))
+        } else {
+            rnl_view::build_file(&request.entry, file, &files, &options).map(|f| (f, None))
+        };
+        return match built {
+            Ok((mut f, drawn)) => {
+                if let Some(o) = &request.overlays {
+                    if let Err(e) = rnl_view::overlays::apply(&mut f.document, o) {
+                        return Response::Error(e);
+                    }
+                }
+                if let Some(drawn) = drawn {
+                    DRAWN.with(|slot| *slot.borrow_mut() = Some(drawn));
+                }
+                Response::File(Box::new(f))
+            }
             Err(e) => Response::Error(e),
         };
     }
@@ -1002,6 +1044,38 @@ C1 a 0 1p
         assert_eq!(v["outline"]["missing"], json!(["/w/lib/parts.inc"]));
         let v = answer(json!({ "outline": true, "entry": "/w/none.sp", "files": {} }));
         assert_eq!(v["error"], "cannot read /w/none.sp");
+    }
+
+    #[test]
+    fn a_file_request_and_a_symbols_request_answer_what_rnl_view_gives() {
+        let top = "* top
+.include \"lib/parts.inc\"
+X1 a b part
+.end
+";
+        let parts = ".subckt part p q
+R1 p q 1k
+.ends
+";
+        let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/lib/parts.inc", parts);
+        let native = rnl_view::build_file("/w/top.sp", "lib/parts.inc", &files, &BuildOptions::default()).unwrap();
+        let sent = json!({ "/w/top.sp": top, "/w/lib/parts.inc": parts });
+        let v = answer(json!({ "file": "lib/parts.inc", "entry": "/w/top.sp", "files": sent }));
+        let keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
+        assert_eq!(keys, ["file"]);
+        assert_eq!(v["file"], wire(native));
+        assert_eq!(v["file"]["levels"][0]["title"], "part", "{v}");
+        assert_eq!(v["file"]["inputs"]["files"][0]["role"], "body");
+        let native = rnl_view::symbols("/w/top.sp", "lib/parts.inc", &files, &BuildOptions::default()).unwrap();
+        let v = answer(json!({ "symbols": "lib/parts.inc", "entry": "/w/top.sp", "files": sent }));
+        assert_eq!(v, json!({ "symbols": wire(native) }));
+        assert_eq!(v["symbols"]["subckts"][0]["ports"], json!(["p", "q"]));
+        // a file the document does not have
+        let v = answer(json!({ "file": "none.inc", "entry": "/w/top.sp", "files": sent }));
+        assert_eq!(v["error"], "none.inc is not a file of /w/top.sp");
+        // one it may have once the files it misses are read
+        let v = answer(json!({ "file": "lib/parts.inc", "entry": "/w/top.sp", "files": { "/w/top.sp": top } }));
+        assert_eq!((&v["file"]["missing"], &v["file"]["levels"]), (&json!(["/w/lib/parts.inc"]), &json!([])));
     }
 
     #[test]

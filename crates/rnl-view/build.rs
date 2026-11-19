@@ -28,6 +28,30 @@ fn main() {
     writeln!(out, "];").unwrap();
     let to = PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("bundled.rs");
     std::fs::write(to, out).unwrap();
+    commit();
+}
+
+/// The commit the core is built from, `RNL_BUILD_COMMIT`, which a reading of one file gives with
+/// the version of the core ([`crate::FileInputs::core`]); "unknown" out of a git checkout.
+fn commit() {
+    let git = |args: &[&str]| -> Option<String> {
+        let output = std::process::Command::new("git").args(args).output().ok()?;
+        output.status.success().then(|| String::from_utf8_lossy(&output.stdout).trim().to_owned())
+    };
+    let commit = git(&["rev-parse", "--short=8", "HEAD"]).unwrap_or_else(|| "unknown".into());
+    println!("cargo:rustc-env=RNL_BUILD_COMMIT={commit}");
+    // Worktrees keep HEAD and branch refs outside this checkout. Read the commit again after one.
+    let mut paths = vec!["HEAD".to_owned(), "packed-refs".to_owned()];
+    if let Some(branch) = git(&["symbolic-ref", "-q", "HEAD"]) {
+        paths.push(branch);
+    }
+    for path in paths {
+        if let Some(path) = git(&["rev-parse", "--git-path", &path]) {
+            let path = PathBuf::from(path);
+            let path = if path.is_absolute() { path } else { std::env::current_dir().unwrap().join(path) };
+            println!("cargo:rerun-if-changed={}", path.display());
+        }
+    }
 }
 
 /// The `.rnl` files of a directory, each named by the directory's name and its own.

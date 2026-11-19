@@ -40,6 +40,12 @@
  * @property {boolean} [outline] Give the outline of the entry instead of its Document: what reading
  *   its files gives before any RNL is interpreted (`Outline` of document.d.ts). The fields that say
  *   how to draw are ignored; false when not given.
+ * @property {string} [file] Read only this file of the document, as the document names it
+ *   (`SourceFile.path`, `OutlineFile.path`), in the context of the entry, and give its reading
+ *   (`FileResult` of document.d.ts) instead of the Document.
+ * @property {string} [symbols] Give the symbols the subcircuits of this file give themselves, as the
+ *   document names it (`FileSymbols` of document.d.ts), instead of a Document. The fields that say
+ *   how to draw are ignored.
  */
 
 /**
@@ -139,6 +145,10 @@
  * @property {(request: Request | string) => object} outline The outline of a request's entry, with no
  *   RNL interpreted (`Outline` of document.d.ts). A request given as text must ask for `outline`
  *   itself.
+ * @property {(request: Request | string) => object} buildFile The reading of the request's `file`, one
+ *   file of the document, in the context of its entry (`FileResult` of document.d.ts).
+ * @property {(request: Request | string) => object} symbols The symbols the subcircuits of the
+ *   request's `symbols`, a file of the document, give themselves (`FileSymbols` of document.d.ts).
  * @property {(request: WriteRequest | string) => { text: string, document: object }} write Write the
  *   ops of a request into its netlist, and build what was written. Throws an Error with the core's
  *   message when an op cannot be written, with code, diagnosticName and diagnostics added
@@ -159,7 +169,7 @@
  * @property {(request: FormatsRequest | string) => { list: object[], detected: Record<string, string> }} formats
  *   The formats a file can be read with, and the format each file of `detect` has when none is set.
  * @property {(request: Request | WriteRequest | ReplaceRecordsRequest | CatalogRequest | DrawingsRequest | string) => object} respond
- *   The core's answer as it gives it: `{ document }`, `{ outline }`, `{ snapshot }`, `{ written }`, `{ replaced }`,
+ *   The core's answer as it gives it: `{ document }`, `{ outline }`, `{ file }`, `{ symbols }`, `{ snapshot }`, `{ written }`, `{ replaced }`,
  *   `{ catalog }`, `{ drawings }` or `{ error }`. Throws only when the core stops.
  */
 
@@ -170,6 +180,8 @@ const ASKS = {
   document: "a build without parts",
   snapshot: "a build with parts",
   outline: "an outline request",
+  file: "a request for one file",
+  symbols: "a symbols request",
   written: "a write",
   replaced: "a replace-records request",
   catalog: "a catalog request",
@@ -257,6 +269,8 @@ export async function loadCore(wasm) {
     build: (request) => part(request, "document"),
     snapshot: (request) => part(request, "snapshot"),
     outline: (request) => part(typeof request === "string" ? request : { ...request, outline: true }, "outline"),
+    buildFile: (request) => part(request, "file"),
+    symbols: (request) => part(request, "symbols"),
     write: (request) => part(request, "written"),
     replaceRecords: (request) => part(request, "replaced"),
     catalog: (request) => part(request, "catalog"),

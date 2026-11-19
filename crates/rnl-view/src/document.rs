@@ -22,7 +22,7 @@ use crate::params::{ParamValue, Params, SubcktParam};
 use crate::primitive::{self, Primitive};
 use crate::{BuildOptions, FormatInfo};
 
-mod symbols;
+pub(crate) mod symbols;
 pub use symbols::{InspectedLabel, InspectedPin, InspectedSymbol};
 mod member_of;
 mod usages;
@@ -314,8 +314,15 @@ pub struct Child {
     /// The subcircuit it instantiates, as written.
     pub master: String,
     /// The level that draws the subcircuit, an index into `Document::levels`; None when the
-    /// netlist does not define it.
+    /// netlist does not define it, and in a reading of one file ([`crate::build_file`]) when
+    /// another file defines it.
     pub level: Option<usize>,
+    /// In a reading of one file ([`crate::build_file`]), the level that defines the subcircuit, by
+    /// its index in the document's levels as `Level::host` and the outline's levels give it; left
+    /// out otherwise, and when the netlist does not define it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub host: Option<usize>,
     /// When the netlist does not define it and Auto Include found it defined more than once in
     /// the Library, so included none, those definitions, in the Library's order, for a viewer to
     /// offer when the instance is entered; left out otherwise.
@@ -541,7 +548,7 @@ pub(crate) fn document(
     }
     let file_index: HashMap<String, usize> = files.iter().enumerate().map(|(k, f)| (f.path.clone(), k)).collect();
     let mut ix = Index::new(&r.doc, &file_index);
-    ix.netlist(&files);
+    ix.netlist(&files, options.runtime.only_file.as_deref());
     for h in &r.refs {
         let Some(&file) = file_index.get(&h.loc.file) else { continue };
         let object = match &h.target {
@@ -632,6 +639,7 @@ pub(crate) fn document(
                     instance: i.name.clone(),
                     master,
                     level,
+                    host: None,
                     symbol: None,
                     candidates,
                     params: params.actuals(lv.level, i),
@@ -882,9 +890,13 @@ impl<'a> Index<'a> {
     }
 
     /// Every instance of every level, and the places in the netlist that name instances and nets.
-    fn netlist(&mut self, files: &[SourceFile]) {
+    /// The objects and spans of the netlist: of every level, or of the levels of the file `only`.
+    fn netlist(&mut self, files: &[SourceFile], only: Option<&str>) {
         let lines: Vec<Vec<&str>> = files.iter().map(|f| f.text.lines().collect()).collect();
         for (lv, level) in self.doc.levels.iter().enumerate() {
+            if only.is_some_and(|f| level.file != f) {
+                continue;
+            }
             for (i, inst) in level.instances.iter().enumerate() {
                 let file = self.files.get(&inst.file).copied();
                 let statement = file.filter(|_| inst.line > 0).and_then(|f| {

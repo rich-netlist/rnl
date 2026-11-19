@@ -295,6 +295,20 @@ fn end_line(doc: &HostDocument, level: usize) -> u32 {
 }
 
 /// The first 16 hexadecimal digits of the SHA-256 of a text, as the numbering's check is made (5.9).
+/// The hash of the records of `file` in `doc`, as [`OutlineFile::records_hash`] gives it.
+pub(crate) fn records_hash(doc: &HostDocument, file: &str) -> String {
+    let mut recs: Vec<(u32, &str)> = Vec::new();
+    for lv in &doc.levels {
+        for rec in lv.records.iter().filter(|rec| rec.file == file) {
+            if !recs.iter().any(|(line, _)| *line == rec.lines.0) {
+                recs.push((rec.lines.0, &rec.text));
+            }
+        }
+    }
+    recs.sort_by_key(|(line, _)| *line);
+    hash(&recs.iter().map(|(_, t)| format!("{t}\n")).collect::<String>())
+}
+
 fn hash(text: &str) -> String {
     hex(&sha256(text.as_bytes()))[..16].to_string()
 }

@@ -180,8 +180,9 @@ pub fn differences(whole: &Interpretation, part: &Interpretation, file: &str) ->
 
 /// Texts of the model with the numbers of the objects of the reading made the order in which they
 /// first come in them: the identity of each symbol, `SymbolView { id: N`, and the id of an object
-/// with no name and no place of its own, `"@N`.
-fn renumbered(texts: &[String]) -> Vec<String> {
+/// with no name and no place of its own, `"@N`. Two readings that make the same objects in another
+/// order of numbers give the same texts.
+pub fn renumbered(texts: &[String]) -> Vec<String> {
     let mut texts = texts.to_vec();
     for mark in ["SymbolView { id: ", "\"@"] {
         let mut ids: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
