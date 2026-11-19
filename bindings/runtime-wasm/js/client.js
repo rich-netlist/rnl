@@ -13,6 +13,10 @@ import { requestText } from "./core.js";
  *   as the JSON text `requestText` makes of it, so it is read as loadCore's build reads it.
  * @property {(request: import("./core.js").Request) => Promise<object>} snapshot Build the snapshot of
  *   a request with `parts`, the editor interface's view of the document (snapshot.d.ts).
+ * @property {(request: import("./core.js").Request) => Promise<object>} outline The outline of a
+ *   request's entry: its files, levels and the subcircuits each calls, the language version and
+ *   packages of each file, and the diagnostics of reading the netlist, with no RNL interpreted
+ *   (`Outline` of document.d.ts).
  * @property {(request: import("./core.js").WriteRequest) => Promise<{ text: string, document: object }>}
  *   write Write the ops of a request into its netlist, and build what was written: the netlist
  *   written and its Document, whose diagnostics say how it reads. Rejects with the core's message
@@ -101,6 +105,7 @@ export function startCore(options = {}) {
   return {
     build: (request) => send(request, "document"),
     snapshot: (request) => send(request, "snapshot"),
+    outline: (request) => send({ ...request, outline: true }, "outline"),
     write: (request) => send(request, "written"),
     replaceRecords: (request) => send(request, "replaced"),
     catalog: (request) => send(request, "catalog"),
@@ -153,10 +158,37 @@ async function spawn(where, receive, stop) {
  *   files it was built from.
  */
 export async function collect(core, request, read) {
+  const { answer: document, files } = await gather((r) => core.build(r), request, read);
+  return { document, files };
+}
+
+/**
+ * The outline of a document with the files it needs, read as `collect` reads them: ask for the
+ * outline, read what `Outline.missing` lists that was not tried yet, and ask again, until nothing
+ * new can be read. No RNL is interpreted.
+ *
+ * @param {{ outline(request: import("./core.js").Request): object | Promise<object> }} core The core:
+ *   from startCore, or from core.js's loadCore.
+ * @param {import("./core.js").Request} request What to outline; its `files` are the files known so far.
+ * @param {(path: string) => Promise<string | null>} read Read a file by the path the core asked for,
+ *   as for `collect`.
+ * @returns {Promise<{ outline: object, files: Record<string, string> }>} The last outline, and the
+ *   files it was read from.
+ */
+export async function collectOutline(core, request, read) {
+  const { answer: outline, files } = await gather((r) => core.outline(r), request, read);
+  return { outline, files };
+}
+
+/**
+ * Ask the core, read what its answer lists as missing that was not tried yet, and ask again, until
+ * nothing new can be read: the last answer, and the files it was made from.
+ */
+async function gather(ask, request, read) {
   const files = { ...request.files };
   const tried = new Set(Object.keys(files));
   let wanted = request.entry in files ? [] : [request.entry];
-  let document = null;
+  let answer = null;
   for (;;) {
     const texts = await Promise.all(wanted.map((path) => read(path)));
     let found = false;
@@ -167,10 +199,10 @@ export async function collect(core, request, read) {
         found = true;
       }
     });
-    if (document && !found) return { document, files };
-    document = await core.build({ ...request, files });
-    wanted = document.missing.filter((path) => !tried.has(path));
-    if (wanted.length === 0) return { document, files };
+    if (answer && !found) return { answer, files };
+    answer = await ask({ ...request, files });
+    wanted = answer.missing.filter((path) => !tried.has(path));
+    if (wanted.length === 0) return { answer, files };
   }
 }
 

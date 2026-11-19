@@ -1,11 +1,11 @@
 // The core in a module Worker: it loads core.js and the module next to it, and answers each message
 // { id, request } with { id, document } for a build, { id, snapshot } for a build with parts,
-// { id, written } for a write, { id, replaced } for a replace-records request, { id, catalog } for a
-// catalog request, { id, drawings } for the drawings of objects the last build kept, { id, formats }
-// for a formats request, or { id, error },
+// { id, outline } for an outline request, { id, written } for a write, { id, replaced } for a
+// replace-records request, { id, catalog } for a catalog request, { id, drawings } for the drawings
+// of objects the last build kept, { id, formats } for a formats request, or { id, error },
 // in the order they came. The request is an object or, as client.js sends it, its JSON text. Every request gets
 // the packages this build brings (packages.js): their files under the request's own, their
-// directories after the request's. It runs in browsers and, for the tests, as a Node worker thread.
+// directories after the request's; an outline, which loads no package, gets none. It runs in browsers and, for the tests, as a Node worker thread.
 
 import { loadCore } from "./core.js";
 import { files as packageFiles, packageDirs } from "./packages.js";
@@ -20,7 +20,9 @@ const port = node ? (await import("node:worker_threads")).parentPort : globalThi
 function withPackages(request) {
   if (packageDirs.length === 0) return request;
   const r = typeof request === "string" ? JSON.parse(request) : request;
-  if (r.drawings !== undefined) return request; // the drawings of the last build need no files
+  // the drawings of the last build need no files, nor does an outline, which loads no package
+  // unless it is the outline of one
+  if (r.drawings !== undefined || (r.outline && !(r.entry in packageFiles))) return request;
   return { ...r, files: { ...packageFiles, ...r.files }, package_dirs: [...(r.package_dirs ?? []), ...packageDirs] };
 }
 

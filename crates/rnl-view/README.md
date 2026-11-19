@@ -83,6 +83,22 @@ lists the symbols, ordinary definitions and sets of the packages the core has: t
 
 `rnl catalog` prints it; the WebAssembly core gives it for a catalog request.
 
+## Outline
+
+```rust
+pub fn outline(entry: &str, files: &dyn Provider, options: &BuildOptions) -> Result<Outline, String>
+```
+
+gives what reading the files of a document gives before any RNL is interpreted, for a frontend that shows the tree of its levels and keys what it keeps of each file without building the Document. It reads the netlist as `build` does, with the `dialect` and `formats` of `options`, the same files and the same Auto Include, and reads only the version declarations of the header records: it evaluates no other RNL and loads no package. Its other options do not change it.
+
+- `files`: the host files in the order of `Document.files`, each with `path`, `name`, `format`, `default_format` and `includes` as there; `levels`, its levels; `text_hash`, the first 16 hexadecimal digits of the SHA-256 of its text; and `records_hash`, the same of its records, so that a change of its netlist alone leaves it as it is.
+- `levels`: every level of the netlist in the order of the host levels, so that a level's index is the host level that `Level.host` and `Object.level` of the Document name. Each has `kind` (`"file"`, `"subckt"`, or `"module"` for a module of a Verilog-A file), `title`, `file`, `lines` (the first line of a subcircuit's definition and the line of its end, as `Level.lines` gives them), `parent`, `circuit`, `ports`, `instances` (how many), and `calls`: the subcircuits its instances call, one for each name, with the level that defines it when the netlist does, how many instances call it, and their names when the netlist defines it. A file level has `version`, the language version it is read in, and `packages`, the names its header record's USE-PACKAGE gives.
+- `roots`: the subcircuits no instance calls; `globals`: the global nets the netlist declares, by the key their names compare by.
+- `diagnostics`: those of reading the netlist, such as an include that is not found, and of the language versions of its files, each as the Document gives it; those of interpreting the RNL are not among them.
+- `missing`: as `Document.missing`, without the package files a build would read by path.
+
+A package file is not read: its outline is the file alone. The WebAssembly core gives the outline for a request with `outline` set.
+
 ## Drawings
 
 A level's drawing comes in the outputs the frontend asks for. A level has an `svg` field only when the SVG was asked for, and a `primitives` field only when the primitives were; its `scale` is always there.
@@ -93,7 +109,7 @@ A level's drawing comes in the outputs the frontend asks for. A level has an `sv
 
 ## Type definitions
 
-[`types/document.d.ts`](types/document.d.ts) declares the Document and everything in it in TypeScript, for frontends and their checks; the page in [`apps/viewer-ui`](../../apps/viewer-ui/README.md) refers to it. [`types/snapshot.d.ts`](types/snapshot.d.ts) declares the snapshot, and [`types/catalog.d.ts`](types/catalog.d.ts) the catalog. They are generated from the Rust types by [ts-rs](https://crates.io/crates/ts-rs), which the types derive in the tests only, and laid out by the test to be read. The test fails when the file is not what the types give; after a change to them that is meant, write it with:
+[`types/document.d.ts`](types/document.d.ts) declares the Document and everything in it in TypeScript, for frontends and their checks; the page in [`apps/viewer-ui`](../../apps/viewer-ui/README.md) refers to it. [`types/snapshot.d.ts`](types/snapshot.d.ts) declares the snapshot, and [`types/catalog.d.ts`](types/catalog.d.ts) the catalog. The outline is declared in `types/document.d.ts` too. They are generated from the Rust types by [ts-rs](https://crates.io/crates/ts-rs), which the types derive in the tests only, and laid out by the test to be read. The test fails when the file is not what the types give; after a change to them that is meant, write it with:
 
 ```bash
 RNL_BLESS=1 cargo test -p rnl-view types

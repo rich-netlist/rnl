@@ -8,6 +8,7 @@ import type {
   FormatList,
   FormatsRequest,
   LibraryRequest,
+  Outline,
   ReplaceRecordsRequest,
   Replaced,
   Request,
@@ -29,6 +30,10 @@ export type {
   LibraryRequest,
   Literal,
   Op,
+  Outline,
+  OutlineCall,
+  OutlineFile,
+  OutlineLevel,
   OverlayOptions,
   OverlayStyle,
   Point,
@@ -50,6 +55,12 @@ export interface CoreWorker {
   build(request: Request): Promise<Document>;
   /** Build the snapshot of a request with `parts`: the editor interface's view of the document. */
   snapshot(request: Request): Promise<Snapshot>;
+  /**
+   * The outline of a request's entry: its files, levels and the subcircuits each calls, the language
+   * version and packages of each file, and the diagnostics of reading the netlist, with no RNL
+   * interpreted.
+   */
+  outline(request: Request): Promise<Outline>;
   /** Write and build. Refusals reject with EditError, carrying a code and host diagnostics. */
   write(request: WriteRequest): Promise<Written>;
   /**
@@ -80,6 +91,13 @@ export function collect(
   request: Request,
   read: (path: string) => Promise<string | null>,
 ): Promise<{ document: Document; files: Record<string, string> }>;
+
+/** The outline of a document with the files it needs, read through `read` as `collect` reads them. */
+export function collectOutline(
+  core: { outline(request: Request): Outline | Promise<Outline> },
+  request: Request,
+  read: (path: string) => Promise<string | null>,
+): Promise<{ outline: Outline; files: Record<string, string> }>;
 
 /** A file's text from its bytes, as rnl reads a file: UTF-8 without a BOM, else Latin-1. */
 export function decodeText(bytes: BufferSource): string;

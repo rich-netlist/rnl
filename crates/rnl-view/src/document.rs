@@ -650,33 +650,8 @@ pub(crate) fn document(
     usages::inspect_all(r, &mut levels, &mut ix);
     member_of::index_all(r, &mut ix);
     let symbols = symbols::inspect(r, &mut levels);
-    let diagnostic = |d: &Diag, sink: &Sink| {
-        let (file, line, col) = match &d.loc {
-            Some(l) => (l.file.clone(), l.line, l.col),
-            None => (String::new(), 0, 0),
-        };
-        let cause = d.cause.map(|c| {
-            let c = sink.get(c);
-            match &c.loc {
-                Some(l) => format!("{}:{}{}: {}", shown_file(&l.file), l.line, col_suffix(l.col), c.message),
-                None => c.message.clone(),
-            }
-        });
-        Diagnostic {
-            severity: d.severity.as_str(),
-            code: d.code.number(),
-            name: d.code.name(),
-            file: shown_file(&file),
-            file_index: file_index.get(&file).copied(),
-            full_path: file,
-            line,
-            col,
-            message: d.message.clone(),
-            origin: d.origin.clone(),
-            cause,
-        }
-    };
-    let mut diagnostics: Vec<Diagnostic> = r.diagnostics().into_iter().map(|d| diagnostic(d, &r.sink)).collect();
+    let mut diagnostics: Vec<Diagnostic> =
+        r.diagnostics().into_iter().map(|d| diagnostic(d, &r.sink, &shown_file, &file_index)).collect();
     for (severity, code, message, loc) in notes {
         let (file, line) = loc.map(|l| (l.file, l.line)).unwrap_or_default();
         diagnostics.push(Diagnostic {
@@ -716,6 +691,40 @@ pub struct SourceInclude {
     pub line: u32,
     /// Index in Document.files.
     pub file: usize,
+}
+
+/// A diagnostic of `sink` as the Document gives it, its files as `shown` shows them and indexed
+/// by `file_index`.
+pub(crate) fn diagnostic(
+    d: &Diag,
+    sink: &Sink,
+    shown: &dyn Fn(&str) -> String,
+    file_index: &HashMap<String, usize>,
+) -> Diagnostic {
+    let (file, line, col) = match &d.loc {
+        Some(l) => (l.file.clone(), l.line, l.col),
+        None => (String::new(), 0, 0),
+    };
+    let cause = d.cause.map(|c| {
+        let c = sink.get(c);
+        match &c.loc {
+            Some(l) => format!("{}:{}{}: {}", shown(&l.file), l.line, col_suffix(l.col), c.message),
+            None => c.message.clone(),
+        }
+    });
+    Diagnostic {
+        severity: d.severity.as_str(),
+        code: d.code.number(),
+        name: d.code.name(),
+        file: shown(&file),
+        file_index: file_index.get(&file).copied(),
+        full_path: file,
+        line,
+        col,
+        message: d.message.clone(),
+        origin: d.origin.clone(),
+        cause,
+    }
 }
 
 /// The host files with the places of their records; the opened file comes first.

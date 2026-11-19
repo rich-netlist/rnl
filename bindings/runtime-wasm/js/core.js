@@ -1,5 +1,6 @@
 // The core as WebAssembly: the module the binding builds (rnl_runtime_wasm.wasm), behind one call
-// that takes a request and returns the Document, for a write the netlist written and its Document,
+// that takes a request and returns the Document, or its outline, for a write the netlist written
+// and its Document,
 // for a replace-records request the file of a level with the level's records replaced, for a catalog
 // request the catalog of the packages the core has, or for a drawings request the drawings of
 // objects an earlier build kept. The call is synchronous, so
@@ -36,6 +37,9 @@
  * @property {{ drawing?: boolean, host?: boolean, model?: boolean }} [parts] The parts of the
  *   editor interface's snapshot to give: with them, the answer is a snapshot (snapshot.d.ts), with
  *   the Document as its `drawing` unless `drawing` is false.
+ * @property {boolean} [outline] Give the outline of the entry instead of its Document: what reading
+ *   its files gives before any RNL is interpreted (`Outline` of document.d.ts). The fields that say
+ *   how to draw are ignored; false when not given.
  */
 
 /**
@@ -132,6 +136,9 @@
  *   when there is none, such as when the entry is not among the files.
  * @property {(request: Request | string) => object} snapshot Build the snapshot of a request with
  *   `parts`, as build builds the Document.
+ * @property {(request: Request | string) => object} outline The outline of a request's entry, with no
+ *   RNL interpreted (`Outline` of document.d.ts). A request given as text must ask for `outline`
+ *   itself.
  * @property {(request: WriteRequest | string) => { text: string, document: object }} write Write the
  *   ops of a request into its netlist, and build what was written. Throws an Error with the core's
  *   message when an op cannot be written, with code, diagnosticName and diagnostics added
@@ -152,7 +159,7 @@
  * @property {(request: FormatsRequest | string) => { list: object[], detected: Record<string, string> }} formats
  *   The formats a file can be read with, and the format each file of `detect` has when none is set.
  * @property {(request: Request | WriteRequest | ReplaceRecordsRequest | CatalogRequest | DrawingsRequest | string) => object} respond
- *   The core's answer as it gives it: `{ document }`, `{ snapshot }`, `{ written }`, `{ replaced }`,
+ *   The core's answer as it gives it: `{ document }`, `{ outline }`, `{ snapshot }`, `{ written }`, `{ replaced }`,
  *   `{ catalog }`, `{ drawings }` or `{ error }`. Throws only when the core stops.
  */
 
@@ -162,6 +169,7 @@ const decoder = new TextDecoder();
 const ASKS = {
   document: "a build without parts",
   snapshot: "a build with parts",
+  outline: "an outline request",
   written: "a write",
   replaced: "a replace-records request",
   catalog: "a catalog request",
@@ -248,6 +256,7 @@ export async function loadCore(wasm) {
     respond,
     build: (request) => part(request, "document"),
     snapshot: (request) => part(request, "snapshot"),
+    outline: (request) => part(typeof request === "string" ? request : { ...request, outline: true }, "outline"),
     write: (request) => part(request, "written"),
     replaceRecords: (request) => part(request, "replaced"),
     catalog: (request) => part(request, "catalog"),

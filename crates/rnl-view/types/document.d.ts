@@ -1072,6 +1072,179 @@ export type Diagnostic = {
 };
 
 /**
+ * What reading a document gives before any RNL is interpreted, as [`crate::outline`] gives it:
+ * its files, its levels and which subcircuits each calls, the language version and the packages
+ * each file's header record declares, and the diagnostics of reading the netlist.
+ */
+export type Outline = {
+  /**
+   * The entry as the frontend named it.
+   */
+  path: string,
+  /**
+   * Its file name.
+   */
+  name: string,
+  /**
+   * The format of the main file, as [`crate::Document::dialect`] names it.
+   */
+  dialect: string,
+  /**
+   * The host files, in the order of [`crate::Document::files`]: the opened file first, then the
+   * files it includes.
+   */
+  files: Array<OutlineFile>,
+  /**
+   * Every level of the netlist, in the order of the host levels: the index of a level here is
+   * the host level that [`crate::Level::host`] and [`crate::Object::level`] name.
+   */
+  levels: Array<OutlineLevel>,
+  /**
+   * The subcircuits that no instance of the netlist calls, the roots of its tree, as indices
+   * into `levels`, in the order of the levels. A Verilog-A module is not one.
+   */
+  roots: Array<number>,
+  /**
+   * The global nets the netlist declares (`.global`, Spectre's `global`), `0` aside, each by
+   * the key its names compare by, in sorted order. A global net is global in every level,
+   * whichever file declares it.
+   */
+  globals: Array<string>,
+  /**
+   * The diagnostics of reading the netlist: of the host readers, such as an include that is not
+   * found, and of the language versions of the files. Those of interpreting the RNL are not
+   * among them.
+   */
+  diagnostics: Array<Diagnostic>,
+  /**
+   * The files the core asked for and did not get, as [`crate::Document::missing`]: a frontend
+   * that can read them adds them and asks again.
+   */
+  missing: Array<string>,
+};
+
+/**
+ * A host file of an [`Outline`].
+ */
+export type OutlineFile = {
+  /**
+   * The file as the runtime knows it, as [`crate::SourceFile::path`].
+   */
+  path: string,
+  /**
+   * The file as shown, as [`crate::SourceFile::name`].
+   */
+  name: string,
+  /**
+   * The format the file was read with, as [`crate::SourceFile::format`].
+   */
+  format: string | null,
+  /**
+   * The format it is read with when none is set for it.
+   */
+  default_format: string | null,
+  /**
+   * Its include directives and the files they loaded, as [`crate::SourceFile::includes`].
+   */
+  includes: Array<SourceInclude>,
+  /**
+   * Its levels, as indices into [`Outline::levels`], in order: its file level, or one for each
+   * time the netlist reads it, then its subcircuits.
+   */
+  levels: Array<number>,
+  /**
+   * The hash of its text: the first 16 hexadecimal digits of the SHA-256 of its UTF-8 bytes.
+   */
+  text_hash: string,
+  /**
+   * The hash of its records, the header record among them, in the order of the file: of their
+   * texts as the runtime reads them, each ended by a line feed, as `text_hash` is made. A
+   * change of the file's netlist alone leaves it as it is.
+   */
+  records_hash: string,
+};
+
+/**
+ * A level of an [`Outline`]: a reading of a file, or a subcircuit.
+ */
+export type OutlineLevel = {
+  /**
+   * "file", "subckt", or "module" for a module of a Verilog-A file.
+   */
+  kind: string,
+  /**
+   * The subcircuit's name, or the name of the file of a file level.
+   */
+  title: string,
+  /**
+   * The file it is written in, an index into [`Outline::files`]; None when it is not one of them.
+   */
+  file: number | null,
+  /**
+   * The first line of its definition, and the line of its end, as [`crate::Level::lines`]
+   * gives them; None for a file level.
+   */
+  lines: [number, number] | null,
+  /**
+   * The level it is written in, an index into [`Outline::levels`]: for a subcircuit, the level
+   * whose text holds its definition; for an included file, the level that includes it. None
+   * for the main file.
+   */
+  parent: number | null,
+  /**
+   * Whether it is a circuit, one with instances and nets of its own: the main file and the
+   * subcircuits (6.1).
+   */
+  circuit: boolean,
+  /**
+   * Its terminals, in the order its definition writes them.
+   */
+  ports: Array<string>,
+  /**
+   * How many instances it has.
+   */
+  instances: number,
+  /**
+   * The subcircuits its instances call, one for each name, in the order first called.
+   */
+  calls: Array<OutlineCall>,
+  /**
+   * For a file level, the language version its text is read in: the one its header record
+   * declares, or the one of the file that includes it, or the tool's default (16.1).
+   */
+  version: string | null,
+  /**
+   * For a file level, the packages its header record uses, by name, in the order written
+   * (16.2); which version of each is used, the interpretation says.
+   */
+  packages: Array<string>,
+};
+
+/**
+ * The instances of a level that call one subcircuit name.
+ */
+export type OutlineCall = {
+  /**
+   * The name as the first of them writes it.
+   */
+  master: string,
+  /**
+   * The level that defines it, an index into [`Outline::levels`]; None when the netlist does
+   * not define it, such as a device of a PDK.
+   */
+  level: number | null,
+  /**
+   * How many instances call it.
+   */
+  count: number,
+  /**
+   * When the netlist defines it, the names of the instances that call it, in the order of the
+   * netlist; left out otherwise.
+   */
+  instances?: Array<string>,
+};
+
+/**
  * One thing drawn on a level: a shape or a text, with the object it draws and its place in the
  * drawing order (11.6). A level lists its primitives in drawing order already.
  */

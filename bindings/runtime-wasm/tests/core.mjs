@@ -20,7 +20,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const dist = pathToFileURL(`${resolve(process.argv[2] ?? resolve(here, "../dist"))}/`);
 const { loadCore } = await import(new URL("core.js", dist));
-const { collect, decodeText, startCore } = await import(new URL("client.js", dist));
+const { collect, collectOutline, decodeText, startCore } = await import(new URL("client.js", dist));
 const wasm = new URL("rnl_runtime_wasm.wasm", dist);
 const char = (...codes) => String.fromCharCode(...codes);
 
@@ -166,6 +166,28 @@ test("collect reads what is missing until nothing new can be read", async () => 
   assert.deepEqual(again.document, document);
 
   await assert.rejects(collect(core, { entry: "/w/none.sp" }, read), { message: "cannot read /w/none.sp" });
+});
+
+test("collectOutline reads what is missing as collect does, and interprets nothing", async () => {
+  const disk = new Map([
+    ["/w/top.sp", `* top\n.include "a.inc"\nX1 p q a\n.end\n`],
+    ["/w/a.inc", `* a\n.include "b.inc"\n.include "none.inc"\n.subckt a p q\nX1 p q b\n.ends\n`],
+    ["/w/b.inc", `* b\n.subckt b p q\nR1 p q 1k\n.ends\n`],
+  ]);
+  const read = async (path) => disk.get(path) ?? null;
+  const { outline, files } = await collectOutline(core, { entry: "/w/top.sp" }, read);
+  assert.deepEqual(Object.keys(files), ["/w/top.sp", "/w/a.inc", "/w/b.inc"]);
+  assert.deepEqual(outline.missing, ["/w/none.inc"]);
+  assert.deepEqual(outline.files.map((f) => f.path), ["top.sp", "a.inc", "b.inc"]);
+  const titles = outline.levels.map((l) => l.title);
+  assert.deepEqual([...titles].sort(), ["a", "a.inc", "b", "b.inc", "top.sp"]);
+  assert.deepEqual(outline.roots, []);
+  const a = outline.levels[titles.indexOf("a")];
+  assert.deepEqual(a.calls, [{ master: "b", level: titles.indexOf("b"), count: 1, instances: ["X1"] }]);
+  // the files of a build: the Document's files and levels are those of the outline
+  const { document } = await collect(core, { entry: "/w/top.sp", files }, read);
+  assert.deepEqual(document.files.map((f) => f.path), outline.files.map((f) => f.path));
+  assert.deepEqual(core.respond({ entry: "/w/top.sp", files, outline: true }), { outline });
 });
 
 test("the core runs in a Worker", async () => {

@@ -10,6 +10,7 @@ mod document;
 mod formats;
 pub mod hints;
 mod library;
+mod outline;
 pub mod overlays;
 mod params;
 #[cfg(test)]
@@ -51,6 +52,7 @@ pub use document::{
 };
 pub use formats::{detect_format, formats, validate_format, FormatInfo};
 pub use library::{LibraryIndex, LibraryProvider};
+pub use outline::{Outline, OutlineCall, OutlineFile, OutlineLevel};
 pub use params::{Bind, ParamValue, SubcktParam};
 pub use primitive::{
     Bar, Cap, Color, HAlign, Join, Layer, Primitive, Run, RunStyle, Segment, Shape, Stroke, Text, TextRun, Unit, VAlign,
@@ -249,6 +251,26 @@ pub fn snapshot(entry: &str, files: &dyn Provider, options: &BuildOptions, parts
         if parts.drawing { options.clone() } else { BuildOptions { svg: false, primitives: false, ..options.clone() } };
     let document = document::document(entry, &r, ws.missing.into_inner(), &draw, false);
     Ok(snapshot::snapshot(&r, document, parts, &options.runtime, !options.formats.is_empty()))
+}
+
+/// The outline of `entry`: what reading its files gives before any RNL is interpreted, the files,
+/// the levels and the subcircuits each calls, the language version and packages of each file, and
+/// the diagnostics of reading the netlist ([`Outline`]). `files` and the `dialect` and `formats` of
+/// `options` are read as [`build`] reads them; its other options do not change it. A package file
+/// ([`entry_format`]) is not read: its outline is the file alone. Fails as [`build`] does.
+pub fn outline(entry: &str, files: &dyn Provider, options: &BuildOptions) -> Result<Outline, String> {
+    let ws = Workspace::with_formats(files, &options.formats);
+    let path = slashed(entry);
+    let Some(text) = ws.read(&path) else { return Err(format!("cannot read {entry}")) };
+    let reading = (options.dialect.as_deref(), &options.formats);
+    let (main, default) = entry_format_in(entry, reading, &ws)?;
+    if formats::name(main) == package::NAME {
+        let (format, default) = (formats::name(main), formats::name(default));
+        return Ok(outline::package_outline(entry, &normalize(&path), &text, format, default));
+    }
+    let mut sink = Sink::new();
+    let doc = read_host_in(entry, reading, &ws, &mut sink)?;
+    Ok(outline::outline(entry, doc, sink, ws.missing.into_inner()))
 }
 
 /// The catalog of the packages the core has: those of the package directories of `files`, the
