@@ -1,4 +1,4 @@
-<!-- translated from en/annex-d.md sha256:799b37025a87 -->
+<!-- translated from en/annex-d.md sha256:72752f1bf7f8 -->
 ## Anexo D Cambios respecto a la versión 0.3 (informativo)
 
 La versión 0.4 escribe cada hecho sobre posiciones con su dirección, de modo que un hecho significa una única disposición y no una elección entre varias. Las versiones 0.x no prometen compatibilidad entre sí (16.1); este anexo enumera qué cambió y cómo pasa un archivo a la versión 0.4. Este estándar describe solo la versión 0.4; un archivo de 0.3 pasa a 0.4 con una herramienta de actualización que lee la versión 0.3, la cual realiza los cambios indicados al final de este anexo (16.1).

@@ -1,3 +1,4 @@
+<!-- translated from en/annex-a.md sha256:2adc09eec4f4 -->
 ## Anhang A Schlüsselwortsignaturen (normativ)
 
 Dieser Anhang wird aus der Wortliste `rnl-words-0.4.json` erzeugt (5.3); weichen beide voneinander ab, liegt ein Erratum vor. Er führt auf, was jedes Schlüsselwort annimmt und liefert; was es bedeutet, steht in dem in der letzten Spalte genannten Abschnitt.

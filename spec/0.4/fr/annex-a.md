@@ -1,3 +1,4 @@
+<!-- translated from en/annex-a.md sha256:2adc09eec4f4 -->
 ## Annexe A Signatures des mots-clés (normative)
 
 La présente annexe est générée à partir de la liste de mots `rnl-words-0.4.json` (5.3) ; en cas de divergence entre les deux, il s’agit d’un erratum. Elle énumère ce que chaque mot-clé reçoit et produit ; ce qu’il signifie figure dans la section nommée dans la dernière colonne.
