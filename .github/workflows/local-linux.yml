@@ -56,6 +56,12 @@ jobs:
     timeout-minutes: 90
     outputs:
       version: ${{ steps.version.outputs.version }}
+    # the paths of the build machine are not written into the program, nor into the core's WebAssembly that its page
+    # carries: the checkout and Cargo's sources by names of their own (the toolchain's are /rustc/<commit> already), and
+    # the same for the C that crates build, such as mimalloc
+    env:
+      RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=/rnl --remap-path-prefix=/home/runner/.cargo=/cargo
+      CFLAGS: -ffile-prefix-map=${{ github.workspace }}=/rnl -ffile-prefix-map=/home/runner/.cargo=/cargo
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Download and verify locked public packages
@@ -89,11 +95,6 @@ jobs:
         env:
           RNL_SITE_DIR: ${{ github.workspace }}/apps/web/dist
           CC_x86_64_unknown_linux_musl: musl-gcc
-          # the paths of the build machine are not written into the program: the checkout and Cargo's sources by
-          # names of their own (the toolchain's are /rustc/<commit> already)
-          RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=/rnl --remap-path-prefix=/home/runner/.cargo=/cargo
-          # (and of the C that crates build, such as mimalloc)
-          CFLAGS: -ffile-prefix-map=${{ github.workspace }}=/rnl -ffile-prefix-map=/home/runner/.cargo=/cargo
         run: |
           cargo build --release --locked --target x86_64-unknown-linux-musl
           cargo build --release --locked
