@@ -23,7 +23,7 @@ let preferences = new Map();
 const activeSettings = new WeakMap();
 let shown = false;
 let groupsShown = false; // the frames of the groups: the Solve panel's Group frames, apart from the usages' View > Show Usages
-let duplicatesHidden = false; // the Usage panel's Hide duplicate usages: of the usages that frame the same objects one frame is drawn
+let duplicatesHidden = false; // the Usage panel's Hide duplicate usages: of the usages that frame the same instances one frame is drawn
 let currentsShown = false;
 let currentLayer = null;
 let revision = 0;
@@ -73,29 +73,38 @@ const chosen =() => selectedAsUsage ? usages().find(u => u.object === selected) 
 const ownVisible = u => (isGroup(u) ? groupsShown : shown) && setting(u).visible;
 const framedKeys = new WeakMap();
 /**
- * The objects a usage's frame goes round, as a key: those that fill its roles, instances, pins and points alike, nets
- * left out; a usage among them for the objects it goes round in turn, and itself too when it has a symbol of its own, as
- * a port, which is drawn; a point by its name, or a position by it (`points`, not an object), so that two usages of the
- * same instance at other points are not the same; the same objects, the same key; "" for none.
+ * The leaves a usage's frame goes round, as a key: the drawn things that fill its roles once every usage among them is
+ * taken apart, however its roles group them. An instance is a leaf, and so is a usage with a symbol of its own, as a port,
+ * which is drawn; a pin stands for what it is the pin of; a usage among them that draws nothing stands for the leaves it
+ * goes round in turn. Nets and points (an axis, a named point, a position) are left out: they are not drawn things, so two
+ * usages of the same instances that differ only in a point, as a $MIRRORED_LAYOUT about an axis and a $MATCHED of the same
+ * pair, are the same. The same leaves, the same key; "" for none.
  */
 function framedKey(u) {
   if (framedKeys.has(u)) return framedKeys.get(u);
   const by = usageByObject();
   const framed = new Set();
-  const points = new Set();
   const seen = new Set([u.object]);
-  const take = (x) => {
-    for (const r of x.roles) for (const p of r.points ?? []) points.add(p);
-    for (const r of x.roles) for (const o of r.objects ?? []) {
-      const inner = by.get(o);
-      if (inner) {
-        if (inner.has_symbol) framed.add(o);
-        if (!seen.has(o)) { seen.add(o); take(inner); }
-      } else if (doc.objects[o] && doc.objects[o].kind !== "net") framed.add(o);
+  const leaf = (o) => {
+    const object = doc.objects[o];
+    if (!object || object.kind === "net") return;
+    if (object.kind === "pin") {
+      if (object.pin?.owner != null && object.pin.owner !== o) take(object.pin.owner);
+      return;
     }
+    framed.add(o);
   };
-  take(u);
-  const key = [...framed].sort((a, b) => a - b).join(",") + (points.size ? ` ${[...points].sort().join(" ")}` : "");
+  const take = (o) => {
+    const inner = by.get(o);
+    if (!inner) return leaf(o);
+    if (inner.has_symbol) framed.add(o);
+    if (seen.has(o)) return;
+    seen.add(o);
+    takeRoles(inner);
+  };
+  const takeRoles = (x) => { for (const r of x.roles) for (const o of r.objects ?? []) take(o); };
+  takeRoles(u);
+  const key = [...framed].sort((a, b) => a - b).join(",");
   framedKeys.set(u, key);
   return key;
 }
@@ -108,9 +117,9 @@ function usageByObject() {
 }
 let duplicateCache = { all: null, revision: -1, on: false, drawn: new Map() };
 /**
- * With Hide duplicate usages on, the usage drawn in the place of each other one that frames the same objects (`framedKey`):
+ * With Hide duplicate usages on, the usage drawn in the place of each other one that frames the same leaves (`framedKey`):
  * of the usages of a level that draw nothing of their own (no symbol, wire or annotation, as $MATCHED or $SERIES; not a
- * group) and are shown by their own switches, those that frame the same objects are one set, of which one frame is drawn.
+ * group) and are shown by their own switches, those that frame the same leaves are one set, of which one frame is drawn.
  * It is the last one written (the order of the Document's usages, in which a usage made inside a definition follows the
  * one it is made in), and then the outermost usage of the set that it is made inside (`parent`, through any number of
  * definitions): of a definition that makes another usage of its own objects, as $DIFFERENTIAL_PAIR makes $MATCHED, the

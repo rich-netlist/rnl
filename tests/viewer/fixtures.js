@@ -29,6 +29,7 @@ export const FILES = {
   "subckt-params": "tests/viewer/inputs/subckt-params.sp",
   "ota-nested-usages": "tests/viewer/inputs/ota-nested-usages.sp",
   "duplicate-usages-04": "tests/viewer/inputs/duplicate-usages-04.sp",
+  "duplicate-usages-mirror-04": "tests/viewer/inputs/duplicate-usages-mirror-04.sp",
   "usage-deep": "tests/viewer/inputs/usage-deep.sp",
   "usage-ota5t": "tests/viewer/inputs/usage-ota5t.sp",
   "package-pkg": "tests/viewer/inputs/acme.pkg",
