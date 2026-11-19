@@ -1,3 +1,4 @@
+<!-- translated from en/annex-a.md sha256:2adc09eec4f4 -->
 ## Anexo A Firmas de las palabras clave (normativo)
 
 Este anexo se genera a partir de la lista de palabras `rnl-words-0.4.json` (5.3); donde ambos difieran, se trata de una errata. Enumera qué admite y qué devuelve cada palabra clave; su significado se encuentra en la sección indicada en la última columna.

@@ -94,6 +94,7 @@
       "matches": [
         "de"
       ],
+      "standard": "de",
       "status": "published",
       "ai_translated": true,
       "names": {
@@ -110,6 +111,7 @@
       "matches": [
         "es"
       ],
+      "standard": "es",
       "status": "published",
       "ai_translated": true,
       "names": {
@@ -126,6 +128,7 @@
       "matches": [
         "fr"
       ],
+      "standard": "fr",
       "status": "published",
       "ai_translated": true,
       "names": {
@@ -142,6 +145,7 @@
       "matches": [
         "ja"
       ],
+      "standard": "ja",
       "status": "published",
       "ai_translated": true,
       "names": {
@@ -164,6 +168,7 @@
       "matches": [
         "ko"
       ],
+      "standard": "ko",
       "status": "published",
       "ai_translated": true,
       "names": {
@@ -214,6 +219,7 @@
         "zh-mo",
         "zh-hant"
       ],
+      "standard": "zh-hant",
       "status": "published",
       "codes": {
         "viewer": "zh-Hant"

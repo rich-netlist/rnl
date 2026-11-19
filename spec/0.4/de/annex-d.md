@@ -1,4 +1,4 @@
-<!-- translated from en/annex-d.md sha256:799b37025a87 -->
+<!-- translated from en/annex-d.md sha256:72752f1bf7f8 -->
 
 ## Anhang D Änderungen gegenüber Version 0.3 (informativ)
 

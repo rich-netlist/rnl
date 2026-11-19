@@ -1,4 +1,4 @@
-<!-- translated from en/annex-d.md sha256:799b37025a87 -->
+<!-- translated from en/annex-d.md sha256:72752f1bf7f8 -->
 ## Annexe D Modifications par rapport à la version 0.3 (informative)
 
 La version 0.4 écrit chaque fait portant sur les positions avec sa direction, de sorte qu’un fait désigne une unique disposition et non un choix entre plusieurs. Les versions 0.x ne font aucune promesse de compatibilité entre elles (16.1) ; cette annexe énumère ce qui a changé et comment un fichier passe à la version 0.4. La présente norme décrit uniquement la version 0.4 ; un fichier de la version 0.3 passe à la 0.4 au moyen d’un outil de mise à niveau qui lit la version 0.3, lequel effectue les modifications indiquées à la fin de cette annexe (16.1).
