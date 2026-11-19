@@ -1,6 +1,6 @@
 //! Circuit and drawing selections (10.1).
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::host::glob;
 
@@ -351,6 +351,21 @@ impl Interp<'_> {
             .collect()
     }
 
+    /// Each net with the pins of `pins` on it, in their order; a pin on two nets is under both.
+    fn pins_by_net(&mut self, scene: SceneId, pins: &[ObjId]) -> HashMap<ObjId, Vec<ObjId>> {
+        let mut by_net: HashMap<ObjId, Vec<ObjId>> = HashMap::new();
+        for &pin in pins {
+            let ObjData::ScenePin { owner, index } = *self.o(pin) else { continue };
+            let mut nets = self.scene_pin_nets(scene, owner, index);
+            nets.sort_unstable();
+            nets.dedup();
+            for net in nets {
+                by_net.entry(net).or_default().push(pin);
+            }
+        }
+        by_net
+    }
+
     pub(super) fn select_pins(
         &mut self,
         scene: SceneId,
@@ -364,6 +379,9 @@ impl Interp<'_> {
         }
         let mut candidates = Vec::new();
         if let Some(pool) = pool {
+            // The pins of each net, in the order of `all`, found once for the whole pool: a pool
+            // of every net would otherwise ask every pin for its nets once per net.
+            let mut net_pins: Option<HashMap<ObjId, Vec<ObjId>>> = None;
             for object in pool {
                 match self.o(object).clone() {
                     ObjData::ScenePin { .. } => candidates.push(object),
@@ -377,12 +395,11 @@ impl Interp<'_> {
                         }
                     }
                     ObjData::Net { .. } => {
-                        for &pin in &all {
-                            let ObjData::ScenePin { owner, index } = *self.o(pin) else { continue };
-                            if self.scene_pin_nets(scene, owner, index).contains(&object) {
-                                candidates.push(pin);
-                            }
-                        }
+                        let net_pins = match net_pins {
+                            Some(ref net_pins) => net_pins,
+                            None => net_pins.insert(self.pins_by_net(scene, &all)),
+                        };
+                        candidates.extend(net_pins.get(&object).into_iter().flatten().copied());
                     }
                     _ => {}
                 }

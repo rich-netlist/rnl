@@ -110,6 +110,8 @@ impl Interp<'_> {
     }
 
     pub(crate) fn scene_pin_nets(&mut self, scene: SceneId, owner: ObjId, index: usize) -> Vec<ObjId> {
+        #[cfg(test)]
+        tests::PIN_NET_LOOKUPS.with(|count| count.set(count.get() + 1));
         self.scene_pin_nets_inner(scene, owner, index, &mut std::collections::HashSet::new())
     }
 
@@ -828,5 +830,70 @@ impl Interp<'_> {
         for (index, fact) in sc.at.iter().enumerate() {
             sc.at_by_target.entry(fact.target).or_default().push(index);
         }
+    }
+}
+
+#[cfg(test)]
+pub(super) mod tests {
+    use std::cell::Cell;
+
+    use crate::diag::{Severity, Sink};
+    use crate::host::{Dialect, HostDocument, Instance, Level, LevelKind};
+    use crate::records::{package_lines, scan_run};
+    use crate::source::MemoryProvider;
+    use crate::{interpret, Options};
+
+    thread_local! {
+        /// How many times a pin was asked for its nets, on this thread.
+        pub(in crate::interp) static PIN_NET_LOOKUPS: Cell<usize> = const { Cell::new(0) };
+    }
+
+    /// The lookups of pins' nets that reading a level of `n` instances of five terminals takes,
+    /// a chain like a row of cells, where a rule selects the pins of every net as the standard
+    /// fill does (# @SELECT-NET => @SELECT-PIN).
+    fn lookups(n: usize) -> usize {
+        let mut sink = Sink::new();
+        let mut main = Level::new(LevelKind::File, "row.sp", "row.sp", "row.sp");
+        main.circuit = true;
+        for k in 0..n {
+            main.instances.push(Instance {
+                name: format!("X{}", k + 1),
+                letter: Some('X'),
+                nodes: vec![format!("n{k}"), format!("n{}", k + 1), format!("n{}", k + 2), "vdd".into(), "vss".into()],
+                file: "row.sp".into(),
+                line: k as u32 + 1,
+                order: k,
+                default_terminals: Some(["a", "b", "y", "vdd", "vss"].map(String::from).to_vec()),
+                ..Instance::default()
+            });
+        }
+        let records = r#"@RNL(type="header") { @VERSION("0.4")}
+@RNL {
+  $TP = @DEFINE(roles=[["t", ["net", "terminal"]]]) {};
+  %pins = # @SELECT-NET(recursive=true) => @SELECT-PIN(wired=false, recursive=true);
+  %more = # @SELECT-NET(recursive=true) => @SELECT-PIN(recursive=true);
+  %more @REMOVE-FROM %pins;
+  $TP @ATTACH %pins
+}"#;
+        main.records = scan_run(&package_lines(records), "row.sp", &mut sink);
+        let dialect = Dialect { name: "spice".into(), case_sensitive: false, ground_aliases: vec![] };
+        PIN_NET_LOOKUPS.with(|count| count.set(0));
+        let read = interpret(
+            HostDocument::new(main, dialect),
+            &MemoryProvider::new(),
+            &Options { std: false, ..Options::default() },
+            sink,
+        );
+        let errors: Vec<_> = read.sink.all().iter().filter(|d| d.severity == Severity::Error).collect();
+        assert!(errors.is_empty(), "{errors:?}");
+        PIN_NET_LOOKUPS.with(Cell::get)
+    }
+
+    #[test]
+    fn selecting_the_pins_of_every_net_grows_with_the_pins_not_with_nets_times_pins() {
+        let (small, large) = (lookups(60), lookups(120));
+        // Twice the instances, twice the pins and twice the nets: a lookup per pin doubles, a
+        // lookup per pin and net, as before, would grow four times.
+        assert!(large <= small * 5 / 2, "{small} lookups for 60 instances, {large} for 120");
     }
 }
