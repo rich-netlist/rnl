@@ -624,6 +624,19 @@ impl Interp<'_> {
     }
 
     /// The physical pins of each net of the level, as the current symbols give them.
+    /// Where each pin of `by_net` is: the index of its net in `nets` and its index among that net's
+    /// pins, once for each net it is on. Sorted, the places of some pins give them net by net in the
+    /// order of `nets`, and in each net in the order of its pins.
+    fn routing_pin_places(nets: &[ObjId], by_net: &HashMap<ObjId, Vec<ObjId>>) -> HashMap<ObjId, Vec<(usize, usize)>> {
+        let mut places: HashMap<ObjId, Vec<(usize, usize)>> = HashMap::new();
+        for (n, net) in nets.iter().enumerate() {
+            for (k, pin) in by_net.get(net).into_iter().flatten().enumerate() {
+                places.entry(*pin).or_default().push((n, k));
+            }
+        }
+        places
+    }
+
     fn routing_net_pins(&mut self, scene: SceneId) -> HashMap<ObjId, Vec<ObjId>> {
         let terms = self.route_terms(scene);
         let mut by_net: HashMap<ObjId, Vec<ObjId>> = HashMap::new();
@@ -654,6 +667,9 @@ impl Interp<'_> {
     fn routing_covers(&mut self, scene: SceneId, report: bool) -> (Vec<RankedCover>, Vec<RoutingRequest>) {
         let sources = self.routing_sources(scene);
         let by_net = self.routing_net_pins(scene);
+        // the place of each pin among the pins of its nets, made when a request over pins first
+        // needs it: such a request takes its pins net by net from it, not from every net
+        let mut places: Option<HashMap<ObjId, Vec<(usize, usize)>>> = None;
         let mut covers = Vec::new();
         'request: for (first, source) in sources.iter().enumerate() {
             let priority = self.eff_priority(scene, source.spec.priority, &source.chain, source.object);
@@ -706,9 +722,36 @@ impl Interp<'_> {
                         continue 'request;
                     }
                 }
-                for net in self.scenes[scene].nets.clone() {
-                    let pins: Vec<_> =
-                        by_net.get(&net).into_iter().flatten().filter(|pin| selected.contains(pin)).copied().collect();
+                let nets = self.scenes[scene].nets.clone();
+                let places = places.get_or_insert_with(|| Self::routing_pin_places(&nets, &by_net));
+                let mut found: Vec<(usize, usize)> =
+                    selected.iter().filter_map(|pin| places.get(pin)).flatten().copied().collect();
+                found.sort_unstable();
+                #[cfg(test)]
+                tests::PIN_PLACES_TAKEN.with(|count| count.set(count.get() + found.len()));
+                #[cfg(debug_assertions)]
+                let filtered: Vec<(ObjId, Vec<ObjId>)> = nets
+                    .iter()
+                    .map(|net| {
+                        let pins = by_net.get(net).into_iter().flatten().filter(|pin| selected.contains(pin));
+                        (*net, pins.copied().collect())
+                    })
+                    .filter(|(_, pins): &(ObjId, Vec<ObjId>)| !pins.is_empty())
+                    .collect();
+                let mut grouped: Vec<(ObjId, Vec<ObjId>)> = Vec::new();
+                for (n, k) in found {
+                    let net = nets[n];
+                    if grouped.last().is_none_or(|(last, _)| *last != net) {
+                        grouped.push((net, Vec::new()));
+                    }
+                    grouped.last_mut().expect("pushed above").1.push(by_net[&net][k]);
+                }
+                #[cfg(debug_assertions)]
+                debug_assert_eq!(
+                    grouped, filtered,
+                    "the pins of a routing request by net, from their places, are not those a scan finds"
+                );
+                for (net, pins) in grouped {
                     if source.spec.join && pins.len() < 2 || pins.is_empty() {
                         continue;
                     }
@@ -975,5 +1018,65 @@ mod tests {
         assert_eq!(routed.pins, [ObjId(10), ObjId(11)]);
         remove_unrouted_pins(&mut routed, Priority::Disabled, &order(0), &exclusions);
         assert!(routed.pins.is_empty());
+    }
+
+    thread_local! {
+        /// How many places of pins the routing requests over objects took, on this thread.
+        pub(super) static PIN_PLACES_TAKEN: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    }
+
+    /// The places of pins taken while a chain of `n` resistors is read with one routing request
+    /// over each two neighbours.
+    fn pin_places_taken(n: usize) -> usize {
+        use crate::diag::{Severity, Sink};
+        use crate::host::{Dialect, HostDocument, Instance, Level, LevelKind};
+        use crate::records::{package_lines, scan_run};
+        use crate::source::MemoryProvider;
+        use crate::{interpret, Options};
+
+        let mut sink = Sink::new();
+        let mut main = Level::new(LevelKind::File, "chain.sp", "chain.sp", "chain.sp");
+        main.circuit = true;
+        let mut statements = String::new();
+        for k in 0..n {
+            main.instances.push(Instance {
+                name: format!("R{}", k + 1),
+                letter: Some('R'),
+                nodes: vec![format!("n{k}"), format!("n{}", k + 1)],
+                value: Some("1k".into()),
+                file: "chain.sp".into(),
+                line: k as u32 + 1,
+                order: k,
+                default_terminals: Some(vec!["p".into(), "n".into()]),
+                ..Instance::default()
+            });
+            if k > 0 {
+                statements.push_str(&format!("  {{#R{k} #R{}}} @ROUTE-OBJECT;\n", k + 1));
+            }
+        }
+        let records = format!("@RNL(type=\"header\") {{ @VERSION(\"0.4\")}}\n@RNL {{\n{statements}}}");
+        main.records = scan_run(&package_lines(&records), "chain.sp", &mut sink);
+        let dialect = Dialect { name: "spice".into(), case_sensitive: false, ground_aliases: vec![] };
+        PIN_PLACES_TAKEN.with(|count| count.set(0));
+        let read = interpret(
+            HostDocument::new(main, dialect),
+            &MemoryProvider::new(),
+            &Options { std: false, ..Options::default() },
+            sink,
+        );
+        let errors: Vec<_> = read.sink.all().iter().filter(|d| d.severity == Severity::Error).collect();
+        assert!(errors.is_empty(), "{errors:?}");
+        PIN_PLACES_TAKEN.with(std::cell::Cell::get)
+    }
+
+    #[test]
+    fn a_routing_request_over_objects_takes_the_places_of_its_own_pins_only() {
+        let (four, sixteen) = (pin_places_taken(4), pin_places_taken(16));
+        // Each time the covers are made, each request takes the four pins of its two resistors,
+        // however many the level has: 3 × 4 and 15 × 4. Looking at every pin of the level for
+        // every request would take 3 × 8 and 15 × 32.
+        assert_eq!(four % (3 * 4), 0, "{four}");
+        assert_eq!(sixteen / (15 * 4), four / (3 * 4), "{four} for 4 resistors, {sixteen} for 16");
+        assert_eq!(sixteen % (15 * 4), 0, "{sixteen}");
     }
 }
