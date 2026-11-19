@@ -89,6 +89,11 @@ jobs:
         env:
           RNL_SITE_DIR: ${{ github.workspace }}/apps/web/dist
           CC_x86_64_unknown_linux_musl: musl-gcc
+          # the paths of the build machine are not written into the program: the checkout and Cargo's sources by
+          # names of their own (the toolchain's are /rustc/<commit> already)
+          RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=/rnl --remap-path-prefix=/home/runner/.cargo=/cargo
+          # (and of the C that crates build, such as mimalloc)
+          CFLAGS: -ffile-prefix-map=${{ github.workspace }}=/rnl -ffile-prefix-map=/home/runner/.cargo=/cargo
         run: |
           cargo build --release --locked --target x86_64-unknown-linux-musl
           cargo build --release --locked
@@ -99,6 +104,10 @@ jobs:
           # (ldd says "statically linked" of a static program and succeeds: ask file instead)
           if file "$GITHUB_WORKSPACE/out/rnl-viewer-local" | grep -q "dynamically linked"; then echo "the musl program is dynamic"; exit 1; fi
           "$GITHUB_WORKSPACE/out/rnl-viewer-local" --version
+          # (no path of the build machine, nor its user, is in the program)
+          if strings "$GITHUB_WORKSPACE/out/rnl-viewer-local" | grep -F -m 5 -e /home/runner -e "$GITHUB_WORKSPACE"; then
+            echo "the program names a path of the build machine"; exit 1
+          fi
       - name: Time a solve with each (the C library and the allocator are what differ)
         run: |
           node apps/local/ci/bench.mjs tests/integration/solver/T4-miller-conflicts.sp apps/web/dist 5 \
