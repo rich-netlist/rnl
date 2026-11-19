@@ -1,8 +1,8 @@
 /* RNL language tour · interactions
  *
- * Every RNL statement shown here reads without errors with rnl check, in language 0.3 with the
- * standard series 0.3. The drawings are laid out by hand in RNL coordinates (x right, y up), as on
- * the introduction page, with the pins where the series 0.3 puts them.
+ * Every RNL statement shown here reads without errors with rnl check, in language 0.4 with the
+ * standard series 0.4. The drawings are laid out by hand in RNL coordinates (x right, y up), as on
+ * the introduction page, with the pins where the series 0.4 puts them.
  */
 (function () {
   'use strict';
@@ -40,19 +40,19 @@
     { k: 'ALIGN', bare: '{#M1 #M2} @ALIGN("y")', en: '{#M1 #M2} @ALIGN("y"), i.e., same y',
       fact: '<en>M1 and M2 have the same y, so they sit in a row. “, i.e., same y” is only a gloss.</en>' },
     { k: 'ORDER', bare: '{#M1 #M2 #M3} @ORDER("left-to-right")', en: '{#M1 #M2 #M3} are in @ORDER("left-to-right")',
-      fact: '<en>M1, M2 and M3 run strictly from left to right. With "x" only the axis is fixed, and the reverse holds too.</en>' },
+      fact: '<en>M1, M2 and M3 run strictly from left to right.</en>' },
     { k: 'DISTANCE', bare: '#M1 #M2 @DISTANCE("bottom-to-top", min=4)', en: 'from #M1 to #M2, they have @DISTANCE("bottom-to-top", min=4)',
       fact: '<en>From M1 up to M2 is at least 4 units: M2’s y exceeds M1’s by 4 or more.</en>' },
-    { k: 'AS', bare: '%dp = #M1(in_p) #M2(in_n) @AS $DIFFERENTIAL_PAIR', en: '%dp = #M1(in_p) and #M2(in_n) treated @AS $DIFFERENTIAL_PAIR',
-      fact: '<en>M1 (in_p) and M2 (in_n) together form a differential pair. This application is a usage, named %dp.</en>' },
+    { k: 'AS', bare: '%dp = #M1(left) #M2(right) @AS $DIFFERENTIAL_PAIR_N', en: '%dp = #M1(left) and #M2(right) treated @AS $DIFFERENTIAL_PAIR_N',
+      fact: '<en>M1 (left) and M2 (right) together form a differential pair of N devices. This application is a usage, named %dp.</en>' },
     { k: 'ATTACH', bare: '$GROUND @ATTACH &c => @PLACE(24, 38) => %g0', en: '$GROUND is @ATTACH to &c => it is at @PLACE(24, 38) => named %g0',
       fact: '<en>A ground is added on net c, at (24, 38), and named %g0. =&gt; hands each part’s result to the next.</en>' },
-    { k: 'SELECT-INSTANCE', bare: '# @SELECT-INSTANCE(model="nch") => @SET-SYMBOL $NMOS', en: 'among the instances at each level in # and below, @SELECT-INSTANCE(model="nch") => they @SET-SYMBOL to $NMOS',
-      fact: '<en>On this level and on every level below, instances of model nch are drawn with $NMOS. This is a rule, evaluated once per level.</en>' },
+    { k: 'SELECT-INSTANCE', bare: '# @SELECT-INSTANCE(model="nch", recursive=true) => @SET-SYMBOL $NMOS', en: 'among the instances at each level in # and below, @SELECT-INSTANCE(model="nch", recursive=true) => they @SET-SYMBOL to $NMOS',
+      fact: '<en>On this level and, with recursive=true, on every level below, instances of model nch are drawn with $NMOS. This is a rule, evaluated once per level.</en>' },
     { k: 'WIRE', bare: '&n1 @WIRE {#R1:2 %j #R2:1}', en: 'net &n1 has a @WIRE connecting {#R1:2 %j #R2:1}',
       fact: '<en>Net n1 has a wire running through R1’s terminal 2, the point %j and R2’s terminal 1, in that order.</en>' }
   ];
-  /* The same statements as Chinese standard sentences, with the alias package rnl-zh; only the Chinese pages have them */
+  /* The same statements as Chinese standard sentences, with the alias package alias-zh; only the Chinese pages have them */
   var LAB_ZH = [];
   /*zh-CN*/
   LAB_ZH = [
@@ -60,9 +60,9 @@
     '{#M1 #M2} @对齐("y")，即 y 坐标相同',
     '{#M1 #M2 #M3} 按 @顺序("从左到右") 排列',
     '#M1 到 #M2 有 @距离("从下到上", 最小值=4)',
-    '%dp = #M1(正输入) 和 #M2(负输入) @视作 $"差分对"',
+    '%dp = #M1(左) 和 #M2(右) @视作 $"N型差分对"',
     '$"地" @附着 在 &c 上 => 其 @位于(24, 38) => 记作 %g0',
-    '从本层 # 及以下每一层的元件中 @选出元件(模型="nch") => 其 @使用符号 $NMOS',
+    '从本层 # 及以下每一层的元件中 @选出元件(模型="nch", 含下层=是) => 其 @使用符号 $NMOS',
     '网络 &n1 的 @导线 连接了 {#R1:2 %j #R2:1}'
   ];
   /*/zh-CN*/
@@ -129,7 +129,7 @@
       route: function () { return { wires: [], dots: [] }; },
       overlays: function (P, S) {
         if (!on) {
-          return [{ id: 'dp', kind: 'box', layer: 'back', ids: ['M1', 'M2'], pad: 0.8, label: '%dp · $DIFFERENTIAL_PAIR', labelAt: [0.5, 1], anchor: 'middle' }];
+          return [{ id: 'dp', kind: 'box', layer: 'back', ids: ['M1', 'M2'], pad: 0.8, label: '%dp · $MATCHED', labelAt: [0.5, 1], anchor: 'middle' }];
         }
         var a = S('M1').x, b = S('M2').x, m = (a + b) / 2;
         return [
@@ -149,22 +149,7 @@
     var codeEl = $('#mp-code'), cap = $('#mp-cap');
     var view = new S.View(svg, { box: [-3, -2.6, 29, 10.4] });
     var on = false, prev = null;
-    function file() {
-      var L = [
-        { t: '* Differential pair' },
-        { t: '.model nch nmos level=1' },
-        { t: 'M1 a b c c nch', r: 'M1' },
-        { t: 'M2 d e c c nch', r: 'M2' },
-        { t: '* @RNL {' },
-        { t: '*   %dp = #M1(in_p) and #M2(in_n) treated @AS $DIFFERENTIAL_PAIR' + (on ? ';' : ''), r: 'M1 M2 ov:dp' }
-      ];
-      if (on) {
-        L.push({ t: '*   %ax = (_, _);', r: 'ov:di' });
-        L.push({ t: '*   %sym = #M1(a), #M2(b) and %ax(axis) treated @AS $MIRRORED', r: 'M1 M2 ov:al ov:di ov:or' });
-      }
-      L.push({ t: '* }' });
-      return L;
-    }
+    function file() { return SC.mpLines(on); }
     var exp = document.createElement('div');
     exp.className = 'exp';
     codeEl.parentNode.appendChild(exp);
@@ -178,11 +163,10 @@
       if (on) {
         var X = [
           ['{#M1 #M2} @ALIGN("y", priority="low");', 'M1 M2 ov:al', '<en>same row</en>'],
-          ['{#M1 %ax #M2} @DISTRIBUTE("x", priority="low");', 'M1 M2 ov:di', '<en>equal steps around the axis</en>'],
-          ['{#M1 #M2} @ORDER("left-to-right", priority="low");', 'M1 M2', '<en>M1 on the left</en>'],
+          ['{#M1 %ax #M2} @DISTRIBUTE("left-to-right", priority="low");', 'M1 M2 ov:di', '<en>M1 on the left, equal steps around the axis</en>'],
           ['#M1 #M2 @ORIENT-RELATION("MY", priority="low")', 'M1 M2 ov:or', '<en>mirror images</en>']
         ];
-        exp.innerHTML = '<p class="exp-k"><en>Expanded, $MIRRORED adds four statements to this level (not written in the file), all of priority low:</en></p>' +
+        exp.innerHTML = '<p class="exp-k"><en>Expanded, $MIRRORED_LAYOUT, a layout only, adds three statements to this level (not written in the file), all of priority low:</en></p>' +
           X.map(function (x) { return '<div class="exp-l" data-refs="' + x[1] + '" tabindex="0"><code>' + C.hlSnippet(x[0]) + '</code><span>' + x[2] + '</span></div>'; }).join('');
         $$('.exp-l', exp).forEach(function (row) {
           function hl() { view.highlight(row.getAttribute('data-refs').split(' ')); }
@@ -191,10 +175,10 @@
           row.addEventListener('mouseleave', function () { view.highlight(null); });
           row.addEventListener('blur', function () { view.highlight(null); });
         });
-        cap.innerHTML = '<en>With the roles a, b and axis replaced by M1, M2 and %ax, the four constraints in the body expand into this level: same row, equal steps around the axis, M1 on the left, mirror images. They are all of priority low, so what the author writes comes first. The axis %ax is a free point that the solver places.</en>';
+        cap.innerHTML = '<en>With the roles left, right and axis replaced by M1, M2 and %ax, the three statements in the body expand into this level: same row, M1 on the left and equal steps around the axis, mirror images. They are all of priority low, so what the author writes comes first. The axis %ax is a free point that the solver places.</en>';
       } else {
         exp.innerHTML = '';
-        cap.innerHTML = '<en>Only $DIFFERENTIAL_PAIR is applied: it records that M1 and M2 are a differential pair, and a viewer may outline them, but nothing moves.</en>';
+        cap.innerHTML = '<en>Only $MATCHED is applied: it records that M1 and M2 are matched, and asserts that they have one type, and a viewer may outline them, but nothing moves.</en>';
       }
     }
     PG.initSeg($('#mp-seg'), 'data-v', function (v) { on = v === '1'; show(true); });
@@ -226,19 +210,8 @@
     var prev = null;
     function show(g, animate) {
       out.textContent = g;
-      var L = lines([
-        '* Two resistors',
-        'R1 a b 1k',
-        'R2 b c 1k',
-        '* @RNL {',
-        '*   $PAIR = @DEFINE(roles=["a", "b"], parameters=[["gap", 2]]) {',
-        '*     {?a ?b} @ALIGN("y");',
-        '*     ?a ?b @DISTANCE("left-to-right", min=?gap)',
-        '*   };',
-        g === 2 ? '*   #R1(a) #R2(b) @AS $PAIR   /* gap = 2 */' : '*   #R1(a) #R2(b) @AS(gap=' + g + ') $PAIR',
-        '* }'
-      ]);
-      if (prev) L[8].mark = 'is-chg';
+      var L = SC.pairLines(g);
+      if (prev) L.forEach(function (l) { if (l.id === 'as') l.mark = 'is-chg'; });
       prev = L;
       C.render(codeEl, L);
       view.setScene(scene(g), { animate: animate, duration: 350 });
@@ -247,29 +220,27 @@
     show(+range.value, false);
   }
 
-  /* The definitions of the standard series 0.3, as its package files write them (libraries/standard/0.3) */
+  /* The definitions of the standard series 0.4, shortened to their main statements (libraries/standard/0.4) */
   var STD = [
-    ['sem', '$CURRENT_MIRROR', '@DEFINE(roles=[["{ref}", "instance"], ["{out}", "instance"]]) {}'],
-    ['sem', '$MATCHED', '@DEFINE(roles=["{members}"]) {}'],
-    ['sem', '$CASCADE', '@DEFINE(roles=["{first}", "{second}", "{feedback}", "{load}"]) {}'],
-    ['sem', '$SUPPLY_HIGH', '@DEFINE(roles=[["pin", "terminal"]]) {}'],
-    ['sem', '$SUPPLY_LOW', '@DEFINE(roles=[["pin", "terminal"]]) {}'],
-    ['lay', '$DIFFERENTIAL_PAIR', '@DEFINE(roles=[["in_p", "instance"], ["in_n", "instance"], ["{tail}", "instance"]]) {\n  {?in_p {?tail} ?in_n} @DISTRIBUTE("x", priority="low")\n}'],
-    ['lay', '$BRANCH', '@DEFINE(roles=["{members}"]) {\n  ?members @ALIGN("x", priority="low")\n}'],
-    ['lay', '$CHAIN', '@DEFINE(roles=["source", "{chain}", "load"]) {\n  {?source ?chain ?load} @ORDER("left-to-right", priority="low")\n}'],
-    ['lay', '$MIRRORED', '@DEFINE(roles=["a", "b", "axis"]) {\n  {?a ?b} @ALIGN("y", priority="low");\n  {?a ?axis ?b} @DISTRIBUTE("x", priority="low");\n  {?a ?b} @ORDER("left-to-right", priority="low");\n  ?a ?b @ORIENT-RELATION("MY", priority="low")\n}'],
-    ['lay', '$FLOW', '@DEFINE(roles=["{path}"], parameters=[["direction", "left-to-right"]]) {\n  ?path @ORDER(?direction, priority="low")\n}'],
-    ['vir', '$GROUND_STUB', '@DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {\n  %g = $GROUND @ATTACH ?t::net;\n  ?t::net @WIRE {?t %g:p};\n  {?t %g:p} @ALIGN("x", priority="low");\n  %g:p ?t @DISTANCE("bottom-to-top", min=?gap, priority="low");\n  %g @ORIENT("R0", priority="low")\n}'],
-    ['vir', '$SUPPLY_STUB', '@DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {\n  %s = $SUPPLY @ATTACH ?t::net;\n  ?t::net @WIRE {?t %s:p};\n  {?t %s:p} @ALIGN("x", priority="low");\n  ?t %s:p @DISTANCE("bottom-to-top", min=?gap, priority="low");\n  %s @ORIENT("R0", priority="low")\n}'],
-    ['vir', '$GROUND', '@DEFINE(roles=[["p", ["net", "terminal"]]]) {}'],
-    ['vir', '$SUPPLY', '@DEFINE(roles=[["p", ["net", "terminal"]]]) {}'],
-    ['vir', '$IO_PORT', '@DEFINE(roles=[["p", ["net", "terminal"]]]) {}'],
-    ['vir', '$NO_CONNECT', '@DEFINE(roles=[["t", "terminal"]]) {}'],
-    ['vir', '$JUNCTION', '@DEFINE(roles=[["p", ["point", "terminal"]]]) {}'],
-    ['vir', '$CURRENT_ARROW', '@DEFINE(roles=[["p", ["terminal", "point"]]]) {}']
+    ['sem', '$CASCADE', '@DEFINE(roles=[["{stages}", ["instance", "usage"]]]) {}'],
+    ['sem', '$SIGNAL_FLOW', '@DEFINE(roles=[["{path}", ["instance", "usage"]], ["{source}", ["instance", "usage", "terminal", "net"]], ["{load}", ["instance", "usage", "terminal", "net"]]]) {}'],
+    ['sem', '$MATCHED', '@DEFINE(roles=[["{members}", ["instance", "usage"]]]) {\n  /* asserts that the members have one type, or one definition */\n}'],
+    ['sem', '$SERIES', '@DEFINE(roles=[["{members}", ["instance", "usage"]]]) {\n  {?members} @ROUTE-OBJECT(priority="low");\n  ?members @ASSERT-TOPOLOGY("series")\n}'],
+    ['lay', '$DIFFERENTIAL_PAIR_N', '@DEFINE(roles=[["left", "instance"], ["right", "instance"], ["tail", ["instance", "usage"]]]) {\n  {?left ?right} @AS $MATCHED;\n  ?left(left) ?right(right) ?tail(axis) @AS $MIRRORED_LAYOUT;\n  {{?left ?right} ?tail} @ORDER("top-to-bottom", priority="low");\n  {?left ?right ?tail} @ROUTE-OBJECT(priority="low");\n  {?left ?right ?tail} @GROUP;\n  /* and asserts that the two sides are of n-type, matched, and meet the tail at one net */\n}'],
+    ['lay', '$CURRENT_MIRROR_P', '@DEFINE(roles=[["{ref}", "instance"], ["{out}", "instance"]]) {\n  {?ref ?out ?} @ALIGN("y", priority="low");\n  /* no orientation relation and no wires: the sources of each face up */\n  {?ref ?out} @SELECT-INSTANCE(type="pmos")\n      => @SELECT-PIN(terminal="s")\n      => @ORIENT("up", priority="low");\n  /* and asserts that they are p-type, share a gate net, and have one model and length */\n}'],
+    ['lay', '$BRANCH', '@DEFINE(roles=[["{members}", ["instance", "usage"]]]) {\n  ?members @AS $SERIES;\n  {?members ?} @ALIGN("x", priority="low");\n  ?members @ORDER("top-to-bottom", priority="low")\n}'],
+    ['lay', '$MIRRORED_LAYOUT', '@DEFINE(roles=[["left", ["instance", "usage"]], ["right", ["instance", "usage"]], ["axis", ["point", "instance", "usage"]]]) {\n  {?left ?right} @ALIGN("y", priority="low");\n  {?left ?axis ?right} @DISTRIBUTE("left-to-right", priority="low");\n  ?left ?right @ORIENT-RELATION("MY", priority="low")\n}'],
+    ['vir', '$GROUND_STUB', '@DEFINE(roles=[["t", "pin"]], parameters=[["gap", 3]]) {\n  %g = $GROUND @ATTACH ?t::net;\n  ?t::net @WIRE {?t %g::pin};\n  %g::pin ?t @DISTANCE("bottom-to-top", max=?gap, priority="low");\n  %g @ORIENT("R0", priority="low")\n}'],
+    ['vir', '$SUPPLY_STUB', '@DEFINE(roles=[["t", "pin"]], parameters=[["gap", 3]]) {\n  %s = $SUPPLY @ATTACH ?t::net;\n  ?t::net @WIRE {?t %s::pin};\n  ?t %s::pin @DISTANCE("bottom-to-top", max=?gap, priority="low");\n  %s @ORIENT("R0", priority="low")\n}'],
+    ['vir', '$GROUND', '@DEFINE(roles=[["p", "net"]]) {}'],
+    ['vir', '$SUPPLY', '@DEFINE(roles=[["p", "net"]]) {}'],
+    ['vir', '$IO_PORT', '@DEFINE(roles=[["p", "net"]]) {\n  ?p @ASSERT-NET(port=true)\n}'],
+    ['vir', '$NO_CONNECT', '@DEFINE(roles=[["t", ["terminal", "pin"]]]) {\n  {? ?t} @ALIGN("x");\n  {? ?t} @ALIGN("y")\n}'],
+    ['vir', '$JUNCTION', '@DEFINE(roles=[["p", ["point", "terminal"]]]) {\n  {? ?p} @ALIGN("x");\n  {? ?p} @ALIGN("y")\n}'],
+    ['vir', '$CURRENT_ARROW', '@DEFINE(roles=[["p", ["terminal", "point"]]]) {\n  {? ?p} @ALIGN("x");\n  {? ?p} @ALIGN("y")\n}']
   ];
   var STD_GROUPS = [
-    ['sem', '<en>Structures with roles only, applied with AS</en>'],
+    ['sem', '<en>Meaning only, applied with AS: they place and route nothing, and may assert what they say</en>'],
     ['lay', '<en>Structures with a default drawing in the body: all of priority low, so what the author writes comes first</en>'],
     ['vir', '<en>Display elements and stubs: added with ATTACH, given symbols by rules; the stubs’ constraints are low too</en>']
   ];
@@ -290,54 +261,58 @@
       show.innerHTML = C.hlSnippet(d[1] + ' = ' + d[2]);
     }
     btns.forEach(function (b) { b.addEventListener('click', function () { pick(b); }); });
-    pick(btns.filter(function (b) { return b.textContent === '$MIRRORED'; })[0]);
+    pick(btns.filter(function (b) { return b.textContent === '$MIRRORED_LAYOUT'; })[0]);
   }
 
   /* ================= T3 Defaults ================= */
 
+  /* As rnl solve draws ce.sp at each preset: nothing is wired; every pin without a wire gets a stub, and
+     every port net still in $PORT_FILL_SET a port tag at R0, in one column left of the instances */
   function ceScene(p) {
     var gen = 'is-gen';
     var dev = {
       Q1: { sym: 'npn', x: 10, y: 0, label: 'Q1', value: 'npn1' },
-      RC: { sym: 'res', x: 10, y: 9, label: 'RC', value: '5k' },
-      CL: { sym: 'cap', x: 16, y: 1, label: 'CL', value: '1p' },
-      P_in: { sym: 'port', x: 3, y: 0, label: 'in', virtual: true, cls: gen },
-      P_out: { sym: 'port', x: 21, y: 4, o: 'MY', label: 'out', virtual: true, cls: gen }
+      RC: { sym: 'res', x: 10, y: 10, label: 'RC', value: '5k' },
+      CL: { sym: 'cap', x: 16, y: 1, label: 'CL', value: '1p' }
     };
-    if (p === 0) {
-      dev.P_vdd = { sym: 'port', x: 3, y: 13, label: 'vdd', virtual: true, cls: gen };
-      dev.P_vss = { sym: 'port', x: 3, y: -4, label: 'vss', virtual: true, cls: gen };
-    }
+    (p >= 2 ? ['in', 'out'] : ['in', 'out', 'vdd', 'vss']).forEach(function (n, i) {
+      dev['T_' + n] = { sym: 'port', x: 1, y: 9 - 3 * i, label: n, virtual: true, cls: gen };
+    });
     if (p >= 1) {
-      /* vss is a ground net not named 0: until the file takes it out of $NAMED_GROUND_NET_SET, its
-         grounds show its name */
-      dev.SUP = { sym: 'supply', x: 10, y: 13, label: 'vdd', virtual: true, cls: gen };
-      dev.G1 = { sym: 'gnd', x: 10, y: -4, label: p === 1 ? 'vss' : undefined, virtual: true, cls: gen };
-      dev.G2 = { sym: 'gnd', x: 16, y: -3, label: p === 1 ? 'vss' : undefined, virtual: true, cls: gen };
+      /* vss is a ground net other than 0, so its grounds show its name */
+      dev.SUP = { sym: 'supply', x: 10, y: 14, label: 'vdd', virtual: true, cls: gen };
+      dev.G1 = { sym: 'gnd', x: 10, y: -4, label: 'vss', virtual: true, cls: gen };
+      dev.G2 = { sym: 'gnd', x: 16, y: -3, label: 'vss', virtual: true, cls: gen };
     }
     return {
       rk: 'ce' + p,
+      box: [-5.5, -7.2, 21.5, 16.6],
       devices: dev,
       route: function (P) {
-        var jo = [10, 4], jc = [16, 4];
-        var w = [
-          { net: 'in', pts: [P('P_in.p'), P('Q1.b')] },
-          { net: 'out', pts: [P('RC.n'), jo, P('Q1.c')] },
-          { net: 'out', pts: [jo, jc, P('P_out.p')] },
-          { net: 'out', pts: [jc, P('CL.p')] }
-        ];
-        var dots = [[10, 4, 'out'], [16, 4, 'out']];
+        var w = [], labels = [];
+        /* a net-label stub: a one-unit lead, the name of the net at its end */
+        function label(ref, dx, dy, net) {
+          var a = P(ref), e = [a[0] + dx, a[1] + dy];
+          w.push({ net: net, pts: [a, e], cls: gen });
+          labels.push({
+            text: net, net: net, cls: gen, anchor: dx < 0 ? 'end' : 'middle',
+            at: [e[0] + (dx < 0 ? -0.35 : 0), e[1] + (dy > 0 ? 0.7 : dy < 0 ? -0.7 : 0)]
+          });
+        }
+        label('Q1.b', -1, 0, 'in');
+        label('Q1.c', 0, 1, 'out');
+        label('RC.n', 0, -1, 'out');
+        label('CL.p', 0, 1, 'out');
         if (p === 0) {
-          w.push({ net: 'vdd', pts: [P('P_vdd.p'), [10, 13], P('RC.p')] });
-          w.push({ net: 'vss', pts: [P('P_vss.p'), [10, -4], P('Q1.e')] });
-          w.push({ net: 'vss', pts: [[10, -4], [16, -4], P('CL.n')] });
-          dots.push([10, -4, 'vss']);
+          label('RC.p', 0, 1, 'vdd');
+          label('Q1.e', 0, -1, 'vss');
+          label('CL.n', 0, -1, 'vss');
         } else {
           w.push({ net: 'vdd', pts: [P('RC.p'), P('SUP.p')], cls: gen });
           w.push({ net: 'vss', pts: [P('Q1.e'), P('G1.p')], cls: gen });
           w.push({ net: 'vss', pts: [P('CL.n'), P('G2.p')], cls: gen });
         }
-        return { wires: w, dots: dots };
+        return { wires: w, labels: labels };
       }
     };
   }
@@ -345,17 +320,18 @@
   var CE_GEN = [
     [
       ['check', '<en>Symbols by first letter: Q1 → $NPN, RC → $RESISTOR, CL → $CAPACITOR.</en>'],
-      ['plus', '<en>Port tags in, out, vdd and vss: $PORT_FILL_SET starts with every port of the subcircuit.</en>'],
-      ['info', '<en>vdd and vss are just two ports: they are not in the supply or ground sets, so no supply or ground is added.</en>']
+      ['plus', '<en>Net-label stubs: nothing is wired, and no net is a ground, supply or bias net yet (vss is not net 0), so every pin gets a short lead with the name of its net.</en>'],
+      ['plus', '<en>Port tags: every port net of the subcircuit gets one, in a column left of the circuit. They come from $PORT_FILL_SET, which holds every port net.</en>']
     ],
     [
-      ['plus', '<en>Supply stub: RC’s vdd terminal has no wire, so $SUPPLY_STUB adds a supply above it, at least 2 units away.</en>'],
-      ['plus', '<en>Ground stubs: Q1:e and CL:n have no wires, so $GROUND_STUB adds a ground to each. vss is not named 0, so the grounds show its name.</en>'],
-      ['minus', '<en>The port tags of vdd and vss are gone: supply and ground nets have their supplies and grounds, and get no port tags.</en>']
+      ['plus', '<en>Supply stub: RC’s vdd pin gets a $SUPPLY_STUB, at most 3 units away.</en>'],
+      ['plus', '<en>Ground stubs: Q1:e and CL:n get a $GROUND_STUB each. vss is not net 0, so the grounds show its name.</en>'],
+      ['minus', '<en>The net-label stubs of vdd and vss are gone: pins on supply and ground nets get supplies and grounds instead.</en>'],
+      ['info', '<en>The four port tags stay: vdd and vss are port nets too.</en>']
     ],
     [
-      ['minus', '<en>The net name under the grounds is gone: vss is no longer in $NAMED_GROUND_NET_SET.</en>'],
-      ['check', '<en>The supply and grounds stay: the textbook look, from three lines in the file.</en>']
+      ['minus', '<en>The port tags of vdd and vss are gone: the two nets are no longer in $PORT_FILL_SET.</en>'],
+      ['check', '<en>The supply, the grounds and the tags of in and out stay: the textbook look, from three lines in the file.</en>']
     ]
   ];
 
@@ -363,19 +339,10 @@
     var svg = $('#ce-svg');
     if (!svg) return;
     var codeEl = $('#ce-code'), gen = $('#ce-gen');
-    var view = new S.View(svg, { box: [-6.6, -7, 30, 16.6] });
+    var view = new S.View(svg, { box: [-5.5, -7.2, 21.5, 16.6] });
     var prev = null;
     function show(p, animate) {
-      var L = lines(['* Common-emitter stage', '.model npn1 npn bf=100', '.subckt ce in out vdd vss', 'Q1 out in vss npn1', 'RC vdd out 5k', 'CL out vss 1p']);
-      if (p >= 1) {
-        L.push({ t: '* @RNL {' });
-        L.push({ t: '*   &vdd @ADD-TO $SUPPLY_NET_SET;' });
-        L.push({ t: '*   &vss @ADD-TO $GROUND_NET_SET' + (p >= 2 ? ';' : '') });
-        if (p >= 2) L.push({ t: '*   &vss @REMOVE-FROM $NAMED_GROUND_NET_SET' });
-        L.push({ t: '* }' });
-      }
-      L.push({ t: '.ends ce' });
-      L = marks(prev, L);
+      var L = marks(prev, SC.ceLines(p));
       prev = L;
       C.render(codeEl, L);
       view.setScene(ceScene(p), { animate: animate, duration: 700 });
@@ -388,22 +355,19 @@
 
     snippetRows($('#fill-code'), [
       { t: '/* <en>sets for files to edit</en> */', cls: 'is-cmt' },
-      '$GROUND_NET_SET = # @SELECT-NET(name="0");',
+      '$GROUND_NET_SET = # @SELECT-NET(name="0", recursive=true);',
       '$SUPPLY_NET_SET = {};',
-      '$PORT_FILL_SET = # @SELECT-NET(port=true);',
-      { t: '/* <en>a stub for each unwired terminal on ground and supply nets</en> */', cls: 'is-cmt' },
-      '$GROUND_FILL_SET = $GROUND_NET_SET @SELECT-TERMINAL(wired=false);',
+      '$PORT_FILL_SET = # @SELECT-NET(port=true, recursive=true);',
+      { t: '/* <en>a stub for each unwired pin on ground and supply nets</en> */', cls: 'is-cmt' },
+      '$GROUND_FILL_SET = $GROUND_NET_SET @SELECT-PIN(wired=false, recursive=true);',
       '$GROUND_STUB @ATTACH $GROUND_FILL_SET;',
-      '$SUPPLY_FILL_SET = $SUPPLY_NET_SET @SELECT-TERMINAL(wired=false);',
+      '$SUPPLY_FILL_SET = $SUPPLY_NET_SET @SELECT-PIN(wired=false, recursive=true);',
       '$SUPPLY_STUB @ATTACH $SUPPLY_FILL_SET;',
-      { t: '/* <en>one port tag for each port of a subcircuit, but not on supply and ground nets</en> */', cls: 'is-cmt' },
-      '$SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_SET;',
-      '$GROUND_NET_SET @REMOVE-FROM $PORT_FILL_SET;',
-      '$IO_PORT @ATTACH $PORT_FILL_SET;',
-      { t: '/* <en>on a ground net other than 0, the grounds show the net’s name</en> */', cls: 'is-cmt' },
-      '$NAMED_GROUND_NET_SET = {$GROUND_NET_SET};',
-      '# @SELECT-NET(name="0") => @REMOVE-FROM $NAMED_GROUND_NET_SET;',
-      '$NAMED_GROUND_NET_SET @SELECT-ANCESTOR-USAGE $GROUND => @SET-SYMBOL $NAMED_GROUND_SYMBOL'
+      { t: '/* <en>a net-label stub for every other pin without a wire</en> */', cls: 'is-cmt' },
+      '$LABEL_FILL_SET = # @SELECT-NET(recursive=true) => @SELECT-PIN(wired=false, recursive=true);',
+      '$NET_LABEL_STUB @ATTACH $LABEL_FILL_SET;',
+      { t: '/* <en>a port tag on each port net left in the set, in one column</en> */', cls: 'is-cmt' },
+      '$IO_PORT @ATTACH $PORT_FILL_SET'
     ]);
   }
 
@@ -441,20 +405,18 @@
           var xa = +o.boxes[g[0]].getAttribute('data-x'), xb = +o.boxes[g[1]].getAttribute('data-x');
           var x0 = Math.min(xa, xb) - 30, x1 = Math.max(xa, xb) + 30;
           S.el('rect', { class: 'sp-grp ' + g[2], x: x0, y: 25, width: x1 - x0, height: 42, rx: 8 }, o.groups);
-          S.el('circle', { class: 'sp-ctr ' + g[2], cx: (xa + xb) / 2, cy: 82, r: 3.5 }, o.groups);
         });
       }
     }
     function rnd() { return Math.random() < 0.5; }
     function shuffle() {
       var f = [0, 1, 2, 3];
-      if (rnd()) f.reverse();
       place(A, f, false);
       A.ok.textContent = '✓ ' + f.map(function (i) { return NAMES[i]; }).join(' < ');
       var g1 = rnd() ? [0, 1] : [1, 0], g2 = rnd() ? [2, 3] : [3, 2];
-      var n = rnd() ? g1.concat(g2) : g2.concat(g1);
+      var n = g1.concat(g2);
       place(B, n, true);
-      B.ok.textContent = '✓ ' + (n[0] < 2 ? '{s1} < {s2}' : '{s2} < {s1}');
+      B.ok.textContent = '✓ ' + n.map(function (i) { return NAMES[i]; }).join(', ') + ': {s1} < {s2}';
     }
     $('#sp-shuffle').addEventListener('click', shuffle);
     shuffle();
@@ -507,8 +469,8 @@
       cap: '<en>The scope is net en: the instances with a pin on it. M3’s drain drives en, and the gates of M1 and M2 sit on it.</en>' },
     { t: '&en @SELECT-TERMINAL(terminal="g") => @SELECT-INSTANCE', hl: ['M1', 'M2', 'ov:pin'], mode: 'g', n: '<en>2 instances</en>',
       cap: '<en>First the terminals on en named g, then the instances they belong to: M1 and M2. M3 touches en with its drain, so it is left out.</en>' },
-    { t: '# @SELECT-TERMINAL(net="0", wired=false)', hl: ['ov:pin', 'M2', 'M3', 'M4'], mode: 'z', n: '<en>6 terminals</en>',
-      cap: '<en>Terminals on net 0 with no wire yet, across the level: the sources of M2, M3 and M4, and their bulk terminals (three-terminal symbols do not draw the bulk). This is exactly how the standard package finds where to add grounds.</en>' }
+    { t: '# @SELECT-PIN(net="0", wired=false)', hl: ['ov:pin', 'M2', 'M3', 'M4'], mode: 'z', n: '<en>3 pins</en>',
+      cap: '<en>Pins on net 0 with no wire yet, on this level: the sources of M2, M3 and M4. Their bulk terminals are on net 0 too, but a three-terminal symbol has no bulk pin, so they are not picked. The standard package finds where to add ground stubs in the same way.</en>' }
   ];
 
   function initSel() {
@@ -549,9 +511,9 @@
       '<en>: M1 and M2 are picked. amp is one level; XA and XB are both instances of it, and the rule is evaluated once in amp.</en>',
       '<en>: MB is picked.</en>'
     ];
-    var EMPTY = '<en>: the result is empty. recursive=false picks objects only on the level where it is written.</en>';
+    var EMPTY = '<en>: the result is empty. Without recursive=true, a selection picks objects only on the level where it is written.</en>';
     function render() {
-      codeEl.innerHTML = C.hlSnippet('# @SELECT-INSTANCE(model="nch"' + (rec ? '' : ', recursive=false') + ') => @SET-SYMBOL $MY_NMOS');
+      codeEl.innerHTML = C.hlSnippet('# @SELECT-INSTANCE(model="nch"' + (rec ? ', recursive=true' : '') + ') => @SET-SYMBOL $MY_NMOS');
     }
     function paint() {
       lvs.forEach(function (lv, i) {
@@ -621,13 +583,7 @@
     var codeEl = $('#tee-code'), cap = $('#tee-cap');
     var view = new S.View(svg, { box: [-9, -12.6, 21, 4] });
     function show(shared, animate) {
-      var L = lines(['* Three resistors', 'RA n1 0 1k', 'RB n1 0 1k', 'RC n1 0 1k', '* @RNL {']);
-      if (shared) {
-        L.push({ t: '*   %j = (6, 0);' }, { t: '*   &n1 @WIRE {#RA:1 %j #RB:1};', r: 'RA RB net:n1' }, { t: '*   &n1 @WIRE {%j #RC:1};', r: 'RC net:n1' }, { t: '*   $JUNCTION @ATTACH %j', r: 'net:n1' });
-      } else {
-        L.push({ t: '*   &n1 @WIRE {#RA:1 (6, 0) #RB:1};', r: 'RA RB net:n1' }, { t: '*   &n1 @WIRE {(6, 0) #RC:1}', r: 'RC net:n1' });
-      }
-      L.push({ t: '* }' });
+      var L = SC.teeLines(shared);
       C.render(codeEl, L);
       view.setScene(teeScene(shared), { animate: animate, duration: 400 });
       cap.innerHTML = shared
@@ -717,28 +673,7 @@
     var svg = $('#bus-svg');
     if (!svg) return;
     var gen = 'is-gen';
-    var L = [
-      { t: '* Two inverters on a bus' },
-      { t: '.subckt inv a y vdd vss' },
-      { t: 'M1 y a vdd vdd pch' },
-      { t: 'M2 y a vss vss nch' },
-      { t: '.ends inv' },
-      { t: '.model nch nmos level=1' },
-      { t: '.model pch pmos level=1' },
-      { t: 'XI<1> D<1> Y<1> vdd 0 inv', r: 'XI' },
-      { t: 'XI<0> D<0> Y<0> vdd 0 inv', r: 'XI' },
-      { t: 'R1 D<1> 0 1k', r: 'R1' },
-      { t: 'R0 D<0> 0 1k', r: 'R0' },
-      { t: '* @RNL {' },
-      { t: '*   #XI<1:0> @BUNDLE => %xi;', r: 'XI' },
-      { t: '*   %s = (_, _); %t1 = (_, _); %t0 = (_, _);', r: 'net:D' },
-      { t: '*   %bus = &D<1:0> @WIRE {%s %t1 %t0 %xi:a};', r: 'net:D XI' },
-      { t: '*   &D<1> @WIRE {%t1 #R1:1};', r: 'net:D1 R1' },
-      { t: '*   &D<0> @WIRE {%t0 #R0:1};', r: 'net:D0 R0' },
-      { t: '*   %bus @TEXT("D<1:0>")', r: 'net:D' },
-      { t: '* }' },
-      { t: '.end' }
-    ];
+    var L = SC.BUS_LINES;
     C.render($('#bus-code'), L);
     var view = new S.View(svg, { box: [-3, -7, 27, 10] });
     view.setScene({
@@ -793,19 +728,9 @@
       };
     }
     function show(animate, what) {
-      var L = [
-        { t: '* Label and annotation' },
-        { t: '.model nch nmos level=1' },
-        { t: 'M1 d g s s nch W=2u L=0.5u', r: 'M1' },
-        { t: '* @RNL {' },
-        { t: '*   #M1 @PLACE(' + (moved ? 12 : 4) + ', 4);', r: 'M1' },
-        { t: '*   #M1 @TEXT("W/L = ${w}/${l}", key="wl", dy=-3);', r: 'M1 ov:wl' },
-        { t: '*   (2, 9) @TEXT("bias branch")' + (keyed ? ';' : ''), r: 'ov:an' }
-      ];
-      if (keyed) L.push({ t: '*   #M1 @TEXT("${w}/${l}", key="wl", dy=-3)', r: 'M1 ov:wl' });
-      L.push({ t: '* }' });
+      var L = SC.txLines(moved, keyed);
       L = marks(prev, L);
-      if (prev && what === 'move') L[4].mark = 'is-chg';
+      if (prev && what === 'move') L.forEach(function (l) { if (l.id === 'place') l.mark = 'is-chg'; });
       prev = L;
       C.render(codeEl, L);
       if (!linker) linker = C.link(codeEl, L, view); else linker.setLines(L);
@@ -823,7 +748,7 @@
     show(false, '');
   }
 
-  /* A small renderer for the text markup of standard 0.3 (13.6), for the playground */
+  /* A small renderer for the text markup of standard 0.4 (13.6), for the playground */
   var GREEK = {
     alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ϵ', varepsilon: 'ε', zeta: 'ζ', eta: 'η', theta: 'θ', vartheta: 'ϑ',
     iota: 'ι', kappa: 'κ', lambda: 'λ', mu: 'μ', nu: 'ν', xi: 'ξ', pi: 'π', varpi: 'ϖ', rho: 'ρ', varrho: 'ϱ', sigma: 'σ', varsigma: 'ς',
@@ -1049,11 +974,11 @@
     { text: function (p) { return '#M2 @PLACE(x=12' + (p === 'normal' ? '' : ', priority="' + p + '"') + ')'; }, def: 'normal', fact: function (a, b) { return b === 12; } },
     { text: function (p) { return '{#M1 #M2} @ALIGN("x"' + (p === 'normal' ? '' : ', priority="' + p + '"') + ')'; }, def: 'high', fact: function (a, b) { return a === b; } },
     { text: function (p) { return '#M1 #M2 @DISTANCE("left-to-right", min=2' + (p === 'normal' ? '' : ', priority="' + p + '"') + ')'; }, def: 'normal', fact: function (a, b) { return b - a >= 2; } },
-    { text: function (p) { return '%c = #M1 #M2 @DISTANCE("x", min=1)' + (p === 'normal' ? '' : ' => @PRIORITY("' + p + '")'); }, def: 'disabled', fact: function (a, b) { return Math.abs(b - a) >= 1; } }
+    { text: function (p) { return '%c = #M1 #M2 @DISTANCE("right-to-left", min=1)' + (p === 'normal' ? '' : ' => @PRIORITY("' + p + '")'); }, def: 'disabled', fact: function (a, b) { return a - b >= 1; } }
   ];
   var PR_NOTE = [
     '<en>M1’s x = 4</en>', '<en>M2’s x = 12</en>', '<en>same x</en>',
-    '<en>M2 at least 2 right of M1</en>', '<en>at least 1 apart, either way</en>'
+    '<en>M2 at least 2 right of M1</en>', '<en>M2 at least 1 left of M1</en>'
   ];
   var GRID = []; for (var gx = -4; gx <= 24; gx++) GRID.push(gx);
 
@@ -1143,15 +1068,17 @@
 
   var HDR = [
     [['* ', ''], ['@RNL(type="header")', 'rec'], [' {', '']],
-    [['*   ', ''], ['@VERSION("0.3")', 'ver'], [';', '']],
-    [['*   ', ''], ['@USE-ALIASES(name="rnl-zh", version="0.3")', 'ali'], [';', '']],
+    [['*   ', ''], ['@VERSION("0.4")', 'ver'], [';', '']],
+    [['*   ', ''], ['@USE-PACKAGE(name="rnl-std-all", version="0.4")', 'pkg'], [';', '']],
+    [['*   ', ''], ['@USE-ALIASES(name="alias-zh", version="0.4")', 'ali'], [';', '']],
     [['*   ', ''], ['@DEVICE(name="XM*", model="sky130_fd_pr__nfet_*", terminals=["d", "g", "s", "b"])', 'dev']],
     [['* ', ''], ['}', '']]
   ];
   var HDR_TIP = {
     rec: ['type="header"', '<en>This is the header record: the file’s first record, outside any subcircuit, at most one. It is always read in standard spelling, without aliases.</en>'],
     ver: ['@VERSION', '<en>The language version of the file. Without it the tool’s default version applies, and tools add it when they save the file.</en>'],
-    ali: ['@USE-ALIASES', '<en>Loads an alias package. rnl-zh gives Chinese spellings to keywords, parameter names and the names in the standard package, so later records may mix both. version= says which version: without it the newest found is used, and a later version could change how the file reads.</en>'],
+    pkg: ['@USE-PACKAGE', '<en>Names a package of definitions and rules. A file of 0.4 uses no package implicitly: <code>rnl-std-all</code> brings in the whole standard series, and a file that draws nothing may name none. version= says which series.</en>'],
+    ali: ['@USE-ALIASES', '<en>Loads an alias package. alias-zh gives Chinese spellings to keywords, parameter names and the names in the standard package, so later records may mix both. version= says which version: without it the newest found is used, and a later version could change how the file reads.</en>'],
     dev: ['@DEVICE', '<en>Names the terminals of devices the netlist does not define: instances whose name matches XM* and model matches sky130_fd_pr__nfet_* get the terminals d, g, s and b, in order.</en>']
   };
 
@@ -1192,15 +1119,7 @@
     if (!codeEl) return;
     var diag = $('#dev-diag');
     function show(on) {
-      var L = [
-        { t: '* PDK example' },
-        { t: on ? '* @RNL(type="header") { @VERSION("0.3"); @DEVICE(name="XM*", model="sky130_fd_pr__nfet_*", terminals=["d", "g", "s", "b"])}' : '* @RNL(type="header") { @VERSION("0.3")}', mark: 'is-chg' },
-        { t: 'XM1 out in 0 0 sky130_fd_pr__nfet_01v8 w=1 l=0.15' },
-        { t: '* @RNL {' },
-        { t: '*   #XM1:d @CURRENT("in")', cls: on ? '' : 'is-err' },
-        { t: '* }' },
-        { t: '.end' }
-      ];
+      var L = SC.devLines(on);
       C.render(codeEl, L);
       diag.innerHTML = on
         ? '<li class="ok">' + icon('check') + '<span><en><code>#XM1:d</code> is XM1’s first terminal, named by @DEVICE.</en></span></li>' +

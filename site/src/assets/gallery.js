@@ -15,8 +15,8 @@
   /* Where the data is, from a page of either language */
   var DATA = '../gallery/';
   var REPO = 'https://github.com/rich-netlist/rnl/blob/main/';
-  /* The archived series 0.2 and 0.3 leave libraries/ on main; their files are linked where they stay, at the tag of
-     the last core of the 0.5 line, which holds them as they were when their data in site/gallery/frozen/ was drawn */
+  /* The archived series 0.2 and 0.3 leave libraries/ on main; their files are linked where they stay, at the tag
+     core-v0.5.6, which holds them as they were when their data in site/gallery/frozen/ was drawn */
   var ARCHIVED_REPO = 'https://github.com/rich-netlist/rnl/blob/core-v0.5.6/';
   function sourceUrl(pkg) {
     return pkg.source || (/^libraries\/standard\/0\.[23]\//.test(pkg.path) ? ARCHIVED_REPO : REPO) + pkg.path;
@@ -35,6 +35,11 @@
     'rnl-std-semiconductors': '<en>The symbols of diodes, MOS transistors, BJTs and JFETs.</en>',
     'rnl-std-spice': '<en>The symbol rules of SPICE netlists: by element letter first, then by model type.</en>',
     'rnl-std-spectre': '<en>The symbol rules of Spectre netlists: primitives by master, instances of model cards by model type.</en>',
+    'rnl-std-all': '<en>The one collection of the series 0.4: it has no content of its own and brings in the styles, symbols, fill, semantics, domain packages and the rules of the host dialect. A file of 0.4 names it in its header record, or names the packages it wants one by one.</en>',
+    'rnl-std-45deg': '<en>45-degree symbols for bridges, cross-coupled pairs, diagonal windings and 45-degree wires. Optional: not in rnl-std-all.</en>',
+    'rnl-std-semantics 0.4': '<en>The semantic definitions of circuit structures and their default drawings, all of priority low: differential pairs and current mirrors of N and P devices, cascodes, branches, mirrored pairs and more.</en>',
+    'rnl-std-fill 0.4': '<en>The automatic fill: a ground, supply or bias stub for every unwired pin on such a net, a net label for the other unwired pins, and a port tag for every port net in $PORT_FILL_SET.</en>',
+    'alias-zh': '<en>The Chinese alias package: Chinese spellings of the standard words and of the names of the standard packages, loaded with @USE-ALIASES in the header record.</en>',
     'rnl-std-fill': '<en>The automatic fill: a ground or supply for every unwired pin on such a net, a port tag for every port net; and the sets a file edits.</en>',
     'rnl-std-fill 0.3': '<en>Automatic fill rules: adds a ground or supply symbol for every unwired terminal on a ground or supply net, adds a port tag for every port net except ground and supply nets, and draws the net name under ground symbols on non-0 ground nets such as vss. Also defines the sets a file can edit.</en>',
     'rnl-std-semantics': '<en>Semantic definitions, such as a differential pair or a current mirror: roles only, nothing drawn.</en>',
@@ -100,9 +105,9 @@
     return map;
   }
 
-  /* The rule that gives the usages of a definition their symbol: `# @SELECT-USAGE $GROUND => @SET-SYMBOL $GROUND_SYMBOL` in 0.3 */
+  /* The rule that gives the usages of a definition their symbol: `# @SELECT-USAGE $GROUND => @SET-SYMBOL $GROUND_SYMBOL` in the series 0.3; in 0.4 SELECT-USAGE has `(recursive=true)` */
   function drawnAs(group, def) {
-    var re = new RegExp('@SELECT-USAGE\\s+\\' + def + '(?![\\w])');
+    var re = new RegExp('@SELECT-USAGE(?:\\([^)]*\\))?\\s+\\' + def + '(?![\\w])');
     var found = null;
     group.packages.forEach(function (p) {
       p.statements.forEach(function (r) { if (r.kind === 'rule' && r.action === 'symbol' && re.test(r.select)) found = r; });
@@ -126,9 +131,21 @@
   /* ---------------- rendering a package ---------------- */
 
   /* Append last so the decorative registration mark sits above every drawing and overlay. */
-  function symbolSvg(s) {
-    if (!s.origin) return s.svg;
-    return s.svg.replace('</svg>', '<g class="g-origin" aria-hidden="true" transform="translate(' + s.origin.join(' ') + ')">' +
+  /* The dotted grid behind a picture: a dot at every 0.5 of the symbol's coordinates, and so on every integer
+     one, drawn in the picture's own coordinates (s.scale: drawing units per symbol unit) so that it follows the
+     symbol's origin and scale, not the pixels of the card. The card clips it. */
+  var gridCount = 0;
+  function withGrid(svg, scale) {
+    if (!scale) return svg;
+    var id = 'gl-grid-' + (++gridCount), step = scale / 2, far = scale * 80;
+    return svg.replace(/^(<svg[^>]*>)/, '$1<defs><pattern id="' + id + '" patternUnits="userSpaceOnUse" width="' + step + '" height="' + step + '">' +
+      '<circle cx="0" cy="0" r="' + (scale * 0.055).toFixed(3) + '"/></pattern></defs>' +
+      '<rect class="g-grid" aria-hidden="true" x="' + (-far) + '" y="' + (-far) + '" width="' + (2 * far) + '" height="' + (2 * far) + '" fill="url(#' + id + ')"/>');
+  }
+
+  function symbolSvg(s, grid) {
+    if (!s.origin) return grid ? withGrid(s.svg, s.scale) : s.svg;
+    return (grid ? withGrid(s.svg, s.scale) : s.svg).replace('</svg>', '<g class="g-origin" aria-hidden="true" transform="translate(' + s.origin.join(' ') + ')">' +
       '<g class="g-origin-mark"><line x1="-5" y1="0" x2="5" y2="0" vector-effect="non-scaling-stroke"/>' +
       '<line x1="0" y1="-5" x2="0" y2="5" vector-effect="non-scaling-stroke"/>' +
       '<circle r="1.5"/></g></g></svg>');
@@ -148,7 +165,7 @@
       return fill('<en>; terminal {t}{m} pointing {d}</en>', { t: terminalText(p), m: p.label || p.name ? ' ' + (p.label || p.name) + ' ' : ' ', d: DIRS[p.dir] || '?' });
     }).join('');
     return '<button type="button" class="gl-card" data-sym="' + esc(s.name) + '" data-pkg="' + esc(pkg.name) + '" aria-label="' + esc(label) + '">' +
-      '<span class="gl-fig" aria-hidden="true">' + symbolSvg(s) + '</span>' +
+      '<span class="gl-fig" aria-hidden="true">' + symbolSvg(s, true) + '</span>' +
       '<span class="gl-card-name"><span>' + breakable(s.name) + '</span>' + warn + '<small class="gl-fit" hidden></small></span>' +
       (row ? '<span class="gl-pins">' + row + '</span>' : '') +
       '</button>';
@@ -190,6 +207,7 @@
     h += '<header class="gl-pkg-head"><div class="gl-pkg-title"><h3>' + esc(pkg.name) + '</h3>' +
       '<span class="chip">' + esc(pkg.version) + '</span>' +
       (pkg.implicit ? '<span class="chip chip-ok" title="<en>Brought in by rnl-std: every netlist has it by default</en>"><en>by default</en></span>'
+        : pkg.inAll ? '<span class="chip chip-ok" title="<en>Brought in by rnl-std-all, which a file of 0.4 names in its header record</en>"><en>in rnl-std-all</en></span>'
         : '<span class="chip chip-user" title="<en>A file has it when its header record names it with USE-PACKAGE</en>"><en>on demand</en></span>') +
       (pkg.language !== pkg.version ? '<span class="chip chip-mute">' + fill('<en>language {v}</en>', { v: esc(pkg.language) }) + '</span>' : '') +
       (group.series ? '' : '<span class="chip chip-warn"><en>not in the standard series</en></span>') +
@@ -403,7 +421,7 @@
           '" aria-label="' + esc(title) + '" aria-expanded="' + open + '" aria-controls="gl-children-' + esc(g.id) + '"><svg class="ico" aria-hidden="true"><use href="#i-next"/></svg></button>' +
           '<button type="button" class="gl-nav-item gl-group' + (selected ? ' here' : '') + '" data-group="' + esc(g.id) +
           '"' + (selected ? ' aria-current="true"' : '') + ' title="' + esc(title) + '"><span class="gl-nav-name">' + esc(title) + '</span>' +
-          (g.kind === 'standard' && g.series === '0.2' ? '<small class="gl-readonly"><en>read-only</en></small>' : '') +
+          (g.kind === 'standard' && (g.series === '0.2' || g.series === '0.3') ? '<small class="gl-readonly"><en>read-only</en></small>' : '') +
           '<small class="gl-nav-count">' + g.counts.packages + '</small></button></div>' +
           '<ul class="gl-children" id="gl-children-' + esc(g.id) + '"' + (open ? '' : ' hidden') + '>' +
           '<li><button type="button" class="gl-nav-item' + (selected && !state.pkg ? ' here' : '') + '" data-group="' + esc(g.id) +
@@ -461,7 +479,7 @@
     group.packages.forEach(function (p) {
       p.statements.forEach(function (r) { if (r.kind === 'rule' && r.action === 'symbol' && r.target === symName) rules.push({ pkg: p, r: r }); });
     });
-    var big = symbolSvg(s).replace(/ width="([\d.]+)" height="([\d.]+)"/, function (m, w, hh) { return ' width="' + (w * 2) + '" height="' + (hh * 2) + '"'; });
+    var big = symbolSvg(s, true).replace(/ width="([\d.]+)" height="([\d.]+)"/, function (m, w, hh) { return ' width="' + (w * 2) + '" height="' + (hh * 2) + '"'; });
     var h = '<div class="gl-dlg-grid"><div class="gl-dlg-fig ' + main.className.replace('gl-main', '') + '">' + big + '</div><div class="gl-dlg-info">';
     h += '<p class="gl-dlg-pkg"><en>Package</en> ' + name(pkg.name + ' ' + pkg.version) + ' · ' + lineLink(pkg, s.line, s.endLine) + '</p>';
     if (docText(s)) h += '<p class="gl-doc">' + esc(docText(s)) + '</p>';

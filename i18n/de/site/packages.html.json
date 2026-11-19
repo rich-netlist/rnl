@@ -4,10 +4,8 @@
   "Skip to content": "Zum Inhalt springen",
   "On this page": "Auf dieser Seite",
   "Switch color theme": "Farbschema wechseln",
-  "Draft · names may change": "Entwurf · Namen können sich ändern",
   "Standard packages": "Standardpakete",
   "What the standard packages hold: every symbol as it is drawn, and the text that defines it": "Was in den Standardpaketen steckt: jedes gezeichnete Symbol und der Text, der es definiert",
-  "Every netlist has the standard package <code>rnl-std</code> at its root by default: it gives elements their symbols and objects their styles, and fills in grounds and supplies for unwired pins. It is made of sub-packages; a file can drop any of them, and add packages that are used on demand. This page lists every package with what it is for, what it references and the text that defines it; the symbols are drawn by the RNL core when the site is built, as the viewers draw them.": "Jede Netzliste bindet auf ihrer Wurzelebene standardmäßig das Standardpaket <code>rnl-std</code> ein: Es weist Bauteilen ihre Symbole und Objekten ihre Stile zu und ergänzt Masse- und Versorgungssymbole für Pins ohne gezeichnete Leitung. Es besteht aus Teilpaketen; eine Datei kann einzelne davon weglassen und bedarfsweise genutzte Pakete hinzufügen. Diese Seite führt jedes Paket samt Zweck, Referenzen und Quelltext auf; die Symbole werden beim Erstellen der Website vom RNL-Kern genauso gezeichnet wie in den Viewern.",
   "Package facts": "Paketübersicht",
   "Content": "Inhalt",
   "Packages": "Pakete",
@@ -38,5 +36,7 @@
   ": section 16.3 is about the standard package": ": Abschnitt 16.3 behandelt das Standardpaket",
   "Web viewer": "Web-Viewer",
   ": draw a netlist as a schematic": ": eine Netzliste als Schaltplan zeichnen",
-  "Source files:": "Quelldateien:"
+  "Source files:": "Quelldateien:",
+  "A file of 0.4 uses no package unless its header record names it. <code>rnl-std-all</code> is the one collection of the series: it brings in the sub-packages that give elements their symbols and objects their styles, define the circuit structures, and fill in grounds, supplies and net labels for unwired pins. A file may name the sub-packages one by one instead, and add packages that are used on demand, such as <code>rnl-std-45deg</code> for 45-degree symbols. (In the series 0.3 and 0.2, <code>rnl-std</code> is at the root of every netlist by default.) This page lists every package with what it is for, what it references and the text that defines it; the symbols are drawn by the RNL core when the site is built, as the viewers draw them.": "Eine 0.4-Datei verwendet kein Paket, sofern es nicht in ihrem Kopfeintrag genannt wird. <code>rnl-std-all</code> ist die einzige Sammlung der Serie: Sie bindet die Teilpakete ein, die Bauteilen ihre Symbole und Objekten ihre Stile geben, die Schaltungsstrukturen definieren sowie Masse-, Versorgungs- und Netz-Labels für unverdrahtete Pins ergänzen. Eine Datei kann stattdessen die Teilpakete einzeln nennen und bedarfsweise genutzte Pakete wie <code>rnl-std-45deg</code> für 45-Grad-Symbole hinzufügen. (In den Serien 0.3 und 0.2 steht <code>rnl-std</code> standardmäßig auf der Wurzelebene jeder Netzliste.) Diese Seite führt jedes Paket samt Zweck, Referenzen und definierendem Text auf; die Symbole werden beim Erstellen der Website vom RNL-Kern genauso gezeichnet wie in den Viewern.",
+  "Series 0.4": "Serie 0.4"
 }

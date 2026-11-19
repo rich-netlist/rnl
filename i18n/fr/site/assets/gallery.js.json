@@ -79,5 +79,12 @@
   "Labels": "Étiquettes",
   "Drawn from": "Composé de",
   "Given by": "Attribué par",
-  "The definition": "La définition"
+  "The definition": "La définition",
+  "The one collection of the series 0.4: it has no content of its own and brings in the styles, symbols, fill, semantics, domain packages and the rules of the host dialect. A file of 0.4 names it in its header record, or names the packages it wants one by one.": "L’unique collection de la série 0.4 : elle n’a aucun contenu propre et apporte les styles, symboles, complétion, sémantique, paquets de domaine et règles du dialecte hôte. Un fichier 0.4 la nomme dans son enregistrement d’en-tête, ou nomme un par un les paquets souhaités.",
+  "45-degree symbols for bridges, cross-coupled pairs, diagonal windings and 45-degree wires. Optional: not in rnl-std-all.": "Symboles à 45 degrés pour ponts, paires à couplage croisé, enroulements en diagonale et fils à 45 degrés. Optionnel : absent de rnl-std-all.",
+  "The semantic definitions of circuit structures and their default drawings, all of priority low: differential pairs and current mirrors of N and P devices, cascodes, branches, mirrored pairs and more.": "Les définitions sémantiques des structures de circuit et leurs dessins par défaut, tous de priorité low : paires différentielles et miroirs de courant de composants N et P, cascodages, branches, paires en miroir et bien plus encore.",
+  "The Chinese alias package: Chinese spellings of the standard words and of the names of the standard packages, loaded with @USE-ALIASES in the header record.": "Le paquet d’alias chinois : les graphies chinoises des mots standards et des noms des paquets standards, chargé avec @USE-ALIASES dans l’enregistrement d’en-tête.",
+  "Brought in by rnl-std-all, which a file of 0.4 names in its header record": "Apporté par rnl-std-all, qu’un fichier 0.4 nomme dans son enregistrement d’en-tête",
+  "in rnl-std-all": "dans rnl-std-all",
+  "The automatic fill: a ground, supply or bias stub for every unwired pin on such a net, a net label for the other unwired pins, and a port tag for every port net in $PORT_FILL_SET.": "La complétion automatique : un raccord de masse, d’alimentation ou de polarisation pour chaque broche non câblée sur un tel net, une étiquette de net pour les autres broches non câblées, et une étiquette de port pour chaque net de port de $PORT_FILL_SET."
 }

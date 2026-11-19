@@ -17,39 +17,27 @@
   /* ---------- The file ---------- */
 
   /* Each statement of meaning in the writing styles: the formal notation, the standard English sentences, the Chinese
-     ones (the alias package rnl-zh; only the Chinese pages have them) */
+     ones (the alias package alias-zh; only the Chinese pages have them) */
   var T = {
-    dp: ['%dp1 = #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR;', '%dp1 = #M1(in_p), #M2(in_n) and #M5(tail) treated @AS $DIFFERENTIAL_PAIR;'],
-    cm1: ['%cm1 = #M3(ref) #M4(out) @AS $CURRENT_MIRROR;', '%cm1 = #M3(ref) and #M4(out) treated @AS $CURRENT_MIRROR;'],
-    y1: ['{#M1 #M2 #M5} @SET-SYMBOL $NMOS;', '{#M1 #M2 #M5} @SET-SYMBOL to $NMOS;'],
-    y2: ['{#M3 #M4} @SET-SYMBOL $PMOS;', '{#M3 #M4} @SET-SYMBOL to $PMOS;'],
+    dp: ['%dp1 = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;', '%dp1 = #M1(left), #M2(right) and #M5(tail) treated @AS $DIFFERENTIAL_PAIR_N;'],
+    cm1: ['%cm1 = #M3(ref) #M4(out) @AS $CURRENT_MIRROR_P;', '%cm1 = #M3(ref) and #M4(out) treated @AS $CURRENT_MIRROR_P;'],
     n1: ['&vdd @ADD-TO $SUPPLY_NET_SET;', '&vdd @ADD-TO $SUPPLY_NET_SET;'],
     n2: ['&vss @ADD-TO $GROUND_NET_SET;', '&vss @ADD-TO $GROUND_NET_SET;'],
-    ax: ['%ax = (_, _);', '%ax = (_, _);'],
-    s12: ['%sym12 = #M1 #M2 %ax @AS $MIRRORED;', '%sym12 = #M1(a), #M2(b) and %ax(axis) treated @AS $MIRRORED;'],
-    s34: ['%sym34 = #M3 #M4 %ax @AS $MIRRORED;', '%sym34 = #M3(a), #M4(b) and %ax(axis) treated @AS $MIRRORED;'],
-    ord: ['{#M5 #M1 #M3} @ORDER("bottom-to-top");', '{#M5 #M1 #M3} are in @ORDER("bottom-to-top");'],
     cur: ['#M5:d @CURRENT("in")', '#M5:d has @CURRENT("in")']
   };
   var TZ = {};
   /*zh-CN*/
   TZ = {
-    dp: '%dp1 = #M1(正输入)、#M2(负输入) 和 #M5(尾管) @视作 $"差分对";',
-    cm1: '%cm1 = #M3(参考管) 和 #M4(输出管) @视作 $"电流镜";',
-    y1: '{#M1 #M2 #M5} @使用符号 $NMOS;',
-    y2: '{#M3 #M4} @使用符号 $PMOS;',
+    dp: '%dp1 = #M1(左)、#M2(右) 和 #M5(尾管) @视作 $"N型差分对";',
+    cm1: '%cm1 = #M3(参考管) 和 #M4(输出管) @视作 $"P型电流镜";',
     n1: '&vdd @加入 $"电源网络集";',
     n2: '&vss @加入 $"地网络集";',
-    ax: '%ax = (_, _);',
-    s12: '%sym12 = #M1(甲)、#M2(乙) 和 %ax(轴) @视作 $"镜像对称";',
-    s34: '%sym34 = #M3(甲)、#M4(乙) 和 %ax(轴) @视作 $"镜像对称";',
-    ord: '{#M5 #M1 #M3} 按 @顺序("从下到上") 排列;',
     cur: '#M5:d 有 @电流("流入")'
   };
   /*/zh-CN*/
   var STYLES = ['bare', 'en', 'zh'];
   var FILES = { bare: 'ota5t-review-bare.sp', en: 'ota5t-review.sp', zh: 'ota5t-review-zh.sp', eda: 'ota5t-review-eda.sp' };
-  var PACKAGES = '; @USE-PACKAGE(name="eda-symbol", version="0.1"); @USE-PACKAGE(name="eda-style", version="0.1")';
+  var PACKAGES = '; @USE-PACKAGE(name="eda-symbol", version="0.2"); @USE-PACKAGE(name="eda-style", version="0.2")';
 
   /* The lines of the file as the panel shows them; r is what a line is about (devices and display objects, and the notes
      of a statement as ov:…), mode the note it makes in the drawing, dev a line of the netlist that is about one device */
@@ -66,7 +54,7 @@
     add('h0', '* Five-transistor OTA');
     add('h1', '.model nch nmos level=1 vto=0.5 kp=100u lambda=0.05');
     add('h2', '.model pch pmos level=1 vto=-0.5 kp=100u lambda=0.05');
-    add('h3', '* @RNL(type="header") { @VERSION("0.3")' + (k === 2 ? '; @USE-ALIASES(name="rnl-zh", version="0.3")' : '') + (look === 'eda' ? PACKAGES : '') + '}', '', look === 'eda' ? { cls: 'is-diff' } : null);
+    add('h3', '* @RNL(type="header") { ' + (k === 2 ? '@VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-ALIASES(name="alias-zh", version="0.4")' : '@VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")') + (look === 'eda' ? PACKAGES : '') + '}', '', look === 'eda' ? { cls: 'is-diff' } : null);
     add('h4', '.subckt ota5t inp inn out vdd vss vbias', 'PI PN PO PB');
     dev('M1', 'M1 x    inp   tail vss nch W=2u L=0.5u');
     dev('M2', 'M2 out  inn   tail vss nch W=2u L=0.5u');
@@ -76,14 +64,8 @@
     add('r0', '* @RNL {');
     st('dp', 'M1 M2 M5 ov:dp');
     st('cm1', 'M3 M4 ov:cm1');
-    st('y1', 'M1 M2 M5');
-    st('y2', 'M3 M4');
     st('n1', 'VDD');
     st('n2', 'VSS');
-    st('ax', 'ov:sym');
-    st('s12', 'M1 M2 ov:sym');
-    st('s34', 'M3 M4 ov:sym');
-    st('ord', 'M5 M1 M3 ov:ord');
     st('cur', 'M5 ov:cur');
     add('r1', '* }');
     add('d0', '* @RNL(type="generated") {');
@@ -106,8 +88,7 @@
     add('dh', '*   &out @WIRE {%jo %po:p};  &vbias @WIRE {#M5:g %pb:p};');
     add('di', '*   %vdd1 = $SUPPLY_STUB @ATTACH #M3:s;  %vdd1::s @PLACE(12, 20);', 'VDD');
     add('dj', '*   %vdd2 = $SUPPLY_STUB @ATTACH #M4:s;  %vdd2::s @PLACE(28, 20);', 'VDD');
-    add('dk', '*   %gnd = $GROUND_STUB @ATTACH #M5:s;  %gnd::g @PLACE(20, -4);', 'VSS');
-    add('dl', '*   %ax @PLACE(20, 8)');
+    add('dk', '*   %gnd = $GROUND_STUB @ATTACH #M5:s;  %gnd::g @PLACE(20, -4)', 'VSS');
     add('d9z', '* }');
     add('e0', '.ends ota5t');
     add('e1', '.end');
@@ -118,10 +99,8 @@
 
   /* One item of the checklist for each statement of meaning: what the agent declared, in plain words */
   var ITEMS = [
-    { key: 'dp', kind: 'structure', devs: 'M1 M2 M5', stmt: ['dp'], text: '<en><b>M1</b> and <b>M2</b> are the input pair; <b>M5</b> is its tail source.</en>' },
+    { key: 'dp', kind: 'structure', devs: 'M1 M2 M5', stmt: ['dp'], text: '<en><b>M1</b> and <b>M2</b> are the input pair, <b>M5</b> its tail source.</en>' },
     { key: 'cm1', kind: 'structure', devs: 'M3 M4', stmt: ['cm1'], text: '<en><b>M3</b> and <b>M4</b> are a current mirror, the load.</en>' },
-    { key: 'sym', kind: 'intent', devs: 'M1 M2 M3 M4', stmt: ['s12', 's34', 'ax'], text: '<en>Symmetric: <b>M1</b>/<b>M2</b> and <b>M3</b>/<b>M4</b> mirror about one axis.</en>' },
-    { key: 'ord', kind: 'intent', devs: 'M5 M1 M3', stmt: ['ord'], text: '<en>Bottom to top: tail <b>M5</b>, pair <b>M1</b>, load <b>M3</b>.</en>' },
     { key: 'cur', kind: 'intent', devs: 'M5', stmt: ['cur'], text: '<en>The tail current enters at the drain of <b>M5</b>.</en>' }
   ];
 
@@ -129,10 +108,8 @@
 
   var DEFAULT = '<en>Pick a statement in the file or an item in the checklist: its devices light up in the drawing and the netlist.</en>';
   var CAPS = {
-    dp: '<en><b>Structure</b>: <code>$DIFFERENTIAL_PAIR</code> says which devices form the pair and which is its tail; the standard package puts the tail under the middle of the pair.</en>',
-    cm1: '<en><b>Structure</b>: <code>$CURRENT_MIRROR</code> says which device is the reference and which copies it. Here the mirror is the pair’s load.</en>',
-    sym: '<en><b>Intent</b>: two pairs, mirror images about one axis. The standard package puts the two devices of each pair at the same height; a tool that draws from it keeps the symmetry.</en>',
-    ord: '<en><b>Intent</b>: the tail at the bottom, the pair above it, the load on top, as schematics are usually read.</en>',
+    dp: '<en><b>Structure</b>: <code>$DIFFERENTIAL_PAIR_N</code> says which devices form the pair of N devices and which is its tail. The standard package draws the pair as mirror images about one axis, with the tail under its middle.</en>',
+    cm1: '<en><b>Structure</b>: <code>$CURRENT_MIRROR_P</code> says which device is the reference and which copies it. Here the mirror of P devices is the pair’s load, and the package draws it above the pair.</en>',
     cur: '<en><b>Intent</b>: where the current flows, from the top of the circuit to the bottom.</en>'
   };
   var SIM = '<en>A simulator reads the lines that are not dimmed: the netlist. Every RNL line starts with <code>*</code>, so for the simulator it is a comment.</en>';
@@ -149,8 +126,6 @@
   var NOTES = {
     dp: label(280, -104, '%dp1'),
     cm1: label(280, -236, '%cm1'),
-    sym: '<line class="axis" x1="280" y1="-300" x2="280" y2="40"/>' + label(286, -302, '%ax', 'start'),
-    ord: arrow(0, 40, 0, -290) + label(10, -296, '@ORDER', 'start'),
     cur: arrow(266, -56, 266, -36) + label(258, -42, 'I', 'end')
   };
 

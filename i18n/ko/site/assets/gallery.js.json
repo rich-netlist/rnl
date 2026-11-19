@@ -79,5 +79,12 @@
   "Labels": "라벨",
   "Drawn from": "구성 부품",
   "Given by": "배정 규칙",
-  "The definition": "정의 원문"
+  "The definition": "정의 원문",
+  "The one collection of the series 0.4: it has no content of its own and brings in the styles, symbols, fill, semantics, domain packages and the rules of the host dialect. A file of 0.4 names it in its header record, or names the packages it wants one by one.": "시리즈 0.4의 유일한 모음 패키지입니다. 자체 내용은 없고 스타일, 심볼, 자동 보충, 의미 정의, 도메인 패키지 및 호스트 방언 규칙을 가져옵니다. 0.4 파일은 헤더 레코드에 이 패키지를 지정하거나 필요한 패키지를 하나씩 나열합니다.",
+  "45-degree symbols for bridges, cross-coupled pairs, diagonal windings and 45-degree wires. Optional: not in rnl-std-all.": "브리지, 교차 결합쌍, 대각선 권선 및 45도 배선을 위한 45도 심볼입니다. 선택 사항이며 rnl-std-all에는 포함되지 않습니다.",
+  "The semantic definitions of circuit structures and their default drawings, all of priority low: differential pairs and current mirrors of N and P devices, cascodes, branches, mirrored pairs and more.": "회로 구조의 의미 정의와 기본 도면(모두 우선순위 low)을 담고 있습니다. N형 및 P형 소자의 차동쌍과 전류 거울, 캐스코드, 분기, 대칭쌍 등이 포함됩니다.",
+  "The Chinese alias package: Chinese spellings of the standard words and of the names of the standard packages, loaded with @USE-ALIASES in the header record.": "중국어 별칭 패키지입니다. 표준 단어와 표준 패키지 이름의 중국어 표기를 제공하며, 헤더 레코드에서 @USE-ALIASES로 불러옵니다.",
+  "Brought in by rnl-std-all, which a file of 0.4 names in its header record": "0.4 파일이 헤더 레코드에 지정하는 rnl-std-all을 통해 가져옴",
+  "in rnl-std-all": "rnl-std-all에 포함",
+  "The automatic fill: a ground, supply or bias stub for every unwired pin on such a net, a net label for the other unwired pins, and a port tag for every port net in $PORT_FILL_SET.": "자동 보충 규칙입니다. 접지·전원·바이어스 넷에 있는 배선 없는 핀마다 해당 스텁을 보충하고, 나머지 배선 없는 핀에는 넷 라벨을, $PORT_FILL_SET에 있는 포트 넷마다 포트 태그를 보충합니다."
 }

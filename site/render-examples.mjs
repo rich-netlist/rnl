@@ -2,7 +2,10 @@
 // two looks of the example (the standard packages, and the same file with the packages eda-symbol and eda-style) that
 // the page's style switch shows.
 //
-//   node site/render-examples.mjs [--core DIR] [--packages DIR]
+//   node site/render-examples.mjs [--core DIR] [--packages DIR] [--only LOOK]
+//
+// --only draws one look (standard or eda) and keeps the other as it is in ota-looks.js, which is for the time the
+// packages of one look have no version of the present language yet: that look then stays stale, and site/build.py says so.
 //
 // --core is the folder with the core as WebAssembly (core.js and rnl_runtime_wasm.wasm; default
 // bindings/runtime-wasm/dist, or the folder of the npm package @rich-netlist/runtime), --packages the folder of the
@@ -19,11 +22,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 let coreDir = join(root, "bindings", "runtime-wasm", "dist");
 let packages = join(root, ".rnl-packages");
+let only = null;
 const args = process.argv.slice(2);
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--core" && args[i + 1]) coreDir = resolve(args[++i]);
   else if (args[i] === "--packages" && args[i + 1]) packages = resolve(args[++i]);
-  else { console.error("usage: node site/render-examples.mjs [--core DIR] [--packages DIR]"); process.exit(2); }
+  else if (args[i] === "--only" && args[i + 1]) only = args[++i];
+  else { console.error("usage: node site/render-examples.mjs [--core DIR] [--packages DIR] [--only LOOK]"); process.exit(2); }
 }
 const { loadCore } = await import(pathToFileURL(join(coreDir, "core.js")).href);
 const core = await loadCore(readFileSync(join(coreDir, "rnl_runtime_wasm.wasm")));
@@ -31,9 +36,9 @@ const version = JSON.parse(readFileSync(join(coreDir, "package.json"), "utf8")).
 
 /** The text of an example with LF line ends, as site/build.py reads it. */
 const example = (name) => readFileSync(join(root, "site", "examples", name), "utf8").replace(/\r\n/g, "\n");
-const library = {
-  "/lib/eda-symbol/eda-symbol.rnl": readFileSync(join(packages, "eda-symbol", "0.1", "eda-symbol.rnl"), "utf8"),
-  "/lib/eda-style/eda-style.rnl": readFileSync(join(packages, "eda-style", "0.1", "eda-style.rnl"), "utf8"),
+const library = only === "standard" ? {} : {
+  "/lib/eda-symbol/eda-symbol.rnl": readFileSync(join(packages, "eda-symbol", "0.2", "eda-symbol.rnl"), "utf8"),
+  "/lib/eda-style/eda-style.rnl": readFileSync(join(packages, "eda-style", "0.2", "eda-style.rnl"), "utf8"),
 };
 
 /** The name a part of the drawing answers to on the page: the device, or a display object (%pi → PI) */
@@ -47,7 +52,13 @@ function refOf(objects, ids) {
 }
 
 const looks = {};
+const outFile = join(root, "site", "src", "assets", "ota-looks.js");
+if (only) {
+  const old = JSON.parse(/window\.RNLOtaLooks = (.*);\s*$/s.exec(readFileSync(outFile, "utf8"))[1]);
+  for (const [k, v] of Object.entries(old.looks)) if (k !== only) looks[k] = v;
+}
 for (const [look, name, withPackages] of [["standard", "ota5t-review.sp", false], ["eda", "ota5t-review-eda.sp", true]]) {
+  if (only && look !== only) continue;
   const text = example(name);
   const doc = await core.build({
     entry: "/top.sp",
@@ -83,4 +94,4 @@ for (const l of Object.values(looks)) l.svg = l.svg.replace(/viewBox="[^"]*"/, `
 
 const head = `/* Drawn by the RNL core ${version} from the example files of site/examples with site/render-examples.mjs; do not edit.
    site/build.py checks that each look is drawn from the current text of its file (the sha256 below). */\n`;
-writeFileSync(join(root, "site", "src", "assets", "ota-looks.js"), `${head}window.RNLOtaLooks = ${JSON.stringify({ core: version, looks }, null, 1)};\n`);
+writeFileSync(outFile, `${head}window.RNLOtaLooks = ${JSON.stringify({ core: version, looks }, null, 1)};\n`);

@@ -541,7 +541,7 @@ def check_links() -> list[str]:
 # Whether the site's texts (agents.html, llms.txt) are those of this package. While the site publishes the skill of
 # the released core it is pinned to (pages.yml), its texts name that package's files, and this is False; the change
 # that publishes this package sets it to True with the texts.
-SITE_TEXTS_OF_THIS_PACKAGE = False
+SITE_TEXTS_OF_THIS_PACKAGE = True
 
 
 def check_site_texts() -> list[str]:

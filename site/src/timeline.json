@@ -218,24 +218,58 @@
         "viewer-v0.1.4",
         "runtime-v0.1.0-preview.15"
       ]
-    }
-  ],
-  "next": [
+    },
     {
+      "id": "core-0.6.0",
+      "date": "2026-11-19",
+      "title": {
+        "en": "Core 0.6.0: the language 0.4 alone"
+      },
+      "description": {
+        "en": "The <code>rnl</code> command and the npm package <code>@rich-netlist/runtime</code> read and write <a href=\"spec/0.4/\">language standard 0.4</a> alone, with the standard series 0.4. Files of 0.2 and 0.3 are no longer read, and versions before 1.0 promise no compatibility: the standards 0.2 and 0.3 are archived, and core 0.5.7 <a href=\"tools.html#upgrade\">upgrades their files</a>."
+      },
+      "url": "https://github.com/rich-netlist/rnl/releases/tag/core-v0.6.0",
+      "link_label": {
+        "en": "Learn more"
+      },
+      "tags": [
+        "core-v0.6.0"
+      ]
+    },
+    {
+      "id": "viewer-0.6.0",
+      "date": "2026-11-19",
+      "title": {
+        "en": "RNL Viewer 0.6.0: solving in the browser"
+      },
+      "description": {
+        "en": "The web and desktop viewers read language 0.4 and carry core 0.6.0. <a href=\"tools.html#solve\">The web viewer solves</a> in the browser, as the desktop viewer does, and the Solve view lists the constraints and the groups. Files of 0.3 open in the web viewer of the 0.5 series, kept on this site, until they are upgraded."
+      },
+      "url": "tools.html",
+      "link_label": {
+        "en": "Learn more"
+      },
+      "tags": [
+        "viewer-v0.6.0"
+      ]
+    },
+    {
+      "id": "standard-0.4",
+      "date": "2026-11-19T05:18:31Z",
       "title": {
         "en": "Language standard 0.4"
       },
       "description": {
-        "en": "Planned: symbols chosen by the number of terminals; the new <code>@SOLVER-CONFIG</code>."
-      }
-    },
-    {
-      "title": {
-        "en": "The solver’s objectives, second version"
+        "en": "Every fact on positions is written with its direction, so that a fact means one layout. Pins are objects of their own, routing is chosen by net or by object, and groups form a tree. The <a href=\"spec/0.4/\">formal standard</a> is in English, with translations; core 0.5.7 <a href=\"tools.html#upgrade\">upgrades files of 0.3</a>."
       },
-      "description": {
-        "en": "Planned: move the standard package’s names out of hardcoded solver logic into its configuration, so the current-direction, ground-direction and signal-flow objectives work on 0.3 files."
-      }
+      "url": "spec/0.4/",
+      "link_label": {
+        "en": "Learn more"
+      },
+      "tags": [
+        "spec-0.4-r1"
+      ]
     }
-  ]
+  ],
+  "next": []
 }

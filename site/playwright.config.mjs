@@ -21,6 +21,8 @@ export default defineConfig({
   },
   projects: [
     { name: "chromium", use: { browserName: "chromium" } },
-    { name: "webkit", use: { browserName: "webkit" } },
+    // WebKit on CI takes over 30 s for some pages, such as packages.html with the 164 cards of the standard 0.4;
+    // a test that sets its own time keeps it
+    { name: "webkit", timeout: 90_000, use: { browserName: "webkit" } },
   ],
 });

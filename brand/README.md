@@ -1,7 +1,8 @@
 # RNL brand assets
 
-The source is [rnl-logo.sp](rnl-logo.sp), copied unchanged from the original RNL 0.3 logo.
-It defines its own symbols and styles and contains no text. Keep its circuit and line weights intact.
+The source is [rnl-logo.sp](rnl-logo.sp), the original RNL 0.3 logo written in RNL 0.4: `rnl upgrade` of core 0.5.7
+converted it, and the pins its wires end on are named and its three dots placed by hand, so it draws exactly as the
+0.3 logo did. It defines its own symbols and styles and contains no text. Keep its circuit and line weights intact.
 
 | File | Use |
 | --- | --- |
@@ -109,6 +110,8 @@ threshold boundaries, short hex values and alpha. PNG, ICO and ICNS files are no
 The site's Chromium and WebKit checks cover the homepage themes, narrow layout and favicon URLs.
 For visual review, compare 16, 24, 32, 48 and 256px icons on light and dark backgrounds.
 
-`rnl check brand/rnl-logo.sp`: **0 errors, 0 violations, 0 warnings, 5 hints**. The hints identify intentional
-overrides of `$base`, `$signal`, `$NMOS`, `$GROUND_SYMBOL` and `$JUNCTION_SYMBOL` from the standard
-package. The source is preserved rather than changing it to silence those hints.
+`rnl check brand/rnl-logo.sp` with core 0.6.0: **0 errors, 0 violations, 0 warnings, 7 hints**. Five identify
+intentional overrides of `$base`, `$signal`, `$NMOS`, `$GROUND_SYMBOL` and `$JUNCTION_SYMBOL` from the standard
+package rnl-std-all; one notes the non-ASCII dash in the title comment; one notes that the wire leaves the drain
+going down, against its pin, as the logo's loop does on purpose. The source is kept rather than changed to silence
+those hints.

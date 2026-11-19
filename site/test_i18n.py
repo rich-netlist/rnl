@@ -167,7 +167,7 @@ class Localization(unittest.TestCase):
             intro = (directory / "dist/ja/index.html").read_text(encoding="utf-8")
             self.assertIn('The circuit source file for the AI era', intro)
             self.assertIn('href="../en/spec/"', intro)
-            self.assertIn('href="../en/spec/0.3/"', intro)
+            self.assertIn('href="../en/spec/0.4/"', intro)
             single = (directory / "dist/ja/rnl-intro-standalone.html").read_text(encoding="utf-8")
             self.assertNotIn('src="assets/', single)
             self.assertIn('https://rich-netlist.github.io/rnl/en/', single)

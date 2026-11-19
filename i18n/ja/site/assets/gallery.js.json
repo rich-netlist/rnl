@@ -79,5 +79,12 @@
   "Labels": "ラベル",
   "Drawn from": "構成パーツ",
   "Given by": "割り当てルール",
-  "The definition": "定義の原文"
+  "The definition": "定義の原文",
+  "The one collection of the series 0.4: it has no content of its own and brings in the styles, symbols, fill, semantics, domain packages and the rules of the host dialect. A file of 0.4 names it in its header record, or names the packages it wants one by one.": "標準シリーズ0.4で唯一のコレクション：自身は中身を持たず、スタイル・シンボル・自動補完・セマンティクス・領域パッケージ・ホスト方言のルールを読み込みます。0.4のファイルはヘッダーレコードにこれを書くか、必要なパッケージを個別に並べます。",
+  "45-degree symbols for bridges, cross-coupled pairs, diagonal windings and 45-degree wires. Optional: not in rnl-std-all.": "ブリッジ・クロスカップル対・斜め巻線・45度配線のための45度シンボル。任意指定であり、rnl-std-allには含まれません。",
+  "The semantic definitions of circuit structures and their default drawings, all of priority low: differential pairs and current mirrors of N and P devices, cascodes, branches, mirrored pairs and more.": "回路構造の意味定義とそのデフォルト描画（すべて優先度low）：N型・P型の差動対やカレントミラー、カスコード、分岐、鏡像対などを収録します。",
+  "The Chinese alias package: Chinese spellings of the standard words and of the names of the standard packages, loaded with @USE-ALIASES in the header record.": "中国語別名パッケージ：標準キーワードと標準パッケージ名に対応する中国語表記を定義します。ヘッダーレコードで@USE-ALIASESにより読み込みます。",
+  "Brought in by rnl-std-all, which a file of 0.4 names in its header record": "ヘッダーレコードで0.4ファイルが指定するrnl-std-allによって読み込まれます",
+  "in rnl-std-all": "rnl-std-allに含まれる",
+  "The automatic fill: a ground, supply or bias stub for every unwired pin on such a net, a net label for the other unwired pins, and a port tag for every port net in $PORT_FILL_SET.": "自動補完ルール：グラウンド・電源・バイアスネット上の各未配線ピンにそれぞれのスタブを補い、その他の未配線ピンにはネットラベルを、$PORT_FILL_SET内の各ポートネットにはポートタグを補います。"
 }
