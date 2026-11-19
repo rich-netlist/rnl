@@ -114,6 +114,12 @@ pub struct Options {
     /// written coordinates and conflicting coordinates are found (11.7). The standard leaves the
     /// tolerance to the tool; a viewer that does not solve uses [`crate::geom::TOL`].
     pub tolerance: f64,
+    /// Build only the levels written in this file, by its name in the document
+    /// ([`crate::host::Level::file`]): the subcircuits it defines and, for the main file, the main
+    /// file level. Everything else is read as for the whole document, the files above it, the
+    /// packages and the block symbols of the subcircuits it instantiates, so each level it builds
+    /// is the one the whole document builds (6.1, 10.3). None, as by default: every level.
+    pub only_file: Option<String>,
 }
 
 impl Default for Options {
@@ -126,6 +132,7 @@ impl Default for Options {
             generated: true,
             problems: false,
             tolerance: crate::geom::TOL,
+            only_file: None,
         }
     }
 }
@@ -175,6 +182,11 @@ pub struct Interpretation {
     /// [`Options::problems`] is set. Built without the generated records ([`Options::solver`]),
     /// it is the solver's input (2.8, 17).
     pub problems: Vec<crate::problem::LevelProblem>,
+    /// How many of the first diagnostics of `sink` come from reading the document: the host
+    /// readers', those of the language versions of the files, and those of reading their records,
+    /// before any level is built. A reading of one file ([`Options::only_file`]) reads the whole
+    /// document as well, and gives them too.
+    pub read: usize,
     /// The numbers of the objects without a name of each drawing level, with their checks, whatever
     /// its version (5.9); empty for a package file checked on its own. See [`crate::numbering`].
     pub numbering: Vec<LevelNumbering>,
@@ -286,6 +298,11 @@ pub struct Interp<'p> {
     pub(crate) read_generated: bool,
     /// Build the problems (`Options::problems`).
     pub(crate) want_problems: bool,
+    /// How many diagnostics reading the document gave ([`Interpretation::read`]).
+    pub(crate) read: usize,
+    /// With [`Options::only_file`], the levels built: those of the file and the circuits above them,
+    /// whose scenes find the rules that reach below (10.1); and the levels given, the file's.
+    pub(crate) only_levels: Option<OnlyLevels>,
     /// The tolerance of the checks against written coordinates (`Options::tolerance`, 11.7).
     pub(crate) tol: f64,
     tool_solver_config: Vec<crate::problem::SolverSetting>,
@@ -364,6 +381,26 @@ pub struct Interp<'p> {
     pub(crate) conflicts: conflicts::Conflicts,
 }
 
+/// The levels a reading of one file builds and gives ([`Options::only_file`]).
+#[derive(Clone, Debug)]
+pub(crate) struct OnlyLevels {
+    /// The levels of the file and the circuits above them.
+    pub(crate) built: HashSet<LevelId>,
+    /// The levels of the file.
+    pub(crate) given: HashSet<LevelId>,
+}
+
+impl OnlyLevels {
+    fn new(doc: &HostDocument, file: &str) -> OnlyLevels {
+        let given: HashSet<LevelId> = (0..doc.levels.len()).filter(|&lv| doc.levels[lv].file == file).collect();
+        let mut built = given.clone();
+        for &lv in &given {
+            built.extend(doc.ancestors(lv).into_iter().filter(|&a| doc.levels[a].circuit));
+        }
+        OnlyLevels { built, given }
+    }
+}
+
 impl<'p> Interp<'p> {
     fn blank(
         doc: HostDocument,
@@ -373,6 +410,7 @@ impl<'p> Interp<'p> {
         numbers: NumberRun,
     ) -> Interp<'p> {
         let nlevels = doc.levels.len();
+        let only_levels = options.only_file.as_ref().map(|f| OnlyLevels::new(&doc, f));
         let mut it = Interp {
             doc,
             provider,
@@ -425,6 +463,8 @@ impl<'p> Interp<'p> {
             std_version: options.std_version.clone(),
             read_generated: options.generated,
             want_problems: options.problems,
+            read: 0,
+            only_levels,
             tol: options.tolerance,
             tool_solver_config: options.solver_config.clone(),
             std_units: HashMap::new(),
@@ -533,6 +573,7 @@ impl<'p> Interp<'p> {
     }
 
     pub fn run(&mut self) {
+        self.read = self.sink.all().len();
         // the standard package of each chain first, by the language version of its file: reading
         // one reads the packages it references (16.3)
         match self.package_main {
@@ -598,7 +639,7 @@ impl<'p> Interp<'p> {
             if self.restart.is_some() {
                 return;
             }
-            if self.doc.levels[lv].circuit {
+            if self.doc.levels[lv].circuit && self.builds(lv) {
                 self.build_scene(lv);
             }
         }
@@ -688,6 +729,18 @@ impl<'p> Interp<'p> {
             self.bindings.specific_names = specific_names;
             self.definition_scenes.plans = body_plans;
         }
+    }
+
+    /// Whether this reading builds the level `lv`: every level, or with [`Options::only_file`]
+    /// those of the file and the circuits above them.
+    fn builds(&self, lv: LevelId) -> bool {
+        self.only_levels.as_ref().is_none_or(|o| o.built.contains(&lv))
+    }
+
+    /// Whether this reading gives the level `lv`: every level, or with [`Options::only_file`] those
+    /// of the file.
+    fn gives(&self, lv: LevelId) -> bool {
+        self.only_levels.as_ref().is_none_or(|o| o.given.contains(&lv))
     }
 
     /// Evaluate the statements of a unit without a circuit once: definitions, rules, errors.
@@ -880,10 +933,12 @@ impl<'p> Interp<'p> {
         !scope.is_empty() && scope.iter().all(|a| matches!(&a.obj, crate::syntax::ObjExpr::Ref(r) if (r.prefix == '#' || r.prefix == '&') && r.name.is_some()))
     }
 
+    /// A record written with scope= a subcircuit that is not below its level fails (2.6). A reading
+    /// of one file checks the records of its levels.
     fn check_scopes(&mut self) {
         for u in 0..self.units.len() {
             let Some(lv) = self.units[u].level.filter(|_| self.units[u].kind == UnitKind::Level) else { continue };
-            if self.units[u].scope_records.is_empty() {
+            if self.units[u].scope_records.is_empty() || !self.gives(lv) {
                 continue;
             }
             let below: Vec<usize> = self
@@ -906,11 +961,11 @@ impl<'p> Interp<'p> {
     }
 
     /// A level that binds a `$` name it inherits from a level above or from a package hides that
-    /// definition in this level and below: a hint (6.8, 16.2).
+    /// definition in this level and below: a hint (6.8, 16.2). A reading of one file checks its levels.
     fn check_shadowing(&mut self) {
         for lv in 0..self.doc.levels.len() {
             let u = self.level_unit[lv];
-            if !self.units[u].ok || !self.file_ok(lv) {
+            if !self.units[u].ok || !self.file_ok(lv) || !self.gives(lv) {
                 continue;
             }
             for key in self.units[u].name_order.clone() {
@@ -942,13 +997,14 @@ impl<'p> Interp<'p> {
     }
 
     /// Packages used in the same level, or at the root, that define the same `$X`: the later
-    /// hides the earlier (16.2). What one USE-PACKAGE brings in is the business of its package.
+    /// hides the earlier (16.2). What one USE-PACKAGE brings in is the business of its package. A
+    /// reading of one file checks its levels.
     fn check_package_shadowing(&mut self) {
         // each USE-PACKAGE, by its unit and place, and name: hinted once
         let mut seen: HashSet<(UnitId, (usize, usize), String)> = HashSet::new();
         for lv in 0..self.doc.levels.len() {
             let u = self.level_unit[lv];
-            if !self.units[u].ok || !self.file_ok(lv) {
+            if !self.units[u].ok || !self.file_ok(lv) || !self.gives(lv) {
                 continue;
             }
             let eff = self.effective_packages(lv);
@@ -1041,10 +1097,13 @@ impl<'p> Interp<'p> {
         if !self.numbers.count {
             self.check_auto_wire_geometry();
         }
-        let model = self.build_model();
+        let mut model = self.build_model();
         self.hint_crowded_nodes(&model);
-        let (problems, results) =
+        let (mut problems, results) =
             if self.want_problems && self.package_main.is_none() { self.build_problems() } else { Default::default() };
+        // the levels above the file were built for the rules they hold, and are not given
+        model.levels.retain(|l| self.gives(l.level));
+        problems.retain(|p| self.gives(p.level));
         // the numbers and their checks (5.9); a reading that counts the objects of the authored
         // records for another gives those alone
         let counting = self.numbers.count;
@@ -1054,7 +1113,9 @@ impl<'p> Interp<'p> {
             HashMap::new()
         };
         let numbering: Vec<LevelNumbering> = if !counting && self.package_main.is_none() {
-            (0..self.scenes.len()).map(|s| self.level_numbering(s)).collect()
+            let mut all: Vec<LevelNumbering> = (0..self.scenes.len()).map(|s| self.level_numbering(s)).collect();
+            all.retain(|n| self.gives(n.level));
+            all
         } else {
             Vec::new()
         };
@@ -1076,9 +1137,14 @@ impl<'p> Interp<'p> {
             included_standard,
             checking_package: checking,
             sources,
-            refs: std::mem::take(&mut self.refs),
+            refs: {
+                let mut refs = std::mem::take(&mut self.refs);
+                refs.retain(|h| self.gives(h.level));
+                refs
+            },
             failed: std::mem::take(&mut self.failed_spans),
             problems,
+            read: self.read,
             numbering,
             unsupported,
             imported_aliases,

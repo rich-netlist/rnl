@@ -64,6 +64,10 @@ A definition receiving a selection-dependent set role is a generation rule, appl
 
 Package rules start at their USE-PACKAGE level, with root packages starting at the top level of the file that uses them. A scoped record starts at its target level.
 
+## Reading one file of a document
+
+`Options::only_file` names a file of the document, as `Level::file` names it, and builds only the levels written in it: the subcircuits it defines and, for the main file, the main file level. The rest is read as for the whole document: every file and its records, the packages, the block symbols of the subcircuits (9.2.6) and the files above it (6.1), whose circuits are built too for the rules they hold that reach below (10.1) and are not given. So each level it gives is the one the reading of the whole document gives, with the same drawing, problem, numbers (5.9) and references, which `per_file::differences` checks. What it reports is among what the whole reading reports: what reading the document reports (`Interpretation::read`, the diagnostics before any level is built), what building its levels and the levels above them reports, and the checks of its own levels (6.8, 16.2, 2.6); `per_file::unreported` says what no reading of one file reports. The objects of a reading are numbered in it, so the identity of a symbol and the id `@N` of an object with no name and no place of its own are those of the reading. `rnl dump --file F` prints such a reading, and `rnl dump --each-file` compares the reading of each file with the whole.
+
 ## For a solver
 
 A solver must not read the records with `type="generated"` (2.8). `Options::generated` set to false leaves them out of every file of the document, with whatever they would report; `Options::solver()` does that and sets `Options::problems`, so that `Interpretation::problems` holds one `LevelProblem` per drawing level:

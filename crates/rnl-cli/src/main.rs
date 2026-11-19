@@ -81,6 +81,12 @@ view options:
   --bind SUBCKT       show the parameters of the subcircuit SUBCKT with the values --param gives
   --param NAME=VALUE  a value for a parameter of the subcircuit --bind names, as text; repeatable.
                       Only the Document's lists of parameters change; nothing drawn does
+dump options:
+  --file F            build only the levels written in the file F of the document, as the reading of
+                      the whole document builds them; the rest is read as for the whole document
+  --each-file         read each file of the document alone, as --file does, and compare it with the
+                      reading of the whole document, both with what a solver reads of the levels:
+                      print the differences and the times as JSON, and exit 1 on any difference
 render options:
   --png               write a PNG image of each level instead of its SVG, drawn by the command
                       itself with the fonts it holds, so that it needs no font of the computer;
@@ -191,6 +197,10 @@ struct Args {
     all: bool,
     /// `view`'s `--bind` and `--param`.
     bind: Option<rnl_view::Bind>,
+    /// `dump`'s `--file`: the file whose levels alone are built.
+    only_file: Option<String>,
+    /// `dump`'s `--each-file`.
+    each_file: bool,
 }
 
 /// What the `rnl` command says of its own, printed as `error: RNL8010 cli-option-needs-value: …`:
@@ -309,6 +319,8 @@ fn parse_args() -> Result<Args, Said> {
     let mut overlays = rnl_view::OverlayOptions::default();
     let mut overlay_args = false;
     let mut encoding = None;
+    let mut only_file = None;
+    let mut each_file = false;
     while let Some(a) = it.next() {
         if a.starts_with('-') {
             written_options.push(a.clone());
@@ -396,6 +408,8 @@ fn parse_args() -> Result<Args, Said> {
             }
             "--all-versions" => all_versions = true,
             "--json" => json = true,
+            "--file" => only_file = Some(it.next().ok_or_else(|| needs("--file needs a file of the document"))?),
+            "--each-file" => each_file = true,
             "--all" => all = true,
             "--layout" => {
                 let layouts = rnl_cli::solver_table::layouts();
@@ -444,6 +458,7 @@ fn parse_args() -> Result<Args, Said> {
             "--png" | "--scale" | "--net-names" => &["render"],
             "--layout" => &["solver-defaults"],
             "--all" => &["groups"],
+            "--file" | "--each-file" => &["dump"],
             "--primitives" | "--no-svg" | "--status" => &["view", "snapshot"],
             "--flylines" => &["view", "snapshot", "render"],
             "--hints" => &["view"],
@@ -556,6 +571,8 @@ fn parse_args() -> Result<Args, Said> {
         layout,
         all,
         bind,
+        only_file,
+        each_file,
     })
 }
 
@@ -744,8 +761,21 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
             // a violation fails the check as an error does: an assertion is written to be checked (7.6)
             Ok(if e > 0 || v > 0 { ExitCode::from(1) } else { ExitCode::SUCCESS })
         }
+        "dump" if args.each_file => {
+            let report =
+                dump::each_file(&args.file, args.dialect.as_deref(), &args.formats, &provider, &options(args))?;
+            println!("{}", serde_json::to_string_pretty(&report).unwrap());
+            let differences = report["differences"].as_u64().unwrap_or(0);
+            Ok(if differences == 0 { ExitCode::SUCCESS } else { ExitCode::from(1) })
+        }
         "dump" => {
-            let r = interpret(args, &provider)?;
+            let mut options = options(args);
+            if let Some(f) = &args.only_file {
+                let file = dump::file_in(&args.file, args.dialect.as_deref(), &args.formats, &provider, f)?;
+                options.only_file = Some(file);
+            }
+            let r =
+                rnl_cli::interpret_file_with(&args.file, args.dialect.as_deref(), &args.formats, &provider, &options)?;
             println!("{}", serde_json::to_string_pretty(&dump::interpretation(&r)).unwrap());
             Ok(ExitCode::SUCCESS)
         }

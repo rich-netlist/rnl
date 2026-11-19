@@ -1,6 +1,15 @@
 //! The effective model and the diagnostics as JSON.
 
+use std::collections::{BTreeMap, HashSet};
+use std::path::Path;
+use std::time::Instant;
+
 use serde_json::{json, Value};
+
+use rnl_runtime::diag::Sink;
+use rnl_runtime::per_file;
+use rnl_runtime::source::{dirname, join, normalize, Provider};
+use rnl_runtime::Options;
 
 use rnl_runtime::interp::obj::Lit;
 use rnl_runtime::markup::{Line, Run};
@@ -142,4 +151,67 @@ pub fn conformance(r: &Interpretation) -> Value {
             "col": d.loc.as_ref().map(|l| l.col),
         })).collect::<Vec<_>>(),
     })
+}
+
+/// The name in the document read from `entry` of the file `given`: the name itself, or a path to
+/// it, relative to the current directory or absolute, as `entry` is given.
+pub fn file_in(
+    entry: &Path,
+    dialect: Option<&str>,
+    formats: &BTreeMap<String, String>,
+    provider: &dyn Provider,
+    given: &str,
+) -> Result<String, String> {
+    let doc = rnl_view::read_host_with(&entry.to_string_lossy(), dialect, formats, provider, &mut Sink::new())?;
+    let names = per_file::files(&doc);
+    let entry_dir = dirname(&normalize(&entry.to_string_lossy().replace('\\', "/")));
+    let wanted = normalize(&given.replace('\\', "/"));
+    names
+        .iter()
+        .find(|n| **n == wanted || normalize(&join(&entry_dir, n)) == wanted)
+        .cloned()
+        .ok_or_else(|| format!("{given} is not a file of the document; its files are {}", names.join(", ")))
+}
+
+/// Read each file of the document alone ([`Options::only_file`]) and compare it with the reading of
+/// the whole document ([`per_file::differences`]), both with the problems of the levels: for each
+/// file its levels, the time it took and its differences, what no reading of one file reports
+/// ([`per_file::unreported`]), and how many differences there are in all.
+pub fn each_file(
+    entry: &Path,
+    dialect: Option<&str>,
+    formats: &BTreeMap<String, String>,
+    provider: &dyn Provider,
+    options: &Options,
+) -> Result<Value, String> {
+    let options = &Options { problems: true, ..options.clone() };
+    let start = Instant::now();
+    let whole = crate::interpret_file_with(entry, dialect, formats, provider, options)?;
+    let whole_ms = start.elapsed().as_secs_f64() * 1000.0;
+    let mut found: HashSet<String> = HashSet::new();
+    let mut files = Vec::new();
+    let mut count = 0;
+    for file in per_file::files(&whole.doc) {
+        let alone = Options { only_file: Some(file.clone()), ..options.clone() };
+        let start = Instant::now();
+        let part = crate::interpret_file_with(entry, dialect, formats, provider, &alone)?;
+        let ms = start.elapsed().as_secs_f64() * 1000.0;
+        let differences = per_file::differences(&whole, &part, &file);
+        count += differences.len();
+        found.extend(per_file::reported(&part));
+        files.push(json!({
+            "file": file,
+            "levels": part.model.levels.iter().map(|l| l.title.clone()).collect::<Vec<_>>(),
+            "ms": (ms * 10.0).round() / 10.0,
+            "differences": differences,
+        }));
+    }
+    let unreported = per_file::unreported(&whole, &found);
+    count += unreported.len();
+    Ok(json!({
+        "whole_ms": (whole_ms * 10.0).round() / 10.0,
+        "files": files,
+        "unreported": unreported,
+        "differences": count,
+    }))
 }
