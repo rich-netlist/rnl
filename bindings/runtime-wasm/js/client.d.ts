@@ -5,6 +5,8 @@ import type {
   CatalogRequest,
   Document,
   DrawingsRequest,
+  FileResult,
+  FileSymbols,
   FormatList,
   FormatsRequest,
   LibraryRequest,
@@ -24,6 +26,13 @@ export type {
   CatalogRequest,
   Document,
   DrawingsRequest,
+  FileCall,
+  FileChild,
+  FileInput,
+  FileInputs,
+  FileOutline,
+  FileResult,
+  FileSymbols,
   FormatInfo,
   FormatList,
   FormatsRequest,
@@ -43,11 +52,14 @@ export type {
   Run,
   RunStyle,
   Snapshot,
+  SubcktSymbol,
   UnplacedDrawing,
   Vertex,
   WriteRequest,
   Written,
 } from "./core.js";
+
+export { coreVersion, fileResultFormat } from "./version.js";
 
 /** The core, running in a Worker. */
 export interface CoreWorker {
@@ -61,6 +73,13 @@ export interface CoreWorker {
    * interpreted.
    */
   outline(request: Request): Promise<Outline>;
+  /**
+   * The reading of the request's `file`, one file of the document, in the context of its entry. Keep
+   * one Worker for a run of them: later versions keep the packages it classified.
+   */
+  buildFile(request: Request & { file: string }): Promise<FileResult>;
+  /** The symbols the subcircuits of the request's `symbols`, a file of the document, give themselves. */
+  symbols(request: Request & { symbols: string }): Promise<FileSymbols>;
   /** Write and build. Refusals reject with EditError, carrying a code and host diagnostics. */
   write(request: WriteRequest): Promise<Written>;
   /**
@@ -98,6 +117,13 @@ export function collectOutline(
   request: Request,
   read: (path: string) => Promise<string | null>,
 ): Promise<{ outline: Outline; files: Record<string, string> }>;
+
+/** The reading of one file of a document with the files it needs, read through `read` as `collect` reads them. */
+export function collectFile(
+  core: { buildFile(request: Request & { file: string }): FileResult | Promise<FileResult> },
+  request: Request & { file: string },
+  read: (path: string) => Promise<string | null>,
+): Promise<{ result: FileResult; files: Record<string, string> }>;
 
 /** A file's text from its bytes, as rnl reads a file: UTF-8 without a BOM, else Latin-1. */
 export function decodeText(bytes: BufferSource): string;

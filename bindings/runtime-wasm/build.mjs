@@ -17,7 +17,7 @@
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { gzipSync } from "node:zlib";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -55,6 +55,19 @@ for (const name of readdirSync(join(here, "js"))) copyFileSync(join(here, "js", 
 // client.d.ts refer to
 for (const name of ["document.d.ts", "snapshot.d.ts", "catalog.d.ts"]) {
   copyFileSync(join(here, "..", "..", "crates", "rnl-view", "types", name), join(out, name));
+}
+// the version of the core and of the shape of its readings of one file, as the module gives them,
+// for a frontend to key what it keeps before it loads the module
+{
+  const { loadCore } = await import(pathToFileURL(join(out, "core.js")).href);
+  const core = await loadCore(readFileSync(wasm));
+  const files = { "/version.sp": "* version\n.end\n" };
+  const { inputs } = core.buildFile({ entry: "/version.sp", files, file: "version.sp", svg: false });
+  const text = readFileSync(join(here, "js", "version.js"), "utf8")
+    .replace("export const coreVersion = null;", `export const coreVersion = ${JSON.stringify(inputs.core)};`)
+    .replace("export const fileResultFormat = null;", `export const fileResultFormat = ${inputs.format};`);
+  writeFileSync(join(out, "version.js"), text);
+  console.log(`version.js: ${inputs.core}, format ${inputs.format}`);
 }
 // An incremental build must not retain the optional data shipped by earlier npm versions.
 rmSync(join(out, "packages", "analog-canvas-extensions.rnl"), { force: true });

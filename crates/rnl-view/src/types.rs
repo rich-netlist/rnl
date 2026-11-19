@@ -9,6 +9,7 @@ use crate::{
     SolverLiteral, SolverSettingView,
 };
 use crate::{CurrentArrow, UsageFrame};
+use crate::{FileCall, FileChild, FileInput, FileInputs, FileOutline, FileResult, FileSymbols, SubcktSymbol};
 use crate::{FormatInfo, InspectedLabel, InspectedPin, InspectedSymbol, SourceInclude, Usage, UsageRole};
 use crate::{GroupView, LevelHint, MemberOf, NetLabel, RoleOf, RuleAt, UsageOf};
 use crate::{Outline, OutlineCall, OutlineFile, OutlineLevel};
@@ -176,6 +177,14 @@ fn all() -> Vec<(String, String)> {
         one::<OutlineFile>(&cfg),
         one::<OutlineLevel>(&cfg),
         one::<OutlineCall>(&cfg),
+        one::<FileResult>(&cfg),
+        one::<FileChild>(&cfg),
+        one::<FileInputs>(&cfg),
+        one::<FileInput>(&cfg),
+        one::<FileOutline>(&cfg),
+        one::<FileCall>(&cfg),
+        one::<FileSymbols>(&cfg),
+        one::<SubcktSymbol>(&cfg),
         one::<Primitive>(&cfg),
         one::<Layer>(&cfg),
         one::<Shape>(&cfg),

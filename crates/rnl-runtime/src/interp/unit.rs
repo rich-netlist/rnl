@@ -2341,6 +2341,10 @@ impl Interp<'_> {
         self.pkg_levels.push(lv);
         // files of one name in two package directories, such as rnl-std.rnl of two standard series,
         // are two sources: the revision of a snapshot counts the text of every file read
+        let read = normalize(path);
+        if !self.package_files.iter().any(|(p, _)| *p == read) {
+            self.package_files.push((read, text.clone()));
+        }
         if !self.pkg_sources.iter().any(|(f, t)| *f == fname && *t == text) {
             self.pkg_sources.push((fname.clone(), text));
         }

@@ -7,6 +7,7 @@
 mod catalog;
 mod constraints;
 mod document;
+mod file_result;
 mod formats;
 pub mod hints;
 mod library;
@@ -49,6 +50,9 @@ pub use document::{
     AutoIncludeCandidate, Child, Diagnostic, Document, Drawings, Hit, InspectedLabel, InspectedPin, InspectedSymbol,
     Level, LevelHint, MemberOf, NetLabel, Object, PinObject, RoleOf, RuleAt, SourceFile, SourceInclude, Span, Unplaced,
     UnplacedDrawing, Usage, UsageRole,
+};
+pub use file_result::{
+    FileCall, FileChild, FileInput, FileInputs, FileOutline, FileResult, FileSymbols, SubcktSymbol, FILE_RESULT_FORMAT,
 };
 pub use formats::{detect_format, formats, validate_format, FormatInfo};
 pub use library::{LibraryIndex, LibraryProvider};
@@ -181,6 +185,80 @@ fn build_with(
     options: &BuildOptions,
     lazy: bool,
 ) -> Result<(Document, Option<Drawings>), String> {
+    build_in(entry, files, options, lazy, |_, d| d)
+}
+
+/// The reading of one file of the document `entry`, `file`, as the document names it
+/// ([`SourceFile::path`], [`Outline`]'s files), in the context of the entry
+/// ([`rnl_runtime::Options::only_file`]): the Document of the file's levels, each the level the
+/// whole document's Document has, with the subcircuits they instantiate and what the reading
+/// depends on ([`FileResult`]). `files` and `options` are those of [`build`]; `options.runtime`'s
+/// `only_file` is set to `file`. Fails as [`build`] does, and when `file` is not a file of the
+/// document and the document misses no file: when it misses some, the result has no level, and
+/// lists them in `missing` for the frontend to read and ask again.
+pub fn build_file(entry: &str, file: &str, files: &dyn Provider, options: &BuildOptions) -> Result<FileResult, String> {
+    Ok(build_file_with(entry, file, files, options, false)?.0)
+}
+
+/// [`build_file`], with the drawings of the objects without a position kept apart, as
+/// [`build_drawn`] keeps them.
+pub fn build_file_drawn(
+    entry: &str,
+    file: &str,
+    files: &dyn Provider,
+    options: &BuildOptions,
+) -> Result<(FileResult, Drawings), String> {
+    let (result, drawings) = build_file_with(entry, file, files, options, true)?;
+    Ok((result, drawings.expect("drawings were asked for")))
+}
+
+fn build_file_with(
+    entry: &str,
+    file: &str,
+    files: &dyn Provider,
+    options: &BuildOptions,
+    lazy: bool,
+) -> Result<(FileResult, Option<Drawings>), String> {
+    let runtime = Options { only_file: Some(file.to_string()), ..options.runtime.clone() };
+    let options = BuildOptions { runtime, ..options.clone() };
+    let (result, drawings) =
+        build_in(entry, files, &options, lazy, |r, d| file_result::file_result(entry, file, r, d))?;
+    // a file not read yet may be among those missing, which a frontend reads to ask again
+    if !result.document.files.iter().any(|f| f.path == file) && result.document.missing.is_empty() {
+        return Err(format!("{file} is not a file of {entry}"));
+    }
+    Ok((result, drawings))
+}
+
+/// The symbols the subcircuits of `file`, a file of the document `entry` as [`build_file`] names
+/// it, give themselves (9.2.6), what the levels that instantiate them use of them, read in the
+/// context of the entry without building any level ([`rnl_runtime::Options::symbols_only`]).
+/// `files` and the reading options of `options` are those of [`build`]. Fails as [`build_file`]
+/// does.
+pub fn symbols(entry: &str, file: &str, files: &dyn Provider, options: &BuildOptions) -> Result<FileSymbols, String> {
+    let ws = Workspace::with_formats(files, &options.formats);
+    if ws.read(&slashed(entry)).is_none() {
+        return Err(format!("cannot read {entry}"));
+    }
+    let runtime =
+        Options { only_file: Some(file.to_string()), symbols_only: true, problems: false, ..options.runtime.clone() };
+    let r = interpret_in(entry, (options.dialect.as_deref(), &options.formats), &ws, &runtime)?;
+    let missing = ws.missing.into_inner();
+    if !r.doc.sources.iter().any(|(p, _)| p == file) && missing.is_empty() {
+        return Err(format!("{file} is not a file of {entry}"));
+    }
+    Ok(file_result::file_symbols(file, &r, missing))
+}
+
+/// The Document of `entry` made into what `finish` makes of it with its interpretation, and when
+/// `lazy` the drawings of the objects without a position.
+fn build_in<T>(
+    entry: &str,
+    files: &dyn Provider,
+    options: &BuildOptions,
+    lazy: bool,
+    finish: impl FnOnce(&Interpretation, Document) -> T,
+) -> Result<(T, Option<Drawings>), String> {
     let ws = Workspace::with_formats(files, &options.formats);
     if ws.read(&slashed(entry)).is_none() {
         return Err(format!("cannot read {entry}"));
@@ -220,7 +298,7 @@ fn build_with(
     }
     drop(other);
     let drawings = lazy.then(|| Drawings::take(&mut r.model.levels, &d, options));
-    Ok((d, drawings))
+    Ok((finish(&r, d), drawings))
 }
 
 /// The solve status of each drawing level, by host level ([`solve_status`]): its problem and model

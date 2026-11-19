@@ -120,6 +120,10 @@ pub struct Options {
     /// packages and the block symbols of the subcircuits it instantiates, so each level it builds
     /// is the one the whole document builds (6.1, 10.3). None, as by default: every level.
     pub only_file: Option<String>,
+    /// With [`Options::only_file`], build no level at all, and give the symbols the subcircuits of
+    /// the file give themselves (9.2.6), [`Interpretation::block_symbols`]: what the levels that
+    /// instantiate them use of them. Off by default.
+    pub symbols_only: bool,
 }
 
 impl Default for Options {
@@ -133,6 +137,7 @@ impl Default for Options {
             problems: false,
             tolerance: crate::geom::TOL,
             only_file: None,
+            symbols_only: false,
         }
     }
 }
@@ -187,6 +192,14 @@ pub struct Interpretation {
     /// before any level is built. A reading of one file ([`Options::only_file`]) reads the whole
     /// document as well, and gives them too.
     pub read: usize,
+    /// With [`Options::only_file`], the symbols subcircuits give themselves (9.2.6), by level, in
+    /// the order of the document, None for one that gives itself none: those of the file with
+    /// [`Options::symbols_only`], else those of every file that defines a subcircuit the file's
+    /// levels instantiate. Empty otherwise.
+    pub block_symbols: Vec<(LevelId, Option<crate::model::BlockSymbol>)>,
+    /// The package files read, each once, by their paths as the provider names them (normalized),
+    /// with their texts, in the order read.
+    pub package_files: Vec<(String, String)>,
     /// The numbers of the objects without a name of each drawing level, with their checks, whatever
     /// its version (5.9); empty for a package file checked on its own. See [`crate::numbering`].
     pub numbering: Vec<LevelNumbering>,
@@ -245,6 +258,8 @@ pub struct Interp<'p> {
     pub(crate) rec_chars: Vec<Option<Rc<[char]>>>,
     pub(crate) pkg_levels: Vec<Level>,
     pub(crate) pkg_sources: Vec<(String, String)>,
+    /// The package files read, by their paths as the provider names them, with their texts.
+    pub(crate) package_files: Vec<(String, String)>,
     /// The packages read, by name and version, the version in its numeric form
     /// ([`unit::package_cache_key`], 16.2).
     pub(crate) packages: HashMap<(String, String), UnitId>,
@@ -303,6 +318,8 @@ pub struct Interp<'p> {
     /// With [`Options::only_file`], the levels built: those of the file and the circuits above them,
     /// whose scenes find the rules that reach below (10.1); and the levels given, the file's.
     pub(crate) only_levels: Option<OnlyLevels>,
+    /// [`Options::symbols_only`].
+    symbols_only: bool,
     /// The tolerance of the checks against written coordinates (`Options::tolerance`, 11.7).
     pub(crate) tol: f64,
     tool_solver_config: Vec<crate::problem::SolverSetting>,
@@ -391,13 +408,34 @@ pub(crate) struct OnlyLevels {
 }
 
 impl OnlyLevels {
-    fn new(doc: &HostDocument, file: &str) -> OnlyLevels {
+    /// The levels of `file`, built with the circuits above them, or none built when `symbols_only`.
+    fn new(doc: &HostDocument, file: &str, symbols_only: bool) -> OnlyLevels {
         let given: HashSet<LevelId> = (0..doc.levels.len()).filter(|&lv| doc.levels[lv].file == file).collect();
-        let mut built = given.clone();
-        for &lv in &given {
-            built.extend(doc.ancestors(lv).into_iter().filter(|&a| doc.levels[a].circuit));
+        let mut built = HashSet::new();
+        if !symbols_only {
+            built.clone_from(&given);
+            for &lv in &given {
+                built.extend(doc.ancestors(lv).into_iter().filter(|&a| doc.levels[a].circuit));
+            }
         }
         OnlyLevels { built, given }
+    }
+
+    /// The subcircuits whose block symbols a reading of one file gives
+    /// ([`Interpretation::block_symbols`]), in the order of the document.
+    fn symbol_levels(&self, doc: &HostDocument, symbols_only: bool) -> Vec<LevelId> {
+        let files: HashSet<&str> = if symbols_only {
+            self.given.iter().map(|&lv| doc.levels[lv].file.as_str()).collect()
+        } else {
+            let called = self.given.iter().flat_map(|&lv| doc.levels[lv].instances.iter());
+            called
+                .filter(|i| i.is_subckt)
+                .filter_map(|i| doc.subckt_of(i))
+                .map(|c| doc.levels[c].file.as_str())
+                .collect()
+        };
+        let subckt = |lv: LevelId| doc.levels[lv].kind == LevelKind::Subckt;
+        (0..doc.levels.len()).filter(|&lv| subckt(lv) && files.contains(doc.levels[lv].file.as_str())).collect()
     }
 }
 
@@ -410,7 +448,7 @@ impl<'p> Interp<'p> {
         numbers: NumberRun,
     ) -> Interp<'p> {
         let nlevels = doc.levels.len();
-        let only_levels = options.only_file.as_ref().map(|f| OnlyLevels::new(&doc, f));
+        let only_levels = options.only_file.as_ref().map(|f| OnlyLevels::new(&doc, f, options.symbols_only));
         let mut it = Interp {
             doc,
             provider,
@@ -429,6 +467,7 @@ impl<'p> Interp<'p> {
             rec_chars: Vec::new(),
             pkg_levels: Vec::new(),
             pkg_sources: Vec::new(),
+            package_files: Vec::new(),
             packages: HashMap::new(),
             pkg_files: HashMap::new(),
             pkg_headers: HashMap::new(),
@@ -465,6 +504,7 @@ impl<'p> Interp<'p> {
             want_problems: options.problems,
             read: 0,
             only_levels,
+            symbols_only: options.symbols_only,
             tol: options.tolerance,
             tool_solver_config: options.solver_config.clone(),
             std_units: HashMap::new(),
@@ -1131,6 +1171,13 @@ impl<'p> Interp<'p> {
             (0..self.doc.levels.len()).map(|lv| self.unsupported_file(lv)).collect()
         };
         let imported_aliases = self.units.iter().flat_map(|u| u.imported_aliases.iter().cloned()).collect();
+        let block_symbols = match self.only_levels.clone() {
+            Some(only) => {
+                let levels = only.symbol_levels(&self.doc, self.symbols_only);
+                levels.into_iter().map(|lv| (lv, self.block_symbol_of(lv))).collect()
+            }
+            None => Vec::new(),
+        };
         Interpretation {
             model,
             sink: std::mem::take(&mut self.sink),
@@ -1145,6 +1192,8 @@ impl<'p> Interp<'p> {
             failed: std::mem::take(&mut self.failed_spans),
             problems,
             read: self.read,
+            block_symbols,
+            package_files: std::mem::take(&mut self.package_files),
             numbering,
             unsupported,
             imported_aliases,
