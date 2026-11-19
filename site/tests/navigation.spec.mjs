@@ -129,7 +129,7 @@ test("gallery: directory categories, search, disclosure, packages, history and s
   await page.goForward();
   await expect(page.locator(".gl-pkg")).toHaveCount(current.counts.packages);
   await page.locator("#gl-q").fill("RNL-STD-BASIC");
-  await expect(page.locator("#gl-nav [data-pkg]").filter({ hasText: packageName })).toHaveCount(1);
+  await expect(page.locator(`#gl-nav [data-group="${current.id}"][data-pkg]`).filter({ hasText: packageName })).toHaveCount(1);
   await expect(page).toHaveURL(/q=RNL-STD-BASIC/);
   await page.locator("#gl-q").fill("nmos");
   await expect(page.locator(".gl-card").first()).toBeVisible();

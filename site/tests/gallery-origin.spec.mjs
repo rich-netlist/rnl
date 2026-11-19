@@ -3,7 +3,9 @@ import { readFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 const group = id => JSON.parse(readFileSync(new URL(`../dist/gallery/${id}.js`, import.meta.url), "utf8").match(/^RNLGallery.group\((.*)\);/s)[1]);
-const standard = group("standard-0.3");
+// the series packages.html shows first: the newest standard series released
+const index = JSON.parse(readFileSync(new URL("../dist/gallery/index.js", import.meta.url), "utf8").match(/^RNLGallery.index\((.*)\);/s)[1]);
+const standard = group(index.groups[0].id);
 const symbols = standard.packages.flatMap(p => p.statements).filter(s => s.svg);
 const review = process.env.RNL_GALLERY_ORIGIN_SCREENSHOTS;
 
@@ -90,7 +92,7 @@ test("origin is off by default, accepts old settings and persists across reloads
 test("three registration points agree with the generated coordinates in cards and enlarged views", async ({ page }) => {
   await page.goto("/en/packages.html");
   await page.locator('[data-show="origin"]').click();
-  for (const name of ["$RESISTOR", "$NMOS", "$CURRENT_ARROW_SYMBOL"]) {
+  for (const name of ["$RESISTOR", "$NMOS", "$ARROW_SYMBOL"]) {
     const symbol = symbols.find(s => s.name === name);
     expect(symbol.origin).toEqual([0,0]); // Every build instance is explicitly @PLACE(0, 0).
     const card = page.locator(`.gl-card[data-sym="${name}"]`);
@@ -139,7 +141,7 @@ test("origin outside the artwork is framed, fixed in size and theme aware", asyn
   await expect.poll(async () => [...new Set((await marks(page)).map(row => row.color))]).toEqual([expected]);
 });
 
-test("review screenshots: standard 0.3 off, on, dark and enlarged", async ({ page }, info) => {
+test("review screenshots: the current standard series off, on, dark and enlarged", async ({ page }, info) => {
   test.skip(!review || info.project.name !== "chromium", "Optional review screenshots");
   mkdirSync(review, { recursive: true });
   await page.addInitScript(() => localStorage.setItem("rnl-intro-theme", "light"));
@@ -148,13 +150,13 @@ test("review screenshots: standard 0.3 off, on, dark and enlarged", async ({ pag
   await page.evaluate(() => document.fonts.ready);
   await page.locator('.gl-block[data-block="symbols"]').evaluate(el => window.scrollTo(0, el.getBoundingClientRect().top+scrollY-125));
   await page.mouse.move(0,0);
-  await page.screenshot({ path: resolve(review, "standard-0.3-origin-off.png") });
+  await page.screenshot({ path: resolve(review, `${standard.id}-origin-off.png`) });
   await page.locator('[data-show="origin"]').click();
   await checkMarks(page);
-  await page.screenshot({ path: resolve(review, "standard-0.3-origin-on.png") });
+  await page.screenshot({ path: resolve(review, `${standard.id}-origin-on.png`) });
   await page.locator("#theme-btn").click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await page.screenshot({ path: resolve(review, "standard-0.3-origin-dark.png") });
+  await page.screenshot({ path: resolve(review, `${standard.id}-origin-dark.png`) });
   await page.locator('.gl-card[data-sym="$RESISTOR"]').click();
   await expect(page.locator("#gl-dlg")).toBeVisible();
   await checkMarks(page, ".gl-dlg-fig .g-origin");

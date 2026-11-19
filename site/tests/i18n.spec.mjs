@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 const registry = JSON.parse(readFileSync(new URL('../../i18n/languages.json', import.meta.url), 'utf8'));
 const offered = registry.languages.filter(entry => entry.code === registry.default || entry.status === 'published').length;
 // whether a published language matches a browser language
+// the standard series packages.html shows first, whose summaries the fixture replaces
+const current = JSON.parse(readFileSync(new URL('../dist/gallery/index.js', import.meta.url), 'utf8').match(/^RNLGallery.index\((.*)\);/s)[1]).groups[0].id;
 const offers = tag => registry.languages.some(entry => entry.status === 'published'
   && (entry.matches || [entry.code]).some(m => tag.toLowerCase().startsWith(m)));
 
@@ -82,7 +84,7 @@ async function serveFixture(page) {
       : file.endsWith('.svg') ? 'image/svg+xml' : file.endsWith('.png') ? 'image/png' : 'text/html';
     try {
       let body = readFileSync(file);
-      if (file.endsWith('standard-0.3.js')) {
+      if (file.endsWith(`${current}.js`)) {
         const data = JSON.parse(body.toString().match(/^RNLGallery.group\((.*)\);\s*$/s)[1]);
         data.packages[0].summary = { en: 'English catalog fallback.' };
         data.packages[1].summary = { en: 'English catalog source.', ja: '日本語のカタログ説明。' };
