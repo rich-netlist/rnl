@@ -140,14 +140,21 @@ impl Interp<'_> {
                 }
             }
         } else if let Some(&symbol) = self.scenes[scene].symbol.get(&owner) {
-            // The owner's terminals and its symbol's pins are taken once for all its terminals,
-            // as `terms_of` and `pins_for` would take them again for each (9.2.4).
-            let terms = self.owner_terms(scene, owner);
-            let terminals: Vec<ObjId> =
-                terms.iter().map(|(number, name)| self.term_obj(scene, owner, *number, name.clone())).collect();
-            for (terminal, &(number, _)) in terminals.into_iter().zip(&terms) {
-                if self.pins_bound(symbol, owner, &terms, number).contains(&index) {
-                    nets.extend(self.term_nets(scene, terminal));
+            if let Some(found) = self.scenes[scene].pin_nets.get(&(owner, index)).cloned() {
+                // Debug and test builds find the nets again on every hit, so that each test checks
+                // that nothing the cache does not hear of has moved them (`Scene::pin_nets`).
+                #[cfg(debug_assertions)]
+                {
+                    let fresh = self.owner_pin_nets(scene, owner, index, symbol);
+                    debug_assert_eq!(found, fresh, "the nets of pin {index} of {owner:?}, kept, are out of date");
+                }
+                nets = found;
+            } else {
+                nets = self.owner_pin_nets(scene, owner, index, symbol);
+                #[cfg(test)]
+                tests::PIN_NETS_FOUND.with(|count| count.set(count.get() + 1));
+                if matches!(self.o(owner), ObjData::Inst { .. } | ObjData::LevelObj { .. }) {
+                    self.scenes[scene].pin_nets.insert((owner, index), nets.clone());
                 }
             }
         } else {
@@ -155,6 +162,22 @@ impl Interp<'_> {
             let _ = self.terms_of(scene, owner);
         }
         visiting.remove(&(owner, index));
+        nets
+    }
+
+    /// The nets of pin `index` of `owner`, which is not a usage and whose symbol is `symbol`: those
+    /// of the terminals bound to it. The owner's terminals and its symbol's pins are taken once for
+    /// all its terminals, as `terms_of` and `pins_for` would take them again for each (9.2.4).
+    fn owner_pin_nets(&mut self, scene: SceneId, owner: ObjId, index: usize, symbol: ObjId) -> Vec<ObjId> {
+        let terms = self.owner_terms(scene, owner);
+        let terminals: Vec<ObjId> =
+            terms.iter().map(|(number, name)| self.term_obj(scene, owner, *number, name.clone())).collect();
+        let mut nets = Vec::new();
+        for (terminal, &(number, _)) in terminals.into_iter().zip(&terms) {
+            if self.pins_bound(symbol, owner, &terms, number).contains(&index) {
+                nets.extend(self.term_nets(scene, terminal));
+            }
+        }
         nets
     }
 
@@ -856,6 +879,8 @@ pub(super) mod tests {
         pub(in crate::interp) static PIN_NET_LOOKUPS: Cell<usize> = const { Cell::new(0) };
         /// How many times the terminals of an owner were taken, on this thread.
         pub(in crate::interp) static OWNER_TERMS_TAKEN: Cell<usize> = const { Cell::new(0) };
+        /// How many times the nets of a pin of an instance were found, on this thread.
+        pub(in crate::interp) static PIN_NETS_FOUND: Cell<usize> = const { Cell::new(0) };
     }
 
     /// The lookups of pins' nets that reading a level of `n` instances of five terminals takes,
@@ -952,5 +977,51 @@ pub(super) mod tests {
         // Four times the terminals, four times the pins: the terminals taken once for each pin
         // grow four times, taken again for each terminal of the owner, as before, about 14 times.
         assert!(wide <= narrow * 6, "{narrow} for 4 terminals, {wide} for 16");
+    }
+
+    /// The times the nets of a pin of an instance are found while a level of 30 instances of five
+    /// terminals is read with `rules` rules that each select the pins of every net.
+    fn pin_nets_found(rules: usize) -> usize {
+        let mut sink = Sink::new();
+        let mut main = Level::new(LevelKind::File, "rules.sp", "rules.sp", "rules.sp");
+        main.circuit = true;
+        for k in 0..30 {
+            main.instances.push(Instance {
+                name: format!("X{}", k + 1),
+                letter: Some('X'),
+                nodes: vec![format!("n{k}"), format!("n{}", k + 1), format!("n{}", k + 2), "vdd".into(), "vss".into()],
+                file: "rules.sp".into(),
+                line: k as u32 + 1,
+                order: k,
+                default_terminals: Some(["a", "b", "y", "vdd", "vss"].map(String::from).to_vec()),
+                ..Instance::default()
+            });
+        }
+        let mut statements = String::from("  $TP = @DEFINE(roles=[[\"t\", [\"net\", \"terminal\"]]]) {};\n");
+        for k in 0..rules {
+            statements.push_str(&format!("  %pins{k} = # @SELECT-NET => @SELECT-PIN;\n  $TP @ATTACH %pins{k};\n"));
+        }
+        let records = format!("@RNL(type=\"header\") {{ @VERSION(\"0.4\")}}\n@RNL {{\n{statements}}}");
+        main.records = scan_run(&package_lines(&records), "rules.sp", &mut sink);
+        let dialect = Dialect { name: "spice".into(), case_sensitive: false, ground_aliases: vec![] };
+        PIN_NETS_FOUND.with(|count| count.set(0));
+        let read = interpret(
+            HostDocument::new(main, dialect),
+            &MemoryProvider::new(),
+            &Options { std: false, ..Options::default() },
+            sink,
+        );
+        let errors: Vec<_> = read.sink.all().iter().filter(|d| d.severity == Severity::Error).collect();
+        assert!(errors.is_empty(), "{errors:?}");
+        PIN_NETS_FOUND.with(Cell::get)
+    }
+
+    #[test]
+    fn the_nets_of_a_pin_of_an_instance_are_found_once_while_nothing_moves_them() {
+        let (one, four) = (pin_nets_found(1), pin_nets_found(4));
+        assert!(one >= 30 * 5, "every pin's nets are found: {one}");
+        // Four rules look the pins up four times as often; their nets are found again only after a
+        // symbol is set, a device matched or the bundles resolved.
+        assert!(four <= one * 3 / 2, "{one} for one rule, {four} for four");
     }
 }

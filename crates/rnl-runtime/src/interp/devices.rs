@@ -95,6 +95,7 @@ impl Interp<'_> {
                 }
             }
             self.scenes[s].device_info.insert(object, info);
+            self.scenes[s].pin_nets.clear();
         }
     }
 
