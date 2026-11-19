@@ -186,7 +186,13 @@ class ReleaseDownloads(unittest.TestCase):
                         self.assertEqual("-linux-x86_64.AppImage\"" in html, linux)
                         self.assertEqual("-linux-x86_64.deb\"" in html, linux)
                         self.assertEqual("-windows-x64-setup.exe\"" in html, version is not None)
+                        # the local viewer for older Linux is in the Linux downloads, and #linux-local lands there or
+                        # on the line that says there are none yet
+                        self.assertEqual("-linux-x86_64.tar.gz\"" in html, linux)
+                        self.assertEqual("-linux-x86_64-with-firefox.tar.gz\"" in html, linux)
+                        self.assertEqual(html.count('id="linux-local"'), 1)
                         if linux:
+                            self.assertIn("viewer-v0.1.2/rnl-viewer-local-0.1.2-linux-x86_64.tar.gz", html)
                             self.assertIn("viewer-v0.1.2/RNL-Viewer-0.1.2-linux-x86_64.deb", html)
                             self.assertIn("--appimage-extract-and-run", html)
                             self.assertIn("sudo apt install ./RNL-Viewer-0.1.2", html)
