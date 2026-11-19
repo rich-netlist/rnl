@@ -159,13 +159,13 @@ See [the three release lines](../../docs/releases.md) for version ownership and 
 
 [`viewer-release.yml`](../../.github/workflows/viewer-release.yml) builds and releases the viewer for Windows x64, Linux x86_64, macOS Apple Silicon and Intel on GitHub's runners. To release version X.Y.Z:
 
-1. Set the Viewer version only in `Cargo.toml` and `tauri.conf.json` here, and update the app's own lockfile entry. Leave the root workspace/core version unchanged. The web viewer reads the Viewer version too; both About dialogs also name the core version and build commit. The tests require the two Viewer declarations to match, independently of the core.
-2. Write the release's notes in `release-notes/X.Y.Z.md`.
+1. Set the Viewer version only in `Cargo.toml` and `tauri.conf.json` here, and in the local viewer's `apps/local/Cargo.toml`, and update both apps' own lockfile entries. Leave the root workspace/core version unchanged. The web viewer reads the Viewer version too; both About dialogs also name the core version and build commit. The tests require the two Viewer declarations to match, independently of the core.
+2. Write the release's notes in `release-notes/X.Y.Z.md`, ending with the downloads ([`release-notes/TEMPLATE.md`](../../release-notes/TEMPLATE.md)). Check that `apps/local/ci/firefox.lock` names Mozilla's newest Firefox ESR.
 3. Push the tag `viewer-vX.Y.Z` of the commit to GitHub.
 
 The workflow stops when the tag is not the app's version or the notes are missing. On Windows it builds with MSVC, checks with `dumpbin` that the executable imports no `WebView2Loader.dll`, smoke-tests the executable alone in a directory, installs each installer silently, smoke-tests the installed app and uninstalls it. On Linux it builds the AppImage and deb, smoke-tests the AppImage alone in a directory under Xvfb, installs the deb, smoke-tests `/usr/bin/rnl-viewer`, uninstalls it and checks that the binary and desktop entry are gone. The tests use a D-Bus session, software rendering and isolated profiles, and keep screenshots as Actions artifacts.
 
-After all platforms succeed, the workflow verifies each platform's checksums and writes one combined `SHA256SUMS.txt`. The GitHub release *RNL Viewer X.Y.Z* contains thirteen files:
+The workflow also builds the local viewer for older enterprise Linux ([`apps/local`](../local/README.md)) through `local-linux.yml`, static, and tests its package with Firefox in containers of CentOS 7, Rocky 8 and Rocky 9. After all platforms succeed, the workflow verifies each platform's checksums and writes one combined `SHA256SUMS.txt`. The GitHub release *RNL Viewer X.Y.Z* contains fifteen files:
 
 - `RNL-Viewer-X.Y.Z-windows-x64-setup.exe`
 - `RNL-Viewer-X.Y.Z-windows-x64.msi`
@@ -179,9 +179,11 @@ After all platforms succeed, the workflow verifies each platform's checksums and
 - `RNL-Viewer-X.Y.Z-with-packages-macos-arm64.dmg`
 - `RNL-Viewer-X.Y.Z-macos-x86_64.dmg`
 - `RNL-Viewer-X.Y.Z-with-packages-macos-x86_64.dmg`
+- `rnl-viewer-local-X.Y.Z-linux-x86_64.tar.gz`
+- `rnl-viewer-local-X.Y.Z-linux-x86_64-with-firefox.tar.gz`
 - `SHA256SUMS.txt`
 
-The release uses `--latest=false`; the repository's latest belongs to the core (`core-vX.Y.Z`), so the viewer's releases are told apart by their tags. A version with a prerelease part, such as `0.2.0-rc.1`, makes a prerelease, which Check for Updates passes over. Run by hand from the Actions tab on a branch, the workflow builds and checks all platforms and keeps the platform artifacts and combined eight-file artifact; it never publishes. Before pushing a release tag, run it on the intended commit, check every build job and the combined checksums, inspect the Linux screenshots, and confirm the versions and notes above. The site only links Linux files when the selected release tag contains the Linux bundle configuration, so earlier Windows-only releases keep valid download links.
+The release uses `--latest=false`; the repository's latest belongs to the core (`core-vX.Y.Z`), so the viewer's releases are told apart by their tags. A version with a prerelease part, such as `0.2.0-rc.1`, makes a prerelease, which Check for Updates passes over. Run by hand from the Actions tab on a branch, the workflow builds and checks all platforms and keeps the platform artifacts and the combined artifact of the fourteen downloads and their checksums; it never publishes. Before pushing a release tag, run it on the intended commit, check every build job and the combined checksums, inspect the Linux screenshots, and confirm the versions and notes above. The site only links Linux files when the selected release tag contains the Linux bundle configuration, so earlier Windows-only releases keep valid download links.
 
 ## macOS downloads and installation
 

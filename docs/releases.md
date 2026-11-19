@@ -115,11 +115,12 @@ website continues to resolve Viewer downloads from those tags; CLI links use the
 latest endpoints. Until the first core release, those CLI links have no matching assets.
 
 The local viewer for older enterprise Linux (`apps/local`, a static program that serves the web viewer on the
-loopback address, shown by a browser) is a line of its own: tags `viewer-local-v*`, built and published by
-`local-release.yml` with `--latest=false` and its own release notes (`apps/local/release-notes/`), so that neither the
-repository's latest endpoint, the desktop viewer's `viewer-v*` releases nor Help > Check for Updates is affected. It has two
-packages, one of which carries Mozilla's official Firefox ESR, unmodified, which is why a release is made with the newest ESR
-(`apps/local/ci/firefox.lock`; the workflow checks it). Each release needs the user's approval, as the others do.
+loopback address, shown by a browser) is released with the Viewer, at the Viewer's version (`scripts/release.py`
+checks `apps/local/Cargo.toml` and its lock): `viewer-release.yml` builds its two packages through `local-linux.yml`,
+tests them in containers of CentOS 7, Rocky 8 and Rocky 9, and attaches them to the `viewer-v*` release, in its
+`SHA256SUMS.txt`. Help > Check for Updates reads the `viewer-v*` tags alone, never the files of a release. One package
+carries Mozilla's official Firefox ESR, unmodified, which is why a Viewer release is made with the newest ESR
+(`apps/local/ci/firefox.lock`; the validation of `viewer-release.yml` checks it against Mozilla's list of versions).
 
 The CLI is unsigned. Windows may show SmartScreen. A macOS browser download may require
 `xattr -d com.apple.quarantine rnl` after verifying and extracting the archive.

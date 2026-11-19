@@ -4,7 +4,8 @@
 # program is to be built for glibc 2.17 instead). It makes the two packages (the program with get-firefox.sh, and the program with
 # Mozilla's official Firefox ESR, unmodified, beside it) and tests the one with Firefox in a container of each of centos:7,
 # rockylinux:8 and rockylinux:9: the program starts the Firefox itself, as a user would, and the page opens the netlist named on its
-# command line and solves it. It publishes nothing; local-release.yml, which calls this, does (from a tag).
+# command line and solves it. It publishes nothing; viewer-release.yml, which calls this, attaches the two packages to the Viewer's
+# release (from a tag viewer-v<version>, the Viewer's version, which apps/local/Cargo.toml has too).
 name: Local viewer, Linux
 
 on:
@@ -123,7 +124,7 @@ jobs:
           retention-days: 14
 
   # Whether to test in the three containers. A pull request does only when it changes the local
-  # viewer, Cargo.lock, a toolchain file or this workflow and the release that calls it; a run on
+  # viewer, Cargo.lock, a toolchain file or this workflow and the Viewer release that calls it; a run on
   # main, on a tag or by hand always does.
   systems:
     runs-on: ubuntu-24.04
@@ -146,7 +147,7 @@ jobs:
             # when they cannot be read, test
             if files=$(git diff --name-only HEAD^1 HEAD); then
               if ! grep -qE -e '^apps/local/' -e '^Cargo\.lock$' -e '(^|/)rust-toolchain(\.toml)?$' \
-                  -e '^\.github/workflows/local-(linux|release)\.yml$' <<<"$files"; then
+                  -e '^\.github/workflows/(local-linux|viewer-release)\.yml$' <<<"$files"; then
                 test=false
               fi
             else
