@@ -178,6 +178,13 @@ pub struct Scene {
     pub(super) resolved_trees: Vec<super::routes::RouteTree>,
     pub keytexts: HashMap<(ObjId, String), ObjId>,
     pub named_subobjects: HashMap<(ObjId, String), ObjId>,
+    /// The nets of each pin of an instance or of the level's ports, as `scene_pin_nets` found
+    /// them. They follow from the owner's symbol, its device and its terminals' nodes alone (9.2.4,
+    /// 6.4), so three writers forget them all: `device_info.insert` (a device matched, in
+    /// devices.rs), `set_symbol` (a symbol set) and `resolve_bundles` (the bundles of the level).
+    /// The pins of usages, whose nets follow their roles, are not kept. Debug builds check every
+    /// kept value against the nets found again.
+    pub pin_nets: HashMap<(ObjId, usize), Vec<ObjId>>,
     pub pins: HashMap<(ObjId, usize), ObjId>,
     pub at: Vec<Fact>,
     /// The indexes in `at` of each object's facts, in order; `add_at` keeps it.
@@ -318,6 +325,7 @@ impl Scene {
             resolved_trees: Vec::new(),
             keytexts: HashMap::new(),
             named_subobjects: HashMap::new(),
+            pin_nets: HashMap::new(),
             pins: HashMap::new(),
             at: Vec::new(),
             at_by_target: HashMap::new(),

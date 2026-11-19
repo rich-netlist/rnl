@@ -180,6 +180,7 @@ impl Interp<'_> {
     // ---- bundles (11.8)
 
     fn resolve_bundles(&mut self, s: SceneId) {
+        self.scenes[s].pin_nets.clear();
         let mut bundles = self.scenes[s].bundles.clone();
         bundles.sort_by(|a, b| self.scenes[s].created_order[a].cmp(&self.scenes[s].created_order[b]));
         let mut owner: HashMap<ObjId, ObjId> = HashMap::new();
@@ -428,6 +429,7 @@ impl Interp<'_> {
             self.symbol_order.entry(s).or_default().push(o);
         }
         self.scenes[s].symbol.insert(o, sym);
+        self.scenes[s].pin_nets.clear();
     }
 
     /// Matching uses the owner's electrical terminal names, or a usage's role names (11.3).
