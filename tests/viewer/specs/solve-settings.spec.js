@@ -745,6 +745,8 @@ test.describe("a shell with defaults of its own, as the web viewer has reroute_n
     // (nothing changed: the table is not asked for before the solve)
     expect(await viewer.calls("solverTable")).toEqual([]);
     await open(page);
+    // (a check box of its own, which WebKit once drew with no width)
+    await expect(field(page, "reroute_nets")).toBeVisible();
     await expect(field(page, "reroute_nets")).toBeChecked();
     await expect(asText(page)).toHaveText("Equivalent CLI command: rnl solve --solver-config 'reroute_nets=true'");
     await field(page, "layout").selectOption("rows");
