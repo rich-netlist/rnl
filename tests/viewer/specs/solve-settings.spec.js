@@ -733,3 +733,58 @@ test.describe("on the desktop", () => {
     });
   });
 });
+
+// A shell's defaults over the solver's (`solverDefaults`): the web viewer routes each net again, which the solver does
+// not do by default. The dialog shows them as the defaults; a solve is given what differs from the solver's own.
+test.describe("a shell with defaults of its own, as the web viewer has reroute_nets", () => {
+  const WEB_DEFAULTS = { ...DESKTOP, "solver-defaults": JSON.stringify({ reroute_nets: true }) };
+
+  test("a solve is given the shell's default, before the dialog is ever shown, and the dialog shows it as the default", async ({ page, viewer }) => {
+    await viewer.open(T4, WEB_DEFAULTS);
+    expect(await solved(page, viewer)).toEqual({ config: "reroute_nets=true", timeall: null });
+    // (nothing changed: the table is not asked for before the solve)
+    expect(await viewer.calls("solverTable")).toEqual([]);
+    await open(page);
+    await expect(field(page, "reroute_nets")).toBeChecked();
+    await expect(asText(page)).toHaveText("Equivalent CLI command: rnl solve --solver-config 'reroute_nets=true'");
+    await field(page, "layout").selectOption("rows");
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'layout="rows",reroute_nets=true'`);
+    await ok(page);
+    // kept: what differs from the dialog's defaults; given: the shell's default with it
+    expect(await viewer.stored("solve-config")).toEqual({ layout: "rows" });
+    expect((await viewer.calls("checkSettings")).at(-1)).toEqual(['layout="rows",reroute_nets=true']);
+    expect(await solved(page, viewer)).toEqual({ config: 'layout="rows",reroute_nets=true', timeall: null });
+  });
+
+  test("turned off, it is kept off and the solver's own default is given, as nothing; Restore Defaults turns it on again", async ({ page, viewer }) => {
+    await viewer.open(T4, WEB_DEFAULTS);
+    await open(page);
+    await field(page, "reroute_nets").uncheck();
+    await expect(asText(page)).toHaveText("The defaults of rnl solve.");
+    await ok(page);
+    expect(await viewer.stored("solve-config")).toEqual({ reroute_nets: false });
+    expect((await viewer.calls("checkSettings")).at(-1)).toEqual([""]);
+    expect(await solved(page, viewer)).toEqual({ config: "", timeall: null });
+    await open(page);
+    await expect(field(page, "reroute_nets")).not.toBeChecked();
+    await dialog(page).getByRole("button", { name: "Restore Defaults" }).click();
+    await expect(field(page, "reroute_nets")).toBeChecked();
+    await ok(page);
+    expect(await viewer.stored("solve-config")).toEqual({});
+    expect(await solved(page, viewer)).toEqual({ config: "reroute_nets=true", timeall: null });
+  });
+
+  test("settings kept before keep their values, and the shell's default joins them", async ({ page, viewer }) => {
+    await viewer.keep({ "solve-config": { beam: 6, layout: "rows" } });
+    await viewer.open(T4, WEB_DEFAULTS);
+    expect(await solved(page, viewer)).toEqual({ config: 'beam=6,layout="rows",reroute_nets=true', timeall: null });
+    expect(await viewer.stored("solve-config")).toEqual({ beam: 6, layout: "rows" });
+  });
+});
+
+test("without defaults of its own, a shell's solve is given none: the desktop and rnl solve leave reroute_nets off", async ({ page, viewer }) => {
+  await viewer.open(T4, DESKTOP);
+  expect(await solved(page, viewer)).toEqual({ config: "", timeall: null });
+  await open(page);
+  await expect(field(page, "reroute_nets")).not.toBeChecked();
+});

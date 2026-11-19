@@ -40,16 +40,55 @@ function changed() {
 
 let tableKept = null;
 
+// A shell may have defaults of its own over the solver's (`solverDefaults`, the web viewer's `reroute_nets=true`). The
+// dialog shows them as the defaults, so what is kept is what differs from them; what a solve, the check and the command
+// line get is what differs from the solver's own defaults, the shell's defaults among it where the user did not change
+// them. So a netlist that sets such a setting itself is overridden only where the shell's default is still in effect.
+
+/** The shell's defaults over the solver's, by key; none where it has none. */
+function shellDefaults() {
+  const given = shell?.solverDefaults;
+  return given !== null && typeof given === "object" && !Array.isArray(given) ? given : {};
+}
+
+/** The solver's table with the shell's defaults as the defaults, the solver's own kept as `solverDefault`. */
+function withShellDefaults(table) {
+  const own = shellDefaults();
+  if (!table || !Array.isArray(table.settings) || Object.keys(own).length === 0) return table;
+  const settings = table.settings.map((s) => (Object.hasOwn(own, s.key) ? { ...s, default: own[s.key], solverDefault: s.default } : s));
+  return { ...table, settings };
+}
+
+/** The shell's table, with the shell's defaults; rejects as the shell does. */
+async function readTable() {
+  return withShellDefaults(await shell.solverTable());
+}
+
 /** The solver's table, asked for once; null where the shell has none or it cannot be read. */
 async function solverTable() {
   if (tableKept) return tableKept;
   if (!shell?.solverTable) return null;
   try {
-    tableKept = await shell.solverTable();
+    tableKept = await readTable();
   } catch {
     return null;
   }
   return tableKept;
+}
+
+/**
+ * What a solve is given of `kept` (what differs from the dialog's defaults): the shell's defaults with `kept` over them,
+ * less what is the solver's own default, of what the layout takes.
+ */
+function forSolver(table, kept) {
+  const values = { ...kept };
+  for (const setting of table.settings) {
+    if (!Object.hasOwn(setting, "solverDefault")) continue;
+    const value = Object.hasOwn(values, setting.key) ? values[setting.key] : setting.default;
+    if (JSON.stringify(value) === JSON.stringify(setting.solverDefault)) delete values[setting.key];
+    else values[setting.key] = value;
+  }
+  return takenValues(table, values);
 }
 
 /** The text a value counts as in a condition of the table (`applies` and the like). */
@@ -121,9 +160,10 @@ export function takenValues(table, values) {
 export async function solverSettings() {
   const values = changed();
   // (nothing differs from the defaults: nothing to take from, and the table, which the browser reads from the solver's
-  // module, is not asked for before the solve, which a Cancel could not stop yet)
+  // module, is not asked for before the solve, which a Cancel could not stop yet; the shell's defaults are then given
+  // as they are, for the default layout, which takes them)
   const table = Object.keys(values).length === 0 ? null : await solverTable();
-  return { config: configText(table ? takenValues(table, values) : values), timeall: keptTimeall() };
+  return { config: configText(table ? forSolver(table, values) : shellDefaults()), timeall: keptTimeall() };
 }
 
 /** A number as RNL writes it: with no exponent. */
@@ -829,7 +869,7 @@ export async function settings() {
   if (!shell || !shell.solverTable || modal()) return;
   let table;
   try {
-    table = tableKept ?? (tableKept = await shell.solverTable());
+    table = tableKept ?? (tableKept = await readTable());
   } catch (e) {
     await inform({ title: m("Solver Settings"), paragraphs: [m`The solver's settings could not be read: ${e instanceof Error ? e.message : String(e)}`] });
     return;
@@ -854,7 +894,7 @@ export async function settings() {
   const asText = span("settings-text", "");
   const showText = () => {
     const read = fields.read();
-    const config = read.error ? null : configText(takenValues(table, differences(table, read.values)));
+    const config = read.error ? null : configText(forSolver(table, differences(table, read.values)));
     const time = whole.read();
     const all = time.error || time.value === null ? "" : ` --timeall ${time.value}`;
     setText(asText, config === null ? "" : config || all ? m`Equivalent CLI command: rnl solve${all}${config ? ` --solver-config '${config}'` : ""}` : m("The defaults of rnl solve."));
@@ -879,7 +919,7 @@ export async function settings() {
       if (shell.checkSettings) {
         let checked;
         try {
-          checked = await shell.checkSettings(configText(takenValues(table, kept)));
+          checked = await shell.checkSettings(configText(forSolver(table, kept)));
         } catch (e) {
           return fail(error, e instanceof Error ? e.message : String(e));
         }

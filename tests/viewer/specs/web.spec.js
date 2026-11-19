@@ -1750,7 +1750,8 @@ test("the Solve view lists the constraints of a netlist before any solve; a deve
     await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"));
     expect(posts).toHaveLength(1);
     expect(posts[0].entry).toMatch(/10-constraints-and-priority\.sp$/);
-    expect(posts[0].config).toBe("");
+    // the web viewer's own default over the solver's (solve-settings.js)
+    expect(posts[0].config).toBe("reroute_nets=true");
     await expect(page.locator("#solve-views")).toBeVisible();
     const rows = page.locator("#constraints-list li.constraint");
     expect(await rows.count()).toBe(22);
@@ -1822,7 +1823,7 @@ test("the web viewer solves in the browser: its Worker starts at the first Solve
   expect(requests).toHaveLength(1);
   expect(requests[0].entry).toMatch(/04-hierarchy\.sp$/);
   expect(requests[0].files).toContain(requests[0].entry);
-  expect(requests[0].solver_config).toBe("");
+  expect(requests[0].solver_config).toBe("reroute_nets=true");
   expect(typeof requests[0].level).toBe("string");
   // the events as docs/solver-progress.md has them: the run, the level, and the level done
   expect(events[0]).toBe("run");
@@ -1898,6 +1899,8 @@ test("the settings dialog of the web viewer is drawn from the solver's module, w
   await page.evaluate(() => window.viewer.command("solve-settings"));
   const dialog = page.locator("dialog.dialog");
   await expect(dialog.getByLabel("layout", { exact: true }).locator("option")).toHaveText(["rows", "tree", "lines"]);
+  // the web viewer routes each net again by default, as the solver does not
+  await expect(dialog.getByLabel("reroute_nets", { exact: true })).toBeChecked();
   await dialog.getByLabel("layout", { exact: true }).selectOption("rows");
   await dialog.getByLabel("beam", { exact: true }).fill("8");
   await dialog.locator("fieldset", { hasText: "Time for the whole file" }).getByLabel("set").check();
@@ -1905,11 +1908,11 @@ test("the settings dialog of the web viewer is drawn from the solver's module, w
   await dialog.getByRole("button", { name: "OK" }).click();
   await expect(dialog).toHaveCount(0);
   // the solver's module gave the table and checked the settings before they were kept
-  expect(await page.evaluate(() => [window.__solver.started, window.__solver.tables, window.__solver.checks])).toEqual([1, 1, ['beam=8,layout="rows"']]);
+  expect(await page.evaluate(() => [window.__solver.started, window.__solver.tables, window.__solver.checks])).toEqual([1, 1, ['beam=8,layout="rows",reroute_nets=true']]);
   await page.keyboard.press("F9");
   await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"), null, { timeout: 90000 });
   const [request] = await page.evaluate(() => window.__solver.requests);
-  expect(request.solver_config).toBe('beam=8,layout="rows"');
+  expect(request.solver_config).toBe('beam=8,layout="rows",reroute_nets=true');
   expect(request.timeall).toBe(45); // beside the settings, not among them
 });
 

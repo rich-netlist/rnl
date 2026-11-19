@@ -810,6 +810,8 @@ function sourceAt(source, full, f) {
 /** @type {import("../shell.js").Shell} */
 export default {
   platform: "web",
+  // the web viewer's defaults over the solver's, as Solve > Settings shows them and a solve takes them (solve-settings.js)
+  solverDefaults: { reroute_nets: true },
   // the core's parse formats, the one it detects for a Library file the document shown does not read,
   // and the key a choice is kept by: the address of a file a server served, else its path
   formats: async () => (await (await someCore()).formats({ formats: {} })).list,
