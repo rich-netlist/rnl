@@ -9,6 +9,7 @@ import { poolSnapshot, restorePool } from "./pool.js";
 import { shell } from "./shell.js";
 import { doc, expanded, path, selected, selectedAsUsage, viewCache } from "./state.js";
 import { commitNavigation, namedPath, rememberView, viewOfFile } from "./subcircuits.js";
+import { showModuleOf } from "./module-view.js";
 import { showFile } from "./text.js";
 import { setPane } from "./panels.js";
 import { sameEntry, sameSource } from "./visit-source.js";
@@ -34,6 +35,8 @@ export function navigate(target, options = {}) {
   }
   const next = visit.path.map(s => ({ ...s,
     level: sameSource(s.entry, currentSource()) ? doc.levels.findIndex(l => l.title === s.title) : -1 }));
+  // a module of Verilog-A of the file shown, which no level draws
+  if (showModuleOf(next)) return;
   return commitNavigation({ ...target, path: next });
 }
 

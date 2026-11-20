@@ -64,13 +64,14 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `problems.js` | The problems list, its counts by severity (switches that show only the rows of a severity) and the coloured line numbers; the geometry hints of the level shown are rows of the list (see below); each row names its kind. |
 | `formats.js` | The parse format chosen for each file in the Library, kept by path under `file-formats`, and the core's list of formats, whose titles it translates where they are words (`formatTitle`: Text; SPICE and Spectre are names); the choices that every request to the core carries (see **Parse formats**, after the Library's paragraphs). |
 | `package-offers.js` | Background web lookup of explicit missing packages and navigation-safe Library confirmations. |
-| `hierarchy.js` | The hierarchy view: the instance tree, with below it the subcircuits that the top level does not call as trees of their own, and the subcircuit index with its search and initials. |
+| `hierarchy.js` | The hierarchy view: the instance tree, with below it the subcircuits that the top level does not call as trees of their own, and the subcircuit index with its search and initials; a module of Verilog-A is marked so in both. |
 | `origins.js` | View › Show Registration Points: a small mark at the registration point of each instance and each usage with a symbol, from the `origin` of the box hits; painted with the other overlays by `usages.js`. |
 | `flylines.js` | View › Show Flylines (key L): shows or hides the flylines of the level shown (the core draws each as a group of class `flyline`), off to begin with and kept; File › Export Image follows it. |
 | `net-labels.js` | View › Show Net Names (key N): the name of each net at the places of `Level.net_labels`, at one size and in grey whatever the zoom; painted with the other overlays by `usages.js`; File › Export Image follows it. |
 | `usages.js` | Scope-local usages grouped by definition, folded to begin with, and Expand All / Collapse All; editable Color, visibility preferences, source and roles; fixed-screen overlays and role labels, selection focus and border picking. |
 | `roots.js` | The subcircuits that the top level does not call, which start trees of their own, and the level a document opens on (see [Subcircuits that nothing calls](#subcircuits-that-nothing-calls)). |
-| `level-tree.js` | The levels the hierarchy shows, by their host levels (`Level.host`): from the outline of the whole document when the shell reads the file shown alone, else from the Document's levels (see [Reading the file shown alone](#reading-the-file-shown-alone)). |
+| `level-tree.js` | The levels the hierarchy shows, by their host levels (`Level.host`): from the outline of the whole document when the shell reads the file shown alone, the modules of Verilog-A among them, else from the Document's levels (see [Reading the file shown alone](#reading-the-file-shown-alone)); and the host level shown, a module's when one is shown in place of a drawing. |
+| `module-view.js` | A module of Verilog-A shown in place of a drawing, for a shell that reads the file shown alone: a symbol of its ports, a note, and its instances with their lines, which open the modules they name (see [Reading the file shown alone](#reading-the-file-shown-alone)). |
 | `visit-source.js` | What names a visit: a source's key, and the view of one file of a document in the context of its entry. |
 | `unplaced.js` | The Not drawn view: the objects of the level shown that have no position, each with its symbol and the nets at its terminals, in a list that loads a part at a time, with their drawings, and is searched by name (see [The objects not drawn](#the-objects-not-drawn)). |
 | `panels.js` | The side panel's views, what is folded, and the splitters. The layout is kept in the shell’s settings store (native `settings.json` on desktop, `localStorage` on web) under `sidebar-shown`, `sidebar-width`, `side-pane`, `problems-shown`, `problems-height`, `index-height` and `show-failed`. |
@@ -137,6 +138,15 @@ view of it: the entry's source with `view`, the file as the document names it (`
   opening that file on its own (File › Open), which reads it as an entry of its own. A pick in the tree, the index, a
   manifest's level or an include link in the text does the same. The path bar keeps the visits of every view of the
   entry, and goes back through them.
+- **The modules of Verilog-A** of the document's Verilog-A files (`ahdl_include`) are in the outline, though no
+  reading draws one (2.9), and the hierarchy lists them, marked *Verilog-A*, each with the modules its instances name
+  (`OutlineCall`), and a name no module has as not defined. An instance of a module, in the netlist or in a module,
+  opens the view of the module's file, as a subcircuit of another file does, and that reading, which has no levels,
+  shows the module (`module-view.js`): a symbol of its ports, in the order the module writes them, a note, and its
+  instances, each with the module it names and its line (`OutlineCall.lines`). A click on an instance shows its line in
+  the text; a double click or Enter opens the module it names, below on the path. A Verilog-A file of the document
+  shown by itself, from the Library say, shows its first module. The parameters an instance gives a module are not shown, and the
+  desktop, which reads the whole document, has no outline and lists no modules.
 - **The readings are kept** (`file-results.js`, `result-cache.js`): in memory, and in the site's IndexedDB where the
   browser lets it (stamped with the core's version and the shape of its results), so that showing a file again, in
   this page or a later visit, asks the core only for the outline. A reading is found by the core, the options that

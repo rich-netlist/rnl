@@ -602,6 +602,53 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
   cursor: default;
 }
 
+/* a module of Verilog-A, shown in place of a drawing (module-view.js) */
+.module-card {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  cursor: default;
+}
+.module-card[hidden] { display: none; }
+.module-heading { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.module-card .badge, .module-instance .badge {
+  font-size: 11px;
+  font-weight: normal;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 4px;
+  line-height: 15px;
+}
+.module-symbol { flex: none; overflow: visible; }
+.module-symbol rect { fill: none; stroke: currentColor; stroke-width: 1.5; }
+.module-symbol line { stroke: currentColor; stroke-width: 1.5; }
+.module-symbol text { fill: currentColor; font-size: 12px; font-family: monospace; }
+.module-note { margin: 0; max-width: 36em; text-align: center; color: var(--muted); }
+.module-instances { display: flex; flex-direction: column; min-width: 16em; max-width: 100%; }
+.module-instance {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.module-instance:hover { background: var(--hover); }
+.module-instance.selected { background: var(--select-text); box-shadow: inset 3px 0 0 var(--select); }
+.module-instance .inst { font-weight: 600; }
+.module-instance .master { color: var(--muted); }
+.module-instance .line { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.module-instance.undefined { cursor: default; color: var(--muted); }
+.module-none { margin: 0; color: var(--muted); }
+
 /* Web fonts follow the generic families: keep native Latin/monospace metrics and use the
    already shipped Noto slices only for glyphs missing from the system (notably CJK on Linux). */
 
@@ -892,7 +939,7 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 }
 .tree-row .inst { font-weight: 600; }
 .tree-row .master { color: var(--muted); }
-.tree-row .badge {
+.tree-row .badge, .index-row .badge {
   font-size: 11px;
   color: var(--muted);
   border: 1px solid var(--line);
