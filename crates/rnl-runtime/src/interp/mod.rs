@@ -254,6 +254,9 @@ pub struct Interp<'p> {
     /// The unit whose text each record is in.
     pub(crate) rec_unit: Vec<UnitId>,
     pub(crate) asts: Vec<Option<Rc<RecordAst>>>,
+    /// The parses this reading took from those kept on the thread ([`unit::parsed`]): a reading
+    /// takes each at most once, since it tells statements apart by where their parse is.
+    pub(crate) kept_parses: HashSet<*const RecordAst>,
     /// The characters of each record's text, collected when an offset into it is first read.
     pub(crate) rec_chars: Vec<Option<Rc<[char]>>>,
     pub(crate) pkg_levels: Vec<Level>,
@@ -464,6 +467,7 @@ impl<'p> Interp<'p> {
             recs: Vec::new(),
             rec_unit: Vec::new(),
             asts: Vec::new(),
+            kept_parses: HashSet::new(),
             rec_chars: Vec::new(),
             pkg_levels: Vec::new(),
             pkg_sources: Vec::new(),

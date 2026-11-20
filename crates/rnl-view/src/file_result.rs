@@ -28,6 +28,12 @@ pub const FILE_RESULT_FORMAT: u32 = 1;
 /// text, records and failed statements; its objects and spans are those of the file's levels,
 /// numbered for this result alone; its diagnostics are those of the file's levels, and those of
 /// reading the document that are about the file or the files it depends on ([`FileInputs`]).
+///
+/// The indices of levels in it, `Level::host`, `Child::host` and [`FileChild::host`], and of files,
+/// `files` and the diagnostics' `file_index`, are those of the outline of the document the result
+/// was read from. Another file that gains or loses a subcircuit or an include moves them in the
+/// outline without changing the result: a frontend that keeps a result finds its levels again by
+/// their order among the file's levels, or by their file and title, and its files by their paths.
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct FileResult {
@@ -51,7 +57,8 @@ pub struct FileChild {
     /// Its name, as the first instance writes it.
     pub master: String,
     /// The level that defines it, by its index in the document's levels, as `Level::host` and the
-    /// outline's levels give it; None when nothing defines it.
+    /// outline's levels give it, in the outline the result was read from; None when nothing defines
+    /// it. When the file defines the name more than once, the last.
     pub host: Option<usize>,
     /// The file that defines it, as the document names it; None when nothing defines it.
     pub file: Option<String>,
@@ -172,8 +179,9 @@ fn hash(text: &str) -> String {
     hex(&sha256(text.as_bytes()))[..16].to_string()
 }
 
-/// The version of the core, with its commit.
-fn core_version() -> String {
+/// The version of the core with the commit it was built from, "0.6.1 (ed815649)", as
+/// [`FileInputs::core`] gives it: a frontend keys what it keeps by it.
+pub fn core_version() -> String {
     format!("{} ({})", env!("CARGO_PKG_VERSION"), env!("RNL_BUILD_COMMIT"))
 }
 
