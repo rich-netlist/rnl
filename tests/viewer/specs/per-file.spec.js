@@ -136,3 +136,18 @@ test('the readings kept are found again by another visit of the page', async ({ 
   expect(await kept(page)).toMatchObject({ hits: 1, misses: 0, persistent: true });
   expect(await shown(page)).toMatchObject({ file: 'top.sp', levels: ['top.sp', 't'] });
 });
+
+test('an included file opens from the Library in the context of the entry, and Add to Library makes it a Library file', async ({ page }) => {
+  await open(page);
+  await page.locator('#tab-files').click();
+  const files = page.locator('.lib-group[data-group="files"]');
+  await expect(files.locator('.pool-include .pool-include-name')).toHaveText(['cells.inc', 'leaf.inc']);
+  await files.locator('.pool-include').getByRole('button', { name: 'Open cells.inc', exact: true }).click();
+  await idle(page);
+  expect(await shown(page)).toMatchObject({ file: 'cells.inc', entry: 'top.sp', level: 'cell' });
+  await expect(page.locator('#pane-files')).toBeVisible();
+  // the rows stay those of the entry, which the Library knows; Add to Library gives leaf.inc a row of its own
+  await files.locator('.pool-include').getByRole('button', { name: 'Add leaf.inc to the Library', exact: true }).click();
+  await expect(files.locator('.pool-row .pool-open')).toHaveText(['top.sp', 'leaf.inc']);
+  await expect(files.locator('.pool-include .pool-include-name')).toHaveText(['cells.inc']);
+});

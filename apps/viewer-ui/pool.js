@@ -12,6 +12,7 @@ import { showManifestBar } from "./manifest-bar.js";
 import { displayFollows } from "./display.js";
 import { chooseFormat, chosenFormat, formatInfo, formatList, formatTitle, setFormatList } from "./formats.js";
 import { sourcePath } from "./source-path.js";
+import { doc as shownDoc } from "./state.js";
 
 let items = [];
 let bundledPackages = []; // the desktop's bundled public packages: { name, version, kind, path }
@@ -101,7 +102,7 @@ function documentFormats(doc) {
   doc.files.forEach((file, index) => {
     if (!file.format) return;
     const path = filePath(sourcePath(doc, file).replace(/^\/?<pool>(?=\/)/, ""));
-    const entry = { path, name: file.name, format: file.format, auto: file.default_format };
+    const entry = { path, name: file.name, format: file.format, auto: file.default_format, index };
     shownFormats.set(path, entry);
     if (index > 0) shownIncludes.push(entry);
   });
@@ -337,16 +338,33 @@ function formatMenu(chip, path, chosen, auto) {
   (menu.querySelector('[aria-checked="true"]') || menu.firstElementChild).focus();
 }
 
-/** A file that the netlist shown includes, under the row of the file opened, with its format chip. */
+/**
+ * A file that the netlist shown includes and that is no Library file, under the row of the file opened, with its
+ * format chip: its name opens it as an include link in the text does (navigation.js), in the context of the netlist
+ * that includes it where the shell reads the file shown alone; Add to Library adds it to Files as Include File would.
+ */
 function includeRow(entry) {
   const row = document.createElement("li");
-  row.className = "pool-include"; // not a .pool-row: it opens nothing and counts as no Library file
+  row.className = "pool-include"; // not a .pool-row: it counts as no Library file
   row.dataset.path = entry.path;
   const name = span("pool-include-name", entry.name);
-  setAttr(name, "title", entry.path);
-  append(row, name, formatChip(entry.path, entry.name));
+  const open = button("", (e) => navigate({ file: entry.index, keepPane: true }, { newWindow: e.shiftKey }), entry.path);
+  open.className = "pool-include-open";
+  setAttr(open, "aria-label", m`Open ${entry.name}`);
+  append(open, name);
+  const add = button(m("Add to Library"), () => addInclude(entry), m`Add ${entry.name} to the Library`);
+  add.className = "pool-include-add";
+  append(row, open, formatChip(entry.path, entry.name), add);
   return row;
 }
+
+/** Add a file the netlist shown includes to Files, by the source the shell reads it from, as Include File adds one. */
+const addInclude = (entry) => update(async () => {
+  const source = shownDoc && currentSource() ? shell.sourceForFile(currentSource(), shownDoc, entry.index) : null;
+  if (!source || source.readonly || items.some((i) => i.path === entry.path)) return false;
+  source.path = entry.path;
+  addItems([shell.poolItem?.(source) || { path: entry.path, name: source.name || entry.name, source }]);
+});
 
 function fileRow(item, kind) {
   const row = document.createElement(kind === "temporary" ? "div" : "li");
@@ -421,7 +439,10 @@ function group(key, title, files, kind, pathInfo) {
   }
   for (const item of files) {
     append(list, fileRow(item, kind));
-    if (kind === "files" && item.path === currentPath) for (const entry of shownIncludes) append(list, includeRow(entry));
+    // (an included file that is in the Library has a row of its own)
+    if (kind === "files" && item.path === currentPath) {
+      for (const entry of shownIncludes) if (!files.some((i) => i.path === entry.path)) append(list, includeRow(entry));
+    }
   }
   if (!files.length) {
     const empty = document.createElement("li");
