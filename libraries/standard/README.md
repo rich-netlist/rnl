@@ -18,6 +18,19 @@ Every package of the series is version 0.4. Its files hold one collection packag
   These are `$DIFFERENTIAL_PAIR_N`, `$CURRENT_MIRROR_N`, `$CASCODE_CURRENT_MIRROR_N` and their `_P` twins, which also draw the n-type with its sources or emitters down and the p-type with them up.
 - The flow of a signal and the flow of power are told apart: `$SIGNAL_FLOW` and `$POWER_FLOW` each take a path, in order, with the sources before it and the loads after it. The devices that bias the rest of a circuit are marked with `$BIAS_CIRCUIT`. The drawing definition of a bias mark, `$BIAS`, is a different thing and stays.
 
+### Terminal order
+
+The terminals of a block are listed in one order. The pins of its symbol follow it, and a subcircuit drawn with the symbol should follow it too:
+
+1. signals before supplies, so `vp` and `vn` come last;
+2. inputs before outputs;
+3. the positive before the negative: `inp` before `inn`, `outp` before `outn`, `q` before `qb`, `vp` before `vn`;
+4. of a winding, the dotted end first: the transformer takes `p1 n1 p2 n2`, with its dots at `p1` and `p2`.
+
+So an op-amp with supply pins is `inp inn out vp vn`, and a fully differential one is `inp inn outp outn vp vn`. A gate of two inputs with supply pins is `a b y vp vn`, and a D flip-flop with a reset is `d ck rst q qb`.
+
+The order holds for the blocks of `rnl-std-functional`, `rnl-std-logic` and `rnl-std-signal-flow`, and for the transformer of `rnl-std-basic`. The symbols of devices take the terminal order of their SPICE element instead, such as `d g s b` for a MOSFET (6.12). Those of `rnl-std-rf` take the terminal names of Analog Canvas. A subcircuit whose ports come in another order, such as a macromodel written `in+ in- V+ V- out`, maps them with `terminals=` on its SET-SYMBOL (11.3).
+
 ### Renamed, merged, split and removed in 0.4
 
 `rnl upgrade` of core 0.5.7 rewrites files of 0.3 and 0.2 by this list. Where the table says *manual*, it reports the place and leaves the text as it was.
