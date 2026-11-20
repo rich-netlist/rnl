@@ -185,7 +185,7 @@ test("collectOutline reads what is missing as collect does, and interprets nothi
   assert.deepEqual([...titles].sort(), ["a", "a.inc", "b", "b.inc", "top.sp"]);
   assert.deepEqual(outline.roots, []);
   const a = outline.levels[titles.indexOf("a")];
-  assert.deepEqual(a.calls, [{ master: "b", level: titles.indexOf("b"), count: 1, instances: ["X1"] }]);
+  assert.deepEqual(a.calls, [{ master: "b", level: titles.indexOf("b"), count: 1, instances: ["X1"], lines: [5] }]);
   // the files of a build: the Document's files and levels are those of the outline
   const { document } = await collect(core, { entry: "/w/top.sp", files }, read);
   assert.deepEqual(document.files.map((f) => f.path), outline.files.map((f) => f.path));

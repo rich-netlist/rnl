@@ -8,11 +8,12 @@
 //! ports, a vector port one terminal for each bit, and its `# @SET-SYMBOL` gives the block symbol
 //! of the instances of it (9.2.6). RNL is read from whole-line `//` comments in column 1, line 1
 //! included; other comments, and the text between `` `ifdef `` or `` `ifndef `` and its
-//! `` `endif ``, are not read.
+//! `` `endif ``, are not read. The instances of modules that a module writes are noted for the
+//! outline ([`Level::module_instances`]); they make no circuit.
 
 use crate::diag::{codes, Code, Loc};
 use crate::host::format::Reading;
-use crate::host::{file_name, Dialect, FileFormat, Level, LevelId, LevelKind};
+use crate::host::{file_name, Dialect, FileFormat, Instance, Level, LevelId, LevelKind};
 use crate::records::{scan_run_0_4, CarrierLine};
 use crate::source::resolve_include;
 
@@ -36,14 +37,24 @@ pub struct HdlInclude {
     pub cur: LevelId,
 }
 
-/// A module of a Verilog-A file: its name, the lines of its `module` and `endmodule`, and its
-/// terminals in the order of its port list.
+/// A module of a Verilog-A file: its name, the lines of its `module` and `endmodule`, its
+/// terminals in the order of its port list, and the instances of modules it writes.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Module {
     pub name: String,
     pub line: u32,
     pub end_line: u32,
     pub terminals: Vec<String>,
+    pub instances: Vec<ModuleInstance>,
+}
+
+/// An instance of a module that a module writes, `amp #(.g(2)) u1 (a, b);`: its name, the module
+/// it names and the line of its name.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModuleInstance {
+    pub name: String,
+    pub master: String,
+    pub line: u32,
 }
 
 /// What a Verilog-A file holds for RNL: its modules, its runs of carrier lines in the order of the
@@ -101,6 +112,21 @@ pub fn read(cx: &mut Reading, h: &HdlInclude) {
         lv.end_line = m.end_line;
         lv.ports = m.terminals.clone();
         lv.case_sensitive = true;
+        lv.module_instances = m
+            .instances
+            .iter()
+            .enumerate()
+            .map(|(order, i)| Instance {
+                name: i.name.clone(),
+                model: Some(i.master.clone()),
+                file: display.clone(),
+                line: i.line,
+                order,
+                is_subckt: true,
+                case_sensitive: true,
+                ..Instance::default()
+            })
+            .collect();
         let id = cx.doc.add_level(lv, Some(file));
         cx.doc.add_subckt(id);
         modules.push((m.line, m.end_line, id));
@@ -122,8 +148,12 @@ pub fn parse(text: &str) -> Parsed {
     let mut run: Vec<CarrierLine> = Vec::new();
     let mut in_comment = false;
     let mut branches = 0usize;
+    let mut inactive = std::collections::HashSet::new();
     for (k, line) in text.lines().enumerate() {
         let no = k as u32 + 1;
+        if branches > 0 {
+            inactive.insert(no);
+        }
         if !in_comment && branches == 0 {
             if let Some(rest) = line.strip_prefix("//") {
                 if rest.trim().is_empty() || rest.starts_with(' ') {
@@ -158,6 +188,10 @@ pub fn parse(text: &str) -> Parsed {
         in_comment = comment_open_after(line, in_comment);
     }
     flush(&mut parsed.runs, &mut run);
+    // an instance the preprocessor may leave out is not one
+    for m in &mut parsed.modules {
+        m.instances.retain(|i| !inactive.contains(&i.line));
+    }
     parsed
 }
 
@@ -257,7 +291,15 @@ fn tokens(text: &str) -> Vec<(Tok, u32)> {
                 i += 1;
             }
             let word: String = c[start..i].iter().collect();
-            if word == "define" {
+            if matches!(word.as_str(), "ifdef" | "ifndef" | "elsif" | "undef") {
+                // the name of the macro is part of the directive
+                while i < c.len() && (c[i] == ' ' || c[i] == '\t') {
+                    i += 1;
+                }
+                while i < c.len() && ident_char(c[i]) {
+                    i += 1;
+                }
+            } else if word == "define" {
                 // to the end of the line, and the lines its `\` continues
                 while i < c.len() && c[i] != '\n' {
                     if c[i] == '\\' && c.get(i + 1) == Some(&'\n') {
@@ -368,6 +410,67 @@ fn declared_name(part: &[(Tok, u32)]) -> Option<String> {
 
 const DIRECTIONS: [&str; 3] = ["input", "output", "inout"];
 
+/// The words that begin a statement of a module that is not an instance.
+const NOT_MODULES: [&str; 31] = [
+    "analog",
+    "initial",
+    "always",
+    "parameter",
+    "localparam",
+    "aliasparam",
+    "defparam",
+    "real",
+    "integer",
+    "string",
+    "genvar",
+    "branch",
+    "wire",
+    "wreal",
+    "reg",
+    "ground",
+    "supply0",
+    "supply1",
+    "assign",
+    "if",
+    "else",
+    "for",
+    "while",
+    "repeat",
+    "case",
+    "casex",
+    "casez",
+    "default",
+    "generate",
+    "task",
+    "function",
+];
+
+/// The instances a statement of a module writes, `amp #(…) u1 [range] (…), u2 (…)`: none when it
+/// is not an instance of a module.
+fn instances_in(statement: &[(Tok, u32)]) -> Vec<ModuleInstance> {
+    let Some((Tok::Ident(master), _)) = statement.first() else { return Vec::new() };
+    if NOT_MODULES.contains(&master.as_str()) || DIRECTIONS.contains(&master.as_str()) {
+        return Vec::new();
+    }
+    let mut i = 1;
+    if is_punct(statement.get(i), '#') && is_punct(statement.get(i + 1), '(') {
+        i = past_close(statement, i + 1);
+    }
+    let mut out = Vec::new();
+    for part in split_commas(&statement[i.min(statement.len())..]) {
+        let Some((Tok::Ident(name), line)) = part.first() else { return Vec::new() };
+        let mut k = 1;
+        if is_punct(part.get(k), '[') {
+            k = past_close(part, k);
+        }
+        if !is_punct(part.get(k), '(') || past_close(part, k) != part.len() {
+            return Vec::new();
+        }
+        out.push(ModuleInstance { name: name.clone(), master: master.clone(), line: *line });
+    }
+    out
+}
+
 /// The modules of a Verilog-A file, with their terminals.
 fn modules(toks: &[(Tok, u32)]) -> Vec<Module> {
     let mut out = Vec::new();
@@ -410,6 +513,7 @@ fn modules(toks: &[(Tok, u32)]) -> Vec<Module> {
         let end_line = toks.get(end).map_or_else(|| toks.last().map_or(line, |t| t.1), |t| t.1);
         let mut k = i;
         let mut in_function = false;
+        let mut instances = Vec::new();
         while k < end {
             let start = k;
             while k < end && !is_punct(toks.get(k), ';') {
@@ -433,6 +537,11 @@ fn modules(toks: &[(Tok, u32)]) -> Vec<Module> {
                 if statement.iter().any(|(t, _)| matches!(t, Tok::Ident(w) if w == "endfunction")) {
                     in_function = false;
                 }
+                continue;
+            }
+            let written = instances_in(statement);
+            if !written.is_empty() {
+                instances.extend(written);
                 continue;
             }
             let Some((Tok::Ident(first), _)) = statement.first() else { continue };
@@ -461,7 +570,7 @@ fn modules(toks: &[(Tok, u32)]) -> Vec<Module> {
                 }
             })
             .collect();
-        out.push(Module { name, line, end_line, terminals });
+        out.push(Module { name, line, end_line, terminals, instances });
         i = end + 1;
     }
     out
@@ -517,5 +626,48 @@ mod tests {
         assert_eq!(parsed.unread[3].0, codes::HOST_RNL_IN_INACTIVE_BRANCH);
         assert_eq!(parsed.unread[4].0, codes::HOST_CARRIER_NO_SPACE);
         assert_eq!((parsed.modules[0].line, parsed.modules[0].end_line), (2, 15));
+    }
+
+    #[test]
+    fn the_instances_a_module_writes_by_name_module_and_line() {
+        let text = "module top(x, y);
+  inout x, y;
+  electrical x, y, mid;
+  electrical [1:0] v;
+  parameter real g = 1 from (0:inf);
+  gain #(.k(g), .n(2)) u1 (x, mid);
+  gain u2 (.a(mid), .b(y)), u3 (mid, y);
+  bank u4 [1:0] (v, x);
+`ifdef DEBUG
+  probe p1 (x);
+`else
+  probe p2 (y);
+`endif
+`ifndef QUIET
+`endif
+  gain u5 (y, x);
+  analog begin
+    V(mid) <+ 0;
+    if (g > 1) V(y) <+ g * V(x);
+  end
+  analog function real f;
+    input a;
+    f = a;
+  endfunction
+endmodule
+module gain(a, b);
+endmodule
+";
+        let parsed = parse(text);
+        let written: Vec<(&str, &str, u32)> =
+            parsed.modules[0].instances.iter().map(|i| (i.name.as_str(), i.master.as_str(), i.line)).collect();
+        // those the preprocessor may leave out are not among them
+        assert_eq!(
+            written,
+            [("u1", "gain", 6), ("u2", "gain", 7), ("u3", "gain", 7), ("u4", "bank", 8), ("u5", "gain", 16)]
+        );
+        assert!(parsed.modules[1].instances.is_empty());
+        // the terminals are as before
+        assert_eq!(parsed.modules[0].terminals, ["x", "y"]);
     }
 }

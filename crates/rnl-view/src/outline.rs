@@ -95,9 +95,10 @@ pub struct OutlineLevel {
     pub circuit: bool,
     /// Its terminals, in the order its definition writes them.
     pub ports: Vec<String>,
-    /// How many instances it has.
+    /// How many instances it has; for a module of Verilog-A, the instances of modules it writes.
     pub instances: usize,
-    /// The subcircuits its instances call, one for each name, in the order first called.
+    /// The subcircuits its instances call, one for each name, in the order first called; for a
+    /// module of Verilog-A, the modules its instances name (2.9), though it has no circuit.
     pub calls: Vec<OutlineCall>,
     /// For a file level, the language version its text is read in: the one its header record
     /// declares, or the one of the file that includes it, or the tool's default (16.1).
@@ -123,6 +124,11 @@ pub struct OutlineCall {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(test, ts(as = "Option<Vec<String>>", optional))]
     pub instances: Vec<String>,
+    /// The line of each of `instances`, in the same order, counted from 1 as `lines` of
+    /// [`OutlineLevel`] counts them, in the file of the level; left out with them.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(test, ts(as = "Option<Vec<u32>>", optional))]
+    pub lines: Vec<u32>,
 }
 
 /// The outline of a host document read with the host reader's diagnostics in `sink`.
@@ -172,7 +178,8 @@ pub(crate) fn outline(entry: &str, doc: HostDocument, sink: Sink, missing: Vec<S
         }
         let mut calls: Vec<OutlineCall> = Vec::new();
         let mut by_name: HashMap<(Option<usize>, String), usize> = HashMap::new();
-        for inst in lv.instances.iter().filter(|i| i.is_subckt) {
+        let written = lv.instances.iter().filter(|i| i.is_subckt).chain(&lv.module_instances);
+        for inst in written {
             let master = inst.model.clone().unwrap_or_default();
             let defined = doc.subckt_of(inst);
             if let Some(d) = defined {
@@ -181,12 +188,13 @@ pub(crate) fn outline(entry: &str, doc: HostDocument, sink: Sink, missing: Vec<S
             // the name compares by the rules of the file that writes the instance, as it is looked up
             let key = (defined, dialect_key(doc.rules(&inst.file), &master));
             let at = *by_name.entry(key).or_insert_with(|| {
-                calls.push(OutlineCall { master, level: defined, count: 0, instances: Vec::new() });
+                calls.push(OutlineCall { master, level: defined, count: 0, instances: Vec::new(), lines: Vec::new() });
                 calls.len() - 1
             });
             calls[at].count += 1;
             if defined.is_some() {
                 calls[at].instances.push(inst.name.clone());
+                calls[at].lines.push(inst.line);
             }
         }
         let (kind, lines) = match lv.kind {
@@ -208,7 +216,7 @@ pub(crate) fn outline(entry: &str, doc: HostDocument, sink: Sink, missing: Vec<S
             parent: lv.parent,
             circuit: lv.circuit,
             ports: lv.ports.clone(),
-            instances: lv.instances.len(),
+            instances: lv.instances.len() + lv.module_instances.len(),
             calls,
             version: versions[k].clone(),
             packages,
@@ -428,6 +436,7 @@ X2 m out inv
         assert_eq!(top.calls.len(), 1);
         assert_eq!((top.calls[0].master.as_str(), top.calls[0].level, top.calls[0].count), ("inv", Some(2), 2));
         assert_eq!(top.calls[0].instances, ["X1", "X2"]);
+        assert_eq!(top.calls[0].lines, [5, 6]);
         // an included file without a header record is read in the version of the file that includes it
         assert_eq!((o.levels[1].version.as_deref(), o.levels[1].parent), (Some("0.4"), Some(0)));
         assert_eq!(o.levels[2].ports, ["in", "out"]);
@@ -438,6 +447,48 @@ X2 m out inv
         // spare and buf call inv, and nothing calls them
         assert_eq!(o.roots, [3, 4]);
         assert_eq!(o.globals, ["vdd"]);
+    }
+
+    #[test]
+    fn a_module_of_verilog_a_calls_the_modules_its_instances_name() {
+        let top = "// top\n// @RNL(type=\"header\") { @VERSION(\"0.4\")}\nsimulator lang=spectre\nahdl_include \"a.va\"\nahdl_include \"b.va\"\nI1 (in out 0) top_va\n";
+        let a = "module top_va(x, y, g);\n  inout x, y, g;\n  electrical x, y, g, mid;\n  gain #(.k(2)) u1 (x, mid);\n  amp u2 (mid, y);\n  ghost u3 (y, g);\n  gain u4 (.a(y), .b(g));\n  analog V(y) <+ 0;\nendmodule\nmodule gain(a, b);\n  inout a, b;\n  electrical a, b;\nendmodule\n";
+        let b = "module amp(a, b);\n  inout a, b;\n  electrical a, b;\nendmodule\n";
+        let files = MemoryProvider::new().with("/w/top.scs", top).with("/w/a.va", a).with("/w/b.va", b);
+        let o = outline("/w/top.scs", &files, &BuildOptions::default()).unwrap();
+        let at = |title: &str| o.levels.iter().position(|l| l.title == title).unwrap();
+        let calls = |k: usize| -> Vec<(&str, Option<usize>, usize, Vec<&str>, Vec<u32>)> {
+            o.levels[k]
+                .calls
+                .iter()
+                .map(|c| {
+                    let instances = c.instances.iter().map(String::as_str).collect();
+                    (c.master.as_str(), c.level, c.count, instances, c.lines.clone())
+                })
+                .collect()
+        };
+        // the netlist's instance of the module
+        assert_eq!(calls(0), [("top_va", Some(at("top_va")), 1, vec!["I1"], vec![6])]);
+        // a module of the same file, one of another file, and a name no module has
+        let top_va = &o.levels[at("top_va")];
+        assert_eq!((top_va.kind, top_va.circuit, top_va.instances), ("module", false, 4));
+        assert_eq!(
+            calls(at("top_va")),
+            [
+                ("gain", Some(at("gain")), 2, vec!["u1", "u4"], vec![4, 7]),
+                ("amp", Some(at("amp")), 1, vec!["u2"], vec![5]),
+                ("ghost", None, 1, vec![], vec![]),
+            ]
+        );
+        assert_eq!(o.levels[at("amp")].file, Some(2));
+        assert!(o.levels[at("gain")].calls.is_empty() && o.levels[at("amp")].instances == 0);
+        // a module is no root, though nothing in the netlist calls gain
+        assert!(o.roots.is_empty());
+        // and nothing of it is drawn: the Document has the netlist's level alone
+        let d = build("/w/top.scs", &files, &BuildOptions::default()).unwrap();
+        assert_eq!(d.levels.len(), 1);
+        let json = serde_json::to_value(&o.levels[at("top_va")].calls[2]).unwrap();
+        assert!(json.get("instances").is_none() && json.get("lines").is_none(), "{json}");
     }
 
     #[test]

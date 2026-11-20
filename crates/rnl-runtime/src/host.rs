@@ -140,6 +140,10 @@ pub struct Level {
     /// The parameters that the level's own `.param` statements (Spectre's `parameters` outside a
     /// subcircuit) set, in the order written, as text.
     pub param_statements: Vec<(String, String)>,
+    /// For a module of Verilog-A (2.9), the instances of modules its text writes, in the order
+    /// written: each with its name, the module it names (`model`), its file and its line. A module
+    /// level has no circuit, so they are not among `instances`: nothing reads them but the outline.
+    pub module_instances: Vec<Instance>,
 }
 
 impl Level {
@@ -164,6 +168,7 @@ impl Level {
             section_lines: None,
             params: Vec::new(),
             param_statements: Vec::new(),
+            module_instances: Vec::new(),
         }
     }
 
