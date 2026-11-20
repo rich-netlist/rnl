@@ -1,7 +1,7 @@
 # 0016. The English terms are the only normative ones; each language keeps its own glossary
 
 - Date: 2026-10-26
-- Status: proposed
+- Status: accepted (2026-10-26). Implemented in #288: each language's glossary is `i18n/<language>/glossary.json`.
 
 ## Context
 

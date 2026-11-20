@@ -1,6 +1,6 @@
 # 0014: Shared inspection overlay geometry
 
-Status: proposed; implementation under review.
+Status: accepted. Implemented in #176 and released in core 0.3.0 and Viewer 0.3.0 (`rnl render --usages --currents`).
 
 The Viewer previously computed usage frames from hits and role extents. CLI and npm SVG
 exports could not reproduce these frames or inspect effective terminal currents.

@@ -1,6 +1,6 @@
 # Named sub-objects keep their written handles
 
-Status: accepted; implementation in steps.
+Status: accepted. Implemented in #412 and released in core 0.5.6.
 
 ## Context
 

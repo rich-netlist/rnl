@@ -1,6 +1,6 @@
 # 0012 — Public packages use an immutable catalog
 
-Status: accepted (2026-10-20). Implementation: `ext/packages-split`, pending pull-request review.
+Status: accepted (2026-10-20). Implemented in #156, merged on 2026-10-20 and released in core 0.2.0 and Viewer 0.1.4.
 
 The standard series, including `rnl-zh`, remains in `rnl/libraries/standard/` and built into the core. Optional packages belong to the separate `rich-netlist/rnl-packages` repository. The initial split moves analog-canvas-extensions, eda-symbol, eda-style and pdk-sky130 with their history and unchanged package bytes.
 
