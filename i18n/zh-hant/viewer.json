@@ -223,6 +223,7 @@
   "The following explicitly referenced packages are available in the public library:": "在公開資源庫中找到以下明確引用的套件：",
   "Add them to Library and reload the current circuit? Pending edits will be kept.": "是否將這些套件加入資源庫並重新載入目前的電路？尚未應用的編輯內容將會保留。",
   "Add to Library": "加入資源庫",
+  "Add {0} to the Library": "將 {0} 加入資源庫",
   "instance": "實例",
   "net": "網路",
   "usage": "用例",

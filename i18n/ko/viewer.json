@@ -223,6 +223,7 @@
   "The following explicitly referenced packages are available in the public library:": "명시적으로 참조된 다음 패키지를 공개 라이브러리에서 사용할 수 있습니다:",
   "Add them to Library and reload the current circuit? Pending edits will be kept.": "이 패키지들을 라이브러리에 추가하고 현재 회로를 새로고침하시겠습니까? 적용 전인 편집 내용은 유지됩니다.",
   "Add to Library": "라이브러리에 추가",
+  "Add {0} to the Library": "{0}을(를) 라이브러리에 추가",
   "instance": "인스턴스",
   "net": "넷",
   "usage": "용례",

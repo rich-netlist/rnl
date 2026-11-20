@@ -223,6 +223,7 @@
   "The following explicitly referenced packages are available in the public library:": "Los siguientes paquetes referenciados explícitamente están disponibles en la biblioteca pública:",
   "Add them to Library and reload the current circuit? Pending edits will be kept.": "¿Añadirlos a la Biblioteca y recargar el circuito actual? Las ediciones pendientes se conservarán.",
   "Add to Library": "Añadir a la Biblioteca",
+  "Add {0} to the Library": "Añadir {0} a la Biblioteca",
   "instance": "instancia",
   "net": "red",
   "usage": "uso",

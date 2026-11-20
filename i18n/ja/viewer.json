@@ -223,6 +223,7 @@
   "The following explicitly referenced packages are available in the public library:": "明示的に参照されている以下のパッケージが公開ライブラリで利用可能です：",
   "Add them to Library and reload the current circuit? Pending edits will be kept.": "これらをライブラリに追加して現在の回路を再読み込みしますか？未適用の編集内容は保持されます。",
   "Add to Library": "ライブラリに追加",
+  "Add {0} to the Library": "{0} をライブラリに追加",
   "instance": "インスタンス",
   "net": "ネット",
   "usage": "適用オブジェクト",
