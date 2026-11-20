@@ -346,14 +346,14 @@ test.describe("with a solve, on the desktop", () => {
     expect(await boxTexts(page)).toEqual(["ALIGN y", "1", "2"]);
     // a distance has two lists, numbered each from its own start (in 0.4 the groups of a DISTANCE stand for their
     // members, a constraint for each pair: one object in each list)
-    await rows(page).filter({ hasText: /DISTANCE x increasing min=3 \{#M1\} \{#CC\}/ }).first().click();
-    expect(await boxTexts(page)).toEqual(["DISTANCE x increasing ≥ 3", "from1", "to1"]);
+    await rows(page).filter({ hasText: /DISTANCE left-to-right min=3 \{#M1\} \{#CC\}/ }).first().click();
+    expect(await boxTexts(page)).toEqual(["DISTANCE left-to-right ≥ 3", "from1", "to1"]);
     // the objects of an ORDER are numbered in its order
-    await rows(page).filter({ hasText: /ORDER x increasing \{#VIP #M1 #M6 #CL\}/ }).first().click();
-    expect(await boxTexts(page)).toEqual(["ORDER x increasing", "1", "2", "3", "4"]);
+    await rows(page).filter({ hasText: /ORDER left-to-right \{#VIP #M1 #M6 #CL\}/ }).first().click();
+    expect(await boxTexts(page)).toEqual(["ORDER left-to-right", "1", "2", "3", "4"]);
     // the pin of an object is marked at the pin
-    await rows(page).filter({ hasText: /DISTANCE y increasing min=0 max=3 \{#VDD::p\}/ }).first().click();
-    expect((await boxTexts(page))[0]).toBe("DISTANCE y increasing ≥ 0 ≤ 3");
+    await rows(page).filter({ hasText: /DISTANCE bottom-to-top min=0 max=3 \{#VDD::p\}/ }).first().click();
+    expect((await boxTexts(page))[0]).toBe("DISTANCE bottom-to-top ≥ 0 ≤ 3");
     // and the box goes with the preview
     await page.evaluate(() => window.viewer.command("solve-close"));
     await expect(page.locator("#preview-badge")).toBeHidden();

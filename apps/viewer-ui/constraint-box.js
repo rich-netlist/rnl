@@ -13,27 +13,28 @@ function codeText(list, single, what, pattern) {
   return pattern?.exec(what ?? "")?.[1] ?? single ?? "";
 }
 
+/** The `direction` of an ORDER, a DISTRIBUTE or a DISTANCE as RNL writes it (14.3): `left-to-right`, or the axis alone for either sense. */
+const DIRECTIONS = { "x increasing": "left-to-right", "x decreasing": "right-to-left", "y increasing": "bottom-to-top", "y decreasing": "top-to-bottom" };
+export const directionWord = (axis, sense) => DIRECTIONS[`${axis} ${sense}`] ?? axis;
+
 /**
- * What a fact says without the objects it names, from the fields of its kind: `ALIGN y`, `ORDER x increasing`,
- * `DISTRIBUTE x increasing`, `DISTANCE x ≥ 2 ≤ 4`, `PLACE-x = 3`, `ORIENT R90`, `ORIENT [MY, R0]`, `TABLE x`. A
- * distance with the same least and most is `= 8`.
+ * What a fact says without the objects it names, from the fields of its kind: `ALIGN y`, `ORDER left-to-right`,
+ * `DISTRIBUTE x`, `DISTANCE top-to-bottom ≥ 2 ≤ 4`, `PLACE-x = 3`, `ORIENT R90`, `ORIENT [MY, R0]`, `TABLE x`. The
+ * direction is written as the statement writes it, the axis alone for either sense. A distance with the same least and
+ * most is `= 8`.
  */
 export function boxTitle(fact) {
   switch (fact.kind) {
     case "ALIGN":
     case "TABLE":
       return `${fact.kind} ${fact.axis}`;
-    case "DISTRIBUTE": {
-      // a DISTRIBUTE of 0.3 runs either way on its axis; one of 0.4 says which
-      const sense = fact.sense ?? /^DISTRIBUTE \S+ (increasing|decreasing)\b/.exec(fact.what ?? "")?.[1];
-      return ["DISTRIBUTE", fact.axis, sense && sense !== "either" && sense].filter(Boolean).join(" ");
-    }
+    case "DISTRIBUTE":
     case "ORDER":
-      return `ORDER ${fact.axis} ${fact.sense}`;
+      return `${fact.kind} ${directionWord(fact.axis, fact.sense)}`;
     case "DISTANCE": {
       const { min, max } = fact;
       const range = min !== null && min === max ? [`= ${num(min)}`] : [min !== null && `≥ ${num(min)}`, max !== null && `≤ ${num(max)}`];
-      return ["DISTANCE", fact.axis, fact.sense !== "either" && fact.sense, ...range].filter(Boolean).join(" ");
+      return ["DISTANCE", directionWord(fact.axis, fact.sense), ...range].filter(Boolean).join(" ");
     }
     case "ORIENT":
       return `ORIENT ${codeText(fact.codes, fact.code, fact.what, /^the orientation (\[[^\]]+\]) /)}`.trim();
