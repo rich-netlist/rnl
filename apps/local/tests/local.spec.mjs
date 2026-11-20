@@ -246,6 +246,8 @@ test("Add Folder to PATH (with Sub-folders) chooses a folder of the machine, who
   await page.locator("#tab-files").click();
   const group = page.locator(`.lib-group[data-group=${JSON.stringify(`path:${pagePath(lib)}`)}]`);
   await expect(group.locator(".lib-deep")).toHaveText("with sub-folders");
+  // (showing the Library scans PATH again: its rows are made again when that ends)
+  await expect(page.locator("#library-groups")).not.toHaveAttribute("aria-busy", "true");
   await group.locator(".lib-toggle").click();
   await expect(group.locator(".pool-open")).toHaveText(["amp.sp", "cells/inv.inc"]);
   // a file of it opens, read from the machine
@@ -263,6 +265,8 @@ test("Add Folder to PATH (with Sub-folders) chooses a folder of the machine, who
   ({ child: server, base, address } = await start(join(work, "proj", "sim", "top.sp")));
   await open(page);
   await page.locator("#tab-files").click();
+  await expect(group.locator(".lib-deep")).toHaveText("with sub-folders");
+  await expect(page.locator("#library-groups")).not.toHaveAttribute("aria-busy", "true");
   await group.locator(".lib-toggle").click();
   await expect(group.locator(".pool-open")).toHaveText(["amp.sp", "cells/inv.inc"]);
 });
