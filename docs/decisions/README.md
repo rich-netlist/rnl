@@ -19,12 +19,12 @@ Decisions made before this log started, including those from the first architect
 | [0009](0009-fonts-shipped-with-the-core.md) | The core ships Noto Sans SC and lays out text with its metrics | accepted |
 | [0010](0010-desktop-viewer-solves-as-a-preview.md) | The desktop viewer solves as a preview and saves a solved copy; it never changes the files it opens | accepted; its second point is changed by [0011](0011-viewers-edit-the-text-and-write-only-what-the-user-saves.md) |
 | [0011](0011-viewers-edit-the-text-and-write-only-what-the-user-saves.md) | The viewers edit the text, and write a file only when the user has edited it and saves it | accepted |
-| [0012](0012-public-packages-use-an-immutable-catalog.md) | Optional public packages use a separate repository and an immutable catalog | accepted; implementation under review; its bilingual summaries are changed by [0015](0015-english-is-the-only-core-language.md) |
-| [0013](0013-independent-release-lines.md) | Core, Viewer and language standard have independent releases; latest belongs to core | accepted; initial versions and npm dist-tag pending |
-| [0014](0014-inspection-overlay-geometry.md) | Shared inspection overlay geometry, with frontend styling and optional SVG export | proposed; implementation under review |
+| [0012](0012-public-packages-use-an-immutable-catalog.md) | Optional public packages use a separate repository and an immutable catalog | accepted; implemented in #156 (core 0.2.0); its bilingual summaries are changed by [0015](0015-english-is-the-only-core-language.md) |
+| [0013](0013-independent-release-lines.md) | Core, Viewer and language standard have independent releases; latest belongs to core | accepted; implemented in #168, first core release 0.2.0 with npm `latest` |
+| [0014](0014-inspection-overlay-geometry.md) | Shared inspection overlay geometry, with frontend styling and optional SVG export | accepted; implemented in #176 (core 0.3.0) |
 | [0015](0015-english-is-the-only-core-language.md) | English is the only core language; every other language, Chinese included, is a translation | accepted; implemented in steps; points 3 and 7 amended by [0016](0016-english-terms-are-normative-each-language-keeps-a-glossary.md) |
-| [0016](0016-english-terms-are-normative-each-language-keeps-a-glossary.md) | The English terms are the only normative ones; each language keeps its own glossary | proposed |
+| [0016](0016-english-terms-are-normative-each-language-keeps-a-glossary.md) | The English terms are the only normative ones; each language keeps its own glossary | accepted; implemented in #288 |
 | [0017](0017-isolate-language-0-4-packages.md) | Language 0.4 packages stay separate from earlier languages; published 0.2/0.3 behavior stays | accepted |
 | [0018](0018-usage-points-and-body-coordinates.md) | Usages in 0.4 have their own points; general body coordinates translate from them | accepted |
-| [0019](0019-pin-identity-in-language-0-4.md) | Pins in 0.4 keep their identity through symbol bindings, geometry and writeback | accepted; implementation in steps |
-| [0020](0020-named-subobject-handles.md) | Named sub-object handles stay distinct from their resolved pin identities | accepted; implementation in steps |
+| [0019](0019-pin-identity-in-language-0-4.md) | Pins in 0.4 keep their identity through symbol bindings, geometry and writeback | accepted; implemented (core 0.5.6) except the pin editing interface, which waits for an editor |
+| [0020](0020-named-subobject-handles.md) | Named sub-object handles stay distinct from their resolved pin identities | accepted; implemented in #412 (core 0.5.6) |

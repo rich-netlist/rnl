@@ -1,6 +1,6 @@
 # 0013 — Independent core, Viewer and language release lines
 
-Status: accepted (2026-10-22). Initial version numbers and npm dist-tag await the user's decision.
+Status: accepted (2026-10-22). Implemented in #168. The first release of the core line was core 0.2.0 (2026-10-22), published to npm under `latest`; the Viewer line continued with Viewer 0.2.0 ([release procedures](../releases.md)).
 
 The user asked for a task that builds the executables automatically each time rnl is released,
 and for the skill to tell users that they can download them directly. They then questioned the

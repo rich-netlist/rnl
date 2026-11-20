@@ -1,6 +1,6 @@
 # Pins keep their own identity in language 0.4
 
-Status: accepted; implementation in steps.
+Status: accepted. Implemented in #403, #405, #408, #412 and #416, released in core 0.5.6, except the pin editing interface, which waits for an editor; the editor is set aside ([roadmap](../roadmap.md)).
 
 ## Context
 
