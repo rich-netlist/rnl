@@ -22,7 +22,8 @@ export function navigate(target, options = {}) {
   if (isLoading()) return;
   const visit = destination(target);
   if (options.newWindow ?? shift) return newWindow(visit);
-  if (target.file !== undefined) setPane('netlist');
+  // (a file opened from the Library keeps the Library shown)
+  if (target.file !== undefined && !target.keepPane) setPane('netlist');
   if (target.source || target.file !== undefined || !sameSource(visit.entry, currentSource())) {
     rememberView();
     // another file of the same document, read alone: the tree stays as it was opened
@@ -49,7 +50,7 @@ function destination(target) {
     select: object ? { kind: object.kind, name: object.name, level: object.level_title,
       ...(target.selectionUsage === undefined ? {} : { usage: target.selectionUsage }) }
       : target.via ? { kind: 'instance', name: target.via, level: last?.title } : null,
-    reveal: target.reveal, netlist: target.file !== undefined, bind: target.bind, bound: target.bound };
+    reveal: target.reveal, netlist: target.file !== undefined && !target.keepPane, bind: target.bind, bound: target.bound };
 }
 
 function fileSource(file) {

@@ -1456,6 +1456,8 @@ button.pool-open:hover { text-decoration: underline; }
 .pool-include { display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 42px; font-size: 12px; }
 .pool-include-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; direction: rtl; text-align: left; color: var(--muted); }
 .pool-include-name::before { content: "\200e"; }
+button.pool-include-open { flex: 1; min-width: 0; display: flex; background: transparent; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+button.pool-include-open:hover .pool-include-name { text-decoration: underline; }
 .pool-note { font-size: 11px; color: var(--muted); margin: 4px 10px 10px; overflow-wrap: anywhere; }
 .pool-temporary { padding-left: 10px; border-bottom: 1px solid var(--line); }
 .pool-temporary .pool-open { font-style: italic; }
