@@ -619,10 +619,12 @@ async function opened(page, action) {
 
 /**
  * The Document that `rnl view` prints for a file, named as given, from the repository's root, with
- * its flylines and hints, as the page asks for them.
+ * its flylines and hints, as the page asks for them; with `name`, the reading of that file of the document alone, in the
+ * context of its entry (`--file`), as the web viewer reads the file it shows.
  */
-function rnlView(file) {
-  const out = execFileSync(process.env.RNL_BIN, ["view", file, "--flylines", "--hints"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
+function rnlView(file, name) {
+  const args = ["view", file, ...(name === undefined ? [] : ["--file", name]), "--flylines", "--hints"];
+  const out = execFileSync(process.env.RNL_BIN, args, { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
   return JSON.parse(out);
 }
 
@@ -653,29 +655,24 @@ function lazily(doc) {
 }
 
 /**
- * A reading of one file (the web viewer reads the file shown alone, in the context of its entry) without what the
- * Document of the whole document does not have: the file read, the subcircuits it calls, what it depends on, the
- * outline the page keeps with it, and where another file defines a subcircuit (`Child.host`).
+ * A reading of one file as both sides give it: without the outline the page keeps with it, the texts it fills in of
+ * the other files for the netlist pane (the reading has the text of its own file only), and the names of the core and of
+ * the entry, which the page gives as the workspace names them.
  */
-function asWhole(doc) {
-  const { file, children, inputs, outline, ...rest } = doc;
-  return { ...rest, levels: rest.levels.map((l) => ({ ...l, children: l.children.map(({ host, ...c }) => c) })) };
+function asRead(doc) {
+  const { outline, inputs, ...rest } = doc;
+  const { core, entry, ...kept } = inputs;
+  return { ...rest, files: rest.files.map((f) => (f.path === doc.file ? f : { ...f, text: "" })), inputs: kept };
 }
 
 /**
  * The same Document as `rnl view` builds for `file`, but for the paths that name the files and the drawings of the
- * objects without a position. Of a document of several files the page reads one: its files and their texts, what is
- * missing and the levels of that file are those of `rnl view`, and its diagnostics are among them.
+ * objects without a position: of the page that reads the file shown alone, the same reading of that file as
+ * `rnl view --file` gives, whole.
  */
 function sameAsRnl(doc, file) {
-  const whole = unnamed(lazily(rnlView(file)));
-  const page = unnamed(asWhole(doc));
-  if (doc.file === undefined || whole.files.length === 1) return expect(page).toEqual(whole);
-  expect(page.files.map((f) => [f.path, f.text])).toEqual(whole.files.map((f) => [f.path, f.text]));
-  expect(page.missing).toEqual(whole.missing);
-  const at = whole.files.findIndex((f) => f.path === doc.file);
-  expect(page.levels.map((l) => l.title)).toEqual(whole.levels.filter((l) => (l.lines?.[0] ?? 0) === at).map((l) => l.title));
-  for (const d of page.diagnostics) expect(whole.diagnostics).toContainEqual(d);
+  if (doc.file === undefined) return expect(unnamed(doc)).toEqual(unnamed(lazily(rnlView(file))));
+  expect(unnamed(asRead(doc))).toEqual(unnamed(asRead(lazily(rnlView(file, doc.file)))));
 }
 
 /** The directories the test made, removed after it, and the servers it started, stopped after it. */
