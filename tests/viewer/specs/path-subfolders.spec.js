@@ -106,3 +106,17 @@ test("screenshots of Add PATH with Sub-folders and Shift+R", async ({ page, view
   await page.evaluate(() => window.viewer.command("shortcuts"));
   await page.locator("dialog.dialog").screenshot({ path: `${dir}/currents-shift-r-shortcuts.png` });
 });
+
+test("desktop: File > Add Folder to PATH (with Sub-folders) adds a directory with its sub-folders, as the Library's button does", async ({ page, viewer }) => {
+  await viewer.open(null, { platform: "desktop", pool: "1", settings: "1" });
+  await page.evaluate(() => {
+    window.fakeShell.packages = { "/pdk": ["/pdk/top.rnl"] };
+    window.fakeShell.deepPackages = { "/pdk": ["/pdk/top.rnl", "/pdk/cells/inv.sp"] };
+    window.fakeShell.path = "/pdk";
+  });
+  await page.evaluate(() => window.viewer.command("add-path-subfolders"));
+  await page.locator("#tab-files").click();
+  await expect(group(page, "path:/pdk").locator(".lib-deep")).toHaveText("with sub-folders");
+  expect(await stored(page, "search-paths")).toEqual(["/pdk"]);
+  expect(await stored(page, "search-paths-subfolders")).toEqual(["/pdk"]);
+});

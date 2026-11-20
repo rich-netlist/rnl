@@ -224,8 +224,11 @@ async function saveDeepPaths(next, add = null) {
   await save("search-paths-subfolders", deep);
 }
 
-/** Add a PATH directory, with its sub-folders when `subfolders`; one already there gains them. */
-const addPath = (subfolders) => update(async () => {
+/**
+ * Add a PATH directory, with its sub-folders when `subfolders`; one already there gains them. The Library's buttons
+ * and File > Add Folder to PATH (with Sub-folders) (desktop) add one.
+ */
+export const addPath = (subfolders) => update(async () => {
   const path = await shell.pickPath();
   if (!path) return false;
   const known = paths().includes(path);
