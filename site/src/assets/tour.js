@@ -106,7 +106,7 @@
     var openLink = $('#file-open');
     var btns = PG.initSeg($('#file-style'), 'data-style', show);
     function show(style) {
-      C.render(el, SC.otaCode(2, style).map(function (l) { return { t: l.t }; }));
+      C.render(el, SC.otaCode(style).map(function (l) { return { t: l.t }; }));
       if (openLink) {
         var target = style === 'zh' ? 'ota5t-zh.sp' : 'ota5t.sp';
         openLink.setAttribute('href', openLink.getAttribute('href').replace(/url=samples\/site\/[^&#]*/, 'url=samples/site/' + target));

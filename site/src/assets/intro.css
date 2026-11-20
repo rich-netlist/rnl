@@ -1026,6 +1026,16 @@ html[lang="en"] .fam { grid-template-columns: 108px 1fr; }
 .fx-lbl { font: 500 12px var(--f-mono); fill: var(--ink); }
 #fix-air { width: 100%; height: 116px; overflow: hidden; }
 
+/* the core's drawings of the OTA (scenes.js coreView): its ink is the page's, and the parts a line is about are lit */
+.core-drawing { --hl: var(--signal); }
+.core-drawing [stroke="#1d1d1f"] { stroke: var(--ink); }
+.core-drawing [fill="#1d1d1f"] { fill: var(--ink); }
+.core-drawing g[data-id] { transition: opacity .15s; }
+.core-drawing.has-lit g[data-id]:not(.is-lit) { opacity: .2; }
+.core-drawing .is-lit [stroke]:not([stroke="none"]) { stroke: var(--hl); }
+.core-drawing .is-lit [fill]:not([fill="none"]) { fill: var(--hl); }
+.ex-fig .fig > svg.core-drawing { display: block; width: 100%; height: auto; max-height: 420px; }
+
 /* ---------- 04 Scenario illustrations ---------- */
 
 .flowline.alt { margin-top: 16px; }

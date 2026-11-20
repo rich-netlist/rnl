@@ -402,9 +402,12 @@
         setOpen('ota5t-edits.sp');
         var lines = SC.E5_LINES;
         C.render(codeEl, lines);
-        var m = mountView(SC.e5Scene(), SC.OTA_BOX);
-        var linker = C.link(codeEl, lines, m.view);
-        m.setLinker(linker);
+        /* the file as the viewer shows it before solving again: the solver's record, with M2 where the editor put it */
+        var linker = null;
+        var view = SC.coreView(fig, 'edits', function (ref) { if (linker) linker.markRef(ref); });
+        if (view) view.svg.setAttribute('aria-label', '<en>Example schematic</en>');
+        linker = C.link(codeEl, lines, view);
+        var m = { view: view };
         extra.innerHTML = '<ul class="diag">' + SC.E5_DIAG.map(function (d) {
           return '<li class="' + d.k + '" data-d="' + d.id + '" tabindex="0">' + icon(d.icon) + '<span>' + d.html + '</span></li>';
         }).join('') + '</ul>';

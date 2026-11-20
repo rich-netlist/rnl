@@ -177,7 +177,7 @@
       <div class="shape"><span class="k"><en>Roles</en></span><code data-hl="#M1(left) and #M2(right) are treated @AS $DIFFERENTIAL_PAIR_N"></code><p><en>Parentheses right after an object say which role of the definition it fills; “and” and “are treated” are free text.</en></p></div>
       <div class="shape"><span class="k"><en>Naming</en></span><code data-hl="%g0 = $GROUND @ATTACH &amp;vss"></code><p><en>Names the object the statement makes, so %g0 can be used later, for example to place it; =&gt; %g0 at the end does the same.</en></p></div>
       <div class="shape"><span class="k"><en>Pipe</en></span><code data-hl='#M2 @PLACE(30, 20) =&gt; @ORIENT("MY")'></code><p><en>Each part passes its result to the next: place it first, then mirror it left to right.</en></p></div>
-      <div class="shape"><span class="k"><en>Record</en></span><code data-hl='* @RNL(author="rnl-solver", priority="high") { #M1 @PLACE(12, 20); #M2 @PLACE(28, 20)}'></code><p><en>One record, with statements separated by semicolons. The record head applies to every statement inside: author records who wrote it, and priority sets the default priority (except for AS and ATTACH, which inherit the record’s priority only when it is "disabled").</en></p></div>
+      <div class="shape"><span class="k"><en>Record</en></span><code data-hl='* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:…") { #M1 @PLACE(10, 16) =&gt; @ORIENT("R0"); #M2 @PLACE(20, 16) =&gt; @ORIENT("MY"); …}'></code><p><en>One record, with statements separated by semicolons. The record head applies to every statement inside: author records who wrote it, and priority sets the default priority (except for AS and ATTACH, which inherit the record’s priority only when it is "disabled").</en></p></div>
     </div>
 
     <h3 class="sub-h"><en>Keyword families</en></h3>
@@ -640,7 +640,7 @@
     <div class="records">
       <div class="rec"><span class="rec-n">1</span><b><en>Designer</en></b><code data-hl='* @RNL(author="designer") {…}'></code><p><en>Semantics and constraints, normal by default. Edited at will.</en></p></div>
       <div class="rec"><span class="rec-n">2</span><b><en>Solver</en></b><code data-hl='* @RNL(type="generated", priority="high", hash="…") {…}'></code><p><en>Coordinates and wires, high. Replaced as a whole on each solve; hash records the input it solved.</en></p></div>
-      <div class="rec"><span class="rec-n">3</span><b><en>Editor</en></b><code data-hl='* @RNL(author="rnl-editor") { #M2 @PLACE(x=30, priority="high")}'></code><p><en>Manual edits are appended after it, also high: within one priority the later wins, so they override the solver.</en></p></div>
+      <div class="rec"><span class="rec-n">3</span><b><en>Editor</en></b><code data-hl='* @RNL(author="rnl-editor") { #M2 @PLACE(x=22, priority="high")}'></code><p><en>Manual edits are appended after it, also high: within one priority the later wins, so they override the solver.</en></p></div>
     </div>
     <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><en>When the input changes and the hash no longer matches, the old result still displays; the viewer only suggests solving again, with no error. On the next solve, the editor’s high coordinates are fixed positions and everything else adjusts.</en></span></p>
   </div>
@@ -741,6 +741,7 @@
 <script src="assets/schem.js"></script>
 <script src="assets/rnl-code.js"></script>
 <script src="assets/scenes.js"></script>
+<script src="assets/ota-looks.js"></script>
 <script src="assets/languages.js"></script>
 <script src="assets/common.js"></script>
 <script src="assets/tour.js"></script>

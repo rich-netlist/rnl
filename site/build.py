@@ -572,16 +572,21 @@ COUNTS = re.compile(r"(\d+) errors?, (\d+) violations?, (\d+) warnings?, (\d+) h
 
 
 def check_examples(files, ex):
-    """Check that every samples/site/<name>.sp referenced in src/ exists in site/examples/, and that
-    the 5T OTA netlist excerpts and coordinates in src/assets/scenes.js, and the example's in src/assets/ota.js,
-    stay in step with them."""
+    """Check that every samples/site/<name>.sp referenced in src/ exists in site/examples/ (and every
+    samples/site/cases/<name> in site/examples/cases/), and that the 5T OTA netlist excerpts in src/assets/scenes.js,
+    and the example's in src/assets/ota.js, stay in step with them."""
     errors = []
     linked = {m.group(1) for text in files.values() for m in SAMPLES_SITE.finditer(text)}
+    linked |= set(re.findall(r'"file": "(ota5t[\w.-]*\.sp)"', files.get("assets/ota-looks.js", "")))
     have = set(ex)
     for name in sorted(linked - have):
         errors.append("src/: references samples/site/%s, which is not in site/examples/" % name)
     for name in sorted(have - linked):
         errors.append("examples/%s: not referenced in src/" % name)
+    cases = {m.group(1) for text in files.values() for m in re.finditer(r"samples/site/cases/([\w.-]+\.sp)", text)}
+    for name in sorted(cases):
+        if not (EXAMPLES / "cases" / name).is_file():
+            errors.append("src/: references samples/site/cases/%s, which is not in site/examples/cases/" % name)
     scenes = files.get("assets/scenes.js", "")
     if not scenes or not ex:
         return errors
@@ -606,17 +611,9 @@ def check_examples(files, ex):
         for target in ("ota5t.sp", "ota5t-zh.sp", "ota5t-edits.sp", "ota5t_tb.sp"):
             if target in ex and line not in ex[target]:
                 errors.append("examples/%s: missing %r from otaCode in src/assets/scenes.js" % (target, line))
-    for tbl_name, targets in (("L_SYM", ("ota5t.sp", "ota5t-zh.sp", "ota5t-edits.sp")),):
-        for dev, x, y, o in re.findall(r"(M\d):\s*\[(-?\d+),\s*(-?\d+),\s*'(\w+)'\]",
-                                       block(r"var %s = \{(.*?)\};" % tbl_name)):
-            stmt = ('#%s @PLACE(%s, %s);' % (dev, x, y) if dev == "M5" and o == "R0"
-                    else '#%s @PLACE(%s, %s) => @ORIENT("%s")' % (dev, x, y, o))
-            for target in targets:
-                if target in ex and stmt not in ex[target]:
-                    errors.append("examples/%s: missing %r from %s in src/assets/scenes.js" % (target, stmt, tbl_name))
     for line, rest in re.findall(r"\{\s*t:\s*'([^']+)'([^}]*)\}", block(r"var E5_LINES = \[(.*?)\n  \];")):
-        if "sig1:" in line:
-            continue
+        if "fold:" in rest:
+            continue   # stands for the lines of the solver's record that the page leaves out
         needle = line.lstrip("* ").strip() if "is-err" in rest else line.rstrip(";")
         if "ota5t-edits.sp" in ex and needle not in ex["ota5t-edits.sp"]:
             errors.append("examples/ota5t-edits.sp: missing %r from E5_LINES in src/assets/scenes.js" % needle)
@@ -629,18 +626,36 @@ def check_examples(files, ex):
 
 
 OTA_FILES = {"bare": "ota5t-review-bare.sp", "en": "ota5t-review.sp", "zh": "ota5t-review-zh.sp", "eda": "ota5t-review-eda.sp"}
+GENERATED = re.compile(r'^\* @RNL\(type="generated".*?(?:\{\}\n|\n\* \}\n)', re.M | re.S)
+
+
+def strip_generated(text):
+    """The text of a file without the records of the solver (type="generated")."""
+    return GENERATED.sub("", text)
 
 
 def check_ota(files, ex):
     """The OTA of the introduction: the lines in src/assets/ota.js are those of the four files
     examples/ota5t-review*.sp (the notation, the English sentences, the Chinese ones, and the English file with the two
-    public packages), and src/assets/ota-looks.js holds the core's drawings of the present text of the standard and
-    the package files."""
+    public packages), but for the records of the solver, which src/assets/ota-looks.js holds as the core reads them from
+    the present text of each file, with the core's drawings of the standard and the package files."""
     script = files.get("assets/ota.js", "")
     if not script or any(name not in ex for name in OTA_FILES.values()):
         return []
     errors = []
     bare, en, zh, eda = (ex[OTA_FILES[k]] for k in ("bare", "en", "zh", "eda"))
+    looks = files.get("assets/ota-looks.js", "")
+    m = re.search(r"window\.RNLOtaLooks = (.*);\s*$", looks, re.S)
+    data = json.loads(m.group(1)) if m else {}
+    records = {}
+    for name in OTA_FILES.values():
+        rec = data.get("records", {}).get(name)
+        if not rec or not hashlib.sha256(ex[name].encode("utf-8")).hexdigest().startswith(rec.get("sha256", "-")):
+            errors.append("src/assets/ota-looks.js: the records of the solver are not those of the present examples/%s; "
+                          "run node site/render-examples.mjs" % name)
+            records[name] = set()
+        else:
+            records[name] = {line for block in rec["blocks"] for line in block}
 
     def block(pattern):
         m = re.search(pattern, script, re.S)
@@ -668,19 +683,23 @@ def check_ota(files, ex):
     statements |= set(re.findall(r"\w+:\s*'([^']+)'", block(r"TZ = \{(.*?)\n  \};")))
     for name, text in (("ota5t-review-bare.sp", bare), ("ota5t-review.sp", en), ("ota5t-review-zh.sp", zh)):
         for line in text.split("\n"):
-            if not line.strip() or '@RNL(type="header")' in line:
+            if not line.strip() or '@RNL(type="header")' in line or line in records[name]:
                 continue
             if line not in fixed and not (line.startswith("*   ") and line[4:] in statements):
                 errors.append("examples/%s: the line %r is not among the lines of src/assets/ota.js" % (name, line))
     # the same file with the two public packages, and the core's drawings of the two, which say which file they are of
     header = '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")}'
     packages = '; @USE-PACKAGE(name="eda-symbol", version="0.2"); @USE-PACKAGE(name="eda-style", version="0.2")'
-    if eda != en.replace(header, header.replace('")}', '")' + packages + "}")):
+    # each file is solved on its own: the packages draw other symbols, so the record of the solver differs
+    if strip_generated(eda) != strip_generated(en).replace(header, header.replace('")}', '")' + packages + "}")):
         errors.append("examples/ota5t-review-eda.sp: is not examples/ota5t-review.sp with the USE-PACKAGE lines of eda-symbol and eda-style in its header")
     if packages not in script:
         errors.append("src/assets/ota.js: PACKAGES is not the USE-PACKAGE lines of examples/ota5t-review-eda.sp")
-    looks = files.get("assets/ota-looks.js", "")
-    for look, name in (("standard", "ota5t-review.sp"), ("eda", "ota5t-review-eda.sp")):
+    for look, name in (("standard", "ota5t-review.sp"), ("eda", "ota5t-review-eda.sp"), ("plain", "ota5t-plain.sp"),
+                       ("edits", "ota5t-edits.sp")):
+        if name not in ex:
+            errors.append("examples/%s: missing, the %s look of src/assets/ota-looks.js is drawn from it" % (name, look))
+            continue
         m = re.search(r'"%s": \{\s*"file": "([^"]+)",\s*"sha256": "([0-9a-f]+)"' % look, looks)
         want = hashlib.sha256(ex[name].encode("utf-8")).hexdigest()
         if not m or m.group(1) != name or not want.startswith(m.group(2)):
@@ -711,7 +730,8 @@ SIM = HERE / "sim" / "ota5t-review-tb.sp"
 def check_sim(files, ex):
     """The simulation beside the example: site/sim/ota5t-review-tb.sp is the example file with a testbench, and the
     result in src/assets/ota-sim.js (a Spectre run, site/sim/make-result.py; Spectre is not in CI) is that of the present
-    testbench."""
+    testbench. The hash covers only the circuit lines of the testbench, the lines that are not empty and do not start with
+    "*": the RNL records are comments to the simulator, so a new drawing does not change the result."""
     result = files.get("assets/ota-sim.js", "")
     if not SIM.is_file() or "ota5t-review.sp" not in ex or not result:
         return []
@@ -721,8 +741,10 @@ def check_sim(files, ex):
     if lines[-2:] != [".end", ""] or not tb.startswith("\n".join(lines[:-2]) + "\n"):
         errors.append("site/sim/ota5t-review-tb.sp: does not start with the lines of examples/ota5t-review.sp (without .end)")
     m = re.search(r'"sha256":"([0-9a-f]+)"', result)
-    if not m or not hashlib.sha256(tb.encode("utf-8")).hexdigest().startswith(m.group(1)):
-        errors.append("src/assets/ota-sim.js: not the result of the present site/sim/ota5t-review-tb.sp; run the testbench and site/sim/make-result.py")
+    circuit = "\n".join(line for line in tb.split("\n") if line.strip() and not line.startswith("*"))
+    if not m or not hashlib.sha256(circuit.encode("utf-8")).hexdigest().startswith(m.group(1)):
+        errors.append("src/assets/ota-sim.js: not the result of the circuit lines of the present site/sim/ota5t-review-tb.sp; "
+                      "run the testbench and site/sim/make-result.py")
     return errors
 
 
@@ -737,12 +759,14 @@ def find_rnl(given):
 
 
 def check_examples_rnl(rnl):
-    """Check that every file in site/examples/*.sp passes `rnl check` with 0 errors, 0 violations and 0 warnings
-    and renders with `rnl render`."""
+    """Check that every file in site/examples/ (*.sp, and cases/*.sp) passes `rnl check` with 0 errors, 0 violations
+    and 0 warnings, renders with `rnl render`, and that the record of the solver of each of its levels is up to date
+    (`rnl view --status`: solved, or fixed for a level that has nothing to solve), so that the viewer shows what it
+    shows and solving it again gives the same; but ota5t-edits.sp, whose editor's record came after the solve."""
     errors = []
     with tempfile.TemporaryDirectory() as tmp:
-        for idx, path in enumerate(sorted(EXAMPLES.glob("*.sp"))):
-            rel = "examples/" + path.name
+        for idx, path in enumerate(sorted(EXAMPLES.glob("*.sp")) + sorted(EXAMPLES.glob("cases/*.sp"))):
+            rel = path.relative_to(HERE).as_posix()
             # a file that includes public packages (USE-PACKAGE) finds them in the locked copies
             # (python scripts/packages.py download)
             paths = []
@@ -763,6 +787,22 @@ def check_examples_rnl(rnl):
                 errors.append("%s: rnl check finds %d errors, %d violations and %d warnings:\n%s"
                               % (rel, n_err, n_vio, n_warn, "\n".join(
                                   l for l in chk.stdout.splitlines() if l.startswith(("error", "violation", "warning")))))
+            view = subprocess.run([str(rnl), "view", str(path), "--status", "--no-svg", *paths],
+                                  capture_output=True, text=True, encoding="utf-8")
+            try:
+                status = {lv.get("title"): lv.get("solve") for lv in json.loads(view.stdout)["levels"]}
+            except (ValueError, KeyError):
+                status = {None: "unread"}
+            bad = {k: v for k, v in status.items() if v not in ("solved", "fixed")}
+            if path.name == "ota5t-edits.sp":
+                # the editor's record came after the solve: the viewer shows the old result and suggests solving again
+                if status.get("ota5t") != "stale":
+                    errors.append("%s: the level ota5t is %s, not stale: its editor's record must come after the solve"
+                                  % (rel, status.get("ota5t")))
+                bad.pop("ota5t", None)
+            if bad:
+                errors.append("%s: the levels %s are not solved: solve the file again with rnl solve"
+                              % (rel, ", ".join("%s (%s)" % kv for kv in sorted(bad.items(), key=str))))
             out_dir = Path(tmp) / str(idx)
             rnd = subprocess.run([str(rnl), "render", str(path), "--out", str(out_dir), *paths],
                                  capture_output=True, text=True, encoding="utf-8")

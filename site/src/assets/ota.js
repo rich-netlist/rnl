@@ -2,9 +2,11 @@
  *
  * The files are site/examples/ota5t-review-bare.sp (the notation), ota5t-review.sp (English sentences) and
  * ota5t-review-zh.sp (Chinese sentences, only on the Chinese pages), and ota5t-review-eda.sp: the same file with the
- * public packages eda-symbol and eda-style. This script keeps their lines, and site/build.py checks them against the files.
- * The drawings are not drawn here: ota-looks.js holds what the RNL core draws from the standard-packages file and from
- * the file with the two packages (node site/render-examples.mjs), with the parts of every device marked in it.
+ * public packages eda-symbol and eda-style. Each file is solved by the solver (rnl solve), which writes its record into
+ * it. This script keeps the lines the author wrote, and site/build.py checks them against the files; the records of the
+ * solver come from ota-looks.js, which takes them from the files. The drawings are not drawn here either: ota-looks.js
+ * holds what the RNL core draws from the standard-packages file and from the file with the two packages
+ * (node site/render-examples.mjs), with the parts of every device marked in it.
  * The review: picking a statement of meaning, in the file or in the checklist, lights up the devices it is about in the
  * drawing and their lines in the netlist. The look switch swaps one core drawing for the other; the circuit is the same.
  */
@@ -21,18 +23,33 @@
   var T = {
     dp: ['%dp1 = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;', '%dp1 = #M1(left), #M2(right) and #M5(tail) treated @AS $DIFFERENTIAL_PAIR_N;'],
     cm1: ['%cm1 = #M3(ref) #M4(out) @AS $CURRENT_MIRROR_P;', '%cm1 = #M3(ref) and #M4(out) treated @AS $CURRENT_MIRROR_P;'],
+    amp: ['%amp = %dp1(transconductor) %cm1(load) @AS $TRANSCONDUCTOR_Z_AMPLIFIER;', '%amp = %dp1(transconductor) and %cm1(load) treated @AS $TRANSCONDUCTOR_Z_AMPLIFIER;'],
+    br1: ['%left = {#M3 #M1} @AS $BRANCH;', '%left = {#M3 #M1} treated @AS $BRANCH;'],
+    br2: ['%right = {#M4 #M2} @AS $BRANCH;', '%right = {#M4 #M2} treated @AS $BRANCH;'],
     n1: ['&vdd @ADD-TO $SUPPLY_NET_SET;', '&vdd @ADD-TO $SUPPLY_NET_SET;'],
     n2: ['&vss @ADD-TO $GROUND_NET_SET;', '&vss @ADD-TO $GROUND_NET_SET;'],
-    cur: ['#M5:d @CURRENT("in")', '#M5:d has @CURRENT("in")']
+    cur: ['#M5:d @CURRENT("in");', '#M5:d has @CURRENT("in");'],
+    /* how to draw it: every net as wires, the inputs and the bias as port stubs, the output port to the right of the stage */
+    rt: ['# @SELECT-NET => @ROUTE-NET;', '# @SELECT-NET => @ROUTE-NET;'],
+    stub: ['$IO_PORT_STUB @ATTACH {#M1:g #M2:g #M5:g};', '$IO_PORT_STUB @ATTACH {#M1:g #M2:g #M5:g};'],
+    po: ['%po = $IO_PORT @ATTACH &out;', '%po = $IO_PORT @ATTACH &out;'],
+    ord: ['{%amp %po::pin} @ORDER("left-to-right")', '{%amp %po::pin} @ORDER("left-to-right")']
   };
   var TZ = {};
   /*zh-CN*/
   TZ = {
     dp: '%dp1 = #M1(左)、#M2(右) 和 #M5(尾管) @视作 $"N型差分对";',
     cm1: '%cm1 = #M3(参考管) 和 #M4(输出管) @视作 $"P型电流镜";',
+    amp: '%amp = %dp1(跨导级) 和 %cm1(负载) @视作 $"跨导阻抗放大器";',
+    br1: '%left = {#M3 #M1} @视作 $"支路";',
+    br2: '%right = {#M4 #M2} @视作 $"支路";',
     n1: '&vdd @加入 $"电源网络集";',
     n2: '&vss @加入 $"地网络集";',
-    cur: '#M5:d 有 @电流("流入")'
+    cur: '#M5:d 有 @电流("流入");',
+    rt: '# @选出网络 => @布线网络;',
+    stub: '$"端口桩" @附着 {#M1:g #M2:g #M5:g};',
+    po: '%po = $"端口" @附着 &out;',
+    ord: '{%amp %po::pin} @顺序("从左到右")'
   };
   /*/zh-CN*/
   var STYLES = ['bare', 'en', 'zh'];
@@ -40,7 +57,8 @@
   var PACKAGES = '; @USE-PACKAGE(name="eda-symbol", version="0.2"); @USE-PACKAGE(name="eda-style", version="0.2")';
 
   /* The lines of the file as the panel shows them; r is what a line is about (devices and display objects, and the notes
-     of a statement as ov:…), mode the note it makes in the drawing, dev a line of the netlist that is about one device */
+     of a statement as ov:…), mode the note it makes in the drawing, dev a line of the netlist that is about one device.
+     The records of the solver are the file's own (ota-looks.js): each line is about the devices and ports it names. */
   function lines(style, look) {
     var k = Math.max(0, STYLES.indexOf(style || 'en'));
     var L = [];
@@ -51,11 +69,20 @@
     }
     function st(id, r) { add(id, '*   ' + (k === 2 ? TZ[id] : T[id][k]), r); }
     function dev(id, t) { add(id.toLowerCase(), t, id, { dev: id }); }
+    function record(n, block) {
+      (block || []).forEach(function (t, i) {
+        var about = (t.match(/#M\d\b/g) || []).map(function (d) { return d.slice(1); });
+        if (/%po\b/.test(t)) about.push('PO');
+        add('g' + n + '-' + i, t, about.join(' '));
+      });
+    }
+    var LOOKS = global.RNLOtaLooks, rec = LOOKS && LOOKS.records && LOOKS.records[look === 'eda' ? FILES.eda : FILES[STYLES[k]]];
+    var blocks = rec ? rec.blocks : [];
     add('h0', '* Five-transistor OTA');
     add('h1', '.model nch nmos level=1 vto=0.5 kp=100u lambda=0.05');
     add('h2', '.model pch pmos level=1 vto=-0.5 kp=100u lambda=0.05');
     add('h3', '* @RNL(type="header") { ' + (k === 2 ? '@VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-ALIASES(name="alias-zh", version="0.4")' : '@VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")') + (look === 'eda' ? PACKAGES : '') + '}', '', look === 'eda' ? { cls: 'is-diff' } : null);
-    add('h4', '.subckt ota5t inp inn out vdd vss vbias', 'PI PN PO PB');
+    add('h4', '.subckt ota5t inp inn out vdd vss vbias', 'PO');
     dev('M1', 'M1 x    inp   tail vss nch W=2u L=0.5u');
     dev('M2', 'M2 out  inn   tail vss nch W=2u L=0.5u');
     dev('M3', 'M3 x    x     vdd  vdd pch W=4u L=0.5u');
@@ -64,33 +91,20 @@
     add('r0', '* @RNL {');
     st('dp', 'M1 M2 M5 ov:dp');
     st('cm1', 'M3 M4 ov:cm1');
+    st('amp', 'M1 M2 M3 M4 M5');
+    st('br1', 'M3 M1');
+    st('br2', 'M4 M2');
     st('n1', 'VDD');
     st('n2', 'VSS');
     st('cur', 'M5 ov:cur');
+    st('rt');
+    st('stub', 'M1 M2 M5');
+    st('po', 'PO');
+    st('ord', 'PO');
     add('r1', '* }');
-    add('d0', '* @RNL(type="generated") {');
-    add('d1', '*   #M1 @PLACE(12, 8) => @ORIENT("R0");  #M2 @PLACE(28, 8) => @ORIENT("MY");', 'M1 M2');
-    add('d2', '*   #M3 @PLACE(12, 16) => @ORIENT("MY");  #M4 @PLACE(28, 16) => @ORIENT("R0");', 'M3 M4');
-    add('d3', '*   #M5 @PLACE(20, 0);  %ja = (16, 16);  %jb = (12, 12);', 'M5');
-    add('d4', '*   &x @WIRE {#M3:d %jb #M1:d};  &x @WIRE {#M3:g %ja #M4:g};');
-    add('d5', '*   &x @WIRE(mode="vertical-horizontal") {%ja %jb};');
-    add('d6', '*   %jo = (28, 12);  %jt = (20, 4);');
-    add('d7', '*   &out @WIRE {#M4:d %jo};  &out @WIRE(mode="horizontal-vertical") {%jo #M2:d};');
-    add('d8', '*   &tail @WIRE(mode="vertical-horizontal") {#M1:s %jt};');
-    add('d9', '*   &tail @WIRE(mode="vertical-horizontal") {#M2:s %jt};');
-    add('da', '*   &tail @WIRE {%jt #M5:d};');
-    add('db', '*   $JUNCTION @ATTACH {%ja %jb %jo %jt};');
-    add('dc', '*   %pi = $IO_PORT @ATTACH &inp;  %pi @PLACE(5, 8);', 'PI');
-    add('dd', '*   %pn = $IO_PORT @ATTACH &inn;  %pn @PLACE(35, 8) => @ORIENT("MY");', 'PN');
-    add('de', '*   %po = $IO_PORT @ATTACH &out;  %po @PLACE(35, 12) => @ORIENT("MY");', 'PO');
-    add('df', '*   %pb = $IO_PORT @ATTACH &vbias;  %pb @PLACE(13, 0);', 'PB');
-    add('dg', '*   &inp @WIRE {#M1:g %pi:p};  &inn @WIRE {#M2:g %pn:p};');
-    add('dh', '*   &out @WIRE {%jo %po:p};  &vbias @WIRE {#M5:g %pb:p};');
-    add('di', '*   %vdd1 = $SUPPLY_STUB @ATTACH #M3:s;  %vdd1::s @PLACE(12, 20);', 'VDD');
-    add('dj', '*   %vdd2 = $SUPPLY_STUB @ATTACH #M4:s;  %vdd2::s @PLACE(28, 20);', 'VDD');
-    add('dk', '*   %gnd = $GROUND_STUB @ATTACH #M5:s;  %gnd::g @PLACE(20, -4)', 'VSS');
-    add('d9z', '* }');
+    record(0, blocks[0]);
     add('e0', '.ends ota5t');
+    blocks.slice(1).forEach(function (b, n) { record(n + 1, b); });
     add('e1', '.end');
     return L;
   }
@@ -109,13 +123,14 @@
   var DEFAULT = '<en>Pick a statement in the file or an item in the checklist: its devices light up in the drawing and the netlist.</en>';
   var CAPS = {
     dp: '<en><b>Structure</b>: <code>$DIFFERENTIAL_PAIR_N</code> says which devices form the pair of N devices and which is its tail. The standard package draws the pair as mirror images about one axis, with the tail under its middle.</en>',
-    cm1: '<en><b>Structure</b>: <code>$CURRENT_MIRROR_P</code> says which device is the reference and which copies it. Here the mirror of P devices is the pair’s load, and the package draws it above the pair.</en>',
+    cm1: '<en><b>Structure</b>: <code>$CURRENT_MIRROR_P</code> says which device is the reference and which copies it. Here the mirror of P devices is the pair’s load.</en>',
     cur: '<en><b>Intent</b>: where the current flows, from the top of the circuit to the bottom.</en>'
   };
   var SIM = '<en>A simulator reads the lines that are not dimmed: the netlist. Every RNL line starts with <code>*</code>, so for the simulator it is a comment.</en>';
 
-  /* What picking a statement shows in the drawing besides the lit devices, in the drawing's own units (the core draws
-     the grid unit as 14: x grows to the right, y downwards) */
+  /* What picking a statement shows in the drawing besides the lit devices. The solver places the devices, so the notes
+     are placed from the drawing itself: the box of the parts of each device the core marks (data-dev), and of each net's
+     wires (data-net), in the drawing's own units (x grows to the right, y downwards). */
   function arrow(x0, y0, x1, y1) {
     var dx = x1 - x0, dy = y1 - y0, n = Math.sqrt(dx * dx + dy * dy), ux = dx / n, uy = dy / n, h = 7;
     var bx = x1 - ux * h * 1.4, by = y1 - uy * h * 1.4;
@@ -123,11 +138,29 @@
       '<path class="head" d="M' + x1 + ' ' + y1 + ' L' + (bx - uy * h * 0.6) + ' ' + (by + ux * h * 0.6) + ' L' + (bx + uy * h * 0.6) + ' ' + (by - ux * h * 0.6) + ' Z"/>';
   }
   function label(x, y, text, anchor) { return '<text x="' + x + '" y="' + y + '" text-anchor="' + (anchor || 'middle') + '">' + text + '</text>'; }
-  var NOTES = {
-    dp: label(280, -104, '%dp1'),
-    cm1: label(280, -236, '%cm1'),
-    cur: arrow(266, -56, 266, -36) + label(258, -42, 'I', 'end')
-  };
+  function box(svg, sel) {
+    var b = null;
+    Array.prototype.forEach.call(svg.querySelectorAll(sel), function (el) {
+      var r;
+      try { r = el.getBBox(); } catch (e) { return; }
+      if (!r.width && !r.height) return;
+      b = b ? { x0: Math.min(b.x0, r.x), y0: Math.min(b.y0, r.y), x1: Math.max(b.x1, r.x + r.width), y1: Math.max(b.y1, r.y + r.height) }
+        : { x0: r.x, y0: r.y, x1: r.x + r.width, y1: r.y + r.height };
+    });
+    return b;
+  }
+  function notes(svg) {
+    var N = {}, pair = box(svg, '[data-dev="M1"],[data-dev="M2"]'), mirror = box(svg, '[data-dev="M3"],[data-dev="M4"]');
+    var tail = box(svg, '[data-net="tail"]'), m5 = box(svg, '[data-dev="M5"]');
+    if (pair) N.dp = label((pair.x0 + pair.x1) / 2, (pair.y0 + pair.y1) / 2 + 4, '%dp1');
+    if (mirror) N.cm1 = label((mirror.x0 + mirror.x1) / 2, mirror.y0 - 6, '%cm1');
+    if (tail && m5) {
+      /* the tail current, beside the wire that comes down from the pair into the drain of M5 */
+      var x = (tail.x0 + tail.x1) / 2 - 14, y1 = m5.y0 + 4, y0 = Math.max(tail.y0 + 4, y1 - 22);
+      N.cur = arrow(x, y0, x, y1) + label(x - 8, (y0 + y1) / 2 + 4, 'I', 'end');
+    }
+    return N;
+  }
 
   /* The simulator's answer: the AC response of the testbench from the Spectre run (ota-sim.js, site/sim/make-result.py) */
   function fmtHz(f) {
@@ -193,8 +226,8 @@
       svg = stage.querySelector('svg');
       svg.setAttribute('role', 'img');
       svg.setAttribute('aria-label', look === 'eda' ? 'Five-transistor OTA in the traditional EDA look' : 'Five-transistor OTA');
-      var g = '';
-      Object.keys(NOTES).forEach(function (key) { g += '<g class="rv-note" data-note="' + key + '">' + NOTES[key] + '</g>'; });
+      var g = '', N = notes(svg);
+      Object.keys(N).forEach(function (key) { g += '<g class="rv-note" data-note="' + key + '">' + N[key] + '</g>'; });
       svg.insertAdjacentHTML('beforeend', g);
       lit(refs);
     }

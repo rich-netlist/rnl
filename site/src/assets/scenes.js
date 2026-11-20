@@ -1,280 +1,112 @@
 /* RNL introduction page · scenes and example data
  *
  * The circuits come from examples used in the RNL language discussion (5T OTA, RC/RLC, the fill
- * example). Coordinates are RNL coordinates (x right, y up) and match the solver and editor records
- * shown in the files; they are placed by hand for this page, not computed by a solver. The RNL follows
- * language standard 0.4 and the standard series 0.4, and reads with the rnl command.
+ * example). The five-transistor OTA is not drawn here: its files are site/examples/ota5t*.sp, solved by
+ * the solver, and the core draws them (site/render-examples.mjs, ota-looks.js). The other scenes are
+ * drawn by this page from the coordinates below, in RNL coordinates (x right, y up), which the files
+ * shown with them write as the author's positions. The RNL follows language standard 0.4 and the
+ * standard series 0.4, and reads with the rnl command.
  */
 (function (global) {
   'use strict';
 
-  function merge(a, b) {
-    var o = {}, k;
-    for (k in a) o[k] = a[k];
-    for (k in b) o[k] = b[k];
-    return o;
-  }
-
   /* ================= Five-transistor OTA ================= */
 
-  var OTA_BOX = [-4.5, -7.5, 43, 23.5];
-
-  var OTA_SPEC = {
-    M1: { sym: 'nmos', label: 'M1', value: 'W/L 2u/0.5u', valueOpt: true },
-    M2: { sym: 'nmos', label: 'M2', value: 'W/L 2u/0.5u', valueOpt: true },
-    M3: { sym: 'pmos', label: 'M3', value: 'W/L 4u/0.5u', valueOpt: true },
-    M4: { sym: 'pmos', label: 'M4', value: 'W/L 4u/0.5u', valueOpt: true },
-    M5: { sym: 'nmos', label: 'M5', value: 'W/L 4u/1u', valueOpt: true },
-    P_inp: { sym: 'port', label: 'inp', virtual: true },
-    P_inn: { sym: 'port', label: 'inn', virtual: true },
-    P_out: { sym: 'port', label: 'out', virtual: true },
-    P_vb: { sym: 'port', label: 'vbias', virtual: true },
-    P_vdd: { sym: 'port', label: 'vdd', virtual: true },
-    P_vss: { sym: 'port', label: 'vss', virtual: true },
-    VDD1: { sym: 'supply', label: 'vdd', virtual: true },
-    VDD2: { sym: 'supply', label: 'vdd', virtual: true },
-    /* vss is a ground net not named 0, so the standard series 0.4 writes its name under the ground */
-    GND: { sym: 'gnd', label: 'vss', virtual: true }
-  };
-
-  /* four: the standard package's default four-terminal MOS symbols, before the file picks its own */
-  function layout(tbl, four) {
-    var devices = {};
-    for (var id in tbl) {
-      var t = tbl[id];
-      var spec = OTA_SPEC[id];
-      if (four && /^M/.test(id)) spec = merge(spec, { sym: spec.sym + '4' });
-      devices[id] = merge(spec, { x: t[0], y: t[1], o: t[2] });
+  /* The core's drawing of a look of the OTA (ota-looks.js: standard, eda, plain, edits) put into the <svg> element el,
+     or into a new one in el when el is not an <svg>. Its parts keep data-dev (a device) and data-net (a wire), so that
+     the drawing can light up what a line of the file is about: the result is a view for RNLCode.link, whose hover over
+     a device calls onHover with its name. */
+  function coreView(el, look, onHover) {
+    var L = global.RNLOtaLooks && global.RNLOtaLooks.looks[look];
+    if (!el || !L) return null;
+    var box = document.createElement('div');
+    box.innerHTML = L.svg;
+    var src = box.querySelector('svg'), svg = el;
+    if (el.tagName.toLowerCase() !== 'svg') {
+      el.innerHTML = '';
+      svg = el.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'svg'));
     }
-    return devices;
+    ['viewBox', 'font-family', 'style'].forEach(function (a) { if (src.getAttribute(a)) svg.setAttribute(a, src.getAttribute(a)); });
+    svg.innerHTML = src.innerHTML;
+    svg.classList.add('core-drawing');
+    function highlight(refs) {
+      var any = false;
+      Array.prototype.forEach.call(svg.querySelectorAll('.is-lit'), function (g) { g.classList.remove('is-lit'); });
+      (refs || []).forEach(function (r) {
+        Array.prototype.forEach.call(svg.querySelectorAll('[data-dev="' + r + '"]'), function (g) { g.classList.add('is-lit'); any = true; });
+      });
+      svg.classList.toggle('has-lit', any);
+    }
+    if (onHover) {
+      svg.addEventListener('mouseover', function (e) {
+        var g = e.target.closest ? e.target.closest('[data-dev]') : null;
+        onHover(g ? g.getAttribute('data-dev') : null);
+      });
+      svg.addEventListener('mouseleave', function () { onHover(null); });
+    }
+    return { svg: svg, highlight: highlight, setMode: function () {} };
   }
 
-  var L_AIR = {
-    M3: [9, 10, 'R0'], M4: [16, 10, 'R0'], M1: [25, 10, 'R0'], M2: [32, 10, 'R0'], M5: [39, 10, 'R0'],
-    P_inp: [3, 22, 'R0'], P_inn: [3, 18, 'R0'], P_out: [3, 14, 'R0'],
-    P_vdd: [3, 6, 'R0'], P_vss: [3, 2, 'R0'], P_vb: [3, -2, 'R0']
-  };
-  var L_SYM = {
-    M1: [12, 8, 'R0'], M2: [28, 8, 'MY'], M3: [12, 16, 'MY'], M4: [28, 16, 'R0'], M5: [20, 0, 'R0'],
-    P_inp: [5, 8, 'R0'], P_inn: [35, 8, 'MY'], P_out: [35, 12, 'MY'], P_vb: [13, 0, 'R0'],
-    VDD1: [12, 20, 'R0'], VDD2: [28, 20, 'R0'], GND: [20, -4, 'R0']
-  };
-  var L_TWEAK = merge(L_SYM, { M2: [30, 8, 'MY'] });
-  var L_RESOLVED = {
-    M1: [10, 8, 'R0'], M2: [30, 8, 'MY'], M3: [10, 16, 'MY'], M4: [30, 16, 'R0'], M5: [20, 0, 'R0'],
-    P_inp: [3, 8, 'R0'], P_inn: [37, 8, 'MY'], P_out: [37, 12, 'MY'], P_vb: [13, 0, 'R0'],
-    VDD1: [10, 20, 'R0'], VDD2: [30, 20, 'R0'], GND: [20, -4, 'R0']
-  };
-
-  /* Connectivity only: each net draws straight lines (airwires) from its first terminal to the others */
-  var AIR_NETS = [
-    ['inp', ['P_inp.p', 'M1.g']], ['inn', ['P_inn.p', 'M2.g']], ['out', ['P_out.p', 'M2.d', 'M4.d']],
-    ['vdd', ['P_vdd.p', 'M3.s', 'M3.b', 'M4.s', 'M4.b']], ['vss', ['P_vss.p', 'M1.b', 'M2.b', 'M5.s', 'M5.b']],
-    ['vbias', ['P_vb.p', 'M5.g']], ['x', ['M1.d', 'M3.d', 'M3.g', 'M4.g']], ['tail', ['M1.s', 'M2.s', 'M5.d']]
-  ];
-
-  function routeAir(P) {
-    var wires = [];
-    AIR_NETS.forEach(function (n) {
-      var a = P(n[1][0]);
-      for (var i = 1; i < n[1].length; i++) wires.push({ net: n[0], pts: [a, P(n[1][i])], air: true });
-    });
-    return { wires: wires, dots: [] };
-  }
-
-  function routeSym(P) {
-    var wires = [], dots = [];
-    var M3d = P('M3.d'), M1d = P('M1.d'), M3g = P('M3.g'), M4g = P('M4.g');
-    var ja = [M3g[0] + (M4g[0] > M3g[0] ? 1 : -1), M3g[1]], jb = [M3d[0], M3d[1] - 2];
-    wires.push({ net: 'x', pts: [M3d, M1d] });
-    wires.push({ net: 'x', pts: [M3g, M4g] });
-    wires.push({ net: 'x', pts: [ja, [ja[0], jb[1]], jb] });
-    dots.push([ja[0], ja[1], 'x'], [jb[0], jb[1], 'x']);
-    var M4d = P('M4.d'), M2d = P('M2.d'), yo = M4d[1] - 2, jo = [M4d[0], yo];
-    wires.push({ net: 'out', pts: [M4d, jo] });
-    wires.push({ net: 'out', pts: M2d[0] === jo[0] ? [jo, M2d] : [jo, [M2d[0], yo], M2d] });
-    wires.push({ net: 'out', pts: [jo, P('P_out.p')] });
-    dots.push([jo[0], jo[1], 'out']);
-    var a = P('M1.s'), b = P('M2.s'), m = P('M5.d'), yt = a[1] - 2;
-    wires.push({ net: 'tail', pts: [a, [a[0], yt], [b[0], yt], b] });
-    wires.push({ net: 'tail', pts: [[m[0], yt], m] });
-    dots.push([m[0], yt, 'tail']);
-    wires.push({ net: 'inp', pts: [P('M1.g'), P('P_inp.p')] });
-    wires.push({ net: 'inn', pts: [P('M2.g'), P('P_inn.p')] });
-    wires.push({ net: 'vbias', pts: [P('M5.g'), P('P_vb.p')] });
-    wires.push({ net: 'vdd', pts: [P('M3.s'), P('VDD1.p')] });
-    wires.push({ net: 'vdd', pts: [P('M4.s'), P('VDD2.p')] });
-    wires.push({ net: 'vss', pts: [P('M5.s'), P('GND.p')] });
-    return {
-      wires: wires, dots: dots,
-      labels: [
-        { text: 'x', at: [M1d[0] - 0.6, jb[1] + 0.9], anchor: 'end', net: 'x', opt: true },
-        { text: 'tail', at: [(a[0] + m[0]) / 2, yt + 0.85], anchor: 'middle', net: 'tail', opt: true },
-        { text: 'out', at: [jo[0] + 3.4, yo + 0.85], anchor: 'middle', net: 'out', opt: true }
-      ]
-    };
-  }
-
-  function r1(v) { return Math.round(v * 10) / 10; }
-
-  /* Where each coordinate tag sits, relative to the device's origin */
-  var TAG = { M1: [1, -0.5, 'start'], M2: [-1, -0.5, 'end'], M3: [-1, -0.5, 'end'], M4: [1, -0.5, 'start'], M5: [1, -0.6, 'start'] };
-
-  function boxes() {
-    return [
-      { id: 'cm1', kind: 'box', layer: 'back', ids: ['M3', 'M4'], pad: 1, label: '<en>%cm1 · current mirror</en>', labelAt: [0.5, 1], anchor: 'middle' },
-      { id: 'dp1', kind: 'box', layer: 'back', ids: ['M1', 'M2', 'M5'], pad: 1.4, label: '<en>%dp1 · diff pair, tail M5</en>', labelAt: [0.03, 0], anchor: 'start' }
-    ];
-  }
-
-  function intent(P, S, axisTone, axisX) {
-    var L = [];
-    var ax = axisX !== undefined ? axisX : (S('M1').x + S('M2').x) / 2;
-    L.push({ id: 'ax', kind: 'vline', layer: 'back', x: ax, y0: -1.2, y1: 21.6, label: '%ax', tone: axisTone });
-    var a = P('M1.s'), b = P('M2.s'), m = P('M5.d'), yt = a[1] - 2;
-    var l1 = r1(m[0] - a[0]), l2 = r1(b[0] - m[0]);
-    var eq = Math.abs(l1 - l2) < 0.05;
-    L.push({
-      id: 'c1', kind: 'ticks', y: yt, segs: [[a[0], m[0]], [m[0], b[0]]], labels: [String(l1), String(l2)],
-      tone: eq ? undefined : 'err', mid: eq ? null : [m[0], yt + 1.25], midText: '≠'
-    });
-    [['M5', '1'], ['M1', '2'], ['M3', '3']].forEach(function (p) {
-      var s = S(p[0]);
-      L.push({ id: 'ord' + p[1], ref: 'ord', kind: 'badge', at: [s.x - 4.3, s.y + 1.6], text: p[1] });
-    });
-    var d5 = P('M5.d');
-    L.push({ id: 'cur', kind: 'arrow', pts: [[d5[0] + 1.1, d5[1] + 1.7], [d5[0] + 1.1, d5[1] + 0.3]], label: 'I', labelAt: [d5[0] + 1.6, d5[1] + 1], anchor: 'start', mono: true, head: 0.4 });
-    return L;
-  }
-
-  function tags(S, userId) {
-    return ['M1', 'M2', 'M3', 'M4', 'M5'].map(function (id) {
-      var st = S(id), o = TAG[id];
-      return {
-        id: 'tag-' + id, ref: id, kind: 'tag', at: [st.x + o[0], st.y + o[1]], anchor: o[2],
-        text: '(' + Math.round(st.x) + ', ' + Math.round(st.y) + ')', tone: id === userId ? 'user' : undefined
-      };
-    });
-  }
-
-  function otaScene(stage) {
-    var tbl = [L_AIR, L_AIR, L_SYM, L_SYM, L_TWEAK, L_RESOLVED][stage];
-    return {
-      rk: stage <= 1 ? 'air' : 'sym',
-      devices: layout(tbl, stage <= 1),
-      route: stage <= 1 ? routeAir : routeSym,
-      overlays: function (P, S) {
-        var L = [];
-        if (stage === 1) L = L.concat(boxes());
-        if (stage >= 2) L = L.concat(intent(P, S, stage === 4 ? 'mute' : undefined, stage === 4 ? (S('M3').x + S('M4').x) / 2 : undefined));
-        if (stage >= 3) L = L.concat(tags(S, stage === 4 ? 'M2' : null));
-        return L;
-      }
-    };
-  }
-
-  /* Step-by-step refinement: the full file at each step, in one of three writing styles.
-     bare: the formal notation only; en: the standard sentences. */
+  /* The whole file, as the language page shows it, in one of three writing styles: bare, the formal notation only;
+     en, the standard sentences; zh, the Chinese ones. Each statement is a line of site/examples/ota5t.sp (bare and en)
+     or ota5t-zh.sp (zh); site/build.py checks them. The file the viewer opens has the solver's record as well. */
   var U = {
     u1: ['%dp1 = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;', '%dp1 = #M1(left), #M2(right) and #M5(tail) treated @AS $DIFFERENTIAL_PAIR_N;'],
-    u2: ['%cm1 = #M3(ref) #M4(out) @AS $CURRENT_MIRROR_P', '%cm1 = #M3(ref) and #M4(out) treated @AS $CURRENT_MIRROR_P'],
+    u2: ['%cm1 = #M3(ref) #M4(out) @AS $CURRENT_MIRROR_P;', '%cm1 = #M3(ref) and #M4(out) treated @AS $CURRENT_MIRROR_P;'],
+    u3: ['%amp = %dp1(transconductor) %cm1(load) @AS $TRANSCONDUCTOR_Z_AMPLIFIER;', '%amp = %dp1(transconductor) and %cm1(load) treated @AS $TRANSCONDUCTOR_Z_AMPLIFIER;'],
+    u4: ['%left = {#M3 #M1} @AS $BRANCH;', '%left = {#M3 #M1} treated @AS $BRANCH;'],
+    u5: ['%right = {#M4 #M2} @AS $BRANCH;', '%right = {#M4 #M2} treated @AS $BRANCH;'],
     u6: ['&vdd @ADD-TO $SUPPLY_NET_SET;', '&vdd @ADD-TO $SUPPLY_NET_SET;'],
     u7: ['&vss @ADD-TO $GROUND_NET_SET;', '&vss @ADD-TO $GROUND_NET_SET;'],
-    u14: ['#M5:d @CURRENT("in")', '#M5:d has @CURRENT("in")']
+    u14: ['#M5:d @CURRENT("in");', '#M5:d has @CURRENT("in");'],
+    u20: ['# @SELECT-NET => @ROUTE-NET;', '# @SELECT-NET => @ROUTE-NET;'],
+    u21: ['$IO_PORT_STUB @ATTACH {#M1:g #M2:g #M5:g};', '$IO_PORT_STUB @ATTACH {#M1:g #M2:g #M5:g};'],
+    u22: ['%po = $IO_PORT @ATTACH &out;', '%po = $IO_PORT @ATTACH &out;'],
+    u23: ['{%amp %po::pin} @ORDER("left-to-right")', '{%amp %po::pin} @ORDER("left-to-right")']
   };
   /* zh: the Chinese standard sentences, written with the alias package alias-zh; only the Chinese pages have them */
   var UZ = {};
   /*zh-CN*/
   UZ = {
     u1: '%dp1 = #M1(左)、#M2(右) 和 #M5(尾管) @视作 $"N型差分对";',
-    u2: '%cm1 = #M3(参考管) 和 #M4(输出管) @视作 $"P型电流镜"',
+    u2: '%cm1 = #M3(参考管) 和 #M4(输出管) @视作 $"P型电流镜";',
+    u3: '%amp = %dp1(跨导级) 和 %cm1(负载) @视作 $"跨导阻抗放大器";',
+    u4: '%left = {#M3 #M1} @视作 $"支路";',
+    u5: '%right = {#M4 #M2} @视作 $"支路";',
     u6: '&vdd @加入 $"电源网络集";',
     u7: '&vss @加入 $"地网络集";',
-    u14: '#M5:d 有 @电流("流入")'
+    u14: '#M5:d 有 @电流("流入");',
+    u20: '# @选出网络 => @布线网络;',
+    u21: '$"端口桩" @附着 {#M1:g #M2:g #M5:g};',
+    u22: '%po = $"端口" @附着 &out;',
+    u23: '{%amp %po::pin} @顺序("从左到右")'
   };
   /*/zh-CN*/
   var STYLES = ['bare', 'en', 'zh'];
 
-  function otaCode(stage, style) {
+  function otaCode(style) {
     var k = Math.max(0, STYLES.indexOf(style || 'en'));
     var L = [];
-    function add(id, t, r, extra) {
-      var o = { id: id, t: t, r: r || '' };
-      if (extra) for (var key in extra) o[key] = extra[key];
-      L.push(o);
-    }
-    function u(id, r) {
-      var t = k === 2 ? UZ[id] : U[id][k];
-      if (id === 'u2' && stage >= 2) t += ';';
-      add(id, '*   ' + t, r);
-    }
+    function add(id, t) { L.push({ id: id, t: t }); }
     add('h0', '* 5T OTA');
     add('h1', '.model nch nmos level=1 vto=0.5');
     add('h2', '.model pch pmos level=1 vto=-0.5');
-    if (stage >= 1) add('hz', k === 2
+    add('hz', k === 2
       ? '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-ALIASES(name="alias-zh", version="0.4")}'
       : '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")}');
-    add('h3', '.subckt ota5t inp inn out vdd vss vbias', stage <= 1 ? 'P_inp P_inn P_out P_vb P_vdd P_vss' : 'P_inp P_inn P_out P_vb');
-    add('m1', 'M1 x    inp   tail vss nch W=2u L=0.5u', 'M1');
-    add('m2', 'M2 out  inn   tail vss nch W=2u L=0.5u', 'M2');
-    add('m3', 'M3 x    x     vdd  vdd pch W=4u L=0.5u', 'M3');
-    add('m4', 'M4 out  x     vdd  vdd pch W=4u L=0.5u', 'M4');
-    add('m5', 'M5 tail vbias vss  vss nch W=4u L=1u', 'M5');
-    if (stage >= 1) {
-      add('u0', '* @RNL {');
-      u('u1', stage >= 2 ? 'M1 M2 M5 ov:dp1 ov:c1 ov:ax ov:ord' : 'M1 M2 M5 ov:dp1');
-      u('u2', 'M3 M4 ov:cm1');
-      if (stage >= 2) {
-        u('u6', 'VDD1 VDD2');
-        u('u7', 'GND');
-        u('u14', 'M5 ov:cur');
-      }
-      add('u15', '* }');
-    }
-    if (stage >= 3) {
-      var s5 = stage >= 5;
-      var x1 = s5 ? 10 : 12, x2 = s5 ? 30 : 28;
-      add('s0', '* @RNL(type="generated", priority="high", author="rnl-solver", hash="sig1:' + (s5 ? '9e27' : '4c1f') + '") {');
-      add('s1', '*   #M1 @PLACE(' + x1 + ', 8) => @ORIENT("R0");  #M2 @PLACE(' + x2 + ', 8) => @ORIENT("MY");', 'M1 M2');
-      add('s2', '*   #M3 @PLACE(' + x1 + ', 16) => @ORIENT("MY");  #M4 @PLACE(' + x2 + ', 16) => @ORIENT("R0");', 'M3 M4');
-      add('s3', '*   #M5 @PLACE(20, 0);  %ja = (' + (x1 + 4) + ', 16);  %jb = (' + x1 + ', 12);', 'M5');
-      add('s4', '*   &x @WIRE {#M3:d %jb #M1:d};  &x @WIRE {#M3:g %ja #M4:g};', 'net:x');
-      add('s5', '*   /* <en>more wires, junctions, ports, supplies and the ground follow; left out here</en> */');
-      add('s6', '* }');
-    }
-    if (stage >= 4) add('e0', '* @RNL(author="rnl-editor") { #M2 @PLACE(x=30, priority="high")}', 'M2');
+    add('h3', '.subckt ota5t inp inn out vdd vss vbias');
+    add('m1', 'M1 x    inp   tail vss nch W=2u L=0.5u');
+    add('m2', 'M2 out  inn   tail vss nch W=2u L=0.5u');
+    add('m3', 'M3 x    x     vdd  vdd pch W=4u L=0.5u');
+    add('m4', 'M4 out  x     vdd  vdd pch W=4u L=0.5u');
+    add('m5', 'M5 tail vbias vss  vss nch W=4u L=1u');
+    add('u0', '* @RNL {');
+    ['u1', 'u2', 'u3', 'u4', 'u5', 'u6', 'u7', 'u14', 'u20', 'u21', 'u22', 'u23'].forEach(function (id) {
+      add(id, '*   ' + (k === 2 ? UZ[id] : U[id][k]));
+    });
+    add('u15', '* }');
     add('end', '.ends ota5t');
     return L;
-  }
-
-  /* "Who owns what" in section 01: one drawing, different annotations per mode */
-  function ownerScene() {
-    return {
-      rk: 'sym',
-      devices: layout(L_SYM),
-      route: routeSym,
-      overlays: function (P, S, B, mode) {
-        if (mode === 'semantic') return boxes();
-        if (mode === 'intent') return intent(P, S);
-        if (mode === 'geometry') return tags(S, null);
-        return [];
-      }
-    };
-  }
-
-  /* The edits-and-errors example: M2 moved right in the editor; the symmetry axis is a free point */
-  function e5Scene() {
-    return {
-      rk: 'sym',
-      devices: layout(L_TWEAK),
-      route: routeSym,
-      overlays: function (P, S) {
-        var L = intent(P, S, 'ok').filter(function (o) { return o.id === 'ax' || o.id === 'c1'; });
-        L.push({ id: 'tag-M2', ref: 'M2', kind: 'tag', at: [S('M2').x - 1, 7.5], anchor: 'end', text: '(30, 8)', tone: 'user' });
-        L.push({ id: 'tag-M4', ref: 'M4', kind: 'tag', at: [29, 15.5], anchor: 'start', text: '(28, 16)', tone: 'mute' });
-        return L;
-      }
-    };
   }
 
   var E5_LINES = [
@@ -289,27 +121,32 @@
     { t: 'M4 out  x     vdd  vdd pch W=4u L=0.5u', r: 'M4' },
     { t: 'M5 tail vbias vss  vss nch W=4u L=1u', r: 'M5' },
     { t: '* @RNL {' },
-    { t: '*   %dp1 = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;', r: 'M1 M2 M5 ov:c1 ov:ax', d: 'conflict' },
+    { t: '*   %dp1 = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;', r: 'M1 M2 M5', d: 'conflict' },
     { t: '*   {#M1 #M2 #M9} @ALIGN("y")', cls: 'is-err', d: 'm9' },
     { t: '* }' },
-    { t: '* @RNL(type="generated", priority="high", author="rnl-solver", hash="sig1:4c1f") {', d: 'fp' },
-    { t: '*   #M1 @PLACE(12, 8) => @ORIENT("R0");  #M2 @PLACE(28, 8) => @ORIENT("MY");', r: 'M1 M2' },
-    { t: '*   #M3 @PLACE(12, 16) => @ORIENT("MY");  #M4 @PLACE(28, 16) => @ORIENT("R0");', r: 'M3 M4', d: 'bad' },
-    { t: '*   #M5 @PLACE(20, 0)', r: 'M5' },
+    { t: '* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:13bd9770c3063bbd.c9d4c659d9406c2d", numbering="09e867fdaf53775a") {', d: 'fp' },
+    { t: '*   #M1 @PLACE(10, 16) => @ORIENT("R0");', r: 'M1' },
+    { t: '*   #M2 @PLACE(20, 16) => @ORIENT("MY");', r: 'M2' },
+    { t: '*   #M3 @PLACE(10, 26) => @ORIENT("MY");', r: 'M3' },
+    { t: '*   #M4 @PLACE(20, 26) => @ORIENT("R0");', r: 'M4', d: 'bad' },
+    { t: '*   #M5 @PLACE(15, 9) => @ORIENT("MY");', r: 'M5' },
+    { t: '*   /* <en>more wires, junctions, ports, supplies and the ground follow; left out here</en> */', fold: true },
     { t: '* }' },
     { t: '* @RNL(author="rnl-editor") {', d: 'fp' },
-    { t: '*   #M2 @PLACE(x=30, priority="high");', r: 'M2', d: 'conflict' },
-    { t: '*   #M4 @PLACE(2O, 16, priority="high")', r: 'M4', cls: 'is-err', d: 'bad' },
+    { t: '*   #M2 @PLACE(x=22, priority="high");', r: 'M2', d: 'conflict' },
+    { t: '*   #M4 @PLACE(2O, 26, priority="high")', r: 'M4', cls: 'is-err', d: 'bad' },
     { t: '* }' },
     { t: '.ends ota5t' }
   ];
 
+  /* What the core says of the file (rnl check site/examples/ota5t-edits.sp, with the two statements shown as errors
+     taken out of their comments) */
   var E5_DIAG = [
     { k: 'err', id: 'm9', icon: 'cross', html: '<en><code>{#M1 #M2 #M9} @ALIGN("y")</code>: this level has no instance M9. ALIGN is strict about its members, so the whole statement fails; it does not fall back to “align only M1 and M2”.</en>', refs: [] },
-    { k: 'err', id: 'bad', icon: 'cross', html: '<en><code>#M4 @PLACE(2O, 16, …)</code>: a number cannot be followed by a letter, and “2O” contains the letter O. Only this statement fails; M4 keeps the solver’s (28, 16).</en>', refs: ['M4'] },
-    { k: 'warn', id: 'conflict', icon: 'warn', html: '<en>The editor’s <code>#M2 @PLACE(x=30, …)</code> is high and written later, so it overrides the solver’s x = 28, which is discarded. The midpoint of the two sources moves to x = 21 while M5 stays at 20: the tail centering that <code>%dp1</code> carries is low, conflicts with these high coordinates and gives way, so the tail is no longer centered. A low constraint giving way is expected and noted no further.</en>', refs: ['M2', 'M5', 'ov:c1'] },
+    { k: 'err', id: 'bad', icon: 'cross', html: '<en><code>#M4 @PLACE(2O, 26, …)</code>: a number cannot be followed by a letter, and “2O” contains the letter O. Only this statement fails; M4 keeps the solver’s (20, 26).</en>', refs: ['M4'] },
+    { k: 'warn', id: 'conflict', icon: 'warn', html: '<en>The editor’s <code>#M2 @PLACE(x=22, …)</code> is high and written later, so it overrides the solver’s x = 20, which is discarded. M1 stays at x = 10, M4 above M2 at x = 20 and M5 at x = 15, so the pair is no longer even about its tail: four low facts of the structures conflict with these high coordinates and give way, the tail centered under the pair, the pair’s own center, the axis of its mirror image and the column of M4 and M2 that <code>%right</code> makes. A low fact giving way is expected and noted no further.</en>', refs: ['M1', 'M2', 'M4', 'M5'] },
     { k: 'info', id: 'fp', icon: 'info', html: '<en>The solver record’s <code>hash</code> no longer matches the current input: the editor added a record after solving. The viewer suggests solving again; the old result still displays.</en>', refs: [] },
-    { k: 'ok', id: 'ok', icon: 'check', html: '<en>Everything else takes effect: the differential pair and its tail; the mirror symmetry the pair carries (low as well, but its axis is free and moves to x = 21, so it still holds); the other coordinates.</en>', refs: ['M1', 'M2', 'ov:ax'] }
+    { k: 'ok', id: 'ok', icon: 'check', html: '<en>Everything else takes effect: the differential pair and its tail, the current mirror, the orientations and the other coordinates.</en>', refs: ['M1', 'M2', 'M5'] }
   ];
 
   /* ================= Hero: RC low-pass ================= */
@@ -501,6 +338,7 @@
     { t: 'CL  out 0 1p', r: 'CL G6' },
     { t: '* @RNL {' },
     { t: '*   #XU1 is at @PLACE(20, 14);', r: 'XU1' },
+    { t: '*   {#VIP #VIN #XU1 #CL} are in @ORDER("left-to-right");', r: 'VIP VIN XU1 CL' },
     { t: '*   nets {&inp &inn &out &vdd &vb} are @ROUTE-NET;', r: 'net:inp net:inn net:out net:vdd net:vb' },
     { t: '*   at (-0.5, 24) there is a @TEXT("5T OTA testbench") => it @SET-STYLE to $note', r: 'ov:note' },
     { t: '* }' },
@@ -722,7 +560,7 @@
   function files() {
     var F = [];
     function add(name, lines, expect) { F.push({ name: name, lines: lines, expect: expect || 'clean' }); }
-    STYLES.forEach(function (style) { add('tour-ota-' + style + '.sp', otaCode(2, style)); });
+    STYLES.forEach(function (style) { add('tour-ota-' + style + '.sp', otaCode(style)); });
     [0, 1, 2].forEach(function (p) { add('tour-ce-' + p + '.sp', ceLines(p)); });
     [false, true].forEach(function (on) { add('tour-pair-' + (on ? 'mirrored' : 'matched') + '.sp', mpLines(on)); });
     [2, 4].forEach(function (g) { add('tour-pair-gap-' + g + '.sp', pairLines(g)); });
@@ -742,9 +580,8 @@
 
   global.RNLScenes = {
     files: files,
-    OTA_BOX: OTA_BOX,
+    coreView: coreView,
     STYLES: STYLES,
-    otaScene: otaScene,
     otaCode: otaCode,
     ceLines: ceLines,
     mpLines: mpLines,
@@ -753,8 +590,6 @@
     BUS_LINES: BUS_LINES,
     txLines: txLines,
     devLines: devLines,
-    ownerScene: ownerScene,
-    e5Scene: e5Scene,
     E5_LINES: E5_LINES,
     E5_DIAG: E5_DIAG,
     RC: RC,

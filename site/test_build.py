@@ -230,9 +230,13 @@ class SiteExamples(unittest.TestCase):
         files = build.sources()
         ex = build.examples()
         self.assertEqual(build.check_examples(files, ex), [])
-        drifted = dict(ex, **{"ota5t.sp": ex["ota5t.sp"].replace("#M1 @PLACE(12, 8)", "#M1 @PLACE(14, 8)")})
+        drifted = dict(ex, **{"ota5t.sp": ex["ota5t.sp"].replace("treated @AS $TRANSCONDUCTOR_Z_AMPLIFIER", "treated @AS $COMMON_SOURCE_AMPLIFIER")})
         errors = build.check_examples(files, drifted)
-        self.assertTrue(any("L_SYM" in e for e in errors), errors)
+        self.assertTrue(any("from U in" in e for e in errors), errors)
+        # the lines of the solver's record that the fifth example shows are those of its file
+        drifted = dict(ex, **{"ota5t-edits.sp": ex["ota5t-edits.sp"].replace("#M5 @PLACE(15, 9)", "#M5 @PLACE(16, 9)")})
+        errors = build.check_examples(files, drifted)
+        self.assertTrue(any("E5_LINES" in e for e in errors), errors)
 
     def test_check_examples_detects_drift_between_the_ota_and_its_files(self):
         files = build.sources()

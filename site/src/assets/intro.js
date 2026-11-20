@@ -78,9 +78,8 @@
   /* ================= 01 Thumbnails for the workarounds ================= */
 
   function initFixes() {
-    var svg = $('#fix-air');
-    if (!svg) return;
-    new S.View(svg, { box: SC.OTA_BOX, grid: false }).setScene(SC.otaScene(0));
+    /* the netlist with no RNL of its own, as a solver lays it out from the connections alone (examples/ota5t-plain.sp) */
+    SC.coreView($('#fix-air'), 'plain');
   }
 
   /* ================= 05 Vision: the central file and its links ================= */
@@ -136,7 +135,7 @@
       if (made[id]) return;
       made[id] = true;
       if (id === 't-ai') {
-        new S.View($('#ai-thumb'), { box: SC.OTA_BOX, grid: false }).setScene(SC.otaScene(2));
+        SC.coreView($('#ai-thumb'), 'standard');
       }
     }
     PG.initTabs(list, function (t) { thumbs(t.id); });
