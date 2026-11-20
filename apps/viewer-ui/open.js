@@ -328,8 +328,11 @@ function showDocument(before, navigation) {
   const gained = before ? roots.filter((r) => !before.roots.includes(r)) : roots;
   setExpanded(new Set([...(before ? before.expanded : navigation?.expanded ?? ["0"]), ...gained]));
   setViewCache(before?.viewCache || navigation?.viewCache || new Map());
-  const file = before ? doc.files.findIndex((f) => f.path === before.file) : -1;
-  renderFiles(file >= 0 ? file : 0);
+  // the text of the file read, or of the file shown before when it is read again
+  const read = Math.max(0, doc.files.findIndex((f) => f.path === doc.file));
+  const again = before ? doc.files.findIndex((f) => f.path === before.file) : -1;
+  const file = again >= 0 ? again : read;
+  renderFiles(file);
   const diags = doc.diagnostics.slice();
   if (doc.failed) diags.unshift({ severity: "error", message: doc.failed, file: "", line: 0, col: 0, origin: "" });
   renderDiagnostics(diags);
@@ -351,7 +354,7 @@ function showDocument(before, navigation) {
       }
     }
   }
-  showFile(file >= 0 ? file : 0);
+  showFile(file);
 
   if (doc.levels.length === 0) {
     clearDrawing(m("Nothing to draw."));
