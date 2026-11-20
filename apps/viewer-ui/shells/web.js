@@ -5,9 +5,13 @@ import { append, m, setAttr, setText } from "../i18n.js";
 // collect in the core's client asks for them; and builds the Document with the core as WebAssembly in
 // module Workers. Each candidate keeps its own lazy drawings until the page accepts it. The page's own
 // opens read the file shown alone, in the context of its entry (`perFile`): the outline of the whole
-// document, then the reading of that one file (collectOutline, collectFile).
+// document, then the reading of that one file (collectOutline, collectFile), which is kept (file-results.js,
+// result-cache.js): in memory, and in the site's IndexedDB where the browser lets it, and read again only
+// when what it depends on has changed.
 
-import { collect, collectFile, collectOutline, decodeText, startCore } from "../core/client.js";
+import { collect, collectFile, collectOutline, coreVersion, decodeText, fileResultFormat, startCore } from "../core/client.js";
+import { openStore, ResultCache, storeLimit } from "../result-cache.js";
+import { holds, readingKey, requestPath, textHash } from "../file-results.js";
 import { loadManifest, readManifest } from "../manifest.js";
 import { ask, choose, inform, modal } from "../dialog.js";
 import { openWebWindow, receiveWebSession } from "../window-session.js";
@@ -148,6 +152,28 @@ async function indexLibrary(worker, snapshot) {
     pool: [...snapshot.texts.keys()], files: Object.fromEntries(snapshot.texts), formats: requestFormats(servedFiles.origin) });
   indexedLibraries.set(worker, snapshot);
   return errors;
+}
+/**
+ * The readings of one file kept, once the store is open: none for a core that does not say its version, as one built
+ * from the sources does not (version.js), and in memory alone where the browser keeps nothing.
+ */
+const readings = coreVersion === null ? null : (async () => {
+  const store = embed ? null : await openStore({ core: coreVersion, format: fileResultFormat });
+  return new ResultCache({ store, storeLimit: await storeLimit() });
+})();
+// the Documents given from the kept readings: the core shown holds no drawings of theirs until it reads them again
+const kept = new WeakSet();
+const primed = new WeakSet();
+// the hash of each file of a Library snapshot, made once
+const libraryHashes = new WeakMap();
+/**
+ * The stamp of the Library a reading is made with: its files and their texts, but those the document reads by the same
+ * names (`own`), whose texts the reading checks itself: the files opened join the Library, and that changes nothing.
+ */
+async function libraryStamp(snapshot, own) {
+  if (!libraryHashes.has(snapshot)) libraryHashes.set(snapshot, Promise.all([...snapshot.texts].map(async ([path, text]) => [path, await textHash(text)])));
+  const hashes = (await libraryHashes.get(snapshot)).filter(([path]) => !own.has(path));
+  return textHash(JSON.stringify(hashes.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))));
 }
 let lastUrl = ""; // the URL opened last, which Open URL offers again
 // The files of the document shown that a server served, by their workspace paths, and its origin: the
@@ -967,7 +993,7 @@ export default {
    * texts of `edits`, by the paths the Document names the files by, are those of the files, not what
    * is read.
    */
-  async build(source, edits, progress, suppliedPackages, signal, { bind, constraints, perFile } = {}) {
+  async build(source, edits, progress, suppliedPackages, signal, { bind, constraints, perFile, fresh } = {}) {
     // the file of a view of a file of a document, read alone in the context of its entry (visit-source.js)
     const view = source.view;
     source = entrySource(source);
@@ -1050,11 +1076,28 @@ export default {
         } };
         const outlined = await collectOutline(outliner, request, read);
         request.file = view ?? outlined.outline.files[0]?.path ?? entry.path.slice(entry.path.lastIndexOf("/") + 1);
-        const reader = { buildFile: (request) => {
-          if (signal?.aborted) throw new Error("superseded");
-          progress?.("parsing"); return buildingCore.buildFile(request);
-        } };
-        ({ result: doc, files: collected } = await collectFile(reader, { ...request, files: outlined.files }, read));
+        // the reading kept, while what it depends on holds; Reload reads it again
+        const cache = await readings;
+        const body = outlined.files[requestPath(entry.path, request.file)];
+        const key = cache && body !== undefined ? await readingKey({ version: coreVersion, format: fileResultFormat }, request, request.file, body) : null;
+        const now = { outline: outlined.outline, textOf: (path) => outlined.files[path], library: await libraryStamp(library, new Set(Object.keys(outlined.files))) };
+        const found = key && !fresh ? await cache.get(key, (stored) => holds(stored, now)) : null;
+        if (found) {
+          doc = structuredClone(found.result);
+          collected = outlined.files;
+          kept.add(doc);
+        } else {
+          const reader = { buildFile: (request) => {
+            if (signal?.aborted) throw new Error("superseded");
+            progress?.("parsing"); return buildingCore.buildFile(request);
+          } };
+          ({ result: doc, files: collected } = await collectFile(reader, { ...request, files: outlined.files }, read));
+          // kept when the document has every file it asks for
+          if (key && !signal?.aborted && doc.missing.length === 0) {
+            const stored = { result: structuredClone(doc), library: now.library };
+            cache.put(key, stored, stored).catch(() => {});
+          }
+        }
         // the texts of the other files, which the reading of one leaves out, for the netlist pane
         for (const f of doc.files) {
           if (f.text) continue;
@@ -1238,7 +1281,21 @@ export default {
     },
   } : {}),
   /** The drawings of the objects the last Document lists without a position, which the core keeps. */
-  unplacedDrawings: (level, items, names) => core.drawings({ drawings: { level, items, names } }),
+  /**
+   * The drawings of the objects the last Document lists without a position, which the core keeps; a Document given
+   * from a kept reading is read again first, for the core to hold its drawings.
+   */
+  async unplacedDrawings(level, items, names) {
+    if (lastBuilt && kept.has(lastBuilt) && !primed.has(lastBuilt)) {
+      await core.buildFile(builtRequests.get(lastBuilt));
+      primed.add(lastBuilt);
+    }
+    return core.drawings({ drawings: { level, items, names } });
+  },
+  /** What the kept readings hold, for File > Memory Cache: as `ResultCache.stats` gives it; null when none are kept. */
+  async readingStats() {
+    return (await readings)?.stats() ?? null;
+  },
   /** Download the files: the web cannot write them where they were read from (decision 0011). */
   async save(source, files) {
     for (const f of files) download(f.name.split("/").pop(), f.text);

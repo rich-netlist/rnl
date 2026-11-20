@@ -87,6 +87,7 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `menubar.js` | The page's own menu bar. |
 | `dialog.js` | Dialogs in the page's style for what a shell or the page asks: one of a list, with a filter; a line of text; several values in a form, such as the grid's settings; a message; a message with a button that acts. They are modal: the page's keys and its menu bar wait while one is shown. |
 | `updates.js` | Help > Check for Updates: the newest release of the viewer on GitHub against the version that runs, compared by Semantic Versioning, in a dialog. |
+| `file-results.js` | The readings of one file kept, for a shell that reads the file shown alone: the key a `FileResult` is kept under, and whether the inputs it records still hold (see [Reading the file shown alone](#reading-the-file-shown-alone)). |
 | `result-cache.js` | The cache of what the core gives for each file, for loading a design file by file: a result is kept under a key with the inputs it records, and given again only while they hold. In memory, and in the site's IndexedDB where the browser lets it, each within a limit in bytes, the least recently used first out; a store written by another core or result shape is emptied when it is opened. Nothing in it knows what a result holds, and a failure of the browser's storage is a miss. |
 | `storage-prefix.js` | The prefix of the names the page keeps in the browser's storage (`util.js`): none, and the web build writes the one `RNL_STORAGE_PREFIX` names over it, for a frozen build beside the current one. |
 | `util.js` | Small helpers for building the page, and for keeping values in the shell’s settings store (native `settings.json` on desktop, `localStorage` on web), read and written so that a page without it starts from its defaults. |
@@ -136,8 +137,17 @@ view of it: the entry's source with `view`, the file as the document names it (`
   opening that file on its own (File › Open), which reads it as an entry of its own. A pick in the tree, the index, a
   manifest's level or an include link in the text does the same. The path bar keeps the visits of every view of the
   entry, and goes back through them.
-- **What is not there yet**: the core's results are not kept, so showing a file again reads it again; the problems are
-  those of the file shown; an entry that only includes others opens on its own empty level.
+- **The readings are kept** (`file-results.js`, `result-cache.js`): in memory, and in the site's IndexedDB where the
+  browser lets it (stamped with the core's version and the shape of its results), so that showing a file again, in
+  this page or a later visit, asks the core only for the outline. A reading is found by the core, the options that
+  change it, the entry, the file and the hash of its text, and given again only while what it recorded it depends
+  on holds: the text of each file and package it read (a bundled package goes with the core), where each name it
+  instantiates is defined and the global nets, as the outline has them now, the Library (a stamp of its files: a package or a definition it did not find may be there now), and
+  the host levels it names. Reload reads the file again and keeps the new reading; a reading of a document that
+  misses a file is not kept. The core shown holds no drawings of a kept reading's objects without a position: the
+  Not drawn list has it read the file again first.
+- **What is not there yet**: the problems are those of the file shown; an entry that only includes others opens on
+  its own empty level; the limits of the readings kept are not set in the page yet.
 
 Problems retains the complete diagnostic list and total counts, but initially creates only 100
 rows. Scrolling near the bottom, or activating the button there, appends the next 100. This keeps
