@@ -5,7 +5,8 @@ import { append, locale, m, setAttr, setText, uiLanguages } from "./i18n.js";
 import { notice } from "./drawing.js";
 import { webLink } from "./manifest.js";
 import { doc } from "./state.js";
-import { enterRoot } from "./subcircuits.js";
+import { enterHost, enterRoot } from "./subcircuits.js";
+import { levelTree } from "./level-tree.js";
 import { $ } from "./util.js";
 
 // the manifest whose bar is shown, for a change of language
@@ -89,13 +90,15 @@ export function showManifestLevel(source) {
 export function showLevel(wanted) {
   if (!wanted || !doc) return;
   if (wanted === "(top)") return enterRoot(0, { here: true });
-  const level = doc.levels.findIndex((l) => l.kind === "subckt" && l.title === wanted);
-  if (level < 0) {
+  // by the levels of every file, those a shell that reads the file shown alone has not read too
+  const { nodes, top } = levelTree();
+  const host = nodes.findIndex((l, h) => l && h !== top && l.title === wanted);
+  if (host < 0) {
     notice(m`The netlist has no level ${wanted}; the level shown is the default one.`);
     return;
   }
   // in the entry's document, with all it includes, even when an included file defines the subcircuit
-  return enterRoot(level, { here: true });
+  return enterHost(host, { here: true });
 }
 
 window.addEventListener("language-changed", () => {

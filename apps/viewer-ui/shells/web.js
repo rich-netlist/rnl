@@ -3,14 +3,17 @@ import { append, m, setAttr, setText } from "../i18n.js";
 // The web shell: the page in a browser, served with the core next to it as core/ (apps/web). It opens
 // files the user chooses or drops, a folder, or a URL; reads only the files a document needs, as
 // collect in the core's client asks for them; and builds the Document with the core as WebAssembly in
-// module Workers. Each candidate keeps its own lazy drawings until the page accepts it.
+// module Workers. Each candidate keeps its own lazy drawings until the page accepts it. The page's own
+// opens read the file shown alone, in the context of its entry (`perFile`): the outline of the whole
+// document, then the reading of that one file (collectOutline, collectFile).
 
-import { collect, decodeText, startCore } from "../core/client.js";
+import { collect, collectFile, collectOutline, decodeText, startCore } from "../core/client.js";
 import { loadManifest, readManifest } from "../manifest.js";
 import { ask, choose, inform, modal } from "../dialog.js";
 import { openWebWindow, receiveWebSession } from "../window-session.js";
 import { load } from "../util.js";
 import { sourcePath } from "../source-path.js";
+import { entrySource } from "../visit-source.js";
 import { chooseFormat, fileFormats } from "../formats.js";
 import { DEFAULT_CATALOG, readCatalog, readPublicPackage, latestPackages } from "../public-packages.js";
 
@@ -810,6 +813,8 @@ function sourceAt(source, full, f) {
 /** @type {import("../shell.js").Shell} */
 export default {
   platform: "web",
+  // the page's opens read the file shown alone, in the context of its entry (per-file loading); an embed reads its document whole
+  perFile: !embed,
   // the web viewer's defaults over the solver's, as Solve > Settings shows them and a solve takes them (solve-settings.js)
   solverDefaults: { reroute_nets: true },
   // the core's parse formats, the one it detects for a Library file the document shown does not read,
@@ -846,7 +851,7 @@ export default {
           if (source.files) snapshots.set(source.files, files);
         }
         const descriptor = { name: source.name, path: source.path || `/${source.name}`, url: source.url,
-          temporary: source.temporary, readonly: source.readonly, fromPool: source.fromPool, files };
+          temporary: source.temporary, readonly: source.readonly, fromPool: source.fromPool, view: source.view, files };
         sources.push(descriptor);
         if (source.text !== undefined) files[descriptor.path] = source.text;
         return id;
@@ -874,7 +879,11 @@ export default {
         { path: item.path, name: item.name, url: item.url, fromPool: !item.url }) };
     });
     if (session.sources) {
-      const sources = session.sources.map(({ files, ...entry }) => ({ ...sessionSource(heldFiles(files), entry), snapshot: files }));
+      // a view of a file of a document (visit-source.js) is the source of its entry with the file to show
+      const sources = session.sources.map(({ files, view, ...entry }) => {
+        const source = { ...sessionSource(heldFiles(files), entry), snapshot: files };
+        return view ? { ...source, entrySource: source, view } : source;
+      });
       session.entry = sources[session.entry] || null;
       session.path = session.path.map(step => ({ ...step, entry: sources[step.entry] }));
     } else if (session.entry) session.entry = { ...sessionSource(heldFiles(session.files), session.entry), snapshot: session.files };
@@ -958,7 +967,10 @@ export default {
    * texts of `edits`, by the paths the Document names the files by, are those of the files, not what
    * is read.
    */
-  async build(source, edits, progress, suppliedPackages, signal, { bind, constraints } = {}) {
+  async build(source, edits, progress, suppliedPackages, signal, { bind, constraints, perFile } = {}) {
+    // the file of a view of a file of a document, read alone in the context of its entry (visit-source.js)
+    const view = source.view;
+    source = entrySource(source);
     const again = built.has(source);
     built.add(source);
     // a file at an address is asked for before the Library is indexed and the core is loaded, which take longer than it
@@ -1029,7 +1041,28 @@ export default {
         if (signal?.aborted) throw new Error("superseded");
         progress?.("parsing"); return buildingCore.build(request);
       } };
-      let { document: doc, files: collected } = await collect(builder, request, read);
+      let doc, collected;
+      if (perFile && !embed) {
+        // the outline of the whole document, which reads every file it includes, then the file shown alone
+        const outliner = { outline: (request) => {
+          if (signal?.aborted) throw new Error("superseded");
+          progress?.("parsing"); return buildingCore.outline(request);
+        } };
+        const outlined = await collectOutline(outliner, request, read);
+        request.file = view ?? outlined.outline.files[0]?.path ?? entry.path.slice(entry.path.lastIndexOf("/") + 1);
+        const reader = { buildFile: (request) => {
+          if (signal?.aborted) throw new Error("superseded");
+          progress?.("parsing"); return buildingCore.buildFile(request);
+        } };
+        ({ result: doc, files: collected } = await collectFile(reader, { ...request, files: outlined.files }, read));
+        // the texts of the other files, which the reading of one leaves out, for the netlist pane
+        for (const f of doc.files) {
+          if (f.text) continue;
+          const full = sourcePath(doc, f);
+          f.text = collected[full] ?? collected[full.replace(/^<pool>\//, "/<pool>/")] ?? "";
+        }
+        doc.outline = outlined.outline;
+      } else ({ document: doc, files: collected } = await collect(builder, request, read));
       if (embed) {
         // Embeds have no Library controls. Resolve named public dependencies with the same
         // catalog and verification as Include Public Package; keep downloads request-local.
@@ -1267,7 +1300,9 @@ export default {
     const request = builtRequests.get(shown);
     const worker = candidates.get(shown) ?? core;
     if (!request || !worker) throw new Error("This document was not loaded in this page. Reopen the file and export again.");
-    const built = await worker.build({ ...request, lazy_unplaced: false, overlays });
+    // a reading of one file is read again as one
+    const built = request.file === undefined ? await worker.build({ ...request, lazy_unplaced: false, overlays })
+      : await worker.buildFile({ ...request, lazy_unplaced: false, overlays });
     const svg = built.levels[level]?.title === title ? built.levels[level].svg : null;
     if (!svg) throw new Error(`Level ${title} has changed since the document was loaded. Reload or reopen the file and export again.`);
     return svg;
