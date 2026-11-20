@@ -158,6 +158,13 @@ view of it: the entry's source with `view`, the file as the document names it (`
   the host levels it names. Reload reads the file again and keeps the new reading; a reading of a document that
   misses a file is not kept. The core shown holds no drawings of a kept reading's objects without a position: the
   Not drawn list has it read the file again first.
+- **File › Memory Cache** (`memory-cache.js`, `shell.memoryCache`) sets the limits of the readings kept: in memory for
+  the page (256 MiB by default) and in the browser's storage for the site (1024 MiB by default, and no more than half
+  of what the browser says the site may keep). Each is kept in the page's settings; 0 keeps none there, and a limit of
+  0 in the browser's storage reads nothing from it either. The dialog says how many readings each holds and their
+  size, with the hits and misses of the page, and Clear Cache empties both, the document shown staying as it is. A
+  browser that keeps nothing for the site, as in a private window, has the limit in memory alone. An embedded viewer
+  has no menu, and keeps its readings in memory alone.
 - **The problems** (`file-checks.js`, `problems.js`) are those of the file shown: the reading of a file has the
   problems of the files above it too, which it reads in its context, and of the packages it uses; the list has those
   of its own file, of no file and of a package. **All Files**, a switch at the right of the problems' heading, adds
@@ -178,7 +185,6 @@ view of it: the entry's source with `view`, the file as the document names it (`
   once"), else how long it took the last time. A click opens it, as the index does. With one alone, a file opened
   opens it at once, the card showing meanwhile; shown again later, the entry stays on its card. An entry that has
   something to draw, or a subcircuit of its own that nothing calls, opens as before.
-- **What is not there yet**: the limits of the readings kept are not set in the page yet.
 
 Problems retains the complete diagnostic list and total counts, but initially creates only 100
 rows. Scrolling near the bottom, or activating the button there, appends the next 100. This keeps

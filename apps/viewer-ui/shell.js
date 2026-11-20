@@ -53,7 +53,9 @@
  *   the file named on the command line.
  * @property {(kind: string) => Promise<Source | null>} pick Ask for something to open: kind "file", and on
  *   the web also "url". Null when nothing is chosen.
- * @property {(clear?: boolean) => Promise<{ limit: number, used: number, entries: number, hits: number, misses: number, prefetched?: number }>} [memoryCache] Desktop render cache statistics; apply the saved limit and optionally clear retained results.
+ * @property {(clear?: boolean) => Promise<{ limit: number, used: number, entries: number, hits: number, misses: number, prefetched?: number, stored?: number | null, storedEntries?: number | null, storeLimit?: number, persistent?: boolean }>} [memoryCache]
+ *   File > Memory Cache: apply the saved limits and optionally clear retained results. The desktop's render cache, or
+ *   the web shell's readings of each file kept (`ResultCache.stats`), which have a limit in the browser's storage too.
  * @property {(source: Source, edits?: Edits, progress?: (stage: string) => void, packages?: object[], signal?: AbortSignal, options?: { fresh?: boolean, constraints?: boolean, perFile?: boolean, bind?: { subckt: string, params: Record<string, string> } }) => Promise<import("../../crates/rnl-view/types/document.js").Document>} build
  *   Read a source and build its Document; rejects with a message when it cannot. With `edits`, the
  *   texts of some of its files are those, not what is read: Edit > Apply Changes (editor.js). The

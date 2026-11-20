@@ -4,7 +4,7 @@
 // one as `(&C)`; a label the catalog does not translate shows in English. An item is shown where its platforms say, and
 // where the shell has the capability it names `with` (and not the one it names `unless`): the page of the local program
 // is the web viewer with the files of a machine behind it (`overwrites`, `pathPackages`), and both read the files of a
-// document one by one (`checkFiles`).
+// document one by one (`checkFiles`) and keep what they read (`memoryCache`).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -16,8 +16,8 @@ const languages = readdirSync(i18n).filter((lang) => existsSync(new URL(`${lang}
 /** The shells whose menus are checked: the platform their items name, and the capabilities of the shell (shell.js). */
 const SHELLS = {
   desktop: { platform: 'desktop', has: ['solve', 'solverTable', 'overwrites', 'pathPackages'] },
-  web: { platform: 'web', has: ['solve', 'solverTable', 'checkFiles'] },
-  local: { platform: 'web', has: ['solve', 'solverTable', 'checkFiles', 'overwrites', 'pathPackages'] },
+  web: { platform: 'web', has: ['solve', 'solverTable', 'checkFiles', 'memoryCache'] },
+  local: { platform: 'web', has: ['solve', 'solverTable', 'checkFiles', 'memoryCache', 'overwrites', 'pathPackages'] },
 };
 
 /** Whether `shell` shows `item`, as commands.js offers it. */
