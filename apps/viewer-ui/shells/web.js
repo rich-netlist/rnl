@@ -157,9 +157,11 @@ async function indexLibrary(worker, snapshot) {
 const MIB = 1024 * 1024;
 /**
  * The limits of the readings kept, in bytes, as File › Memory Cache sets them (memory-cache.js): in memory, and in the
- * browser's storage, no more than half of what the browser says the site may keep. 0 keeps none there.
+ * browser's storage, no more than half of what the browser says the site may keep. 0 keeps none there. An embedded
+ * viewer reads no setting and keeps nothing in the browser's storage, as it keeps none of its preferences: the default
+ * in memory, and no store.
  */
-const cacheLimits = async () => ({
+const cacheLimits = async () => (embed ? { memoryLimit: MEMORY_LIMIT, storeLimit: 0 } : {
   memoryLimit: load("file-cache-memory-mib", MEMORY_LIMIT / MIB) * MIB,
   storeLimit: await storeLimit(load("file-cache-store-mib", STORE_LIMIT / MIB) * MIB),
 });
