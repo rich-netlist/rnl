@@ -2,8 +2,8 @@
    Gates, buffer, inverter, delay cell and D flip-flops.
    In rnl-std-all; a file that wants it alone names it with USE-PACKAGE (16.2).
    Coordinates are y-up; one unit is one grid step. The pins bind terminals by name (9.2.4, 11.3),
-   listed in the comment above each symbol. A subcircuit instance drawn with one of these symbols
-   needs ports of these names, or terminals= on its SET-SYMBOL (11.3). */
+   listed above each symbol in the standard order (inputs, outputs, vp, vn; see the README). A subcircuit
+   instance drawn with one of these symbols needs ports of these names, or terminals= on its SET-SYMBOL (11.3). */
 @RNL(type="header") {
   @VERSION("0.4");
   @PACKAGE(name="rnl-std-logic", version="0.4");
