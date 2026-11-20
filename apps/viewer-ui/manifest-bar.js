@@ -4,6 +4,7 @@ import { append, locale, m, setAttr, setText, uiLanguages } from "./i18n.js";
 // the level the manifest names.
 import { notice } from "./drawing.js";
 import { webLink } from "./manifest.js";
+import { sourcePath } from "./source-path.js";
 import { doc } from "./state.js";
 import { enterHost, enterRoot } from "./subcircuits.js";
 import { levelTree } from "./level-tree.js";
@@ -83,16 +84,24 @@ export function showManifestBar(external) {
  * no subcircuit of is told, and the level shown stays.
  */
 export function showManifestLevel(source) {
-  return showLevel(new URLSearchParams(location.search).get("level") ?? source?.external?.level);
+  const asked = new URLSearchParams(location.search).get("level");
+  return showLevel(asked ?? source?.external?.level, asked === null ? source?.external?.file : null);
 }
 
-/** Show the level named `wanted`, as a manifest names it (a project's too): a subcircuit's name or "(top)". */
-export function showLevel(wanted) {
+/**
+ * Show the level named `wanted`, as a manifest names it (a project's too): a subcircuit's name or "(top)"; `file`, when
+ * it is given, is the workspace path of the file it is written in, which tells it from a subcircuit of that name in
+ * another file.
+ */
+export function showLevel(wanted, file = null) {
   if (!wanted || !doc) return;
   if (wanted === "(top)") return enterRoot(0, { here: true });
   // by the levels of every file, those a shell that reads the file shown alone has not read too
   const { nodes, top } = levelTree();
-  const host = nodes.findIndex((l, h) => l && h !== top && l.title === wanted);
+  const plain = (path) => path.replace(/^\/?<pool>(?=\/)/, "");
+  const inFile = (l) => !file || (l.file !== null && plain(sourcePath(doc, { path: l.file })) === plain(file));
+  const named = (l, h) => l && h !== top && l.title === wanted;
+  const host = [(l, h) => named(l, h) && inFile(l), named].map((test) => nodes.findIndex(test)).find((h) => h >= 0) ?? -1;
   if (host < 0) {
     notice(m`The netlist has no level ${wanted}; the level shown is the default one.`);
     return;

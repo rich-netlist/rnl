@@ -223,8 +223,12 @@ export function checkManifest(manifest, { archive = false, limits = {} } = {}) {
   if (!settings || typeof settings !== "object" || Array.isArray(settings)) throw new ManifestError("The manifest's settings are not an object.");
   if (settings.autoInclude !== undefined && typeof settings.autoInclude !== "boolean") throw new ManifestError("The manifest's autoInclude is not true or false.");
   if (level !== undefined && typeof level !== "string") throw new ManifestError("The manifest's level is not a name.");
+  // the file the level is written in, when it is not the entry: read in the context of the entry (a manifest without it
+  // means the entry)
+  const file = manifest.file === undefined ? null : relativePath(manifest.file, "The file shown");
+  if (file !== null && !listed.has(file)) throw new ManifestError(`The file shown ${file} is not among the manifest's files.`, file);
   const { display, ignored } = displaySettings(manifest.display);
-  return { ...manifest, id, base, entry: entryPath, level: level ?? null, files, pool, formats: { ...formats }, paths, settings: { ...settings },
+  return { ...manifest, id, base, entry: entryPath, level: level ?? null, file, files, pool, formats: { ...formats }, paths, settings: { ...settings },
     display, displayIgnored: ignored };
 }
 
@@ -282,6 +286,7 @@ async function inParallel(items, limit, work) {
  *   looked for;
  * - `formats`: the format chosen for some files, `{ path: name }`, as a build takes them;
  * - `entry`: the path to open; `level`: the level to show, a subcircuit's name or "(top)", or null;
+ *   `file`: the file that level is written in, when it is not the entry, read in the context of the entry, or null;
  * - `paths`: the search paths it records, `[{ path, subfolders }]`; `settings`;
  * - `display`: the display settings it proposes (displaySettings), which a viewer asks before it
  *   applies, and `displayIgnored`, the names of those it will not apply, of another shape (left out of
@@ -340,6 +345,7 @@ export async function loadManifest(json, { fetch = globalThis.fetch, readFile, o
     license: manifest.license ?? null,
     entry: root + manifest.entry,
     level: manifest.level,
+    file: manifest.file === null ? null : root + manifest.file,
     files,
     bytes,
     urls,
@@ -377,12 +383,13 @@ export async function readManifest(url, options = {}) {
 
 /**
  * Write the manifest of `files`, `[{ path, bytes, url? }]`, each path relative: their SHA-256 and
- * sizes, with `entry`, `pool`, `formats`, `level`, `paths`, `settings` and, for a design, `id`,
+ * sizes, with `entry`, `pool`, `formats`, `level`, `file` (the file of the level, when it is not the entry), `paths`,
+ * `settings` and, for a design, `id`,
  * `title` and the rest as given. `archive` says the files go in the archive with it (a project);
  * else each needs a `url` or the manifest a `base` (a manifest of links). What it gives is checked
  * as a reader checks it, so a manifest this writes is one it reads.
  */
-export async function writeManifest({ files, entry, pool = [], formats = {}, level, paths = [], settings = {}, display = {}, archive = false, ...rest }) {
+export async function writeManifest({ files, entry, pool = [], formats = {}, level, file, paths = [], settings = {}, display = {}, archive = false, ...rest }) {
   const listed = await Promise.all(files.map(async (file) => ({
     path: file.path, sha256: await sha256Hex(file.bytes), size: file.bytes.length, ...(file.url !== undefined && { url: file.url }),
     ...(file.member !== undefined && file.member !== file.path && { member: file.member }),
@@ -395,6 +402,7 @@ export async function writeManifest({ files, entry, pool = [], formats = {}, lev
     pool,
     ...(Object.keys(formats).length && { formats }),
     ...(level !== undefined && level !== null && { level }),
+    ...(file !== undefined && file !== null && file !== entry && { file }),
     ...(paths.length && { paths }),
     ...(Object.keys(settings).length && { settings }),
     ...(Object.keys(display).length && { display }),
