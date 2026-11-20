@@ -188,7 +188,7 @@
     </div>
 
     <h3 class="sub-h"><en>Five layout constraints</en></h3>
-    <p class="sub-lead"><en>All layout intent comes down to these relations: the first four act on x or y coordinates, the fifth on orientations. Only ALIGN names an axis; the others take a direction, such as "left-to-right", which fixes which comes first.</en></p>
+    <p class="sub-lead"><en>Besides positions and orientations, the facts of a layout are these five relations: the first four act on x or y coordinates, the fifth on orientations. Only ALIGN names an axis; the others take a direction, such as "left-to-right", which fixes which comes first. Groups, in the next section, are not a sixth relation but structure the solver lays the circuit out by.</en></p>
     <div class="atoms">
       <div class="atom">
         <div class="atom-fig">
@@ -208,7 +208,7 @@
             <g class="ab or-b"><rect x="-13" y="-13" width="26" height="26" rx="4"/><text>B</text></g>
             <g class="ab or-c"><rect x="-13" y="-13" width="26" height="26" rx="4"/><text>C</text></g>
             <text class="gtext or-t1" x="110" y="112" text-anchor="middle">A → B → C ✓</text>
-            <text class="gtext or-t2" x="110" y="112" text-anchor="middle"><en>C ← B ← A also ✓</en></text>
+            <g class="or-t2"><text class="gtext or-bad" x="110" y="104" text-anchor="middle">C B A ✗</text><text class="gtext or-bad" x="110" y="120" text-anchor="middle"><en>that is "right-to-left", another fact</en></text></g>
           </svg>
         </div>
         <div class="atom-body"><code data-hl='{#A #B #C} @ORDER("left-to-right")'></code><p><en>Order: strictly along one direction, which is always written: "left-to-right" puts A, B and C in that order. The reverse is a different fact, "right-to-left".</en></p></div>
@@ -245,6 +245,42 @@
           </svg>
         </div>
         <div class="atom-body"><code data-hl='#A #B @ORIENT-RELATION("MY")'></code><p><en>Orientation relation: B is A mirrored left to right; which way each one faces is up to the solver.</en></p></div>
+      </div>
+    </div>
+
+    <h3 class="sub-h"><en>Groups: the structure the solver lays out by</en></h3>
+    <p class="sub-lead"><en>GROUP is not a sixth constraint. It gives the solver structure: which objects form one block, and how the blocks nest. The solver lays the circuit out by it, after every fact is kept.</en></p>
+    <div class="grp">
+      <div class="grp-fig">
+        <svg viewBox="0 0 440 210" aria-hidden="true">
+          <rect class="grp-frame grp-outer" x="18" y="30" width="268" height="168" rx="8"/>
+          <text class="gtext grp-lab grp-outer" x="24" y="24">{%stage1_set %stage2_set} @GROUP</text>
+          <rect class="grp-frame grp-inner" x="36" y="46" width="104" height="112" rx="6"/>
+          <text class="gtext grp-lab grp-inner" x="88" y="176" text-anchor="middle">%stage1_set</text>
+          <rect class="grp-frame grp-inner" x="164" y="46" width="106" height="54" rx="6"/>
+          <text class="gtext grp-lab grp-inner" x="217" y="118" text-anchor="middle">%stage2_set</text>
+          <g class="ab gr-m1"><rect x="-15" y="-13" width="30" height="26" rx="4"/><text>M1</text></g>
+          <g class="ab gr-m2"><rect x="-15" y="-13" width="30" height="26" rx="4"/><text>M2</text></g>
+          <g class="ab gr-m5"><rect x="-15" y="-13" width="30" height="26" rx="4"/><text>M5</text></g>
+          <g class="ab gr-m3"><rect x="-15" y="-13" width="30" height="26" rx="4"/><text>M3</text></g>
+          <g class="ab gr-m4"><rect x="-15" y="-13" width="30" height="26" rx="4"/><text>M4</text></g>
+          <g class="ab gr-x"><rect x="-15" y="-13" width="30" height="26" rx="4"/><text>R1</text></g>
+          <text class="gtext grp-lab grp-out" x="362" y="146" text-anchor="middle"><en>kept outside</en></text>
+        </svg>
+      </div>
+      <div class="grp-body">
+        <div class="grp-code">
+          <code data-hl="%stage1_set = {#M1 #M2 #M5} @GROUP;"></code>
+          <code data-hl="%stage2_set = {#M3 #M4} @GROUP(spacing_x=-1);"></code>
+          <code data-hl="{%stage1_set %stage2_set} @GROUP;"></code>
+          <code data-hl='%stage1_set %stage2_set @DISTANCE("left-to-right", min=1)'></code>
+        </div>
+        <ul class="grp-points">
+          <li><en><b>One block.</b> The solver arranges the members of a group together, and keeps other objects out of its region as far as the facts allow.</en></li>
+          <li><en><b>A tree.</b> Groups nest by containment: the outer group holds both stages. <code>spacing_x</code> and <code>spacing_y</code> add to the solver’s spacing inside a group; a negative value draws it tighter.</en></li>
+          <li><en><b>Not a constraint.</b> A group takes no part in resolving conflicts and has no priority, only on and off: <code>@PRIORITY("disabled")</code> turns it off. It guarantees no geometric relation, and a fact that needs an object inside its region wins. A requirement on positions, such as not interleaving or being centered, is written as a constraint, like the <code>DISTANCE</code> in the last line.</en></li>
+          <li><en><b>Built into structures.</b> The structures of the standard package carry groups of their own: the definition of <code>$DIFFERENTIAL_PAIR_N</code> holds <code>{?left ?right ?tail} @GROUP</code>, so every pair is laid out as one block.</en></li>
+        </ul>
       </div>
     </div>
 

@@ -881,6 +881,56 @@ html[lang="en"] .fam { grid-template-columns: 108px 1fr; }
 @media (max-width: 760px) { .atoms { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .atoms { grid-template-columns: 1fr; } }
 
+/* GROUP: the members gather into blocks, the frames of the groups appear and an object outside is kept out */
+.grp { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); overflow: hidden; }
+.grp-fig { background: var(--panel-2); border-right: 1px dashed var(--line); display: flex; align-items: center; }
+.grp-fig svg { width: 100%; height: auto; display: block; }
+.grp-body { padding: 16px 18px 18px 4px; display: grid; gap: 12px; align-content: start; }
+.grp-code { display: grid; gap: 2px; }
+.grp-code code { font-size: 12.5px; overflow-wrap: break-word; }
+.grp-points { margin: 0; padding-left: 18px; display: grid; gap: 8px; }
+.grp-points li { font-size: 14px; color: var(--ink-2); line-height: 1.6; }
+.grp-points b { color: var(--ink); }
+.grp-points code { font-size: 12.5px; }
+.grp .ab rect { fill: var(--panel); stroke: var(--ink); stroke-width: 1.5; }
+.grp .ab text { font: 600 12px var(--f-mono); fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
+.grp .gtext { font: 500 11px var(--f-body); fill: var(--markup); }
+.grp .grp-lab { font-family: var(--f-mono); }
+.grp .grp-out { font-family: var(--f-body); }
+.grp-frame { fill: none; stroke: var(--markup); stroke-width: 1.4; stroke-dasharray: 5 3; }
+.grp-outer { opacity: 0; animation: grp-outer 9s ease-in-out infinite; }
+.grp-inner { opacity: 0; animation: grp-inner 9s ease-in-out infinite; }
+.grp-out { opacity: 0; animation: grp-inner 9s ease-in-out infinite; }
+.gr-m1 { animation: gr-m1 9s ease-in-out infinite; }
+.gr-m2 { animation: gr-m2 9s ease-in-out infinite; }
+.gr-m5 { animation: gr-m5 9s ease-in-out infinite; }
+.gr-m3 { animation: gr-m3 9s ease-in-out infinite; }
+.gr-m4 { animation: gr-m4 9s ease-in-out infinite; }
+.gr-x { animation: gr-x 9s ease-in-out infinite; }
+@keyframes grp-inner { 0%, 34% { opacity: 0; } 42%, 88% { opacity: 1; } 96%, 100% { opacity: 0; } }
+@keyframes grp-outer { 0%, 44% { opacity: 0; } 52%, 88% { opacity: 1; } 96%, 100% { opacity: 0; } }
+@keyframes gr-m1 { 0%, 12% { transform: translate(64px, 150px); } 34%, 88% { transform: translate(62px, 76px); } 100% { transform: translate(64px, 150px); } }
+@keyframes gr-m2 { 0%, 12% { transform: translate(250px, 150px); } 34%, 88% { transform: translate(114px, 76px); } 100% { transform: translate(250px, 150px); } }
+@keyframes gr-m5 { 0%, 12% { transform: translate(196px, 74px); } 34%, 88% { transform: translate(88px, 128px); } 100% { transform: translate(196px, 74px); } }
+@keyframes gr-m3 { 0%, 12% { transform: translate(120px, 74px); } 34%, 88% { transform: translate(190px, 73px); } 100% { transform: translate(120px, 74px); } }
+@keyframes gr-m4 { 0%, 12% { transform: translate(160px, 150px); } 34%, 88% { transform: translate(244px, 73px); } 100% { transform: translate(160px, 150px); } }
+@keyframes gr-x { 0%, 12% { transform: translate(110px, 112px); } 34%, 88% { transform: translate(362px, 112px); } 100% { transform: translate(110px, 112px); } }
+@media (max-width: 760px) {
+  .grp { grid-template-columns: 1fr; }
+  .grp-fig { border-right: 0; border-bottom: 1px dashed var(--line); }
+  .grp-body { padding: 14px 16px 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .grp-outer, .grp-inner, .grp-out { animation: none; opacity: 1; }
+  .gr-m1, .gr-m2, .gr-m5, .gr-m3, .gr-m4, .gr-x { animation: none; }
+  .gr-m1 { transform: translate(62px, 76px); }
+  .gr-m2 { transform: translate(114px, 76px); }
+  .gr-m5 { transform: translate(88px, 128px); }
+  .gr-m3 { transform: translate(190px, 73px); }
+  .gr-m4 { transform: translate(244px, 73px); }
+  .gr-x { transform: translate(362px, 112px); }
+}
+
 .pipe { display: flex; flex-wrap: wrap; gap: 8px 0; align-items: center; }
 .pipe button {
   position: relative; height: 38px; padding: 0 14px 0 20px; border: 0; background: var(--panel); cursor: pointer; font-size: 14px;
@@ -1165,6 +1215,7 @@ html[lang="en"] .fam { grid-template-columns: 108px 1fr; }
 @keyframes or-c { 0%, 44% { transform: translate(175px, 56px); } 54% { transform: translate(110px, 84px); } 64%, 86% { transform: translate(45px, 56px); } 100% { transform: translate(175px, 56px); } }
 @keyframes or-t1 { 0%, 20% { opacity: 0; } 25%, 44% { opacity: 1; } 49%, 100% { opacity: 0; } }
 @keyframes or-t2 { 0%, 62% { opacity: 0; } 67%, 86% { opacity: 1; } 91%, 100% { opacity: 0; } }
+.atom .or-bad { fill: var(--err); }
 
 .di-a { transform: translate(40px, 60px); }
 .di-c { transform: translate(180px, 60px); }
