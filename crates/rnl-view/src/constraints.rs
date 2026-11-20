@@ -171,8 +171,10 @@ pub enum ConstraintKind {
     Table { axis: &'static str, rows: ConstraintTableCell },
     #[serde(rename = "ORDER")]
     Order { axis: &'static str, sense: &'static str, members: Vec<ConstraintPoint> },
+    /// `sense` as ORDER's: "increasing", "decreasing" or "either", which a DISTRIBUTE without a
+    /// direction is.
     #[serde(rename = "DISTRIBUTE")]
-    Distribute { axis: &'static str, members: Vec<ConstraintPoint> },
+    Distribute { axis: &'static str, sense: &'static str, members: Vec<ConstraintPoint> },
     #[serde(rename = "DISTANCE")]
     Distance {
         axis: &'static str,
@@ -361,8 +363,8 @@ fn kind(f: &ProblemFact) -> ConstraintKind {
         FactKind::Order { axis, sense, members } => {
             ConstraintKind::Order { axis: axis.as_str(), sense: sense.as_str(), members: points_of(members) }
         }
-        FactKind::Distribute { axis, members, .. } => {
-            ConstraintKind::Distribute { axis: axis.as_str(), members: points_of(members) }
+        FactKind::Distribute { axis, sense, members } => {
+            ConstraintKind::Distribute { axis: axis.as_str(), sense: sense.as_str(), members: points_of(members) }
         }
         FactKind::Distance { axis, sense, min, max, from, to } => ConstraintKind::Distance {
             axis: axis.as_str(),

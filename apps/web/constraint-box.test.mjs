@@ -45,11 +45,14 @@ test('a title says the kind and what it is given, not the objects', () => {
   assert.equal(boxTitle({ kind: 'ALIGN', axis: 'y' }), 'ALIGN y');
   assert.equal(boxTitle({ kind: 'DISTRIBUTE', axis: 'x' }), 'DISTRIBUTE x');
   assert.equal(boxTitle({ kind: 'DISTRIBUTE', axis: 'x', sense: 'either' }), 'DISTRIBUTE x');
-  assert.equal(boxTitle({ kind: 'DISTRIBUTE', axis: 'x', sense: 'increasing' }), 'DISTRIBUTE x increasing');
-  assert.equal(boxTitle({ kind: 'DISTRIBUTE', axis: 'y', what: 'DISTRIBUTE y decreasing {#R1 #R2 #R3}' }), 'DISTRIBUTE y decreasing');
-  assert.equal(boxTitle({ kind: 'ORDER', axis: 'x', sense: 'increasing' }), 'ORDER x increasing');
+  assert.equal(boxTitle({ kind: 'DISTRIBUTE', axis: 'x', sense: 'increasing' }), 'DISTRIBUTE left-to-right');
+  assert.equal(boxTitle({ kind: 'DISTRIBUTE', axis: 'y', sense: 'decreasing' }), 'DISTRIBUTE top-to-bottom');
+  assert.equal(boxTitle({ kind: 'ORDER', axis: 'x', sense: 'increasing' }), 'ORDER left-to-right');
+  assert.equal(boxTitle({ kind: 'ORDER', axis: 'x', sense: 'decreasing' }), 'ORDER right-to-left');
+  assert.equal(boxTitle({ kind: 'ORDER', axis: 'y', sense: 'increasing' }), 'ORDER bottom-to-top');
+  assert.equal(boxTitle({ kind: 'ORDER', axis: 'y', sense: 'either' }), 'ORDER y');
   assert.equal(boxTitle({ kind: 'DISTANCE', axis: 'x', sense: 'either', min: 2, max: 4 }), 'DISTANCE x ≥ 2 ≤ 4');
-  assert.equal(boxTitle({ kind: 'DISTANCE', axis: 'x', sense: 'increasing', min: 8, max: 8 }), 'DISTANCE x increasing = 8');
+  assert.equal(boxTitle({ kind: 'DISTANCE', axis: 'x', sense: 'increasing', min: 8, max: 8 }), 'DISTANCE left-to-right = 8');
   assert.equal(boxTitle({ kind: 'DISTANCE', axis: 'y', sense: 'either', min: 1.5, max: null }), 'DISTANCE y ≥ 1.5');
   assert.equal(boxTitle({ kind: 'DISTANCE', axis: 'y', sense: 'either', min: null, max: 3 }), 'DISTANCE y ≤ 3');
   assert.equal(boxTitle({ kind: 'PLACE-x', value: 3 }), 'PLACE-x = 3');
@@ -83,7 +86,7 @@ test('the members keep the order of the fact, a distance and a relation number e
 
 test('the box holds the objects the fact names, each with its number, in the SVG pixels of the hits', () => {
   const b = constraintBox(level, { kind: 'ORDER', axis: 'x', sense: 'increasing', members: [origin(2), origin(0), origin(1)] });
-  assert.equal(b.title, 'ORDER x increasing');
+  assert.equal(b.title, 'ORDER left-to-right');
   assert.deepEqual(b.items, [
     { rect: [200, 0, 280, 16], tag: '1' }, { rect: [0, 0, 80, 16], tag: '2' }, { rect: [100, 0, 180, 16], tag: '3' },
   ]);

@@ -49,21 +49,21 @@ test('a box with a title and the numbers of the objects, in the order the constr
   await expect(frame(page)).toHaveCount(1);
   expect(await texts(page)).toEqual(['ALIGN y', '1', '2', '3']);
   // the order of the list, not the order of the drawing
-  await row(page, /ORDER x increasing \{#R3 #R1 #R2\}/).click();
+  await row(page, /ORDER left-to-right \{#R3 #R1 #R2\}/).click();
   await expect(frame(page)).toHaveCount(1);
-  expect(await texts(page)).toEqual(['ORDER x increasing', '1', '2', '3']);
+  expect(await texts(page)).toEqual(['ORDER left-to-right', '1', '2', '3']);
   const order = await page.evaluate(() => {
     const marks = [...document.querySelectorAll('.constraint-box .constraint-mark')].map((g) => [g.querySelector('text').textContent, g.getBoundingClientRect().left]);
     return marks.sort((a, b) => a[1] - b[1]).map((m) => m[0]);
   });
   expect(order).toEqual(['2', '3', '1']);
   // a distance numbers its two lists apart, and writes its limits
-  await row(page, /DISTANCE x/).click();
-  expect(await texts(page)).toEqual(['DISTANCE x increasing ≥ 2 ≤ 4', 'from1', 'to1']);
+  await row(page, /DISTANCE left-to-right/).click();
+  expect(await texts(page)).toEqual(['DISTANCE left-to-right ≥ 2 ≤ 4', 'from1', 'to1']);
   // every frame of the usages but the box is dimmed
   await expect(page.locator('.usage-overlays [data-muted]')).toHaveCount(await page.locator('.usage-overlays .usage-frame').count());
   // a second click on the row takes the box away
-  await row(page, /DISTANCE x/).click();
+  await row(page, /DISTANCE left-to-right/).click();
   await expect(frame(page)).toHaveCount(0);
 });
 
@@ -228,11 +228,11 @@ test('in RNL 0.4, directional DISTRIBUTE, orientation lists, pin orientations an
   await page.keyboard.press('7');
   await expect.poll(() => page.locator('#constraints-list li.constraint').count()).toBeGreaterThan(0);
 
-  await row(page, /DISTRIBUTE x increasing/).click();
-  expect(await texts(page)).toEqual(['DISTRIBUTE x increasing', '1', '2', '3']);
+  await row(page, /DISTRIBUTE left-to-right/).click();
+  expect(await texts(page)).toEqual(['DISTRIBUTE left-to-right', '1', '2', '3']);
 
-  await row(page, /DISTRIBUTE y decreasing/).click();
-  expect(await texts(page)).toEqual(['DISTRIBUTE y decreasing', '1', '2', '3']);
+  await row(page, /DISTRIBUTE top-to-bottom/).click();
+  expect(await texts(page)).toEqual(['DISTRIBUTE top-to-bottom', '1', '2', '3']);
 
   await row(page, /the orientation \[MY, R0\] of #R1/).click();
   expect(await texts(page)).toEqual(['ORIENT [MY, R0]']);

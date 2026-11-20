@@ -821,7 +821,21 @@ pub fn net_pieces(p: &LevelProblem) -> Vec<Vec<Vec<PointRef>>> {
         .collect()
 }
 
-/// What the fact of rank `k` says, in one line, such as `ALIGN y {#M1 #M2}` or `the x of #M1 = 3`.
+/// The `direction` of an ORDER, a DISTRIBUTE or a DISTANCE as RNL writes it (14.3): `left-to-right` and
+/// `right-to-left` along x, `bottom-to-top` and `top-to-bottom` along y, or the axis alone when either sense
+/// will do; [`crate::interp::kw::direction`] reads it.
+pub fn direction_word(axis: Axis, sense: Sense) -> &'static str {
+    match (axis, sense) {
+        (Axis::X, Sense::Increasing) => "left-to-right",
+        (Axis::X, Sense::Decreasing) => "right-to-left",
+        (Axis::Y, Sense::Increasing) => "bottom-to-top",
+        (Axis::Y, Sense::Decreasing) => "top-to-bottom",
+        (axis, Sense::Either) => axis.as_str(),
+    }
+}
+
+/// What the fact of rank `k` says, in one line, such as `ALIGN y {#M1 #M2}`, `ORDER left-to-right {#M1 #M2}` or
+/// `the x of #M1 = 3`.
 pub fn fact_statement(p: &LevelProblem, k: usize) -> String {
     let f = &p.facts[k];
     let num = |v: f64| fmt_num(v);
@@ -877,24 +891,28 @@ pub fn fact_statement(p: &LevelProblem, k: usize) -> String {
             format!("TABLE {} {}", axis.as_str(), show(p, rows))
         }
         FactKind::Align { axis, members } => format!("ALIGN {} {}", axis.as_str(), list(members)),
-        FactKind::Distribute { axis, sense: Sense::Either, members } => {
-            format!("DISTRIBUTE {} {}", axis.as_str(), list(members))
-        }
+        // the direction as the statement writes it (14.3): `left-to-right`, or the axis alone for either sense
         FactKind::Distribute { axis, sense, members } => {
-            format!("DISTRIBUTE {} {} {}", axis.as_str(), sense.as_str(), list(members))
+            format!("DISTRIBUTE {} {}", direction_word(*axis, *sense), list(members))
         }
         FactKind::Order { axis, sense, members } => {
-            format!("ORDER {} {} {}", axis.as_str(), sense.as_str(), list(members))
+            format!("ORDER {} {}", direction_word(*axis, *sense), list(members))
         }
         FactKind::Distance { axis, sense, min, max, from, to } => {
-            let mut bounds = String::new();
-            if let Some(m) = min {
-                bounds.push_str(&format!(" min={}", num(*m)));
-            }
-            if let Some(m) = max {
-                bounds.push_str(&format!(" max={}", num(*m)));
-            }
-            format!("DISTANCE {} {}{bounds} {} {}", axis.as_str(), sense.as_str(), list(from), list(to))
+            let bounds = match (min, max) {
+                (Some(a), Some(b)) if a == b => format!(" exact={}", num(*a)),
+                _ => {
+                    let mut bounds = String::new();
+                    if let Some(m) = min {
+                        bounds.push_str(&format!(" min={}", num(*m)));
+                    }
+                    if let Some(m) = max {
+                        bounds.push_str(&format!(" max={}", num(*m)));
+                    }
+                    bounds
+                }
+            };
+            format!("DISTANCE {}{bounds} {} {}", direction_word(*axis, *sense), list(from), list(to))
         }
         FactKind::OrientRelation { relation, from, to } => {
             format!("ORIENT-RELATION {} {} {}", orientation(*relation), objects(from), objects(to))

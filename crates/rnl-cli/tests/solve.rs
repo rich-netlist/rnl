@@ -483,7 +483,7 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
     let statements = [
         "    T4-miller-conflicts.sp:48 [0] the y of #M1 = 0 took part in discarding [23]",
         "    T4-miller-conflicts.sp:49 [4] the y of #M2 = 3 took part in discarding [23]",
-        "    T4-miller-conflicts.sp:50 [3] DISTANCE x increasing min=2 {#M6} {#M7} took part in discarding [7]",
+        "    T4-miller-conflicts.sp:50 [3] DISTANCE left-to-right min=2 {#M6} {#M7} took part in discarding [7]",
     ];
     let head = lines.iter().position(|l| l == "  statements whose facts took part in discarding (8.5):").unwrap();
     assert_eq!(lines[head + 1..head + 4], statements, "{lines:#?}");
@@ -538,7 +538,7 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
     );
     assert_eq!(
         all[at + 1],
-        "        [2] DISTANCE y increasing min=6 max=6 {#VIP} {#VIN} (normal, T4-miller-conflicts.sp:51)"
+        "        [2] DISTANCE bottom-to-top exact=6 {#VIP} {#VIN} (normal, T4-miller-conflicts.sp:51)"
     );
     let head = all.iter().position(|l| l == "  statements whose facts took part in discarding (8.5):").unwrap();
     assert_eq!(
@@ -547,7 +547,7 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
             "    T4-miller-conflicts.sp:48 [0] the y of #M1 = 0 took part in discarding [23], [70]",
             "    T4-miller-conflicts.sp:49 [4] the y of #M2 = 3 took part in discarding [23], [70]",
             statements[2],
-            "    T4-miller-conflicts.sp:51 [2] DISTANCE y increasing min=6 max=6 {#VIP} {#VIN} took part in \
+            "    T4-miller-conflicts.sp:51 [2] DISTANCE bottom-to-top exact=6 {#VIP} {#VIN} took part in \
              discarding [59]",
         ],
         "{all:#?}"
@@ -1992,7 +1992,7 @@ fn a_fact_that_contradicts_itself_fails_and_the_level_is_solved_without_it() {
     let fact = |text: &str| (0..p.facts.len()).find(|&k| describe_fact(p, k).contains(text)).unwrap();
     let mut failed = vec![
         fact("ALIGN y {#M1:d #M1:g}"),
-        fact("ORDER x increasing {#M1:g #M1:d #M1:s}"),
+        fact("ORDER left-to-right {#M1:g #M1:d #M1:s}"),
         fact("{#M1:d} {#M1:s}"),
         fact("{#M1:g} {#M1:d}"),
     ];
