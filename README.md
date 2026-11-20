@@ -96,7 +96,7 @@ node apps/web/serve.mjs
 
 ## Next steps
 
-The [roadmap](docs/roadmap.md) is the list, and says what is done and what is not. Among what is open: the direction facts of pins, their selections and the editing of pins in the language 0.4 ([decision 0019](docs/decisions/0019-pin-identity-in-language-0-4.md)), and pins named in a drawing resolved once the symbols are chosen; symbol packages for the devices of foundries' PDKs, beyond the one for SKY130 in [rnl-packages](https://github.com/rich-netlist/rnl-packages); a viewer that asks for a solve only when one is needed; checks that the solver's WebAssembly build solves as the native one does; a precise contract for what the solver writes; and signed releases for Windows. An editor that moves devices by dragging is set aside for now, and the roadmap says why.
+The [roadmap](docs/roadmap.md) is the list, and says what is done and what is not. Among what is open: symbol packages for the devices of foundries' PDKs, beyond the one for SKY130 in [rnl-packages](https://github.com/rich-netlist/rnl-packages); deciding how the solver writes back an object that a rule makes again; telling apart, in diagnostics, package files of one name in two package directories; finding the members of a long chain of `@ADD-TO` without a call for each set; a TypeScript workspace; releases of the crates; and signed releases for Windows. An editor that moves devices by dragging is set aside for now, and the roadmap says why.
 
 ## License
 
