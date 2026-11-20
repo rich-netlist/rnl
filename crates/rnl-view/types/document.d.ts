@@ -1211,11 +1211,12 @@ export type OutlineLevel = {
    */
   ports: Array<string>,
   /**
-   * How many instances it has.
+   * How many instances it has; for a module of Verilog-A, the instances of modules it writes.
    */
   instances: number,
   /**
-   * The subcircuits its instances call, one for each name, in the order first called.
+   * The subcircuits its instances call, one for each name, in the order first called; for a
+   * module of Verilog-A, the modules its instances name (2.9), though it has no circuit.
    */
   calls: Array<OutlineCall>,
   /**
@@ -1252,6 +1253,11 @@ export type OutlineCall = {
    * netlist; left out otherwise.
    */
   instances?: Array<string>,
+  /**
+   * The line of each of `instances`, in the same order, counted from 1 as `lines` of
+   * [`OutlineLevel`] counts them, in the file of the level; left out with them.
+   */
+  lines?: Array<number>,
 };
 
 /**
