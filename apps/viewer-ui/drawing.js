@@ -10,6 +10,7 @@ import { current, doc, selected, selectedAsUsage, setCurrent, setPath } from "./
 import { colourDrawing } from "./background.js";
 import { paintGrid } from "./grid.js";
 import { updateHierarchy } from "./hierarchy.js";
+import { setModuleShown } from "./level-tree.js";
 import { flylinesShown } from "./flylines.js";
 import { boxAt, hitsAt, nameOf, objectsOf } from "./hits.js";
 import { hideTip, hoverNamesOn, hoverRolesOn, showTip } from "./hover.js";
@@ -26,6 +27,12 @@ import { skeletonAt } from "./skeleton-lines.js";
 import { TOUCH_CLICK_MS, touchGestures } from "./touch-gestures.js";
 
 const canvas = $("canvas");
+
+/** Take away the module of Verilog-A shown in place of a drawing (module-view.js). */
+function hideModule() {
+  $("module-card").hidden = true;
+  setModuleShown(null);
+}
 
 const MIN_ZOOM = 0.02;
 const MAX_ZOOM = 50;
@@ -53,6 +60,7 @@ append(canvas, zoomBox);
  */
 export function showLevel(i, keptView) {
   cancelGesture();
+  hideModule();
   setCurrent(i);
   notice("");
   const lv = doc.levels[i];
@@ -137,6 +145,7 @@ export function notice(text) {
 }
 
 export function clearDrawing(message) {
+  hideModule();
   paintUsages(null, null, groups);
   cancelGesture();
   notice("");

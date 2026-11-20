@@ -7,11 +7,12 @@ import { append, m, setAttr, setText } from "./i18n.js";
 // The paths of the rows: "0" is the top level and "0/1/0" the first instance of the second instance
 // of the top level; "r3/0" is the first instance of the subcircuit 3 that the top level does not
 // call (roots.js). Levels are named by their host levels (level-tree.js): the tree lists the levels
-// of every file, also of those a shell that reads the file shown alone has not read.
+// of every file, also of those a shell that reads the file shown alone has not read, and the modules
+// of Verilog-A of its outline, marked so, which open as their ports and instances (module-view.js).
 
 import { current, doc, expanded } from "./state.js";
 import { uncalledRoots } from "./roots.js";
-import { hostOf, levelTree } from "./level-tree.js";
+import { levelTree, shownHost } from "./level-tree.js";
 import { enterHost, enterRow, pathRow } from "./subcircuits.js";
 import { $, span } from "./util.js";
 
@@ -37,7 +38,8 @@ function renderTree() {
   const tree = $("tree");
   tree.replaceChildren();
   const levels = levelTree();
-  if (!doc || doc.levels.length === 0 || !levels.nodes[levels.top]) return;
+  // (the reading of a file of Verilog-A has no levels, and the outline has the levels of the others)
+  if (!doc || !levels.nodes[levels.top]) return;
   const walk = (level, path, depth, child, above) => {
     const lv = levels.nodes[level];
     const cycle = above.includes(level);
@@ -92,13 +94,15 @@ function treeRow({ level, path, depth, child, branches, open, cycle }) {
     if (level === null) append(row, span("badge", m("not defined")));
     if (cycle) append(row, span("badge", m("recursive")));
   }
+  // the name of the language is no word to translate
+  if (level !== null && nodes[level].module) append(row, span("badge", "Verilog-A"));
   if (level === null) {
     row.classList.add("undefined");
     setAttr(row, "title", m`${child.master} is not defined in the netlist`);
     return row;
   }
   row.dataset.level = String(level);
-  if (level === hostOf(current)) row.classList.add("current");
+  if (level === shownHost(current)) row.classList.add("current");
   if (path === active) row.classList.add("active");
   row.addEventListener("click", (e) => openLevel(level, path, { newWindow: e.shiftKey }));
   row.addEventListener("dblclick", () => { if (branches) toggleBranch(path); });
@@ -145,7 +149,7 @@ function renderIndex() {
   letters.replaceChildren();
   setText($("index-count"), "");
   const { nodes, top } = levelTree() ?? {};
-  if (!doc || doc.levels.length === 0 || !nodes[top]) return;
+  if (!doc || !nodes?.[top]) return;
   const q = $("search").value.trim().toLowerCase();
   const uses = [];
   for (const lv of nodes) for (const c of lv?.children ?? []) if (c.host !== null) uses[c.host] = (uses[c.host] ?? 0) + 1;
@@ -216,9 +220,10 @@ function indexRow(level, q, count) {
     setText(name, title);
   }
   append(row, name);
+  if (nodes[level].module) append(row, span("badge", "Verilog-A"));
   if (level === top) append(row, span("uses", m("top level")));
   else append(row, span("uses", count === 1 ? m("1 use") : m`${count} uses`));
-  if (level === hostOf(current)) {
+  if (level === shownHost(current)) {
     row.classList.add("current");
     row.setAttribute("aria-selected", "true");
   }
@@ -244,7 +249,7 @@ export function openLevel(level, path, options) {
  */
 export function updateHierarchy() {
   if (!doc) return;
-  active = pathRow() || pathTo(hostOf(current));
+  active = pathRow() || pathTo(shownHost(current));
   if (active) {
     const parts = active.split("/");
     for (let k = 1; k < parts.length; k++) expanded.add(parts.slice(0, k).join("/"));

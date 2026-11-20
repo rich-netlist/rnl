@@ -43,7 +43,8 @@ export function candidatesOf(o) {
 
 /**
  * Where the subcircuit of instance `o` is defined when another file of the document defines it, in a reading of the
- * file shown alone (`Child.host`): `{ file, title }`, the file as the document names it; else null.
+ * file shown alone (`Child.host`): `{ file, title, module }`, the file as the document names it, and `module` true for a
+ * module of Verilog-A (module-view.js); else null.
  */
 export function definedElsewhere(o) {
   const obj = doc && o !== null && o !== undefined ? doc.objects[o] : null;
@@ -51,7 +52,7 @@ export function definedElsewhere(o) {
   const child = doc.levels.find((l) => l.host === obj.level)?.children.find((c) => c.instance === obj.name);
   if (child?.host === undefined || child.host === null) return null;
   const node = levelTree().nodes[child.host];
-  return node && node.file !== null ? { file: node.file, title: node.title } : null;
+  return node && node.file !== null ? { file: node.file, title: node.title, module: node.module === true } : null;
 }
 
 /** Whether an instance can be entered: it has a definition, in this file or another, or has several to choose from. */
@@ -151,11 +152,13 @@ export function descend(o, options) {
   if (level === null && !elsewhere) return chooseDefinition(o, options);
   const obj = doc.objects[o];
   if (elsewhere) {
-    // another file defines it: that file's view, in the context of the entry, with the parameters of the instance
+    // another file defines it: that file's view, in the context of the entry, with the parameters of the instance; a
+    // module of Verilog-A is shown without them (module-view.js)
     const at = doc.levels[current].host === obj.level ? current : doc.levels.findIndex((l) => l.host === obj.level);
     if (!options?.newWindow) window.dispatchEvent(new Event("viewer-navigate"));
     const step = { title: elsewhere.title, via: obj.name };
-    return navigate({ source: viewOfFile(elsewhere.file), path: at < 0 ? [step] : [...cutTo(at), step], selection: null, reveal: true, ...parametersOf(obj) }, options);
+    return navigate({ source: viewOfFile(elsewhere.file), path: at < 0 ? [step] : [...cutTo(at), step], selection: null, reveal: true,
+      ...(elsewhere.module ? {} : parametersOf(obj)) }, options);
   }
   // the instance is on the level shown, or on one that the path is cut back to or starts at
   const at = doc.levels[current].host === obj.level ? current : doc.levels.findIndex((l) => l.host === obj.level);

@@ -24,6 +24,7 @@ import { startLevel, uncalledRoots } from "./roots.js";
 import { clearSelection, select } from "./selection.js";
 import { endPreview, previewing, solve } from "./solve.js";
 import { levelNamed, namedPath, restorePath, visitView } from "./subcircuits.js";
+import { showModule } from "./module-view.js";
 import { clearSource, fileShown, fileViews, renderFiles, revealDefinition, showFile } from "./text.js";
 import { $ } from "./util.js";
 import { setEnabled } from "./commands.js";
@@ -358,6 +359,8 @@ function showDocument(before, navigation) {
   }
   showFile(file);
 
+  // the reading of a file of Verilog-A has no levels: one of its modules, as the outline gives it
+  if (doc.levels.length === 0 && showModule(before?.path || navigation?.path || [])) return;
   if (doc.levels.length === 0) {
     clearDrawing(m("Nothing to draw."));
     renderHierarchy();
