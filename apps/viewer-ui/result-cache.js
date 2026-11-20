@@ -202,6 +202,22 @@ export class ResultCache {
     return entry.value;
   }
 
+  /**
+   * The value kept under `key` when `valid(inputs)` says that what it was made from still holds, as `get` gives it, but
+   * looked at only: it counts as no hit or miss, is not made the most recently used, and is not dropped when it does not
+   * hold. Null otherwise.
+   */
+  async peek(key, valid = async () => true) {
+    let entry = this.memory.get(key);
+    if (!entry && this.store) {
+      try {
+        const kept = await this.store.get(key);
+        if (kept) entry = { value: JSON.parse(await unpack(kept)), inputs: kept.inputs };
+      } catch { entry = undefined; }
+    }
+    return entry && (await valid(entry.inputs)) ? entry.value : null;
+  }
+
   /** Keep `value`, made from `inputs`, under `key`, in memory and in the store. */
   async put(key, value, inputs = []) {
     const text = JSON.stringify(value);

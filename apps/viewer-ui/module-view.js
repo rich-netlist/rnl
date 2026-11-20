@@ -80,7 +80,7 @@ function renderCard(node) {
   const note = document.createElement("p");
   note.className = "module-note";
   setText(note, m("A module of Verilog-A has no drawing: its ports are shown as a symbol, and the modules its instances name are listed below."));
-  append(card, heading, symbol(node), note);
+  append(card, heading, portSymbol(node.ports), note);
   const list = document.createElement("div");
   list.className = "module-instances";
   list.setAttribute("role", "list");
@@ -128,9 +128,8 @@ function instanceRow(node, child) {
   return row;
 }
 
-/** The symbol of a module: a box with a pin for each of its ports, in the order the module writes them. */
-function symbol(node) {
-  const ports = node.ports ?? [];
+/** The symbol of a module, or of a subcircuit that gives itself none: a box with a pin for each of its `ports`, in their order. */
+export function portSymbol(ports = []) {
   const left = ports.slice(0, Math.ceil(ports.length / 2));
   const right = ports.slice(left.length);
   const pitch = 20;

@@ -101,3 +101,26 @@ test("in the site's store: another page finds a result, a store of another forma
   expect(seen.left).toEqual([true, false, true]);
   expect(seen.cleared).toBeNull();
 });
+
+test("peek looks at a result without using it: no hit or miss, no order changed, nothing dropped", async ({ page }) => {
+  const seen = await inPage(page, `
+    const cache = new rc.ResultCache({ memoryLimit: 100000 });
+    let holds = true;
+    const valid = async () => holds;
+    await cache.put("one", { n: 1 }, ["a"]);
+    await cache.put("two", { n: 2 }, ["b"]);
+    const looked = await cache.peek("one", valid);
+    const order = [...cache.memory.keys()];
+    holds = false;
+    const stale = await cache.peek("two", valid);
+    const anyway = await cache.peek("two");
+    const none = await cache.peek("three");
+    return { looked, order, stale, anyway, none, stats: cache.stats() };
+  `);
+  expect(seen.looked).toEqual({ n: 1 });
+  expect(seen.order).toEqual(["one", "two"]);
+  expect(seen.stale).toBeNull();
+  expect(seen.anyway).toEqual({ n: 2 });
+  expect(seen.none).toBeNull();
+  expect(seen.stats).toMatchObject({ entries: 2, hits: 0, misses: 0 });
+});

@@ -1095,10 +1095,11 @@ export default {
             if (signal?.aborted) throw new Error("superseded");
             progress?.("parsing"); return buildingCore.buildFile(request);
           } };
+          const started = performance.now();
           const read1 = await collectFile(reader, { ...request, file, files: outlined.files }, read);
-          // kept when the document has every file it asks for
+          // kept when the document has every file it asks for, with how long it took to read (the entry page tells it)
           if (key && !signal?.aborted && read1.result.missing.length === 0) {
-            const stored = { result: structuredClone(read1.result), library: now.library };
+            const stored = { result: structuredClone(read1.result), library: now.library, took: performance.now() - started };
             cache.put(key, stored, stored).catch(() => {});
           }
           return read1;
@@ -1316,6 +1317,31 @@ export default {
       primed.add(lastBuilt);
     }
     return core.drawings({ drawings: { level, items, names } });
+  },
+  /**
+   * Of each of `files`, files of the document shown as its outline names them, for the entry page (entry-page.js): the
+   * symbols its subcircuits give themselves (`FileSymbols.subckts`, or null when they cannot be read), whether a
+   * reading of it is kept that still holds, and how long that reading took, in milliseconds (null when not known).
+   */
+  async fileSummaries(files) {
+    const doc = lastBuilt;
+    const request = doc && builtRequests.get(doc);
+    if (!request || !doc.outline) return {};
+    const cache = await readings;
+    const now = { outline: doc.outline, textOf: (path) => request.files[path],
+      library: await libraryStamp(librarySnapshot, new Set(Object.keys(request.files))) };
+    const out = {};
+    for (const file of files) {
+      let subckts = null;
+      try { subckts = (await core.symbols({ ...request, symbols: file })).subckts; } catch { /* no symbols: the page draws a box */ }
+      const body = request.files[requestPath(request.entry, file)];
+      const key = cache && body !== undefined ? await readingKey({ version: coreVersion, format: fileResultFormat }, request, file, body) : null;
+      const found = key ? await cache.peek(key, (stored) => holds(stored, now)) : null;
+      // how long the last reading took, also of one that no longer holds
+      const last = found ?? (key ? await cache.peek(key) : null);
+      out[file] = { subckts, kept: !!found, took: last?.took ?? null };
+    }
+    return out;
   },
   /** What the kept readings hold, for File > Memory Cache: as `ResultCache.stats` gives it; null when none are kept. */
   async readingStats() {

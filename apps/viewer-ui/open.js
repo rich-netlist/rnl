@@ -25,6 +25,7 @@ import { clearSelection, select } from "./selection.js";
 import { endPreview, previewing, solve } from "./solve.js";
 import { levelNamed, namedPath, restorePath, visitView } from "./subcircuits.js";
 import { showModule } from "./module-view.js";
+import { openOnlyRoot } from "./entry-page.js";
 import { clearSource, fileShown, fileViews, renderFiles, revealDefinition, showFile } from "./text.js";
 import { $ } from "./util.js";
 import { setEnabled } from "./commands.js";
@@ -111,6 +112,8 @@ export async function openSource(source, keep, edited, fresh = false, navigation
       // a file or a project opened, not read again, rebuilt, visited from another file or imported by the API:
       // asked whether to solve it when it has components not drawn (solve-on-open.js)
       if (d === doc && !keep && !edited && !navigation && !signal) void askToSolve(d, source, operation.signal);
+      // an entry that only includes other files, with one subcircuit nothing calls: that subcircuit (entry-page.js)
+      if (d === doc && !keep && !edited && !navigation && !signal) openOnlyRoot();
       window.dispatchEvent(new Event("open-finished"));
     }
   }

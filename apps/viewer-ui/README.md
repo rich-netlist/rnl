@@ -72,6 +72,7 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `usages.js` | Scope-local usages grouped by definition, folded to begin with, and Expand All / Collapse All; editable Color, visibility preferences, source and roles; fixed-screen overlays and role labels, selection focus and border picking. |
 | `roots.js` | The subcircuits that the top level does not call, which start trees of their own, and the level a document opens on (see [Subcircuits that nothing calls](#subcircuits-that-nothing-calls)). |
 | `level-tree.js` | The levels the hierarchy shows, by their host levels (`Level.host`): from the outline of the whole document when the shell reads the file shown alone, the modules of Verilog-A among them, else from the Document's levels (see [Reading the file shown alone](#reading-the-file-shown-alone)); and the host level shown, a module's when one is shown in place of a drawing. |
+| `entry-page.js` | The entry page, for a shell that reads the file shown alone: an entry that only includes other files shows the subcircuits nothing calls in place of its empty drawing, each with its symbol, file, instances and whether its file's reading is kept, and opens the one alone at once (see [Reading the file shown alone](#reading-the-file-shown-alone)). |
 | `module-view.js` | A module of Verilog-A shown in place of a drawing, for a shell that reads the file shown alone: a symbol of its ports, a note, and its instances with their lines, which open the modules they name (see [Reading the file shown alone](#reading-the-file-shown-alone)). |
 | `visit-source.js` | What names a visit: a source's key, and the view of one file of a document in the context of its entry. |
 | `unplaced.js` | The Not drawn view: the objects of the level shown that have no position, each with its symbol and the nets at its terminals, in a list that loads a part at a time, with their drawings, and is searched by name (see [The objects not drawn](#the-objects-not-drawn)). |
@@ -90,7 +91,7 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `dialog.js` | Dialogs in the page's style for what a shell or the page asks: one of a list, with a filter; a line of text; several values in a form, such as the grid's settings; a message; a message with a button that acts. They are modal: the page's keys and its menu bar wait while one is shown. |
 | `updates.js` | Help > Check for Updates: the newest release of the viewer on GitHub against the version that runs, compared by Semantic Versioning, in a dialog. |
 | `file-results.js` | The readings of one file kept, for a shell that reads the file shown alone: the key a `FileResult` is kept under, and whether the inputs it records still hold (see [Reading the file shown alone](#reading-the-file-shown-alone)). |
-| `result-cache.js` | The cache of what the core gives for each file, for loading a design file by file: a result is kept under a key with the inputs it records, and given again only while they hold. In memory, and in the site's IndexedDB where the browser lets it, each within a limit in bytes, the least recently used first out; a store written by another core or result shape is emptied when it is opened. Nothing in it knows what a result holds, and a failure of the browser's storage is a miss. |
+| `result-cache.js` | The cache of what the core gives for each file, for loading a design file by file: a result is kept under a key with the inputs it records, and given again only while they hold. In memory, and in the site's IndexedDB where the browser lets it, each within a limit in bytes, the least recently used first out; a store written by another core or result shape is emptied when it is opened. A result can be looked at without being used (`peek`), as the entry page does. Nothing in it knows what a result holds, and a failure of the browser's storage is a miss. |
 | `storage-prefix.js` | The prefix of the names the page keeps in the browser's storage (`util.js`): none, and the web build writes the one `RNL_STORAGE_PREFIX` names over it, for a frozen build beside the current one. |
 | `util.js` | Small helpers for building the page, and for keeping values in the shell’s settings store (native `settings.json` on desktop, `localStorage` on web), read and written so that a page without it starts from its defaults. |
 | `embed.js`, `embed.css` | Web-only canvas controls, hierarchy path and postMessage API; started only when the web shell has `embed=1`. See [Embedding](../web/README.md#embedding). |
@@ -169,8 +170,15 @@ view of it: the entry's source with `view`, the file as the document names it (`
   changed, edited or included anew, or a package that a reading used read with another text, starts it again. The
   numbers of the lines are coloured by the problems listed. The desktop reads the whole document, whose list has the
   problems of every file, and has no switch.
-- **What is not there yet**: an entry that only includes others opens on its own empty level; the limits of the
-  readings kept are not set in the page yet.
+- **The entry page** (`entry-page.js`). An entry that only includes other files has an empty top level, and the
+  subcircuits nothing calls (`roots.js`) are in the other files: reading the entry alone is quick, but none of them is
+  read yet. In place of the empty drawing, a card says that the file only includes other files and lists them, each
+  with its symbol (the one it gives itself, `shell.fileSummaries` asking the core for the symbols of its file, else a
+  box of its ports), the file that defines it, its instances, and whether its file's reading is kept ("Kept: opens at
+  once"), else how long it took the last time. A click opens it, as the index does. With one alone, a file opened
+  opens it at once, the card showing meanwhile; shown again later, the entry stays on its card. An entry that has
+  something to draw, or a subcircuit of its own that nothing calls, opens as before.
+- **What is not there yet**: the limits of the readings kept are not set in the page yet.
 
 Problems retains the complete diagnostic list and total counts, but initially creates only 100
 rows. Scrolling near the bottom, or activating the button there, appends the next 100. This keeps

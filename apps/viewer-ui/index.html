@@ -306,6 +306,7 @@ if (new URLSearchParams(location.search).get("embed") !== "1") document.addEvent
       <canvas id="grid" class="grid" aria-hidden="true"></canvas>
       <p id="empty" class="empty">Open a SPICE or Spectre netlist with File &#x203A; Open File (Ctrl+O).<br>Drag to move the view, scroll to zoom, click a symbol or a wire to find it in the netlist.</p>
       <div id="module-card" class="module-card" hidden></div>
+      <div id="entry-card" class="entry-card" hidden></div>
       <button id="enter-badge" class="enter-badge" type="button" hidden title="Open the subcircuit (E, Enter, or double-click; Shift opens a new window)" aria-label="Open the subcircuit">
         <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 5.5 10 10M10 6.5V10H6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
