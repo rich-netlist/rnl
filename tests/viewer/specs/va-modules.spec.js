@@ -33,19 +33,17 @@ const B = `module amp(inp, outp);
 endmodule
 `;
 
-async function open(page) {
+/** Choose `files` (name → text) with File › Open File, as one choice of several files. */
+async function choose(page, files) {
   await page.route('https://rich-netlist.github.io/rnl-packages/**', route => route.abort());
   await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
   await expect(page.locator('#menubar')).toBeVisible();
-  await page.locator('#file-input').setInputFiles([
-    { name: 'top.scs', mimeType: 'text/plain', buffer: Buffer.from(TOP) },
-    { name: 'a.va', mimeType: 'text/plain', buffer: Buffer.from(A) },
-    { name: 'b.va', mimeType: 'text/plain', buffer: Buffer.from(B) },
-  ]);
-  // the page asks which of the files is the top level: the netlist, listed first
-  const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('option', { name: 'top.scs' })).toHaveAttribute('aria-selected', 'true');
-  await dialog.getByRole('button', { name: 'Open' }).click();
+  await page.locator('#file-input').setInputFiles(Object.entries(files).map(([name, text]) => ({ name, mimeType: 'text/plain', buffer: Buffer.from(text) })));
+}
+
+/** Open the netlist with its two Verilog-A files: a file of Verilog-A is one a netlist uses, so the netlist opens. */
+async function open(page) {
+  await choose(page, { 'top.scs': TOP, 'a.va': A, 'b.va': B });
   await idle(page);
 }
 const idle = (page) => page.waitForFunction(() => window.viewer.doc && !document.body.classList.contains('busy'));
@@ -138,4 +136,28 @@ test('a module picked in the index opens as the root of the path, and the file o
   await page.evaluate(() => import('./navigation.js').then(n => n.navigate({ file: window.viewer.doc.files.findIndex(f => f.path === 'b.va') })));
   await idle(page);
   expect(await shown(page)).toEqual({ file: 'b.va', module: 'amp', kind: 'Verilog-A module', path: ['amp'] });
+});
+
+test('a netlist chosen with Verilog-A files opens with no question; a Verilog-A file alone, or among netlists, can still be opened', async ({ page }) => {
+  await open(page);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(await page.evaluate(() => window.viewer.doc.file)).toBe('top.scs');
+  // a file of Verilog-AMS is one too
+  await choose(page, { 'top.scs': TOP, 'a.vams': A, 'b.va': B });
+  await idle(page);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(await page.evaluate(() => window.viewer.doc.path.split('/').pop())).toBe('top.scs');
+  // two netlists: the question lists the Verilog-A files too, after the netlists, and one can be opened
+  await choose(page, { 'top.scs': TOP, 'other.scs': TOP, 'a.va': A });
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('option')).toHaveText(['other.scs', 'top.scs', 'a.va']);
+  await dialog.getByRole('option', { name: 'a.va' }).click();
+  await dialog.getByRole('button', { name: 'Open' }).click();
+  await idle(page);
+  expect(await page.evaluate(() => window.viewer.doc.path.split('/').pop())).toBe('a.va');
+  // a Verilog-A file alone opens at once
+  await choose(page, { 'b.va': B });
+  await idle(page);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(await page.evaluate(() => window.viewer.doc.path.split('/').pop())).toBe('b.va');
 });

@@ -24,8 +24,8 @@ import { DEFAULT_CATALOG, readCatalog, readPublicPackage, latestPackages } from 
 
 /** The extensions of netlists that are opened on their own, listed first as the file to open. */
 const NETLISTS = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "scs"];
-/** The extensions of files mostly included or used by a netlist, listed after the netlists. */
-const PARTS = ["inc", "lib", "rnl"];
+/** The extensions of files mostly included or used by a netlist, listed after the netlists: Verilog-A and Verilog-AMS among them. */
+const PARTS = ["inc", "lib", "rnl", "va", "vams"];
 /** How long a server may send nothing, before or during its answer, until a fetch is given up (ms). */
 const STALL = 30000;
 const embed = new URLSearchParams(location.search).get("embed") === "1";
