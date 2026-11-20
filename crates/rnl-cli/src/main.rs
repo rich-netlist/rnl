@@ -78,6 +78,9 @@ view options:
   --status            give each level its solve status: fixed, unsolved, solved or stale
   --constraints       give each level its constraints after expansion, what a solver takes in, tied
                       to the Document's objects; experimental, not promised to stay as it is
+  --file F            print the reading of the file F of the document alone, as a viewer that reads
+                      one file at a time gets it: the Document of its levels, the subcircuits they
+                      instantiate and what the reading depends on
   --bind SUBCKT       show the parameters of the subcircuit SUBCKT with the values --param gives
   --param NAME=VALUE  a value for a parameter of the subcircuit --bind names, as text; repeatable.
                       Only the Document's lists of parameters change; nothing drawn does
@@ -197,7 +200,7 @@ struct Args {
     all: bool,
     /// `view`'s `--bind` and `--param`.
     bind: Option<rnl_view::Bind>,
-    /// `dump`'s `--file`: the file whose levels alone are built.
+    /// `dump`'s and `view`'s `--file`: the file whose levels alone are built.
     only_file: Option<String>,
     /// `dump`'s `--each-file`.
     each_file: bool,
@@ -458,7 +461,8 @@ fn parse_args() -> Result<Args, Said> {
             "--png" | "--scale" | "--net-names" => &["render"],
             "--layout" => &["solver-defaults"],
             "--all" => &["groups"],
-            "--file" | "--each-file" => &["dump"],
+            "--file" => &["dump", "view"],
+            "--each-file" => &["dump"],
             "--primitives" | "--no-svg" | "--status" => &["view", "snapshot"],
             "--flylines" => &["view", "snapshot", "render"],
             "--hints" => &["view"],
@@ -793,7 +797,14 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
                 constraints: args.constraints,
                 bind: args.bind.clone(),
             };
-            let doc = rnl_view::build(&args.file.to_string_lossy(), &provider, &options)?;
+            let entry = args.file.to_string_lossy();
+            if let Some(f) = &args.only_file {
+                let file = dump::file_in(&args.file, args.dialect.as_deref(), &args.formats, &provider, f)?;
+                let result = rnl_view::build_file(&entry, &file, &provider, &options)?;
+                println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                return Ok(ExitCode::SUCCESS);
+            }
+            let doc = rnl_view::build(&entry, &provider, &options)?;
             println!("{}", serde_json::to_string_pretty(&doc).unwrap());
             Ok(ExitCode::SUCCESS)
         }

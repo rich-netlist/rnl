@@ -60,6 +60,9 @@ view options:
   --status            give each level its solve status: fixed, unsolved, solved or stale
   --constraints       give each level its constraints after expansion, what a solver takes in, tied
                       to the Document's objects; experimental, not promised to stay as it is
+  --file F            print the reading of the file F of the document alone, as a viewer that reads
+                      one file at a time gets it: the Document of its levels, the subcircuits they
+                      instantiate and what the reading depends on
   --bind SUBCKT       show the parameters of the subcircuit SUBCKT with the values --param gives
   --param NAME=VALUE  a value for a parameter of the subcircuit --bind names, as text; repeatable.
                       Only the Document's lists of parameters change; nothing drawn does
