@@ -815,5 +815,12 @@
   "Show the problems of every file read, not only of the file shown": "Afficher les problèmes de chaque fichier lu, pas seulement du fichier affiché",
   "Check All Files": "Vérifier tous les fichiers",
   "Read each file not read yet, for its problems": "Lire chaque fichier pas encore lu, pour en trouver les problèmes",
-  "&Check All Files": "&Vérifier tous les fichiers"
+  "&Check All Files": "&Vérifier tous les fichiers",
+  "{0} only includes other files": "{0} ne fait qu’inclure d’autres fichiers",
+  "Opening {0}, which nothing calls.": "Ouverture de {0}, que rien n’appelle.",
+  "Open one of the subcircuits that nothing calls:": "Ouvrez l’un des sous-circuits que rien n’appelle :",
+  "1 instance": "1 instance",
+  "{0} instances": "{0} instances",
+  "Kept: opens at once": "En cache : s’ouvre aussitôt",
+  "Read in {0} s the last time": "Lu en {0} s la dernière fois"
 }

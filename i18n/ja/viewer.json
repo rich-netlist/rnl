@@ -815,5 +815,12 @@
   "Show the problems of every file read, not only of the file shown": "表示中のファイルだけでなく、読み込んだすべてのファイルの問題を表示",
   "Check All Files": "すべてのファイルをチェック",
   "Read each file not read yet, for its problems": "まだ読み込んでいない各ファイルを読み込み、その問題を調べる",
-  "&Check All Files": "すべてのファイルをチェック(&C)"
+  "&Check All Files": "すべてのファイルをチェック(&C)",
+  "{0} only includes other files": "{0} は他のファイルをインクルードするだけです",
+  "Opening {0}, which nothing calls.": "どこからも呼び出されていない {0} を開いています。",
+  "Open one of the subcircuits that nothing calls:": "どこからも呼び出されていないサブサーキットを1つ開いてください：",
+  "1 instance": "インスタンス 1 個",
+  "{0} instances": "インスタンス {0} 個",
+  "Kept: opens at once": "キャッシュ済み：すぐに開きます",
+  "Read in {0} s the last time": "前回の読み込みは {0} 秒"
 }

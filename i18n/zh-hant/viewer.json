@@ -815,5 +815,12 @@
   "Show the problems of every file read, not only of the file shown": "顯示每個已讀取檔案的問題，而不只是目前顯示的檔案",
   "Check All Files": "檢查所有檔案",
   "Read each file not read yet, for its problems": "讀取每個尚未讀取的檔案，找出其中的問題",
-  "&Check All Files": "檢查所有檔案(&C)"
+  "&Check All Files": "檢查所有檔案(&C)",
+  "{0} only includes other files": "{0} 只引入了其他檔案",
+  "Opening {0}, which nothing calls.": "正在開啟沒有被呼叫的 {0}。",
+  "Open one of the subcircuits that nothing calls:": "開啟一個沒有被呼叫的子電路：",
+  "1 instance": "1 個實例",
+  "{0} instances": "{0} 個實例",
+  "Kept: opens at once": "已快取：可立即開啟",
+  "Read in {0} s the last time": "上次讀取耗時 {0} 秒"
 }
