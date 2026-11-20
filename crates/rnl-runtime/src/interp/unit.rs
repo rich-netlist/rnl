@@ -668,13 +668,20 @@ impl Interp<'_> {
         self.sink.add(sev, code, msg, loc, Extra { in_package: pkg.to_string(), ..Extra::default() })
     }
 
-    /// Parse a record once: `%#3` is a number (5.9).
+    /// Parse a record once: `%#3` is a number (5.9). A text parsed before on this thread, by an
+    /// earlier reading or by the reading before this one that counts the objects (5.9), is not
+    /// parsed again ([`parsed`]). Within a reading every record has a parse of its own, even when
+    /// two records have the same text: statements, definitions and their errors are told apart by
+    /// where their parse is.
     pub(crate) fn parse(&mut self, rec: RecId) -> Rc<RecordAst> {
         if let Some(a) = &self.asts[rec] {
             return a.clone();
         }
         self.places.enabled = true;
-        let a = Rc::new(syntax::parse_record_language(&self.recs[rec].text, true, true));
+        let mut a = parsed(&self.recs[rec].text);
+        if !self.kept_parses.insert(Rc::as_ptr(&a)) {
+            a = Rc::new(syntax::parse_record_language(&self.recs[rec].text, true, true));
+        }
         self.asts[rec] = Some(a.clone());
         a
     }
@@ -2598,9 +2605,63 @@ pub fn type_name(t: &ParamType) -> &'static str {
     }
 }
 
+/// How much record text [`parsed`] keeps, in bytes: past it, what it keeps is dropped and it starts
+/// again. The records of a large design are a few megabytes.
+const PARSED_TEXT_LIMIT: usize = 64 << 20;
+
+/// The records parsed on a thread, by their whole text, and how many bytes of text they are.
+#[derive(Default)]
+struct ParsedRecords {
+    by_text: HashMap<Rc<str>, Rc<RecordAst>>,
+    bytes: usize,
+}
+
+thread_local! {
+    static PARSED: std::cell::RefCell<ParsedRecords> = std::cell::RefCell::new(ParsedRecords::default());
+}
+
+/// A record's text parsed with numbers and the forms of 0.4 (5.9), as
+/// [`syntax::parse_record_language`] parses it, kept on this thread by the whole text: a reading
+/// of a document, a second reading of it that counts the objects of the records (5.9), and later
+/// readings in the same Worker parse each text once. Parsing depends on the text alone, and a
+/// reading never changes what it gets: it changes a copy. A text that differs in any character is
+/// another key. A reading takes a kept parse for one record only ([`Interp::parse`]).
+pub(crate) fn parsed(text: &str) -> Rc<RecordAst> {
+    PARSED.with(|cell| {
+        let mut kept = cell.borrow_mut();
+        if let Some(a) = kept.by_text.get(text) {
+            return a.clone();
+        }
+        let a = Rc::new(syntax::parse_record_language(text, true, true));
+        if kept.bytes + text.len() > PARSED_TEXT_LIMIT {
+            kept.by_text.clear();
+            kept.bytes = 0;
+        }
+        kept.bytes += text.len();
+        kept.by_text.insert(Rc::from(text), a.clone());
+        a
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_text_parsed_before_is_the_same_parse_and_another_text_is_parsed_again() {
+        let text = "@RNL { #R1 @PLACE(0, 0); %#3 @SET-STYLE $grey }";
+        let first = parsed(text);
+        assert_eq!(*first, syntax::parse_record_language(text, true, true));
+        assert!(Rc::ptr_eq(&first, &parsed(text)));
+        // one character more is another text
+        let other = parsed("@RNL { #R1 @PLACE(0, 1); %#3 @SET-STYLE $grey }");
+        assert!(!Rc::ptr_eq(&first, &other));
+        assert_eq!(
+            *other,
+            syntax::parse_record_language("@RNL { #R1 @PLACE(0, 1); %#3 @SET-STYLE $grey }", true, true)
+        );
+        assert_ne!(*first, *other);
+    }
 
     #[test]
     fn similarity_like_difflib() {

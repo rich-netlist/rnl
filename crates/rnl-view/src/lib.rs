@@ -52,7 +52,8 @@ pub use document::{
     UnplacedDrawing, Usage, UsageRole,
 };
 pub use file_result::{
-    FileCall, FileChild, FileInput, FileInputs, FileOutline, FileResult, FileSymbols, SubcktSymbol, FILE_RESULT_FORMAT,
+    core_version, FileCall, FileChild, FileInput, FileInputs, FileOutline, FileResult, FileSymbols, SubcktSymbol,
+    FILE_RESULT_FORMAT,
 };
 pub use formats::{detect_format, formats, validate_format, FormatInfo};
 pub use library::{LibraryIndex, LibraryProvider};

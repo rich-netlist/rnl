@@ -158,6 +158,7 @@ fn a_file_read_alone_gives_its_levels_where_its_children_are_and_what_it_depends
         serde_json::json!([{ "master": "leaf", "file": "leaf.inc", "title": "leaf" }])
     );
     assert_eq!(v["inputs"]["format"], 1);
+    assert_eq!(v["inputs"]["core"], rnl_view::core_version().as_str());
     // the hashes are the outline's
     let outline = rnl_view::outline("/w/top.sp", &files, &options).unwrap();
     for i in v["inputs"]["files"].as_array().unwrap().iter().filter(|i| i["role"] != "package") {

@@ -76,7 +76,9 @@ pub struct Level {
     pub ports: Vec<String>,
     /// The subcircuit's own block symbol, an index into `Document::symbols`.
     pub symbol: Option<usize>,
-    /// The host level drawn, as `Object::level` names it.
+    /// The host level drawn, as `Object::level` names it: its index in the document's levels, which
+    /// the outline's levels follow. In a reading of one file ([`crate::build_file`]), in the
+    /// outline the result was read from.
     pub host: usize,
     pub title: String,
     /// "file" or "subckt".
@@ -318,8 +320,9 @@ pub struct Child {
     /// another file defines it.
     pub level: Option<usize>,
     /// In a reading of one file ([`crate::build_file`]), the level that defines the subcircuit, by
-    /// its index in the document's levels as `Level::host` and the outline's levels give it; left
-    /// out otherwise, and when the netlist does not define it.
+    /// its index in the document's levels as `Level::host` and the outline's levels give it, in the
+    /// outline the result was read from; left out otherwise, and when the netlist does not define
+    /// it.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub host: Option<usize>,
@@ -1516,6 +1519,23 @@ M1 d g s 0 nmos
             .hits
             .iter()
             .all(|h| h.objects.iter().all(|o| !["C1", "M1"].contains(&d.objects[*o].name.as_str()))));
+    }
+
+    #[test]
+    fn two_subcircuits_with_the_same_symbol_record_each_define_their_own_symbol() {
+        // the same text in two levels is two records, though their text is parsed once
+        let record = "* @RNL { %s = @DEFINE-SYMBOL(box=[-1, -1, 1, 1]) {(-1, 0) @PIN(terminal=\"a\"); (1, 0) @PIN(terminal=\"b\")}; # @SET-SYMBOL %s }";
+        let text = format!(
+            "* two symbols\nX1 n1 n2 sa\nX2 n2 0 sb\n.subckt sa a b\n{record}\nR1 a b 1k\n.ends\n.subckt sb a b\n{record}\nR1 a b 1k\n.ends\n.end\n"
+        );
+        let files = rnl_runtime::source::MemoryProvider::new().with("a.sp", &text);
+        for _ in 0..2 {
+            let d = crate::build("a.sp", &files, &BuildOptions::default()).unwrap();
+            let mut origins: Vec<&str> = d.symbols.iter().map(|s| s.origin.as_str()).collect();
+            origins.retain(|o| o.starts_with("Defined in"));
+            origins.sort_unstable();
+            assert_eq!(origins, ["Defined in sa", "Defined in sb"]);
+        }
     }
 
     #[test]

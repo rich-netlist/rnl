@@ -110,7 +110,9 @@ export type Level = {
    */
   symbol: number | null,
   /**
-   * The host level drawn, as `Object::level` names it.
+   * The host level drawn, as `Object::level` names it: its index in the document's levels, which
+   * the outline's levels follow. In a reading of one file ([`crate::build_file`]), in the
+   * outline the result was read from.
    */
   host: number,
   title: string,
@@ -426,8 +428,9 @@ export type Child = {
   level: number | null,
   /**
    * In a reading of one file ([`crate::build_file`]), the level that defines the subcircuit, by
-   * its index in the document's levels as `Level::host` and the outline's levels give it; left
-   * out otherwise, and when the netlist does not define it.
+   * its index in the document's levels as `Level::host` and the outline's levels give it, in the
+   * outline the result was read from; left out otherwise, and when the netlist does not define
+   * it.
    */
   host?: number,
   /**
@@ -1259,6 +1262,12 @@ export type OutlineCall = {
  * text, records and failed statements; its objects and spans are those of the file's levels,
  * numbered for this result alone; its diagnostics are those of the file's levels, and those of
  * reading the document that are about the file or the files it depends on ([`FileInputs`]).
+ *
+ * The indices of levels in it, `Level::host`, `Child::host` and [`FileChild::host`], and of files,
+ * `files` and the diagnostics' `file_index`, are those of the outline of the document the result
+ * was read from. Another file that gains or loses a subcircuit or an include moves them in the
+ * outline without changing the result: a frontend that keeps a result finds its levels again by
+ * their order among the file's levels, or by their file and title, and its files by their paths.
  */
 export type FileResult = {
   /**
@@ -1333,7 +1342,8 @@ export type FileChild = {
   master: string,
   /**
    * The level that defines it, by its index in the document's levels, as `Level::host` and the
-   * outline's levels give it; None when nothing defines it.
+   * outline's levels give it, in the outline the result was read from; None when nothing defines
+   * it. When the file defines the name more than once, the last.
    */
   host: number | null,
   /**
