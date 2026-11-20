@@ -9,9 +9,13 @@ import { append, m, setAttr, setText, tr } from "./i18n.js";
 // the kind's short name (`name`, such as param-wrong-type) and the line; the explanation, the message, is below it, when
 // the row is open. A click on a row shows its line in the text and opens or closes the row; the twisty only opens or closes.
 // (The levels are the one list SEVERITIES, which the violation of 0.4, between the error and the warning, is in.)
+// The reading of one file of a document of several (per-file loading, file-checks.js) lists the problems of that file;
+// the All Files switch of the heading adds those of the other files, as far as they were read, and says how far that
+// is; Check All Files reads the rest. The line numbers coloured are those of the problems listed.
 
 import { fileShown, markSourceDiagnostics, revealLine } from "./text.js";
 import { current, doc } from "./state.js";
+import { canCheckAll, checkAllFiles, otherFiles, readFileIndex, shownFileProblems } from "./file-checks.js";
 import { $, span } from "./util.js";
 import { shell } from "./shell.js";
 import { includePublicPackage } from "./pool.js";
@@ -99,20 +103,57 @@ function packageHint(d, version) {
   return li;
 }
 
-let diagnosticList = [];
+let given = []; // the problems of the Document shown, as renderDiagnostics was given them
+let diagnosticList = []; // those listed: of the file shown, and with All Files those of the other files
 let hints = []; // the geometry hints of the level shown
 let hintsOf = undefined; // the `hints` of the level they are from, to tell whether another level is shown
 let filter = null; // the severity whose count is on, so that only its rows are listed; null shows all
+let allFiles = false; // whether the problems of the other files of a document read one file at a time are listed
+let others = null; // what file-checks.js gives of those files: { list, checked, total, checking }, or null
 
 const hintsOfLevel = () => doc?.levels?.[current]?.hints;
 
+/** The problems listed, of `given`: all of them, or for the reading of one file, those of its file and, with All Files, of the others. */
+function scoped() {
+  others = readFileIndex(doc) < 0 ? null : otherFiles(doc);
+  if (!others) return given;
+  const own = shownFileProblems(doc, given);
+  return allFiles ? [...own, ...others.list] : own;
+}
+
+/** List the problems of the Document shown, `list`, and colour the numbers of their lines. */
 export function renderDiagnostics(list) {
   ++renderVersion;
-  diagnosticList = list;
+  given = list;
+  diagnosticList = scoped();
   hintsOf = hintsOfLevel();
   hints = hintsOf ?? [];
   refresh();
 }
+
+/** Edit > Check All Files: the problems of every file listed, and the files not read yet read for theirs (file-checks.js). */
+export function checkAll() {
+  if (readFileIndex(doc) < 0) return;
+  if (!allFiles) {
+    allFiles = true;
+    diagnosticList = scoped();
+    refresh();
+  }
+  return checkAllFiles();
+}
+
+/** The problems of the other files have changed: those of a file read, or Check All Files going on. */
+window.addEventListener("file-checks", () => {
+  if (!doc) return;
+  ++renderVersion;
+  diagnosticList = scoped();
+  if (!allFiles) return renderScope();
+  // the list grows as the files are checked: the rows read stay where they were
+  const top = body.scrollTop;
+  refresh();
+  while (more && body.scrollHeight - body.clientHeight < top) appendBatch();
+  body.scrollTop = top;
+});
 
 /** The geometry hints of another level, when one is shown. */
 function levelChanged() {
@@ -151,28 +192,67 @@ function refresh() {
   }
   appendBatch();
   renderCounts();
+  renderScope();
+  markDiagnostics(diagnosticList);
+}
+
+/**
+ * A button of the heading, `className` its class: as the heading is a button that folds the problems, a click on it,
+ * or Enter or Space, does `action` and does not fold them. `pressed` makes it a switch, on or off.
+ */
+function chip(className, text, title, action, pressed = null) {
+  const el = span(`${className} chip${pressed ? " on" : ""}`, text);
+  el.setAttribute("role", "button");
+  el.tabIndex = 0;
+  if (pressed !== null) el.setAttribute("aria-pressed", String(pressed));
+  if (title) setAttr(el, "title", title);
+  const act = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    action(document.activeElement === el);
+  };
+  el.addEventListener("click", act);
+  el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") act(e); });
+  return el;
 }
 
 /** One count of the heading, which is a switch: it shows only the rows of its severity, and all again. */
 function count(kind, text) {
-  const el = span(`n-${kind} chip${filter === kind ? " on" : ""}`, text);
-  el.setAttribute("role", "button");
-  el.tabIndex = 0;
-  el.setAttribute("aria-pressed", String(filter === kind));
-  setAttr(el, "title", m("Show only these; click again for all"));
-  const toggle = (e) => {
-    // the heading is a button that folds the problems: a switch in it does not
-    e.preventDefault();
-    e.stopPropagation();
-    const focused = document.activeElement === el;
+  return chip(`n-${kind}`, text, m("Show only these; click again for all"), (focused) => {
     filter = filter === kind ? null : kind;
     refresh();
     // the counts are made again: a switch that had the focus keeps it, for the keyboard
     if (focused) $("counts").querySelector(`.n-${kind}`)?.focus();
-  };
-  el.addEventListener("click", toggle);
-  el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") toggle(e); });
-  return el;
+  }, filter === kind);
+}
+
+/**
+ * The switch of the heading between the problems of the file shown and those of every file, for the reading of one file
+ * of a document of several: with every file, how many of the files were read, and Check All Files while some were not.
+ */
+function renderScope() {
+  const scope = $("problems-scope");
+  const focused = scope.contains(document.activeElement) ? document.activeElement.dataset.part : null;
+  scope.replaceChildren();
+  scope.hidden = !others;
+  if (!others) return;
+  const all = chip("all-files", m("All Files"), m("Show the problems of every file read, not only of the file shown"), () => {
+    allFiles = !allFiles;
+    diagnosticList = scoped();
+    refresh();
+    $("problems-scope").querySelector(".all-files")?.focus();
+  }, allFiles);
+  all.dataset.part = "all";
+  append(scope, all);
+  if (!allFiles) return;
+  const { checked, total, checking } = others;
+  append(scope, span("checked", checking ? m`Checking files: ${checking.done} of ${checking.total}` : m`${checked} of ${total} files checked`));
+  if (!checking && canCheckAll()) {
+    const check = chip("check-all", m("Check All Files"), m("Read each file not read yet, for its problems"), () => void checkAllFiles());
+    check.dataset.part = "check";
+    append(scope, check);
+  }
+  if (focused) (scope.querySelector(`[data-part="${focused}"]`) ?? scope.querySelector(".all-files"))?.focus();
 }
 
 function renderCounts() {

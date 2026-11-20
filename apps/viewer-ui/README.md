@@ -61,7 +61,8 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `edits.js` | Per-file editor text, applied text, saved snapshot and underlying source baseline; dirty/unapplied marks and the overlays to build or solve. |
 | `navigation.js`, `window-session.js` | The common navigation entry point and new-window session handoff (see [Navigation and new windows](#navigation-and-new-windows)). |
 | `editor.js` | Editing the text: the netlist pane switched to edit, a text box and line numbers for each file, the state above the text, Apply Changes, Save and Save As, and asking before changes not saved are left (see [Editing the text](#editing-the-text)). |
-| `problems.js` | The problems list, its counts by severity (switches that show only the rows of a severity) and the coloured line numbers; the geometry hints of the level shown are rows of the list (see below); each row names its kind. |
+| `problems.js` | The problems list, its counts by severity (switches that show only the rows of a severity) and the coloured line numbers; the geometry hints of the level shown are rows of the list (see below); each row names its kind. For the reading of one file, the All Files switch and Check All Files. |
+| `file-checks.js` | The problems of each file of a document read one file at a time, as its own reading gave them, for All Files, and Edit › Check All Files, which reads the files not read yet (see [Reading the file shown alone](#reading-the-file-shown-alone)). |
 | `formats.js` | The parse format chosen for each file in the Library, kept by path under `file-formats`, and the core's list of formats, whose titles it translates where they are words (`formatTitle`: Text; SPICE and Spectre are names); the choices that every request to the core carries (see **Parse formats**, after the Library's paragraphs). |
 | `package-offers.js` | Background web lookup of explicit missing packages and navigation-safe Library confirmations. |
 | `hierarchy.js` | The hierarchy view: the instance tree, with below it the subcircuits that the top level does not call as trees of their own, and the subcircuit index with its search and initials. |
@@ -146,8 +147,20 @@ view of it: the entry's source with `view`, the file as the document names it (`
   the host levels it names. Reload reads the file again and keeps the new reading; a reading of a document that
   misses a file is not kept. The core shown holds no drawings of a kept reading's objects without a position: the
   Not drawn list has it read the file again first.
-- **What is not there yet**: the problems are those of the file shown; an entry that only includes others opens on
-  its own empty level; the limits of the readings kept are not set in the page yet.
+- **The problems** (`file-checks.js`, `problems.js`) are those of the file shown: the reading of a file has the
+  problems of the files above it too, which it reads in its context, and of the packages it uses; the list has those
+  of its own file, of no file and of a package. **All Files**, a switch at the right of the problems' heading, adds
+  those of the other files of the document, each as its own reading gave them, when it was shown or checked, or as
+  the outline gives them (reading the netlist: an include not found, a subcircuit defined twice) for a file not read
+  yet, and says how many of the files were read ("2 of 3 files checked"). **Edit › Check All Files** (and the button
+  beside the count) reads the files not read yet, one by one, in the background, alone in the context of the entry
+  and with the edits applied (`shell.checkFiles`), most of them kept from before; the count goes up as each is read.
+  What is kept belongs to the document as it is (its entry and the text of each file, the outline's hashes): a file
+  changed, edited or included anew, or a package that a reading used read with another text, starts it again. The
+  numbers of the lines are coloured by the problems listed. The desktop reads the whole document, whose list has the
+  problems of every file, and has no switch.
+- **What is not there yet**: an entry that only includes others opens on its own empty level; the limits of the
+  readings kept are not set in the page yet.
 
 Problems retains the complete diagnostic list and total counts, but initially creates only 100
 rows. Scrolling near the bottom, or activating the button there, appends the next 100. This keeps

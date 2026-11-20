@@ -20,6 +20,8 @@ import { closePreview, saveSolved, solve } from "./solve.js";
 import { settings } from "./solve-settings.js";
 import { doc, selected } from "./state.js";
 import { findInSource } from "./text.js";
+import { checkAll } from "./problems.js";
+import { canCheckAll } from "./file-checks.js";
 import { canEditParams, editParameters } from "./params.js";
 import { ascend, canOpen, descend } from "./subcircuits.js";
 import { checkForUpdates } from "./updates.js";
@@ -113,6 +115,7 @@ export function command(id, options = {}) {
     case "apply-edits": applyChanges(); break;
     case "discard-edits": discardChanges(); break;
     case "find-text": return findInSource();
+    case "check-all-files": showPane("netlist"); setProblems(true); return checkAll();
     case "fit": fit(); break;
     case "zoom-in": zoomCenter(1.25); break;
     case "zoom-out": zoomCenter(0.8); break;
@@ -213,7 +216,7 @@ export function isChecked(id) {
   return checks.get(id) === true;
 }
 
-export const isEnabled = (id) => id === "panel-hide" ? !$("app").classList.contains("sidebar-hidden") : id === "find-text" ? !!doc && !editing : id === "edit-params" ? canEditParams() : id !== "descend-new-window" || canOpen(selected);
+export const isEnabled = (id) => id === "check-all-files" ? canCheckAll() : id === "panel-hide" ? !$("app").classList.contains("sidebar-hidden") : id === "find-text" ? !!doc && !editing : id === "edit-params" ? canEditParams() : id !== "descend-new-window" || canOpen(selected);
 export function setEnabled(id, enabled) {
   shell?.setEnabled?.(id, enabled);
 }
