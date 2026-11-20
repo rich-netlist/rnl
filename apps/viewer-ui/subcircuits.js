@@ -1,7 +1,9 @@
 import { append, m, setAttr, setText } from "./i18n.js";
 // The bar records visits, not the document's include scope. Only descent extends it;
 // other navigation starts a new chain. Ancestors retain their entry source and title so
-// crossing a file boundary can rebuild independently and still return to that visit.
+// crossing a file boundary can rebuild independently and still return to that visit. A shell
+// that reads the file shown alone (`shell.perFile`) crosses into another file of the same
+// document as a view of that file in the context of the entry (visit-source.js `fileView`).
 
 import { choose } from "./dialog.js";
 import { shell } from "./shell.js";
@@ -13,7 +15,8 @@ import { clearSelection, select } from "./selection.js";
 import { revealDefinition } from "./text.js";
 import { navigate } from "./navigation.js";
 import { currentSource } from "./open.js";
-import { sameSource, sourceKey } from "./visit-source.js";
+import { fileView, sameEntry, sameSource, sourceKey } from "./visit-source.js";
+import { levelTree, localLevel } from "./level-tree.js";
 import { $, span } from "./util.js";
 
 const bar = $("level-path");
@@ -38,8 +41,24 @@ export function candidatesOf(o) {
   return child?.candidates?.length > 1 ? child.candidates : [];
 }
 
-/** Whether an instance can be entered: it has a definition, or has several to choose from. */
-export const canOpen = (o) => opens(o) !== null || candidatesOf(o).length > 1;
+/**
+ * Where the subcircuit of instance `o` is defined when another file of the document defines it, in a reading of the
+ * file shown alone (`Child.host`): `{ file, title }`, the file as the document names it; else null.
+ */
+export function definedElsewhere(o) {
+  const obj = doc && o !== null && o !== undefined ? doc.objects[o] : null;
+  if (!obj || obj.kind !== "instance" || (obj.opens !== null && obj.opens !== undefined) || !doc.outline) return null;
+  const child = doc.levels.find((l) => l.host === obj.level)?.children.find((c) => c.instance === obj.name);
+  if (child?.host === undefined || child.host === null) return null;
+  const node = levelTree().nodes[child.host];
+  return node && node.file !== null ? { file: node.file, title: node.title } : null;
+}
+
+/** Whether an instance can be entered: it has a definition, in this file or another, or has several to choose from. */
+export const canOpen = (o) => opens(o) !== null || definedElsewhere(o) !== null || candidatesOf(o).length > 1;
+
+/** The source of the view of the file `file` of the document shown, as the document names it, in the context of its entry. */
+export const viewOfFile = (file) => fileView(currentSource(), file, doc.outline?.files[0]?.path);
 
 /** The level a title names: exactly, or else, when only one level has it, by the title in any case, as SPICE names it. */
 export function levelNamed(title) {
@@ -128,8 +147,16 @@ async function chooseDefinition(o, options) {
 /** Open the subcircuit of instance `o`, below the level that has the instance; with several definitions, the one chosen. */
 export function descend(o, options) {
   const level = opens(o);
-  if (level === null) return chooseDefinition(o, options);
+  const elsewhere = level === null ? definedElsewhere(o) : null;
+  if (level === null && !elsewhere) return chooseDefinition(o, options);
   const obj = doc.objects[o];
+  if (elsewhere) {
+    // another file defines it: that file's view, in the context of the entry, with the parameters of the instance
+    const at = doc.levels[current].host === obj.level ? current : doc.levels.findIndex((l) => l.host === obj.level);
+    if (!options?.newWindow) window.dispatchEvent(new Event("viewer-navigate"));
+    const step = { title: elsewhere.title, via: obj.name };
+    return navigate({ source: viewOfFile(elsewhere.file), path: at < 0 ? [step] : [...cutTo(at), step], selection: null, reveal: true, ...parametersOf(obj) }, options);
+  }
   // the instance is on the level shown, or on one that the path is cut back to or starts at
   const at = doc.levels[current].host === obj.level ? current : doc.levels.findIndex((l) => l.host === obj.level);
   if (!options?.newWindow) window.dispatchEvent(new Event("viewer-navigate"));
@@ -155,14 +182,28 @@ export function goTo(level, selection, options) {
 
 /** A tree pick is a new visit head, not a descent through its displayed ancestors. */
 export function enterRow(row, options = {}) {
+  const { nodes, top } = levelTree();
   const [start, ...rest] = row.split("/");
-  const next = [{ level: start.startsWith("r") ? Number(start.slice(1)) : 0, via: null }];
+  let host = start.startsWith("r") ? Number(start.slice(1)) : top;
   for (const k of rest.map(Number)) {
-    const child = doc.levels[next[next.length - 1].level].children[k];
-    if (!child || child.level === null) return;
-    next.push({ level: child.level, via: child.instance });
+    const child = nodes[host]?.children[k];
+    if (!child || child.host === null) return;
+    host = child.host;
   }
-  return enterRoot(next.at(-1).level, options);
+  return enterHost(host, options);
+}
+
+/**
+ * Show a level by its host level as the root of the path, as `enterRoot` does: one of the Document shown, or, for a
+ * shell that reads the file shown alone, one of another file, in that file's view.
+ */
+export function enterHost(host, options = {}) {
+  const level = localLevel(host);
+  if (level >= 0) return enterRoot(level, options);
+  const node = levelTree()?.nodes[host];
+  if (!node || node.file === null || !doc.outline) return;
+  if (!options.newWindow) window.dispatchEvent(new Event("viewer-navigate"));
+  return navigate({ source: viewOfFile(node.file), path: [{ title: node.title, via: null }], reveal: true }, options);
 }
 
 /**
@@ -183,14 +224,22 @@ export function enterRoot(level, options = {}) {
  * that the top level does not call, as "r3/0"; otherwise null.
  */
 export function pathRow() {
-  const local = path.slice(path.findLastIndex(s => !sameSource(s.entry, currentSource())) + 1);
+  // the visits of this document: of this source, or of any view of its entry when the shell reads the file shown alone
+  const ours = (s) => (doc?.outline ? sameEntry : sameSource)(s.entry, currentSource());
+  const local = path.slice(path.findLastIndex(s => !ours(s)) + 1);
   if (local.length === 0) return null;
-  const first = local[0].level;
-  if (first !== 0 && !uncalledRoots().includes(first)) return null;
-  const row = [first === 0 ? "0" : rootPath(first)];
+  const { nodes, top } = levelTree();
+  const titled = (s) => nodes.findIndex((n, h) => n && n.title === s.title && (h === top || uncalledRoots().includes(h)));
+  const shown = (s) => sameSource(s.entry, currentSource()) && s.level >= 0;
+  let host = shown(local[0]) ? doc.levels[local[0].level]?.host : titled(local[0]);
+  if (host !== top && !uncalledRoots().includes(host)) return null;
+  const row = [host === top ? "0" : rootPath(host)];
   for (let d = 1; d < local.length; d++) {
-    const k = doc.levels[local[d - 1].level]?.children.findIndex(c => c.instance === local[d].via && c.level === local[d].level) ?? -1;
+    const s = local[d];
+    const k = nodes[host]?.children.findIndex(c => c.instance === s.via && c.host !== null &&
+      (shown(s) ? c.host === doc.levels[s.level]?.host : nodes[c.host]?.title === s.title)) ?? -1;
     if (k < 0) return null;
+    host = nodes[host].children[k].host;
     row.push(String(k));
   }
   return row.join("/");

@@ -219,6 +219,22 @@ test("writeManifest gives a manifest that reads back to the same files", async (
   assert.equal(links.files[0].url, "https://example.test/top.scs");
 });
 
+test("the file of the level is kept when it is not the entry, and must be one of the files; a manifest without it means the entry", async () => {
+  const encode = (text) => new TextEncoder().encode(text);
+  const files = Object.entries(FILES).map(([path, text]) => ({ path, bytes: encode(text) }));
+  const written = await writeManifest({ archive: true, entry: "top.scs", level: "amp", file: "cells/amp.scs", files });
+  assert.equal(written.file, "cells/amp.scs");
+  const read = await loadManifest(JSON.parse(JSON.stringify(written)), { readFile: async (path) => encode(FILES[path]) });
+  assert.equal(read.entry, "/top/top.scs");
+  assert.equal(read.file, "/top/cells/amp.scs");
+  // the entry itself, or none: not written, and read as none
+  assert.equal("file" in await writeManifest({ archive: true, entry: "top.scs", level: "amp", file: "top.scs", files }), false);
+  const plain = await writeManifest({ archive: true, entry: "top.scs", level: "amp", files });
+  assert.equal("file" in plain, false);
+  assert.equal(checkManifest(plain, { archive: true }).file, null);
+  assert.throws(() => checkManifest({ ...written, file: "cells/other.scs" }, { archive: true }), /The file shown cells\/other.scs is not among the manifest's files/);
+});
+
 test("a file is decoded as client.js decodeText decodes it: UTF-8 without a BOM, else Latin-1", async () => {
   const { decodeText } = await import("../js/client.js");
   const samples = [

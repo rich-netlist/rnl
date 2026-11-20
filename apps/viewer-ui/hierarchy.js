@@ -6,11 +6,13 @@ import { append, m, setAttr, setText } from "./i18n.js";
 //
 // The paths of the rows: "0" is the top level and "0/1/0" the first instance of the second instance
 // of the top level; "r3/0" is the first instance of the subcircuit 3 that the top level does not
-// call (roots.js).
+// call (roots.js). Levels are named by their host levels (level-tree.js): the tree lists the levels
+// of every file, also of those a shell that reads the file shown alone has not read.
 
 import { current, doc, expanded } from "./state.js";
 import { uncalledRoots } from "./roots.js";
-import { enterRoot, enterRow, pathRow } from "./subcircuits.js";
+import { hostOf, levelTree } from "./level-tree.js";
+import { enterHost, enterRow, pathRow } from "./subcircuits.js";
 import { $, span } from "./util.js";
 
 let active = null; // the tree row of the level shown: its path's, or else the first that reaches it
@@ -34,9 +36,10 @@ export function rootPath(level) {
 function renderTree() {
   const tree = $("tree");
   tree.replaceChildren();
-  if (!doc || doc.levels.length === 0) return;
+  const levels = levelTree();
+  if (!doc || doc.levels.length === 0 || !levels.nodes[levels.top]) return;
   const walk = (level, path, depth, child, above) => {
-    const lv = doc.levels[level];
+    const lv = levels.nodes[level];
     const cycle = above.includes(level);
     const branches = cycle ? [] : lv.children;
     const open = branches.length > 0 && expanded.has(path);
@@ -44,11 +47,11 @@ function renderTree() {
     if (!open) return;
     branches.forEach((c, k) => {
       const p = `${path}/${k}`;
-      if (c.level === null) append(tree, treeRow({ level: null, path: p, depth: depth + 1, child: c, branches: 0 }));
-      else walk(c.level, p, depth + 1, c, above.concat(level));
+      if (c.host === null || !levels.nodes[c.host]) append(tree, treeRow({ level: null, path: p, depth: depth + 1, child: c, branches: 0 }));
+      else walk(c.host, p, depth + 1, c, above.concat(level));
     });
   };
-  walk(0, "0", 0, null, []);
+  walk(levels.top, "0", 0, null, []);
   const roots = uncalledRoots();
   if (roots.length === 0) return;
   const heading = document.createElement("div");
@@ -77,13 +80,15 @@ function treeRow({ level, path, depth, child, branches, open, cycle }) {
     });
   }
   append(row, twisty);
+  const { nodes } = levelTree();
   if (child === null) {
-    append(row, span("inst", doc.levels[0].title), span("badge", m("top")));
+    append(row, span("inst", nodes[level].title), span("badge", m("top")));
   } else if (child === ROOT) {
-    append(row, span("inst", doc.levels[level].title), span("badge", m("not called")));
-    setAttr(row, "title", m`No instance calls ${doc.levels[level].title}`);
+    append(row, span("inst", nodes[level].title), span("badge", m("not called")));
+    setAttr(row, "title", m`No instance calls ${nodes[level].title}`);
   } else {
-    append(row, span("inst", child.instance), span("master", child.master));
+    // a name the netlist does not define, from the outline: one row for all its instances
+    append(row, span("inst", child.instance ?? `${child.count}×`), span("master", child.master));
     if (level === null) append(row, span("badge", m("not defined")));
     if (cycle) append(row, span("badge", m("recursive")));
   }
@@ -93,7 +98,7 @@ function treeRow({ level, path, depth, child, branches, open, cycle }) {
     return row;
   }
   row.dataset.level = String(level);
-  if (level === current) row.classList.add("current");
+  if (level === hostOf(current)) row.classList.add("current");
   if (path === active) row.classList.add("active");
   row.addEventListener("click", (e) => openLevel(level, path, { newWindow: e.shiftKey }));
   row.addEventListener("dblclick", () => { if (branches) toggleBranch(path); });
@@ -107,22 +112,23 @@ function toggleBranch(path) {
 }
 
 /**
- * The first path in the tree that reaches `level`, from the top level and else from the roots of the
+ * The first path in the tree that reaches the host level `level`, from the top level and else from the roots of the
  * subcircuits it does not call; or null.
  */
 export function pathTo(level) {
+  const { nodes, top: start } = levelTree();
   const find = (l, path, above) => {
     if (l === level) return path;
-    if (above.includes(l)) return null;
-    const kids = doc.levels[l].children;
+    if (above.includes(l) || !nodes[l]) return null;
+    const kids = nodes[l].children;
     for (let k = 0; k < kids.length; k++) {
-      if (kids[k].level === null) continue;
-      const p = find(kids[k].level, `${path}/${k}`, above.concat(l));
+      if (kids[k].host === null) continue;
+      const p = find(kids[k].host, `${path}/${k}`, above.concat(l));
       if (p) return p;
     }
     return null;
   };
-  const top = find(0, "0", []);
+  const top = find(start, "0", []);
   if (top) return top;
   for (const r of uncalledRoots()) {
     const p = find(r, rootPath(r), []);
@@ -138,12 +144,13 @@ function renderIndex() {
   list.replaceChildren();
   letters.replaceChildren();
   setText($("index-count"), "");
-  if (!doc || doc.levels.length === 0) return;
+  const { nodes, top } = levelTree() ?? {};
+  if (!doc || doc.levels.length === 0 || !nodes[top]) return;
   const q = $("search").value.trim().toLowerCase();
-  const uses = doc.levels.map(() => 0);
-  for (const lv of doc.levels) for (const c of lv.children) if (c.level !== null) uses[c.level]++;
-  append(list, indexRow(0, "", null));
-  const all = doc.levels.map((l, k) => ({ title: l.title, k })).filter((x) => x.k !== 0);
+  const uses = [];
+  for (const lv of nodes) for (const c of lv?.children ?? []) if (c.host !== null) uses[c.host] = (uses[c.host] ?? 0) + 1;
+  append(list, indexRow(top, "", null));
+  const all = nodes.flatMap((l, k) => (l && k !== top ? [{ title: l.title, k }] : []));
   const shown = all
     .filter((x) => !q || x.title.toLowerCase().includes(q))
     .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true }));
@@ -165,7 +172,7 @@ function renderIndex() {
       b.addEventListener("click", () => scrollToGroup(list, h));
       append(letters, b);
     }
-    append(list, indexRow(x.k, q, uses[x.k]));
+    append(list, indexRow(x.k, q, uses[x.k] ?? 0));
   }
   if (all.length > 0 && shown.length === 0) {
     const p = document.createElement("div");
@@ -192,13 +199,14 @@ function initialOf(name) {
 }
 
 function indexRow(level, q, count) {
+  const { nodes, top } = levelTree();
   const row = document.createElement("div");
-  row.className = level === 0 ? "index-row top" : "index-row";
+  row.className = level === top ? "index-row top" : "index-row";
   row.setAttribute("role", "option");
   row.dataset.level = String(level);
   const name = document.createElement("span");
   name.className = "name";
-  const title = doc.levels[level].title;
+  const title = nodes[level].title;
   const at = q ? title.toLowerCase().indexOf(q) : -1;
   if (at >= 0) {
     const m = document.createElement("mark");
@@ -208,9 +216,9 @@ function indexRow(level, q, count) {
     setText(name, title);
   }
   append(row, name);
-  if (level === 0) append(row, span("uses", m("top level")));
+  if (level === top) append(row, span("uses", m("top level")));
   else append(row, span("uses", count === 1 ? m("1 use") : m`${count} uses`));
-  if (level === current) {
+  if (level === hostOf(current)) {
     row.classList.add("current");
     row.setAttribute("aria-selected", "true");
   }
@@ -219,7 +227,7 @@ function indexRow(level, q, count) {
 }
 
 /**
- * Open a level from the hierarchy: from a tree row (`path`), by the way to it from the top level, or
+ * Open a level from the hierarchy, by its host level: from a tree row (`path`), by the way to it from the top level, or
  * from the index (null), as the root of the path (subcircuits.js). A pick of the path shown already
  * changes nothing, and the tree is not drawn again, so that the second click of a double click
  * presses the row the first did: Firefox sends no dblclick to a row that is out of the page.
@@ -227,7 +235,7 @@ function indexRow(level, q, count) {
 export function openLevel(level, path, options) {
   if (!doc) return;
   if (path !== null) enterRow(path, options);
-  else enterRoot(level, options);
+  else enterHost(level, options);
 }
 
 /**
@@ -236,7 +244,7 @@ export function openLevel(level, path, options) {
  */
 export function updateHierarchy() {
   if (!doc) return;
-  active = pathRow() || pathTo(current);
+  active = pathRow() || pathTo(hostOf(current));
   if (active) {
     const parts = active.split("/");
     for (let k = 1; k < parts.length; k++) expanded.add(parts.slice(0, k).join("/"));

@@ -53,6 +53,15 @@ function levelName() {
   return level?.kind === "subckt" ? level.title : "(top)";
 }
 
+/**
+ * The file shown, as the Library names it, when it is not the entry: a file read alone in the context of its entry
+ * (per-file loading), which a project opens in that context again; null otherwise.
+ */
+function shownPath() {
+  const shown = doc?.file ? doc.files.find((f) => f.path === doc.file) : null;
+  return shown && shown !== doc.files[0] ? canonical(sourcePath(doc, shown)) : null;
+}
+
 /** The path of the file the document shown was read from, as the Library names it. */
 function entryPath(source) {
   if (doc?.files[0]) {
@@ -104,6 +113,7 @@ function projectContents() {
     }
   }
   const entry = entryPath(source);
+  const shown = shownPath();
   const names = relativeNames(files.map((file) => file.path));
   const byPath = new Map(files.map((file, k) => [file.path, k]));
   const pool = [...(external ? source.pool : []), ...items.map((item) => canonical(item.path))]
@@ -139,6 +149,7 @@ function projectContents() {
     pool: searched.map((k) => entries[k].name),
     formats,
     level: levelName(),
+    file: shown === null ? null : entries[byPath.get(shown)]?.name ?? null,
     paths: paths.map(({ dir, subfolders }) => ({ path: dir, subfolders })),
     settings: { autoInclude: load("auto-include", true) === true },
     name: stem(entry),
@@ -153,7 +164,7 @@ async function projectZip(contents) {
     catch (error) { throw new Error(`${e.path}: ${error.message || error}`); }
   }
   const manifest = await writeManifest({ archive: true, entry: contents.entry, files, pool: contents.pool, formats: contents.formats,
-    level: contents.level, paths: contents.paths, settings: contents.settings, display: contents.display });
+    level: contents.level, file: contents.file, paths: contents.paths, settings: contents.settings, display: contents.display });
   const json = `${JSON.stringify(manifest, null, 2)}\n`;
   // (the names are those of the manifest, made once by archiveNames: the archive writes them as they are)
   return libraryZip([{ path: PROJECT_MANIFEST, read: () => json }, ...files.map((f) => ({ path: f.member, read: () => f.bytes }))], { named: true });
@@ -228,7 +239,8 @@ export async function openProject() {
     setSidebar(true);
     setPane("files");
     if (await openSource(source, false, undefined, false, null, null, true)) {
-      await showLevel(read.level);
+      // a level of a file the entry includes opens in the context of the entry, as it was shown
+      await showLevel(read.level, read.file);
       const files = new Set(Object.keys(read.files).map((path) => path.replace(/\\/g, "/")));
       await offerDisplay(read.display, picked.name, read.displayIgnored, (path) => files.has(path.replace(/\\/g, "/")));
     }
@@ -289,7 +301,7 @@ export async function downloadManifest() {
       files.push({ path: e.name, bytes, url });
     }
     const manifest = await writeManifest({ entry: contents.entry, files, pool: contents.pool, formats: contents.formats, level: contents.level,
-      settings: contents.settings, display, id: contents.name });
+      file: contents.file, settings: contents.settings, display, id: contents.name });
     await shell.saveManifest(`${contents.name}.json`, `${JSON.stringify(manifest, null, 2)}\n`);
     note(m`Downloaded the manifest of ${files.length} files.`);
   } catch (error) {

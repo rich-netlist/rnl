@@ -297,19 +297,25 @@ test('canceling the save picker reads nothing, and an unreadable file fails with
 test('Open Project reads a project back: its Library, its entry, its level and the formats chosen', async ({ page }) => {
   await start(page, '?url=samples/cases/04-hierarchy.sp');
   await ready(page);
-  const sub = await page.evaluate(() => window.viewer.doc.levels.findIndex((l) => l.kind === 'subckt'));
-  const title = await page.evaluate((level) => window.viewer.doc.levels[level].title, sub);
-  // the subcircuit is in the included file, which opens as the document shown: the project's entry
-  await page.evaluate(async (level) => {
+  // the subcircuit of the included file, which the outline has (the document shown has the levels of its own file)
+  const sub = await page.evaluate(() => {
+    const { outline } = window.viewer.doc;
+    return outline.levels.findIndex((l) => l.kind === 'subckt' && outline.files[l.file].path.endsWith('-lib.inc'));
+  });
+  const title = await page.evaluate((host) => window.viewer.doc.outline.levels[host].title, sub);
+  // it opens with its file shown, read in the context of the entry, which stays the project's entry
+  await page.evaluate(async (host) => {
     await (await import('./formats.js')).chooseFormat('/samples/cases/04-hierarchy.sp', 'spice');
-    await (await import('./subcircuits.js')).enterRoot(level);
+    await (await import('./subcircuits.js')).enterHost(host);
   }, sub);
   await expect.poll(() => page.evaluate(() => window.viewer.doc.levels[window.viewer.level].title)).toBe(title);
   await ready(page);
   const document = await page.evaluate(() => window.viewer.doc);
+  expect(document.file).toBe('04-hierarchy-lib.inc');
   const out = await project(page);
-  expect(out.manifest.entry).toBe('samples/cases/04-hierarchy-lib.inc');
+  expect(out.manifest.entry).toBe('samples/cases/04-hierarchy.sp');
   expect(out.manifest.level).toBe(title);
+  expect(out.manifest.file).toBe('samples/cases/04-hierarchy-lib.inc');
   // a new page, with nothing of the first, opens it
   await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
   await page.route('**/samples/**', route => route.abort());
@@ -317,9 +323,12 @@ test('Open Project reads a project back: its Library, its entry, its level and t
   await ready(page);
   await expect.poll(() => page.evaluate(() => window.viewer.doc.levels[window.viewer.level].title)).toBe(title);
   const opened = await page.evaluate(() => window.viewer.doc);
+  // the file of the level, read in the context of the entry again: the same files, texts and problems
+  expect(opened.file).toBe('04-hierarchy-lib.inc');
+  expect(opened.outline.files.map((f) => f.path)).toEqual(document.outline.files.map((f) => f.path));
   expect(opened.files.map((f) => f.text)).toEqual(document.files.map((f) => f.text));
-  const errors = (d) => d.diagnostics.filter((x) => x.severity === 'error').map((x) => x.message);
-  expect(errors(opened)).toEqual(errors(document));
+  const problems = (d) => d.diagnostics.map((x) => [x.severity, x.message, x.line ?? null]);
+  expect(problems(opened)).toEqual(problems(document));
   await page.locator('#tab-files').click();
   // the files go under the archive's name, as a folder's do; the pool's are the Library's files
   const root = out.name.replace(/\.zip$/, '');

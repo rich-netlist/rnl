@@ -251,7 +251,7 @@ test("the parameters of a subcircuit entered through an instance are built again
   await expect(params.nth(1)).toHaveText("l = {2*nothing} ?changed");
 });
 
-test("a subcircuit defined in a Library file opens as a view of that file with the parameters its instance writes", async ({ page }) => {
+test("a subcircuit defined in a Library file opens as a view of that file, in the context of the entry, with the parameters its instance writes", async ({ page }) => {
   await start(page);
   await page.locator("#include-input").setInputFiles([{ name: "amp.inc", mimeType: "text/plain", buffer: Buffer.from("* library\n.subckt amp a b wn=1u l=0.18u\nR1 a b 1k\n.ends\n") }]);
   await expect(page.getByRole("button", { name: "Exclude amp.inc", exact: true })).toBeVisible();
@@ -265,7 +265,8 @@ test("a subcircuit defined in a Library file opens as a view of that file with t
   await page.evaluate(() => { window.seen = new WeakSet([window.viewer.doc]); });
   await page.keyboard.press("e");
   const entered = await shown(page);
-  expect(entered.path).toMatch(/amp\.inc$/);
+  expect(entered.path).toBe("/top.netlist");
+  expect(entered.file).toMatch(/amp\.inc$/);
   await expect(page.locator("#level-name")).toHaveText("amp");
   await expect(page.locator("#params-bar .param")).toHaveText(["wn = 2ufrom X1", "l = 0.18udefault"]);
   // the file is built with the values bound, which changes no more than the lists of parameters
@@ -395,8 +396,9 @@ const descendNamed = (page, name) => page.evaluate(async name => {
 }, name);
 const visitTitles = page => page.locator('#level-path .crumb').evaluateAll(es => es.map(e => e.querySelector('.name, #level-name')?.textContent));
 
-for (const method of ['descend', 'tree', 'index', 'source', 'include']) {
-  test(`cross-file ${method} opens independently, joins Files and starts the correct history`, async ({page}) => {
+// (the text of a file not read names no objects: its spans are in that file's reading, so a click in it opens nothing)
+for (const method of ['descend', 'tree', 'index', 'include']) {
+  test(`cross-file ${method} reads that file in the context of the entry, adds nothing to Files and starts the correct history`, async ({page}) => {
     await page.addInitScript(() => localStorage.setItem('auto-include', 'false'));
     await start(page);
     await opened(page, () => page.locator('#file-input').setInputFiles(Object.entries(visitFiles).map(([name,text]) =>
@@ -411,28 +413,24 @@ for (const method of ['descend', 'tree', 'index', 'source', 'include']) {
         return page.locator(method === 'tree' ? '.tree-row[data-path="0/0"]' : '.index-row').filter({hasText:/cell/}).first().click();
       }
       await page.locator('#tab-netlist').click();
-      if (method === 'include') return page.locator('.include-link').filter({hasText:'cell.inc'}).click();
-      await showSource(page, 'cell.inc');
-      return page.locator('#source .file:not([hidden]) .obj').filter({hasText:'Xleaf'}).first().click();
+      return page.locator('.include-link').filter({hasText:'cell.inc'}).click();
     });
-    expect(child.path).toBe('/cell.inc');
-    expect(child.files.map(f => f.name)).toEqual(['cell.inc']);
+    // the entry stays, and the file read is cell.inc: the other files are the entry's, and leaf in leaf.inc
+    expect(child.path).toBe('/visit-top.sp');
+    expect(child.file).toBe('cell.inc');
+    expect(child.files.map(f => f.name)).toEqual(['visit-top.sp', 'cell.inc', 'leaf.inc']);
     expect(child.objects.find(o => o.name === 'Xleaf').opens).toBeNull();
-    expect(child.levels.some(l => l.title === 'leaf')).toBe(false);
-    await expect(page.locator('#pool-list .pool-row')).toHaveCount(2);
+    expect(child.levels.map(l => l.title)).toEqual(['cell']);
+    await expect(page.locator('#netlist-file')).toHaveText(/cell\.inc$/);
+    await expect(page.locator('#pool-list .pool-row')).toHaveCount(1);
     expect(await visitTitles(page)).toEqual(method === 'descend' ? ['visit-top.sp','cell'] : ['cell']);
     await expect(page.locator('#auto-include')).not.toBeChecked();
     if (method !== 'descend') { await expect(page.locator('#up')).toBeHidden(); return; }
-    // Reloading changes include scope but keeps visit history. The Library index may resolve leaf.
-    await page.locator('#tab-netlist').click();
-    await opened(page, () => page.locator('#include-input').setInputFiles({ name:'leaf.inc', mimeType:'text/plain', buffer:Buffer.from(visitFiles['leaf.inc']) }));
-    await page.locator('#tab-netlist').click();
-    const auto = await opened(page, () => page.locator('#auto-include').check());
-    expect(auto.objects.find(o => o.name === 'Xleaf').opens).not.toBeNull();
-    expect(auto.diagnostics.some(d => d.message.includes('by Auto Include'))).toBe(true);
+    // on down into the third file, and back up the path to the entry, with its view and the instance left through
     await opened(page, () => descendNamed(page, 'Xleaf'));
     expect(await visitTitles(page)).toEqual(['visit-top.sp','cell','leaf']);
-    await expect(page.locator('#pool-list .pool-row')).toHaveCount(3);
+    expect(await page.evaluate(() => window.viewer.doc.file)).toBe('leaf.inc');
+    await expect(page.locator('#pool-list .pool-row')).toHaveCount(1);
     await opened(page, () => page.locator('#level-path .crumb[data-depth="0"]').click());
     expect(await visitTitles(page)).toEqual(['visit-top.sp']);
     expect(await page.locator('#canvas > svg').getAttribute('viewBox')).toBe(view);
@@ -440,13 +438,10 @@ for (const method of ['descend', 'tree', 'index', 'source', 'include']) {
     await opened(page, () => descendNamed(page, 'Xcell'));
     await opened(page, () => page.locator('#up').click());
     expect(await visitTitles(page)).toEqual(['visit-top.sp']);
-    await page.locator('#tab-files').click();
-    await opened(page, () => page.getByRole('button', {name:'Open cell.inc',exact:true}).click());
-    expect(await visitTitles(page)).toEqual(['cell']);
   });
 }
 
-test('a URL descent transfers independent scope and visit history to a new window', async ({page, context}) => {
+test('a URL descent transfers the view of the file and the visit history to a new window', async ({page, context}) => {
   await page.addInitScript(() => localStorage.setItem('auto-include', 'false'));
   await context.route('**/visits/*', route => route.fulfill({contentType:'text/plain', body:visitFiles[new URL(route.request().url()).pathname.split('/').pop()] || ''}));
   await start(page, '?url=visits/visit-top.sp');
@@ -458,17 +453,18 @@ test('a URL descent transfers independent scope and visit history to a new windo
   try {
     await expect(child.locator('#level-name')).toHaveText('cell');
     const doc = await shown(child);
-    expect(doc.path).toBe('/visits/cell.inc');
-    expect(doc.files).toHaveLength(1);
+    expect(doc.path).toBe('/visits/visit-top.sp');
+    expect(doc.file).toBe('cell.inc');
+    expect(doc.files).toHaveLength(3);
     expect(doc.objects.find(o => o.name === 'Xleaf').opens).toBeNull();
     expect(await visitTitles(child)).toEqual(['visit-top.sp','cell']);
     await opened(child, () => child.locator('#up').click());
     expect(await visitTitles(child)).toEqual(['visit-top.sp']);
-    expect((await child.evaluate(() => window.viewer.doc.files)).length).toBe(3);
+    expect(await child.evaluate(() => window.viewer.doc.file)).toBe('visit-top.sp');
     await opened(child, () => descendNamed(child, 'Xcell'));
     await opened(child, () => child.evaluate(() => window.viewer.command('reload')));
     expect(await visitTitles(child)).toEqual(['visit-top.sp','cell']);
-    expect((await child.evaluate(() => window.viewer.doc.files)).length).toBe(1);
+    expect(await child.evaluate(() => window.viewer.doc.file)).toBe('cell.inc');
     expect(await visitTitles(page)).toEqual(['visit-top.sp']);
   } finally { await child.close(); }
 });
@@ -483,7 +479,8 @@ test('a transferred URL snapshot can open a child after the server becomes unava
     await shown(child);
     await context.route(host+'/**',route=>route.abort());
     const d=await opened(child,()=>descendNamed(child,'Xcell'));
-    expect(d.path).toBe('/cell.inc');
+    expect(d.path).toBe('/top.sp');
+    expect(d.file).toBe('cell.inc');
     expect(d.levels.some(l=>l.title==='cell')).toBe(true);
     expect(await visitTitles(child)).toEqual(['top.sp','cell']);
   } finally {await child.close();}
@@ -508,7 +505,7 @@ test('canceling a dirty cross-file descent preserves the entry and visit history
   expect(await page.locator('#source textarea:visible').inputValue()).toContain('* pending');
 });
 
-test('independent URL child opens follow redirects for relative includes', async ({page}) => {
+test('a file of a served netlist that redirects is read in the context of the entry', async ({page}) => {
   const host = await server({
     '/alias/top.sp':'* top\n.include "cell.inc"\nXcell a 0 cell\n.end\n',
     '/actual/cell.inc':'* cell\n.include "parts.inc"\n.subckt cell p n\nXleaf p n leaf\n.ends\n',
@@ -517,12 +514,13 @@ test('independent URL child opens follow redirects for relative includes', async
   await start(page, `?url=${encodeURIComponent(host+'/alias/top.sp')}`);
   await shown(page);
   const child = await opened(page, () => descendNamed(page,'Xcell'));
-  expect(child.path).toBe('/actual/cell.inc');
-  expect(child.objects.find(o=>o.name==='Xleaf').opens).not.toBeNull();
-  expect(child.missing).toEqual([]);
+  expect(child.path).toBe('/alias/top.sp');
+  expect(child.file).toBe('cell.inc');
+  expect(child.levels.map(l => l.title)).toEqual(['cell']);
+  expect(child.files.find(f => f.path === 'cell.inc').text).toBe('* cell\n.include "parts.inc"\n.subckt cell p n\nXleaf p n leaf\n.ends\n');
 });
 
-test("include links independently open the target in this tab and a Shift-opened tab", async ({ page }) => {
+test("include links show the file included in this tab and a Shift-opened tab", async ({ page }) => {
   await start(page);
   await opened(page, () => page.locator('#file-input').setInputFiles({name:'top.sp', mimeType:'text/plain',
     buffer:Buffer.from('* Top\n.include "models.inc"\nR1 a 0 1k\n.end\n')}));
@@ -536,8 +534,9 @@ test("include links independently open the target in this tab and a Shift-opened
   try {
     await expect(child.locator('#netlist-file')).toHaveText(/models\.inc$/);
     await expect(child.locator('#source .file:not([hidden]) .ln').first()).toContainText('.param bias=1.2');
-    expect(await child.evaluate(() => window.viewer.doc.files.length)).toBe(1);
-    expect(await child.evaluate(() => window.viewer.doc.name)).toBe('models.inc');
+    // the file is read in the context of the netlist that includes it
+    expect(await child.evaluate(() => window.viewer.doc.name)).toBe('top.sp');
+    expect(await child.evaluate(() => window.viewer.doc.file)).toMatch(/models\.inc$/);
     await expect(page.locator('#netlist-file')).toHaveText(/top\.sp$/);
     await link.click();
     await expect(page.locator('#netlist-file')).toHaveText(/models\.inc$/);
@@ -653,9 +652,30 @@ function lazily(doc) {
   return { ...doc, levels };
 }
 
-/** The same Document as `rnl view` builds for `file`, but for the paths that name the files and the drawings of the objects without a position. */
+/**
+ * A reading of one file (the web viewer reads the file shown alone, in the context of its entry) without what the
+ * Document of the whole document does not have: the file read, the subcircuits it calls, what it depends on, the
+ * outline the page keeps with it, and where another file defines a subcircuit (`Child.host`).
+ */
+function asWhole(doc) {
+  const { file, children, inputs, outline, ...rest } = doc;
+  return { ...rest, levels: rest.levels.map((l) => ({ ...l, children: l.children.map(({ host, ...c }) => c) })) };
+}
+
+/**
+ * The same Document as `rnl view` builds for `file`, but for the paths that name the files and the drawings of the
+ * objects without a position. Of a document of several files the page reads one: its files and their texts, what is
+ * missing and the levels of that file are those of `rnl view`, and its diagnostics are among them.
+ */
 function sameAsRnl(doc, file) {
-  expect(unnamed(doc)).toEqual(unnamed(lazily(rnlView(file))));
+  const whole = unnamed(lazily(rnlView(file)));
+  const page = unnamed(asWhole(doc));
+  if (doc.file === undefined || whole.files.length === 1) return expect(page).toEqual(whole);
+  expect(page.files.map((f) => [f.path, f.text])).toEqual(whole.files.map((f) => [f.path, f.text]));
+  expect(page.missing).toEqual(whole.missing);
+  const at = whole.files.findIndex((f) => f.path === doc.file);
+  expect(page.levels.map((l) => l.title)).toEqual(whole.levels.filter((l) => (l.lines?.[0] ?? 0) === at).map((l) => l.title));
+  for (const d of page.diagnostics) expect(whole.diagnostics).toContainEqual(d);
 }
 
 /** The directories the test made, removed after it, and the servers it started, stopped after it. */
@@ -718,7 +738,9 @@ async function showsDocument(page, doc) {
   // the hierarchy: the top level, and every subcircuit in the index
   await page.locator("#tab-hierarchy").click();
   await expect(page.locator("#tree .tree-row").first()).toContainText(doc.levels[0].title);
-  await expect(page.locator("#index .index-row:not(.top)")).toHaveCount(doc.levels.length - 1);
+  // (the levels of every file, from the outline, when the page reads the file shown alone)
+  const levels = doc.outline ? doc.outline.levels.filter((l) => l.circuit).length : doc.levels.length;
+  await expect(page.locator("#index .index-row:not(.top)")).toHaveCount(levels - 1);
   await page.locator("#tab-netlist").click();
 }
 
@@ -1141,7 +1163,8 @@ test("the text edited and applied is built by the core as rnl view builds the sa
   // applied, the core builds the files with the texts in place of what is read, as it builds the same texts from disk
   const doc = await opened(page, () => page.locator("#apply-edits").click());
   expect(doc.files.map((f) => [f.path, f.text])).toEqual([["top.sp", editedTop], ["parts.inc", editedParts]]);
-  expect(doc.objects.some((o) => o.kind === "instance" && o.name === "R7")).toBe(true);
+  // the file shown is read, with the text of the other applied: its subcircuit calls the subcircuit as edited
+  expect(doc.objects.some((o) => o.kind === "instance" && o.name === "R1")).toBe(true);
   sameAsRnl(doc, path.join(folder({ "top.sp": editedTop, "parts.inc": editedParts }), "top.sp"));
   await expect(page.locator("#source .editor")).toHaveCount(0);
   // the server's files are as they were: nothing was written
@@ -1688,7 +1711,8 @@ test("the files of a manifest are searched as the Library's: Auto Include finds 
   expect(await page.evaluate(() => document.getElementById("auto-include").checked)).toBe(true);
   const defined = () => page.evaluate(() => {
     const doc = window.viewer.doc;
-    return doc.levels.flatMap((l) => l.children).filter((c) => c.master === "amp").map((c) => c.level !== null);
+    // (defined in this file's reading, or in another file the reading names)
+    return doc.levels.flatMap((l) => l.children).filter((c) => c.master === "amp").map((c) => c.level !== null || c.host != null);
   });
   // a file of the manifest that uses amp without including it, opened from the Library
   await page.locator("#tab-files").click();

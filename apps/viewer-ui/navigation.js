@@ -7,11 +7,11 @@ import { changes } from "./edits.js";
 import { currentSource, isLoading, openSource } from "./open.js";
 import { poolSnapshot, restorePool } from "./pool.js";
 import { shell } from "./shell.js";
-import { doc, path, selected, selectedAsUsage, viewCache } from "./state.js";
-import { commitNavigation, namedPath, rememberView } from "./subcircuits.js";
+import { doc, expanded, path, selected, selectedAsUsage, viewCache } from "./state.js";
+import { commitNavigation, namedPath, rememberView, viewOfFile } from "./subcircuits.js";
 import { showFile } from "./text.js";
 import { setPane } from "./panels.js";
-import { sameSource } from "./visit-source.js";
+import { sameEntry, sameSource } from "./visit-source.js";
 
 let shift = false;
 window.addEventListener("keydown", (e) => { shift = e.shiftKey; }, true);
@@ -25,9 +25,11 @@ export function navigate(target, options = {}) {
   if (target.file !== undefined) setPane('netlist');
   if (target.source || target.file !== undefined || !sameSource(visit.entry, currentSource())) {
     rememberView();
+    // another file of the same document, read alone: the tree stays as it was opened
+    const tree = doc?.outline && sameEntry(visit.entry, currentSource()) ? { expanded } : {};
     // the file is built without the instance, with the parameters that the instance writes bound (params.js)
     return openSource(visit.entry, false, undefined, false,
-      { ...visit, viewCache: visit.path.length ? viewCache : new Map() }, options.signal, false, { bind: visit.bind, bound: visit.bound });
+      { ...visit, ...tree, viewCache: visit.path.length ? viewCache : new Map() }, options.signal, false, { bind: visit.bind, bound: visit.bound });
   }
   const next = visit.path.map(s => ({ ...s,
     level: sameSource(s.entry, currentSource()) ? doc.levels.findIndex(l => l.title === s.title) : -1 }));
@@ -51,6 +53,8 @@ function destination(target) {
 }
 
 function fileSource(file) {
+  // a shell that reads the file shown alone: the view of that file, in the context of the entry
+  if (doc?.outline) return viewOfFile(doc.files[file].path);
   if (file === 0) return currentSource();
   const source = shell.sourceForFile(currentSource(), doc, file);
   // Navigation promotes a new file but does not refresh an already indexed Library entry.

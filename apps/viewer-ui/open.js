@@ -6,7 +6,8 @@ import { append, m, setAttr, setText, tr } from "./i18n.js";
 // preview (solve.js) ends when a source is opened or read again, which shows it as written; while
 // one is shown, File > Reload solves again. Text edited in the page (editor.js) is built over the
 // files with Apply Changes; opening another file or reading it again asks first about what is not
-// saved.
+// saved. A shell that reads the file shown alone (`shell.perFile`) is asked for the file of the source
+// only, in the context of its entry (visit-source.js), with the outline of the whole document.
 
 import { form, inform, modal } from "./dialog.js";
 import { sourceOpened } from "./pool.js";
@@ -28,6 +29,7 @@ import { setEnabled } from "./commands.js";
 import { startLoading, nextPaint } from "./loading.js";
 import { offerMissingPackages } from "./package-offers.js";
 import { askToSolve } from "./solve-on-open.js";
+import { entrySource } from "./visit-source.js";
 
 let lastSource = null; // what was last opened, also when it failed to open, for reloading
 let loading = false;
@@ -66,7 +68,7 @@ export async function openSource(source, keep, edited, fresh = false, navigation
     d = await shell.build(source, edited, stage => {
       if (operation.signal.aborted) throw new Error('Opening superseded');
       progress.setStage(stage);
-    }, undefined, operation.signal, { fresh, bind: options.bind, ...(constraintsWanted ? { constraints: true } : {}) });
+    }, undefined, operation.signal, { fresh, bind: options.bind, ...(constraintsWanted ? { constraints: true } : {}), ...(shell.perFile ? { perFile: true } : {}) });
     if (operation.signal.aborted) return;
     if (options.bound) bindings.set(d, options.bound);
     await progress.stage("displaying");
@@ -76,7 +78,8 @@ export async function openSource(source, keep, edited, fresh = false, navigation
     if (edited) adoptBuffers(d);
     else resetBuffers(d);
     showBuilt(d, keep, navigation);
-    await sourceOpened(source, d, !keep, !!edited);
+    // the Library and the manifest bar know the entry; the view of another of its files is no file opened
+    await sourceOpened(entrySource(source), d, !keep && !source.view, !!edited);
     await nextPaint();
     return true;
   } catch (e) {
@@ -95,7 +98,7 @@ export async function openSource(source, keep, edited, fresh = false, navigation
     renderHierarchy();
     renderDiagnostics([{ severity: "error", message: String(e), file: "", line: 0, col: 0, origin: "" }]);
     setProblems(true);
-    await sourceOpened(source, null, false);
+    await sourceOpened(entrySource(source), null, false);
   } finally {
     if (d) shell.discardBuild?.(d);
     progress.finish();
@@ -138,7 +141,7 @@ export async function applyEdits() {
   let d;
   try {
     await progress.stage("reading");
-    d = await shell.build(lastSource, changes(false), progress.setStage, undefined, operation.signal);
+    d = await shell.build(lastSource, changes(false), progress.setStage, undefined, operation.signal, shell.perFile ? { perFile: true } : {});
     if (operation.signal.aborted) return false;
     await progress.stage("displaying");
     if (operation.signal.aborted) return false;
@@ -148,7 +151,7 @@ export async function applyEdits() {
     adoptBuffers(d);
     showBuilt(d, true);
     if (ended) fit();
-    await sourceOpened(lastSource, d, false, true);
+    await sourceOpened(entrySource(lastSource), d, false, true);
     await nextPaint();
   } catch (e) {
     if (operation.signal.aborted) return false;
@@ -323,10 +326,13 @@ function showDocument(before, navigation) {
   // document read again gained
   const roots = uncalledRoots().map(rootPath);
   const gained = before ? roots.filter((r) => !before.roots.includes(r)) : roots;
-  setExpanded(new Set([...(before ? before.expanded : ["0"]), ...gained]));
+  setExpanded(new Set([...(before ? before.expanded : navigation?.expanded ?? ["0"]), ...gained]));
   setViewCache(before?.viewCache || navigation?.viewCache || new Map());
-  const file = before ? doc.files.findIndex((f) => f.path === before.file) : -1;
-  renderFiles(file >= 0 ? file : 0);
+  // the text of the file read, or of the file shown before when it is read again
+  const read = Math.max(0, doc.files.findIndex((f) => f.path === doc.file));
+  const again = before ? doc.files.findIndex((f) => f.path === before.file) : -1;
+  const file = again >= 0 ? again : read;
+  renderFiles(file);
   const diags = doc.diagnostics.slice();
   if (doc.failed) diags.unshift({ severity: "error", message: doc.failed, file: "", line: 0, col: 0, origin: "" });
   renderDiagnostics(diags);
@@ -348,7 +354,7 @@ function showDocument(before, navigation) {
       }
     }
   }
-  showFile(file >= 0 ? file : 0);
+  showFile(file);
 
   if (doc.levels.length === 0) {
     clearDrawing(m("Nothing to draw."));
