@@ -492,7 +492,7 @@
   "&Include File...": "파일 포함(&I)...",
   "Include &Folder (with Sub-folders)...": "폴더 포함(하위 폴더 포함)(&F)...",
   "Add Folder to &PATH (with Sub-folders)...": "PATH에 폴더 추가(하위 폴더 포함)(&P)...",
-  "Include Public &Package...": "공개 패키지 포함(&P)...",
+  "Include Public Pac&kage...": "공개 패키지 포함(&K)...",
   "Open &URL...": "URL 열기(&U)...",
   "Open Projec&t...": "프로젝트 열기(&T)...",
   "Load &Manifest...": "매니페스트 불러오기(&M)...",
