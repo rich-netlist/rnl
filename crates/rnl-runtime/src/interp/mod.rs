@@ -408,6 +408,9 @@ pub(crate) struct OnlyLevels {
     pub(crate) built: HashSet<LevelId>,
     /// The levels of the file.
     pub(crate) given: HashSet<LevelId>,
+    /// The subcircuits whose records are read ([`Interp::reads`]): those built, every subcircuit
+    /// of a file that defines a subcircuit they instantiate, and the levels above those.
+    pub(crate) read: HashSet<LevelId>,
 }
 
 impl OnlyLevels {
@@ -421,7 +424,25 @@ impl OnlyLevels {
                 built.extend(doc.ancestors(lv).into_iter().filter(|&a| doc.levels[a].circuit));
             }
         }
-        OnlyLevels { built, given }
+        // the records of the levels built, and of the levels above the file's; and, for the
+        // symbols the levels built draw their instances with (9.2.6), of every subcircuit of the
+        // files that define the subcircuits they instantiate, with the levels above them
+        let mut read: HashSet<LevelId> = built.iter().chain(&given).copied().collect();
+        for &lv in &given {
+            read.extend(doc.ancestors(lv));
+        }
+        let mut files: HashSet<&str> = HashSet::new();
+        for &lv in &built {
+            let called = doc.levels[lv].instances.iter().filter(|i| i.is_subckt).filter_map(|i| doc.subckt_of(i));
+            files.extend(called.map(|c| doc.levels[c].file.as_str()));
+        }
+        for lv in 0..doc.levels.len() {
+            if doc.levels[lv].kind == LevelKind::Subckt && files.contains(doc.levels[lv].file.as_str()) {
+                read.insert(lv);
+                read.extend(doc.ancestors(lv));
+            }
+        }
+        OnlyLevels { built, given, read }
     }
 
     /// The subcircuits whose block symbols a reading of one file gives
@@ -592,8 +613,10 @@ impl<'p> Interp<'p> {
         it.check_host_diagnostics();
         it.check_host_input_diagnostics();
         for lv in 0..it.doc.levels.len() {
-            let u = it.level_unit[lv];
-            it.read_unit(u);
+            if it.reads(lv) {
+                let u = it.level_unit[lv];
+                it.read_unit(u);
+            }
         }
         it.publish_scope_names();
         it
@@ -779,6 +802,15 @@ impl<'p> Interp<'p> {
     /// those of the file and the circuits above them.
     fn builds(&self, lv: LevelId) -> bool {
         self.only_levels.as_ref().is_none_or(|o| o.built.contains(&lv))
+    }
+
+    /// Whether this reading reads the records of the level `lv`: every level, or with
+    /// [`Options::only_file`] every file level and the subcircuits [`OnlyLevels::read`] lists. A
+    /// subcircuit's records reach no other level (2.6, 10.1), and a file's packages are those of
+    /// the header records of its file levels (16.2, 16.3), so the levels a reading builds read as in
+    /// the whole document; the other subcircuits have no names, rules or diagnostics of records.
+    fn reads(&self, lv: LevelId) -> bool {
+        self.doc.levels[lv].kind != LevelKind::Subckt || self.only_levels.as_ref().is_none_or(|o| o.read.contains(&lv))
     }
 
     /// Whether this reading gives the level `lv`: every level, or with [`Options::only_file`] those
