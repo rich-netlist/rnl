@@ -800,5 +800,20 @@
   "1 setting": "設定 1 件",
   "1 objective": "目的関数 1 件",
   "1 of the settings keeps a value you set.": "設定のうち 1 件には、指定した値が残っています。",
-  " and ": "と"
+  " and ": "と",
+  "The file could not be checked: {0}": "ファイルをチェックできませんでした：{0}",
+  "No module is named {0}": "{0} という名前のモジュールはありません",
+  "line {0}": "{0} 行目",
+  "Click to show its line in the text; double-click or Enter opens {0} (Shift opens a new window)": "クリックでテキスト内のその行を表示、ダブルクリックまたはEnterで {0} を開く（Shiftで新しいウィンドウ）",
+  "Verilog-A module": "Verilog-A モジュール",
+  "A module of Verilog-A has no drawing: its ports are shown as a symbol, and the modules its instances name are listed below.": "Verilog-A のモジュールには図面がありません。ポートはシンボルとして表示され、インスタンスが指すモジュールは下に一覧表示されます。",
+  "Instances": "インスタンス",
+  "No instances of modules.": "モジュールのインスタンスはありません。",
+  "Checking files: {0} of {1}": "ファイルをチェック中：{0} / {1}",
+  "{0} of {1} files checked": "{1} 個中 {0} 個のファイルをチェック済み",
+  "All Files": "すべてのファイル",
+  "Show the problems of every file read, not only of the file shown": "表示中のファイルだけでなく、読み込んだすべてのファイルの問題を表示",
+  "Check All Files": "すべてのファイルをチェック",
+  "Read each file not read yet, for its problems": "まだ読み込んでいない各ファイルを読み込み、その問題を調べる",
+  "&Check All Files": "すべてのファイルをチェック(&C)"
 }

@@ -800,5 +800,20 @@
   "1 setting": "1 項設定",
   "1 objective": "1 個最佳化目標",
   "1 of the settings keeps a value you set.": "其中 1 項設定仍保留著你設定的值。",
-  " and ": "和 "
+  " and ": "和 ",
+  "The file could not be checked: {0}": "無法檢查檔案：{0}",
+  "No module is named {0}": "沒有名為 {0} 的模組",
+  "line {0}": "第 {0} 行",
+  "Click to show its line in the text; double-click or Enter opens {0} (Shift opens a new window)": "點選以在文字中顯示它所在的行；雙擊或按 Enter 開啟 {0}（按住 Shift 在新視窗開啟）",
+  "Verilog-A module": "Verilog-A 模組",
+  "A module of Verilog-A has no drawing: its ports are shown as a symbol, and the modules its instances name are listed below.": "Verilog-A 模組沒有圖面：它的連接埠顯示為一個符號，它的實例所引用的模組列在下方。",
+  "Instances": "實例",
+  "No instances of modules.": "沒有模組的實例。",
+  "Checking files: {0} of {1}": "正在檢查檔案：{0} / {1}",
+  "{0} of {1} files checked": "已檢查 {0} / {1} 個檔案",
+  "All Files": "所有檔案",
+  "Show the problems of every file read, not only of the file shown": "顯示每個已讀取檔案的問題，而不只是目前顯示的檔案",
+  "Check All Files": "檢查所有檔案",
+  "Read each file not read yet, for its problems": "讀取每個尚未讀取的檔案，找出其中的問題",
+  "&Check All Files": "檢查所有檔案(&C)"
 }

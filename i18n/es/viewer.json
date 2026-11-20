@@ -800,5 +800,20 @@
   "1 setting": "1 ajuste",
   "1 objective": "1 objetivo",
   "1 of the settings keeps a value you set.": "1 de los ajustes conserva un valor que has definido.",
-  " and ": " y "
+  " and ": " y ",
+  "The file could not be checked: {0}": "No se pudo comprobar el archivo: {0}",
+  "No module is named {0}": "Ningún módulo se llama {0}",
+  "line {0}": "línea {0}",
+  "Click to show its line in the text; double-click or Enter opens {0} (Shift opens a new window)": "Haz clic para mostrar su línea en el texto; doble clic o Enter abre {0} (Shift lo abre en una ventana nueva)",
+  "Verilog-A module": "módulo Verilog-A",
+  "A module of Verilog-A has no drawing: its ports are shown as a symbol, and the modules its instances name are listed below.": "Un módulo de Verilog-A no tiene dibujo: sus puertos se muestran como un símbolo y los módulos que nombran sus instancias se enumeran abajo.",
+  "Instances": "Instancias",
+  "No instances of modules.": "No hay instancias de módulos.",
+  "Checking files: {0} of {1}": "Comprobando archivos: {0} de {1}",
+  "{0} of {1} files checked": "{0} de {1} archivos comprobados",
+  "All Files": "Todos los archivos",
+  "Show the problems of every file read, not only of the file shown": "Mostrar los problemas de cada archivo leído, no solo del archivo mostrado",
+  "Check All Files": "Comprobar todos los archivos",
+  "Read each file not read yet, for its problems": "Leer cada archivo aún no leído para encontrar sus problemas",
+  "&Check All Files": "&Comprobar todos los archivos"
 }

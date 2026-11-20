@@ -800,5 +800,20 @@
   "1 setting": "1 Einstellung",
   "1 objective": "1 Optimierungsziel",
   "1 of the settings keeps a value you set.": "1 der Einstellungen behält einen von Ihnen gesetzten Wert.",
-  " and ": " und "
+  " and ": " und ",
+  "The file could not be checked: {0}": "Die Datei konnte nicht geprüft werden: {0}",
+  "No module is named {0}": "Kein Modul heißt {0}",
+  "line {0}": "Zeile {0}",
+  "Click to show its line in the text; double-click or Enter opens {0} (Shift opens a new window)": "Klicken zeigt seine Zeile im Text; Doppelklick oder Enter öffnet {0} (Shift öffnet ein neues Fenster)",
+  "Verilog-A module": "Verilog-A-Modul",
+  "A module of Verilog-A has no drawing: its ports are shown as a symbol, and the modules its instances name are listed below.": "Ein Modul in Verilog-A hat keine Zeichnung: Seine Ports werden als Symbol gezeigt, und die Module, die seine Instanzen nennen, sind unten aufgeführt.",
+  "Instances": "Instanzen",
+  "No instances of modules.": "Keine Instanzen von Modulen.",
+  "Checking files: {0} of {1}": "Dateien werden geprüft: {0} von {1}",
+  "{0} of {1} files checked": "{0} von {1} Dateien geprüft",
+  "All Files": "Alle Dateien",
+  "Show the problems of every file read, not only of the file shown": "Die Probleme jeder gelesenen Datei zeigen, nicht nur die der angezeigten",
+  "Check All Files": "Alle Dateien prüfen",
+  "Read each file not read yet, for its problems": "Jede noch nicht gelesene Datei lesen, um ihre Probleme zu finden",
+  "&Check All Files": "&Alle Dateien prüfen"
 }
