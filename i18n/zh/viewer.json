@@ -822,5 +822,13 @@
   "1 instance": "1 个元件",
   "{0} instances": "{0} 个元件",
   "Kept: opens at once": "已缓存：可立即打开",
-  "Read in {0} s the last time": "上次读取用时 {0} 秒"
+  "Read in {0} s the last time": "上次读取用时 {0} 秒",
+  "Limit in memory (MiB)": "内存上限（MiB）",
+  "Limit in this browser's storage (MiB)": "此浏览器存储空间上限（MiB）",
+  "Readings in memory: {0} ({1} MiB) · {2} hits, {3} misses": "内存中的读取结果：{0} 个（{1} MiB）· 命中 {2} 次，未命中 {3} 次",
+  "Readings in this browser's storage: {0} ({1} MiB)": "此浏览器存储空间中的读取结果：{0} 个（{1} MiB）",
+  "This browser keeps nothing for the site, as in a private window: the readings are kept in memory alone.": "此浏览器不为本网站保存任何内容，如同在隐私窗口中：读取结果只保存在内存中。",
+  "Keep the reading of each file, so that a file shown again, also in a later visit, is not read again: in memory for this page, and in this browser's storage for this site. The least recently used go first. Set 0 to keep none there.": "保存每个文件的读取结果，再次显示某个文件时（包括以后再访问时）不必重新读取：在内存中为此页面保存，在此浏览器的存储空间中为本网站保存。优先移除最久未使用的结果。设为 0 则该处不保存。",
+  "Enter a whole number from 0 to 65536.": "请输入 0 到 65536 之间的整数。",
+  "This build of the core keeps no readings: it does not say its version.": "此核心构建不保存读取结果：它没有给出自己的版本。"
 }

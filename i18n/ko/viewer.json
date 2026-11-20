@@ -822,5 +822,13 @@
   "1 instance": "인스턴스 1개",
   "{0} instances": "인스턴스 {0}개",
   "Kept: opens at once": "캐시됨: 바로 열립니다",
-  "Read in {0} s the last time": "지난번 읽기에 {0}초 걸림"
+  "Read in {0} s the last time": "지난번 읽기에 {0}초 걸림",
+  "Limit in memory (MiB)": "메모리 상한 (MiB)",
+  "Limit in this browser's storage (MiB)": "이 브라우저 저장소 상한 (MiB)",
+  "Readings in memory: {0} ({1} MiB) · {2} hits, {3} misses": "메모리의 읽기 결과: {0}개 ({1} MiB) · 적중 {2}회, 실패 {3}회",
+  "Readings in this browser's storage: {0} ({1} MiB)": "이 브라우저 저장소의 읽기 결과: {0}개 ({1} MiB)",
+  "This browser keeps nothing for the site, as in a private window: the readings are kept in memory alone.": "이 브라우저는 개인 정보 보호 창처럼 이 사이트를 위해 아무것도 저장하지 않습니다. 읽기 결과는 메모리에만 보관됩니다.",
+  "Keep the reading of each file, so that a file shown again, also in a later visit, is not read again: in memory for this page, and in this browser's storage for this site. The least recently used go first. Set 0 to keep none there.": "각 파일의 읽기 결과를 보관하여, 다시 표시하는 파일은 나중에 다시 방문할 때도 다시 읽지 않습니다. 이 페이지용으로는 메모리에, 이 사이트용으로는 이 브라우저 저장소에 보관합니다. 가장 오래 사용하지 않은 것부터 제거됩니다. 0으로 설정하면 그곳에는 보관하지 않습니다.",
+  "Enter a whole number from 0 to 65536.": "0에서 65536 사이의 정수를 입력하세요.",
+  "This build of the core keeps no readings: it does not say its version.": "이 코어 빌드는 읽기 결과를 보관하지 않습니다. 자체 버전을 알려 주지 않기 때문입니다."
 }

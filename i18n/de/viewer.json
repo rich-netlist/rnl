@@ -822,5 +822,13 @@
   "1 instance": "1 Instanz",
   "{0} instances": "{0} Instanzen",
   "Kept: opens at once": "Im Cache: öffnet sofort",
-  "Read in {0} s the last time": "Beim letzten Mal in {0} s gelesen"
+  "Read in {0} s the last time": "Beim letzten Mal in {0} s gelesen",
+  "Limit in memory (MiB)": "Limit im Speicher (MiB)",
+  "Limit in this browser's storage (MiB)": "Limit im Speicherplatz dieses Browsers (MiB)",
+  "Readings in memory: {0} ({1} MiB) · {2} hits, {3} misses": "Leseergebnisse im Speicher: {0} ({1} MiB) · {2} Treffer, {3} Fehlschläge",
+  "Readings in this browser's storage: {0} ({1} MiB)": "Leseergebnisse im Speicherplatz dieses Browsers: {0} ({1} MiB)",
+  "This browser keeps nothing for the site, as in a private window: the readings are kept in memory alone.": "Dieser Browser speichert nichts für die Website, wie in einem privaten Fenster: Die Leseergebnisse werden nur im Speicher gehalten.",
+  "Keep the reading of each file, so that a file shown again, also in a later visit, is not read again: in memory for this page, and in this browser's storage for this site. The least recently used go first. Set 0 to keep none there.": "Das Leseergebnis jeder Datei behalten, damit eine wieder gezeigte Datei, auch bei einem späteren Besuch, nicht erneut gelesen wird: im Speicher für diese Seite und im Speicherplatz dieses Browsers für diese Website. Die am längsten nicht genutzten gehen zuerst. 0 behält dort keine.",
+  "Enter a whole number from 0 to 65536.": "Geben Sie eine ganze Zahl zwischen 0 und 65536 ein.",
+  "This build of the core keeps no readings: it does not say its version.": "Dieser Build des Kerns behält keine Leseergebnisse: Er nennt seine Version nicht."
 }
