@@ -96,3 +96,43 @@ test('a level of another file picked in the index is that file\'s reading, as th
   await idle(page);
   expect(await shown(page)).toMatchObject({ file: 'top.sp', level: 't', path: ['t'] });
 });
+
+/** What the readings kept say of themselves (result-cache.js `stats`). */
+const kept = (page) => page.evaluate(async () => (await import('./shells/web.js')).default.readingStats());
+const descendNamed = async (page, name) => {
+  await page.evaluate((name) => import('./subcircuits.js').then(s => s.descend(window.viewer.doc.objects.findIndex(o => o.kind === 'instance' && o.name === name))), name);
+  await idle(page);
+};
+
+test('a file read before is shown again from the readings kept, until a file it depends on changes', async ({ page }) => {
+  await open(page);
+  expect(await kept(page)).toMatchObject({ hits: 0, misses: 1 });
+  await descendNamed(page, 'X1');
+  await page.evaluate(() => import('./subcircuits.js').then(s => s.backTo(0)));
+  await idle(page);
+  await descendNamed(page, 'X1');
+  expect(await shown(page)).toMatchObject({ file: 'cells.inc', levels: ['cell'], path: ['top.sp', 'cell'] });
+  expect(await kept(page)).toMatchObject({ hits: 2, misses: 2 });
+  // the core reads it again for the drawings of what has no position, which a kept reading leaves out
+  await page.locator('#tab-unplaced').click();
+  await expect(page.locator('#unplaced-list svg').first()).toBeVisible();
+  await expect(page.locator('#unplaced-list')).toContainText('X2');
+  await expect(page.locator('#unplaced-list')).not.toContainText('document was built again');
+  await page.locator('#tab-netlist').click();
+  // the subcircuit cells.inc calls changes: its reading is made again, and kept again
+  await page.keyboard.press('Control+q');
+  await page.evaluate(async () => (await import('./text.js')).showFile(window.viewer.doc.files.findIndex(f => f.path === 'leaf.inc')));
+  await page.locator('#source .editor:not([hidden]) textarea').fill(LEAF.replace('R1 a b 1k', 'R1 a b 2k'));
+  await page.locator('#apply-edits').click();
+  await idle(page);
+  await expect.poll(() => kept(page)).toMatchObject({ hits: 2, misses: 3 });
+  expect(await shown(page)).toMatchObject({ file: 'cells.inc', levels: ['cell'] });
+});
+
+test('the readings kept are found again by another visit of the page', async ({ page }) => {
+  await open(page);
+  await expect.poll(async () => (await kept(page)).stored ?? 0).toBeGreaterThan(0);
+  await open(page);
+  expect(await kept(page)).toMatchObject({ hits: 1, misses: 0, persistent: true });
+  expect(await shown(page)).toMatchObject({ file: 'top.sp', levels: ['top.sp', 't'] });
+});
