@@ -11,7 +11,7 @@ import { append, m, setAttr, setText } from "../i18n.js";
 // problems of every file (file-checks.js).
 
 import { collect, collectFile, collectOutline, coreVersion, decodeText, fileResultFormat, startCore } from "../core/client.js";
-import { openStore, ResultCache, storeLimit } from "../result-cache.js";
+import { MEMORY_LIMIT, openStore, ResultCache, STORE_LIMIT, storeLimit } from "../result-cache.js";
 import { holds, readingKey, requestPath, textHash } from "../file-results.js";
 import { loadManifest, readManifest } from "../manifest.js";
 import { ask, choose, inform, modal } from "../dialog.js";
@@ -154,13 +154,24 @@ async function indexLibrary(worker, snapshot) {
   indexedLibraries.set(worker, snapshot);
   return errors;
 }
+const MIB = 1024 * 1024;
+/**
+ * The limits of the readings kept, in bytes, as File › Memory Cache sets them (memory-cache.js): in memory, and in the
+ * browser's storage, no more than half of what the browser says the site may keep. 0 keeps none there. An embedded
+ * viewer reads no setting and keeps nothing in the browser's storage, as it keeps none of its preferences: the default
+ * in memory, and no store.
+ */
+const cacheLimits = async () => (embed ? { memoryLimit: MEMORY_LIMIT, storeLimit: 0 } : {
+  memoryLimit: load("file-cache-memory-mib", MEMORY_LIMIT / MIB) * MIB,
+  storeLimit: await storeLimit(load("file-cache-store-mib", STORE_LIMIT / MIB) * MIB),
+});
 /**
  * The readings of one file kept, once the store is open: none for a core that does not say its version, as one built
  * from the sources does not (version.js), and in memory alone where the browser keeps nothing.
  */
 const readings = coreVersion === null ? null : (async () => {
   const store = embed ? null : await openStore({ core: coreVersion, format: fileResultFormat });
-  return new ResultCache({ store, storeLimit: await storeLimit() });
+  return new ResultCache({ store, ...(await cacheLimits()) });
 })();
 // the Documents given from the kept readings: the core shown holds no drawings of theirs until it reads them again
 const kept = new WeakSet();
@@ -1347,6 +1358,19 @@ export default {
   async readingStats() {
     return (await readings)?.stats() ?? null;
   },
+  ...(embed ? {} : {
+    /**
+     * File › Memory Cache (memory-cache.js): apply the limits saved to the readings kept, empty them with `clear`, and
+     * tell what they hold, as `ResultCache.stats` gives it. Fails for a core that keeps none (one built from the sources).
+     */
+    async memoryCache(clear = false) {
+      const cache = await readings;
+      if (!cache) throw m("This build of the core keeps no readings: it does not say its version.");
+      await cache.setLimits(await cacheLimits());
+      if (clear) await cache.clear();
+      return cache.stats();
+    },
+  }),
   /** Download the files: the web cannot write them where they were read from (decision 0011). */
   async save(source, files) {
     for (const f of files) download(f.name.split("/").pop(), f.text);

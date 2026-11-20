@@ -16,7 +16,7 @@
         { "id": "reload", "label": "&Reload", "keys": ["F5"] },
         { "id": "reload-library", "label": "Reload Li&brary" },
         { "id": "toggle-auto-include", "label": "Auto Includ&e", "check": true },
-        { "id": "memory-cache", "label": "Memory Cac&he...", "platforms": ["desktop"] },
+        { "id": "memory-cache", "label": "Memory Cac&he...", "platforms": ["desktop"], "with": "memoryCache" },
         "-",
         { "id": "save", "label": "&Save", "keys": ["Ctrl+S"], "platforms": ["desktop"], "with": "overwrites" },
         { "id": "save", "label": "&Download File", "keys": ["Ctrl+S"], "platforms": ["web"], "unless": "overwrites" },

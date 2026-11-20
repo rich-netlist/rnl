@@ -171,6 +171,7 @@ export class ResultCache {
     this.memoryLimit = memoryLimit;
     this.storeLimit = storeLimit;
     this.storeUsed = null; // not known until the store is trimmed once
+    this.storeCount = null; // nor the entries in it
     this.hits = 0;
     this.misses = 0;
   }
@@ -179,7 +180,7 @@ export class ResultCache {
   async get(key, valid = async () => true) {
     let entry = this.memory.get(key);
     let fromStore = false;
-    if (!entry && this.store) {
+    if (!entry && this.store && this.storeLimit > 0) {
       try {
         const kept = await this.store.get(key);
         if (kept) {
@@ -209,7 +210,7 @@ export class ResultCache {
    */
   async peek(key, valid = async () => true) {
     let entry = this.memory.get(key);
-    if (!entry && this.store) {
+    if (!entry && this.store && this.storeLimit > 0) {
       try {
         const kept = await this.store.get(key);
         if (kept) entry = { value: JSON.parse(await unpack(kept)), inputs: kept.inputs };
@@ -231,7 +232,7 @@ export class ResultCache {
       const packed = await pack(text);
       if (packed.bytes.length * LARGEST_SHARE > this.storeLimit) return;
       await this.store.put({ key, inputs, ...packed, size: packed.bytes.length });
-      ({ used: this.storeUsed } = await this.store.trim(this.storeLimit));
+      ({ used: this.storeUsed, count: this.storeCount } = await this.store.trim(this.storeLimit));
     } catch { /* not kept: only slower */ }
   }
 
@@ -245,7 +246,7 @@ export class ResultCache {
     this.memoryLimit = memoryLimit;
     this.storeLimit = storeLimit;
     this.trimMemory();
-    try { if (this.store) ({ used: this.storeUsed } = await this.store.trim(storeLimit)); } catch { /* trimmed later */ }
+    try { if (this.store) ({ used: this.storeUsed, count: this.storeCount } = await this.store.trim(storeLimit)); } catch { /* trimmed later */ }
   }
 
   /** Empty the memory and the store, and count again from 0. */
@@ -253,13 +254,19 @@ export class ResultCache {
     this.memory.clear();
     this.memoryUsed = 0;
     this.hits = this.misses = 0;
-    try { await this.store?.clear(); this.storeUsed = this.store ? 0 : null; } catch { /* the store is not the browser's to empty */ }
+    try {
+      await this.store?.clear();
+      this.storeUsed = this.storeCount = this.store ? 0 : null;
+    } catch { /* the store is not the browser's to empty */ }
   }
 
-  /** What is kept, for File › Memory Cache: the entries and bytes in memory, the bytes in the store (null until known), hits and misses. */
+  /**
+   * What is kept, for File › Memory Cache: the entries and bytes in memory, the entries and bytes in the store (null until
+   * known), hits and misses.
+   */
   stats() {
     return { entries: this.memory.size, used: this.memoryUsed, limit: this.memoryLimit, stored: this.storeUsed,
-      storeLimit: this.storeLimit, persistent: !!this.store, hits: this.hits, misses: this.misses };
+      storedEntries: this.storeCount, storeLimit: this.storeLimit, persistent: !!this.store, hits: this.hits, misses: this.misses };
   }
 
   /** Whether a result of `size` bytes is kept in memory at all. */
