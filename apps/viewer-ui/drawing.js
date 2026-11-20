@@ -11,6 +11,7 @@ import { colourDrawing } from "./background.js";
 import { paintGrid } from "./grid.js";
 import { updateHierarchy } from "./hierarchy.js";
 import { setModuleShown } from "./level-tree.js";
+import { hideEntryPage, showEntryPage } from "./entry-page.js";
 import { flylinesShown } from "./flylines.js";
 import { boxAt, hitsAt, nameOf, objectsOf } from "./hits.js";
 import { hideTip, hoverNamesOn, hoverRolesOn, showTip } from "./hover.js";
@@ -28,10 +29,11 @@ import { TOUCH_CLICK_MS, touchGestures } from "./touch-gestures.js";
 
 const canvas = $("canvas");
 
-/** Take away the module of Verilog-A shown in place of a drawing (module-view.js). */
+/** Take away the module of Verilog-A shown in place of a drawing (module-view.js), and the entry page (entry-page.js). */
 function hideModule() {
   $("module-card").hidden = true;
   setModuleShown(null);
+  hideEntryPage();
 }
 
 const MIN_ZOOM = 0.02;
@@ -89,7 +91,8 @@ export function showLevel(i, keptView) {
     showPointer();
     setText($("zoom"), "");
     setText($("empty"), emptyMessage(lv));
-    $("empty").hidden = false;
+    // an entry that only includes other files: the subcircuits nothing calls, in place of the message
+    $("empty").hidden = showEntryPage(i);
     window.dispatchEvent(new Event("viewer-level"));
     return;
   }
