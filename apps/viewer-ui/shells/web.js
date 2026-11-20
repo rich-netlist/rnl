@@ -7,7 +7,8 @@ import { append, m, setAttr, setText } from "../i18n.js";
 // opens read the file shown alone, in the context of its entry (`perFile`): the outline of the whole
 // document, then the reading of that one file (collectOutline, collectFile), which is kept (file-results.js,
 // result-cache.js): in memory, and in the site's IndexedDB where the browser lets it, and read again only
-// when what it depends on has changed.
+// when what it depends on has changed. `checkFiles` reads the other files of the document so, one by one, for the
+// problems of every file (file-checks.js).
 
 import { collect, collectFile, collectOutline, coreVersion, decodeText, fileResultFormat, startCore } from "../core/client.js";
 import { openStore, ResultCache, storeLimit } from "../result-cache.js";
@@ -991,9 +992,10 @@ export default {
    * Read the files the document needs, as SVG for the page to draw, and name the browser tab. A
    * source that holds its text, such as the clipboard's, can use the file pool for includes. The
    * texts of `edits`, by the paths the Document names the files by, are those of the files, not what
-   * is read.
+   * is read. With `perFile` and `check` ({ files, each }), each file of `check.files` is read too, in the context
+   * of the entry, before the file of the source, and given to `check.each` (checkFiles).
    */
-  async build(source, edits, progress, suppliedPackages, signal, { bind, constraints, perFile, fresh } = {}) {
+  async build(source, edits, progress, suppliedPackages, signal, { bind, constraints, perFile, fresh, check } = {}) {
     // the file of a view of a file of a document, read alone in the context of its entry (visit-source.js)
     const view = source.view;
     source = entrySource(source);
@@ -1078,26 +1080,40 @@ export default {
         request.file = view ?? outlined.outline.files[0]?.path ?? entry.path.slice(entry.path.lastIndexOf("/") + 1);
         // the reading kept, while what it depends on holds; Reload reads it again
         const cache = await readings;
-        const body = outlined.files[requestPath(entry.path, request.file)];
-        const key = cache && body !== undefined ? await readingKey({ version: coreVersion, format: fileResultFormat }, request, request.file, body) : null;
         const now = { outline: outlined.outline, textOf: (path) => outlined.files[path], library: await libraryStamp(library, new Set(Object.keys(outlined.files))) };
-        const found = key && !fresh ? await cache.get(key, (stored) => holds(stored, now)) : null;
-        if (found) {
-          doc = structuredClone(found.result);
-          collected = outlined.files;
-          kept.add(doc);
-        } else {
+        /** The reading of `file` alone, the one kept or a new one, which is kept. */
+        const readFile = async (file, fresh) => {
+          const body = outlined.files[requestPath(entry.path, file)];
+          const key = cache && body !== undefined ? await readingKey({ version: coreVersion, format: fileResultFormat }, request, file, body) : null;
+          const found = key && !fresh ? await cache.get(key, (stored) => holds(stored, now)) : null;
+          if (found) {
+            const result = structuredClone(found.result);
+            kept.add(result);
+            return { result, files: outlined.files };
+          }
           const reader = { buildFile: (request) => {
             if (signal?.aborted) throw new Error("superseded");
             progress?.("parsing"); return buildingCore.buildFile(request);
           } };
-          ({ result: doc, files: collected } = await collectFile(reader, { ...request, files: outlined.files }, read));
+          const read1 = await collectFile(reader, { ...request, file, files: outlined.files }, read);
           // kept when the document has every file it asks for
-          if (key && !signal?.aborted && doc.missing.length === 0) {
-            const stored = { result: structuredClone(doc), library: now.library };
+          if (key && !signal?.aborted && read1.result.missing.length === 0) {
+            const stored = { result: structuredClone(read1.result), library: now.library };
             cache.put(key, stored, stored).catch(() => {});
           }
+          return read1;
+        };
+        // the other files to check, each told as it is read, or why it could not be; the file of the source last, so that
+        // the core keeps its drawings
+        for (const file of check?.files ?? []) {
+          if (signal?.aborted) throw new Error("superseded");
+          try { check.each(file, (await readFile(file, false)).result, null); }
+          catch (e) {
+            if (signal?.aborted) throw e;
+            check.each(file, null, e instanceof Error ? e.message : String(e));
+          }
         }
+        ({ result: doc, files: collected } = await readFile(request.file, fresh));
         // the texts of the other files, which the reading of one leaves out, for the netlist pane
         for (const f of doc.files) {
           if (f.text) continue;
@@ -1156,6 +1172,15 @@ export default {
     candidates.delete(doc);
     pendingCores.delete(candidate);
     replenishCore();
+  },
+  /**
+   * Read each of `files`, files of the document `source` reads as `build` with `perFile` names them, alone in the
+   * context of its entry, with `edits` over the texts, and give each to `each(file, result, error)` as it is read: the
+   * reading (a FileResult), or null and why it could not be read. The readings are kept as an open keeps them.
+   */
+  async checkFiles(source, edits, files, each, signal) {
+    const doc = await this.build(source, edits, undefined, undefined, signal, { perFile: true, check: { files, each } });
+    this.discardBuild(doc);
   },
   discardBuild(doc) {
     const candidate = candidates.get(doc);

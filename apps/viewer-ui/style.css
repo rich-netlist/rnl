@@ -819,6 +819,10 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 .counts .chip:hover { background: var(--hover); }
 .counts .chip.on { font-weight: 600; box-shadow: inset 0 -2px 0 currentColor; }
 .counts .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* the switch to the problems of every file, for the reading of one file of several (problems.js), at the right */
+.problems-scope { margin-left: auto; gap: 6px; align-items: center; }
+.problems-scope[hidden] { display: none; }
+.problems-scope .checked { color: var(--muted); }
 
 /* ------------------------------------------------------------------ status bar */
 

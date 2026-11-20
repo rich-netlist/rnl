@@ -41,6 +41,9 @@
  * @property {boolean} [perFile] Whether `build` with `{ perFile: true }` reads the file of the source alone, in the
  *   context of its entry, and gives its `FileResult` with the outline of the whole document as `outline` (see the
  *   README's Reading the file shown alone); the page then names the file by the source's `view` (visit-source.js).
+ * @property {(source: Source, edits: Edits | undefined, files: string[], each: (file: string, result: object | null, error: string | null) => void, signal?: AbortSignal) => Promise<void>} [checkFiles]
+ *   With `perFile`, read each of `files` of the document `source` reads, alone in the context of its entry, and give
+ *   each reading, or why it could not be read, to `each` as it is read: Check All Files (file-checks.js).
  * @property {boolean} nativeMenu Whether the platform shows the menu bar itself; if not, the page shows
  *   its own (menubar.js).
  * @property {() => Promise<Source | null>} initial What to open at start, if anything: on the desktop,

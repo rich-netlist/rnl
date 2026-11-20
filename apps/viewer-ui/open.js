@@ -18,7 +18,8 @@ import { bindings, constraintsWanted, current, doc, expanded, selected, selected
 import { clearDrawing, fit, notice, showLevel, view } from "./drawing.js";
 import { renderHierarchy, rootPath } from "./hierarchy.js";
 import { setProblems } from "./panels.js";
-import { markDiagnostics, renderDiagnostics } from "./problems.js";
+import { renderDiagnostics } from "./problems.js";
+import { noteShown } from "./file-checks.js";
 import { startLevel, uncalledRoots } from "./roots.js";
 import { clearSelection, select } from "./selection.js";
 import { endPreview, previewing, solve } from "./solve.js";
@@ -335,8 +336,9 @@ function showDocument(before, navigation) {
   renderFiles(file);
   const diags = doc.diagnostics.slice();
   if (doc.failed) diags.unshift({ severity: "error", message: doc.failed, file: "", line: 0, col: 0, origin: "" });
+  // the problems of a file read alone are kept, for those of every file (file-checks.js)
+  noteShown(doc);
   renderDiagnostics(diags);
-  markDiagnostics(diags);
   $("search").value = "";
 
   if (before) {
