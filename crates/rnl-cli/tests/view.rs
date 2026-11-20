@@ -70,3 +70,36 @@ fn the_files_are_read_as_the_disk_holds_them() {
     assert_eq!((none.file_index, none.line), (Some(0), 3));
     assert_eq!(d.missing, [path_str(&std::path::absolute(dir.join("lib").join("none.inc")).unwrap())]);
 }
+
+#[test]
+fn view_with_file_prints_the_reading_of_that_file_alone() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("view-file");
+    std::fs::create_dir_all(dir.join("lib")).unwrap();
+    std::fs::write(dir.join("top.sp"), "* top\n.include \"lib/parts.inc\"\nX1 a b part\n.end\n").unwrap();
+    std::fs::write(dir.join("lib/parts.inc"), "* parts\n.subckt part p q\nR1 p q 1k\n.ends\n").unwrap();
+    let top = path_str(&std::path::absolute(dir.join("top.sp")).unwrap());
+    let view = |file: &str| {
+        let out = std::process::Command::new(env!("CARGO_BIN_EXE_rnl"))
+            .args(["view", &top, "--file", file, "--flylines"])
+            .output()
+            .unwrap();
+        (out.status.code(), String::from_utf8(out.stdout).unwrap(), String::from_utf8(out.stderr).unwrap())
+    };
+    let options = BuildOptions { flylines: true, ..BuildOptions::default() };
+    let expected =
+        serde_json::to_value(rnl_view::build_file(&top, "lib/parts.inc", &FsProvider::new(&[]), &options).unwrap())
+            .unwrap();
+    assert_eq!(expected["file"], "lib/parts.inc");
+    assert_eq!(expected["levels"][0]["title"], "part");
+    // the file as the document names it, or a path to it
+    let absolute = path_str(&std::path::absolute(dir.join("lib/parts.inc")).unwrap());
+    for given in ["lib/parts.inc", absolute.as_str()] {
+        let (code, stdout, stderr) = view(given);
+        assert_eq!(code, Some(0), "{stderr}");
+        assert_eq!(serde_json::from_str::<serde_json::Value>(&stdout).unwrap(), expected, "{given}");
+    }
+    // a file the document does not read
+    let (code, stdout, stderr) = view("lib/other.inc");
+    assert_ne!(code, Some(0));
+    assert!(stdout.is_empty() && stderr.contains("lib/other.inc") && stderr.contains("lib/parts.inc"), "{stderr}");
+}
