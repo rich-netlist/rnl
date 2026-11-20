@@ -507,7 +507,7 @@ dependencies = [
 
 [[package]]
 name = "rnl-viewer-local"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "mimalloc",
  "rnl-cli",
