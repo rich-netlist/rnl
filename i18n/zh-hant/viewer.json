@@ -493,7 +493,7 @@
   "&Include File...": "引入檔案(&I)...",
   "Include &Folder (with Sub-folders)...": "引入資料夾（含子資料夾）(&F)...",
   "Add Folder to &PATH (with Sub-folders)...": "將資料夾新增至 PATH（含子資料夾）(&P)...",
-  "Include Public &Package...": "引入公開套件(&P)...",
+  "Include Public Pac&kage...": "引入公開套件(&K)...",
   "Open &URL...": "開啟 URL(&U)...",
   "Open Projec&t...": "開啟專案(&T)...",
   "Load &Manifest...": "載入清單(&M)...",

@@ -357,6 +357,32 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
             app.roots.allow_chosen(&dir).map_err(forbidden)?;
             Ok(Response::json(200, &json!({ "dir": allow.dir })))
         }
+        "/api/path" if get => {
+            // a PATH folder of the settings, and no other: the chooser (`/api/ls`) gives names; this gives what the Library
+            // reads, and allows it to be read
+            let dir = request.param("dir").filter(|d| !d.is_empty()).ok_or_else(|| bad("which folder?"))?;
+            let subfolders = request.param("subfolders").is_some_and(|s| s == "1");
+            let values = app.settings.values();
+            let listed = |key: &str| {
+                values.get(key).and_then(|v| v.as_array()).is_some_and(|a| a.iter().any(|p| p.as_str() == Some(&dir)))
+            };
+            if !listed("search-paths") {
+                return Err(forbidden("only a folder the settings have as PATH is listed"));
+            }
+            if subfolders && !listed("search-paths-subfolders") {
+                return Err(forbidden("the sub-folders of a PATH folder are listed only when it was added with them"));
+            }
+            let path = files::machine_path(&dir);
+            if !path.is_absolute() {
+                return Err(bad("the path is not absolute"));
+            }
+            app.roots.allow_chosen(&path).map_err(forbidden)?;
+            let (found, truncated) = files::path_files(&path, subfolders).map_err(bad)?;
+            Ok(Response::json(
+                200,
+                &json!({ "files": found.iter().map(|p| files::page_path(p)).collect::<Vec<_>>(), "truncated": truncated }),
+            ))
+        }
         "/api/save" if method == "POST" => {
             #[derive(Deserialize)]
             struct Save {
@@ -732,6 +758,104 @@ mod tests {
         assert_eq!(app.has_unsaved(), 3);
         assert_eq!(ask(&app, &get("/api/changes?since=0&unsaved=0", Some(&key)), b"").0, 200);
         assert_eq!(app.has_unsaved(), 0);
+    }
+
+    #[test]
+    fn only_a_path_folder_of_the_settings_is_listed_and_nothing_outside_it() {
+        let (app, token, _) = app(Site::Embedded);
+        let key = sign_in(&app, &token);
+        let base = std::env::temp_dir().join(format!(
+            "rnl-local-path-{}-{}",
+            std::process::id(),
+            &crate::security::random_hex()[..8]
+        ));
+        let (lib, outside) = (base.join("lib"), base.join("outside"));
+        for dir in ["lib/0.4", "lib/sub/deeper", "lib/.hid", "outside"] {
+            std::fs::create_dir_all(base.join(dir)).unwrap();
+        }
+        for file in [
+            "lib/a.rnl",
+            "lib/n.sp",
+            "lib/notes.txt",
+            "lib/0.4/v.rnl",
+            "lib/sub/s.rnl",
+            "lib/sub/deeper/d.inc",
+            "lib/.hid/h.rnl",
+            "lib/.h.rnl",
+            "outside/secret.sp",
+        ] {
+            std::fs::write(base.join(file), "* x\n").unwrap();
+        }
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(outside.join("secret.sp"), lib.join("out.sp")).unwrap();
+            std::os::unix::fs::symlink(&outside, lib.join("linked")).unwrap();
+            std::os::unix::fs::symlink(&outside, lib.join("1.0")).unwrap();
+            std::os::unix::fs::symlink(lib.join("a.rnl"), lib.join("same.rnl")).unwrap();
+        }
+        let page = |p: &Path| files::page_path(p);
+        let list = |dir: &str, subfolders: bool| {
+            let query = format!("dir={}{}", encode_path(dir), if subfolders { "&subfolders=1" } else { "" });
+            let (status, _, body) = ask(&app, &get(&format!("/api/path?{query}"), Some(&key)), b"");
+            (status, serde_json::from_slice::<serde_json::Value>(&body).unwrap_or_default())
+        };
+        let set = |name: &str, value: serde_json::Value| {
+            let (head, body) = post("/api/settings", &key, &json!({ "key": name, "value": value }));
+            assert_eq!(ask(&app, &head, &body).0, 200);
+        };
+        let names = |listing: &serde_json::Value| -> Vec<String> {
+            let prefix = format!("{}/", page(&lib));
+            let files = listing["files"].as_array().unwrap();
+            files
+                .iter()
+                .map(|f| f.as_str().unwrap().strip_prefix(&prefix).expect("below the PATH folder").to_string())
+                .collect()
+        };
+        // without the session, nothing
+        assert_eq!(ask(&app, &get(&format!("/api/path?dir={}", encode_path(&page(&lib))), None), b"").0, 403);
+        // a folder the settings do not have as PATH is not listed, and its files are not served
+        assert_eq!(list(&page(&lib), false).0, 403);
+        assert_eq!(ask(&app, &get(&furl(&lib.join("a.rnl")), Some(&key)), b"").0, 403);
+        set("search-paths", json!([page(&lib)]));
+        let (status, listing) = list(&page(&lib), false);
+        assert_eq!(status, 200, "{listing}");
+        let mut expected = vec!["0.4/v.rnl", "a.rnl", "n.sp"];
+        if cfg!(unix) {
+            expected.push("same.rnl"); // a link that stays in the folder is a file of it
+        }
+        expected.sort();
+        assert_eq!(names(&listing), expected);
+        assert_eq!(listing["truncated"], json!(false));
+        // now its files are served, and still nothing hidden in it, nor what a link of it leads to outside it
+        assert_eq!(ask(&app, &get(&furl(&lib.join("a.rnl")), Some(&key)), b"").0, 200);
+        assert_eq!(ask(&app, &get(&furl(&lib.join(".h.rnl")), Some(&key)), b"").0, 403);
+        assert_eq!(ask(&app, &get(&furl(&lib.join("out.sp")), Some(&key)), b"").0, 403);
+        assert_eq!(ask(&app, &get(&furl(&outside.join("secret.sp")), Some(&key)), b"").0, 403);
+        // its sub-folders only when it was added with them, and then not through a link
+        assert_eq!(list(&page(&lib), true).0, 403);
+        set("search-paths-subfolders", json!([page(&lib)]));
+        let (status, listing) = list(&page(&lib), true);
+        assert_eq!(status, 200, "{listing}");
+        let mut expected = vec!["0.4/v.rnl", "a.rnl", "n.sp", "sub/deeper/d.inc", "sub/s.rnl"];
+        if cfg!(unix) {
+            expected.push("same.rnl");
+        }
+        expected.sort();
+        assert_eq!(names(&listing), expected);
+        // no other folder by way of one that is: above it, beside it, or the same written otherwise
+        assert_eq!(list(&page(&outside), false).0, 403);
+        assert_eq!(list(&page(&base), false).0, 403);
+        assert_eq!(list(&format!("{}/../outside", page(&lib)), false).0, 403);
+        assert_eq!(list(&format!("{}/", page(&lib)), false).0, 403);
+        assert_eq!(list(&page(&lib.join("sub")), false).0, 403);
+        // and a PATH folder of the settings that is too broad to give, or hidden, is refused as Include Folder's is
+        let home = files::home().expect("a home folder");
+        let root = base.ancestors().last().unwrap().to_path_buf();
+        set("search-paths", json!([page(&home), page(&root), page(&lib.join(".hid"))]));
+        assert_eq!(list(&page(&home), false).0, 403);
+        assert_eq!(list(&page(&root), false).0, 403);
+        assert_eq!(list(&page(&lib.join(".hid")), false).0, 403);
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]

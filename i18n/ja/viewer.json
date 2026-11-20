@@ -493,7 +493,7 @@
   "&Include File...": "ファイルをインクルード(&I)...",
   "Include &Folder (with Sub-folders)...": "フォルダをインクルード（サブフォルダを含む）(&F)...",
   "Add Folder to &PATH (with Sub-folders)...": "フォルダをPATHに追加（サブフォルダを含む）(&P)...",
-  "Include Public &Package...": "公開パッケージをインクルード(&P)...",
+  "Include Public Pac&kage...": "公開パッケージをインクルード(&K)...",
   "Open &URL...": "URLを開く(&U)...",
   "Open Projec&t...": "プロジェクトを開く(&T)...",
   "Load &Manifest...": "マニフェストを読み込む(&M)...",

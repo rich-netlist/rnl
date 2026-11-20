@@ -212,6 +212,65 @@ test("the chooser lists the machine's files, goes up and in, and opens the one c
   expect((await document(page)).path.replaceAll("\\", "/")).toMatch(/proj\/sim\/other\.sp$/);
 });
 
+test("Add Folder to PATH (with Sub-folders) chooses a folder of the machine, whose files the Library lists and opens, and no other folder is listed", async ({ page }) => {
+  mkdirSync(join(work, "lib", "cells"), { recursive: true });
+  mkdirSync(join(work, "lib", ".hidden"), { recursive: true });
+  writeFileSync(join(work, "lib", "amp.sp"), "* An amplifier\nR5 in out 5k\n.end\n");
+  writeFileSync(join(work, "lib", "cells", "inv.inc"), "* An inverter\n");
+  writeFileSync(join(work, "lib", ".hidden", "secret.inc"), "* hidden\n");
+  writeFileSync(join(work, "lib", "notes.txt"), "not a netlist\n");
+  await open(page);
+  const lib = join(work, "lib").replaceAll("\\", "/");
+  const pagePath = (p) => (process.platform === "win32" ? `/${p}` : p);
+  const listed = (dir, subfolders) => page.evaluate(async ({ dir, subfolders }) => {
+    const response = await fetch(`api/path?${new URLSearchParams({ dir, ...(subfolders ? { subfolders: "1" } : {}) })}`, { headers: { "X-RNL": "1" } });
+    return response.status;
+  }, { dir, subfolders });
+  // before it is PATH, the program lists it to no one
+  expect(await listed(pagePath(lib), false)).toBe(403);
+  // the chooser starts in the folder of the netlist: up twice, into lib, and that folder chosen
+  await page.evaluate(() => window.viewer.command("add-path-subfolders"));
+  const dialog = page.locator("dialog.dialog");
+  const options = dialog.locator(".dialog-option");
+  await expect(dialog.locator(".dialog-title")).toHaveText("Choose Folder");
+  for (let i = 0; i < 2; i++) {
+    await options.filter({ hasText: "Parent folder" }).click();
+    await dialog.getByRole("button", { name: "Choose" }).click();
+  }
+  await options.filter({ hasText: "lib/" }).dblclick();
+  await options.filter({ hasText: "Choose this folder" }).click();
+  await dialog.getByRole("button", { name: "Choose" }).click();
+  await expect.poll(() => JSON.parse(readFileSync(join(work, "settings.json"), "utf8"))["search-paths-subfolders"]).toEqual([pagePath(lib)]);
+  expect(JSON.parse(readFileSync(join(work, "settings.json"), "utf8"))["search-paths"]).toEqual([pagePath(lib)]);
+  // the Library lists its netlists, those of its sub-folders too, nothing hidden and nothing else
+  await page.locator("#tab-files").click();
+  const group = page.locator(`.lib-group[data-group=${JSON.stringify(`path:${pagePath(lib)}`)}]`);
+  await expect(group.locator(".lib-deep")).toHaveText("with sub-folders");
+  // (showing the Library scans PATH again: its rows are made again when that ends)
+  await expect(page.locator("#library-groups")).not.toHaveAttribute("aria-busy", "true");
+  await group.locator(".lib-toggle").click();
+  await expect(group.locator(".pool-open")).toHaveText(["amp.sp", "cells/inv.inc"]);
+  // a file of it opens, read from the machine
+  await group.locator(".pool-open", { hasText: "amp.sp" }).click();
+  await page.waitForFunction(() => window.viewer.doc?.path.endsWith("amp.sp"));
+  expect((await document(page)).files[0].text).toContain("R5 in out 5k");
+  // the program lists that folder, and no other: not the one above it, not one below it, not the same written otherwise
+  expect(await listed(pagePath(lib), true)).toBe(200);
+  expect(await listed(pagePath(join(work, "proj").replaceAll("\\", "/")), false)).toBe(403);
+  expect(await listed(pagePath(work.replaceAll("\\", "/")), false)).toBe(403);
+  expect(await listed(`${pagePath(lib)}/cells`, false)).toBe(403);
+  expect(await listed(`${pagePath(lib)}/../proj`, false)).toBe(403);
+  // and it is still PATH after the program is started again
+  server.kill();
+  ({ child: server, base, address } = await start(join(work, "proj", "sim", "top.sp")));
+  await open(page);
+  await page.locator("#tab-files").click();
+  await expect(group.locator(".lib-deep")).toHaveText("with sub-folders");
+  await expect(page.locator("#library-groups")).not.toHaveAttribute("aria-busy", "true");
+  await group.locator(".lib-toggle").click();
+  await expect(group.locator(".pool-open")).toHaveText(["amp.sp", "cells/inv.inc"]);
+});
+
 test("the settings are kept in a file of the user's own, and survive the program", async ({ page }) => {
   await open(page);
   await page.evaluate(() => window.viewer.command("toggle-currents"));
