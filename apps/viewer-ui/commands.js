@@ -4,7 +4,7 @@ import { languageFor, m, locale, setLanguage, translate, uiLanguages } from "./i
 // item its id, its label, its keys and the platforms that offer it. A command runs by its id,
 // whether it comes from the platform's menu, the HTML menu bar or a key.
 
-import { includeFiles, reloadLibrary, toggleAutoInclude } from "./pool.js";
+import { addPath, includeFiles, reloadLibrary, toggleAutoInclude } from "./pool.js";
 import { setBackground } from "./background.js";
 import { inform } from "./dialog.js";
 import { cancelGesture, fit, pan, zoomCenter } from "./drawing.js";
@@ -90,6 +90,7 @@ export function command(id, options = {}) {
     case "open": pickAndOpen("file"); break;
     case "include-file": includeFiles("file"); break;
     case "include-folder": includeFiles("folder"); break;
+    case "add-path-subfolders": addPath(true); break;
     case "include-library": includeFiles("library"); break;
     case "open-url": pickAndOpen("url"); break;
     case "load-clipboard": loadClipboard(); break;
