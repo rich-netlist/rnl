@@ -457,7 +457,9 @@ X2 m out inv
         let files = MemoryProvider::new().with("/w/top.scs", top).with("/w/a.va", a).with("/w/b.va", b);
         let o = outline("/w/top.scs", &files, &BuildOptions::default()).unwrap();
         let at = |title: &str| o.levels.iter().position(|l| l.title == title).unwrap();
-        let calls = |k: usize| -> Vec<(&str, Option<usize>, usize, Vec<&str>, Vec<u32>)> {
+        // each call: the name, the level that defines it, how many, the instances and their lines
+        type Call<'a> = (&'a str, Option<usize>, usize, Vec<&'a str>, Vec<u32>);
+        let calls = |k: usize| -> Vec<Call> {
             o.levels[k]
                 .calls
                 .iter()
