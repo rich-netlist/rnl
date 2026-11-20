@@ -181,6 +181,88 @@ impl Roots {
     }
 }
 
+/// The files the Library reads in a PATH folder: netlists and packages, by their names.
+const NETLISTS: [&str; 11] = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "inc", "lib", "scs", "rnl"];
+
+/// The most sub-folders of a PATH folder added with its sub-folders that are searched, as on the desktop.
+pub const SUBFOLDER_LIMIT: usize = 500;
+
+/// The packages and netlists of a PATH folder, as the desktop viewer's Library lists them: those of the folder and of its
+/// folders named by a version number, and with `subfolders` those of the folders below it, depth first, up to
+/// [`SUBFOLDER_LIMIT`] (which the second value says was reached). Nothing hidden, no folder reached through a link, and
+/// no file that is not in the folder as the file system resolves it: a link that leads out of it is not listed. Each file
+/// is named below `dir` as given.
+pub fn path_files(dir: &Path, subfolders: bool) -> Result<(Vec<PathBuf>, bool), String> {
+    let root = canonical(dir).filter(|d| d.is_dir()).ok_or_else(|| format!("{} is not a folder", dir.display()))?;
+    let mut dirs = vec![dir.to_path_buf()];
+    let mut truncated = false;
+    if subfolders {
+        truncated = folders_below(dir, &mut dirs);
+    }
+    let mut found = Vec::new();
+    for folder in &dirs {
+        path_folder(folder, &root, &mut found);
+    }
+    found.sort();
+    found.dedup();
+    Ok((found, truncated))
+}
+
+/// The folders below `dir`, depth first in the order of their names, into `out` until it holds [`SUBFOLDER_LIMIT`] of
+/// them beyond the first; whether it did. Not hidden ones, not links, not the folders of a version.
+fn folders_below(dir: &Path, out: &mut Vec<PathBuf>) -> bool {
+    let Ok(entries) = std::fs::read_dir(dir) else { return false };
+    let mut children: Vec<PathBuf> = entries
+        .filter_map(Result::ok)
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            !name.starts_with('.') && !rnl_runtime::source::version_directory(&name)
+        })
+        .map(|e| e.path())
+        .collect();
+    children.sort();
+    for child in children {
+        if out.len() > SUBFOLDER_LIMIT {
+            return true;
+        }
+        out.push(child.clone());
+        if folders_below(&child, out) {
+            return true;
+        }
+    }
+    false
+}
+
+/// The netlists and packages of one folder, and of its folders named by a version number, that are in `root`.
+fn path_folder(dir: &Path, root: &Path, out: &mut Vec<PathBuf>) {
+    let visible = |e: &std::fs::DirEntry| !e.file_name().to_string_lossy().starts_with('.');
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    for entry in entries.filter_map(Result::ok).filter(visible) {
+        if entry.file_type().is_ok_and(|t| t.is_dir()) {
+            if rnl_runtime::source::version_directory(&entry.file_name().to_string_lossy()) {
+                let Ok(children) = std::fs::read_dir(entry.path()) else { continue };
+                for child in children.filter_map(Result::ok).filter(visible) {
+                    path_file(child.path(), root, out);
+                }
+            }
+        } else {
+            path_file(entry.path(), root, out);
+        }
+    }
+}
+
+/// A netlist or package, when it is a file in `root` as the file system resolves it, with nothing hidden on the way.
+fn path_file(path: PathBuf, root: &Path, out: &mut Vec<PathBuf>) {
+    let named = path.extension().is_some_and(|e| NETLISTS.iter().any(|x| e.eq_ignore_ascii_case(x)));
+    let inside = || {
+        canonical(&path).is_some_and(|real| real.is_file() && real.strip_prefix(root).is_ok_and(|below| !hidden(below)))
+    };
+    if named && inside() {
+        out.push(path);
+    }
+}
+
 /// One entry of a folder, for the file chooser of the page.
 #[derive(Debug, Serialize)]
 pub struct Entry {
@@ -612,6 +694,21 @@ mod tests {
         assert!(allowed.iter().any(|d| *d == dir || dir.starts_with(d)));
         let filesystem_root = dir.ancestors().last().unwrap().to_path_buf();
         assert!(!allowed.contains(&filesystem_root));
+    }
+
+    #[test]
+    fn a_path_folder_with_its_sub_folders_stops_at_the_limit_and_says_so() {
+        let dir = temp("path-many");
+        for i in 0..SUBFOLDER_LIMIT + 5 {
+            std::fs::create_dir_all(dir.join(format!("d{i:04}"))).unwrap();
+            std::fs::write(dir.join(format!("d{i:04}/f.sp")), "x").unwrap();
+        }
+        let (found, truncated) = path_files(&dir, false).unwrap();
+        assert!(found.is_empty() && !truncated);
+        let (found, truncated) = path_files(&dir, true).unwrap();
+        assert!(truncated);
+        assert_eq!(found.len(), SUBFOLDER_LIMIT);
+        assert!(path_files(&dir.join("none"), false).is_err());
     }
 
     #[test]

@@ -37,7 +37,7 @@ async function syncPool(reload = false) {
   const all = [...items];
   const seen = new Set(all.map((i) => i.path));
   for (const { files } of scanned.values()) for (const path of files) {
-    if (!seen.has(path)) { all.push({ path, searchPath: true, source: { path, name: path } }); seen.add(path); }
+    if (!seen.has(path)) { all.push({ path, searchPath: true, ...(shell.pathItem?.(path) ?? { source: { path, name: path } }) }); seen.add(path); }
   }
   // the files of an external manifest are searched as the Library's are: for bare includes, packages
   // by name and Auto Include, by any file opened; its pool first, in its order
@@ -67,6 +67,9 @@ export async function toggleAutoInclude(value = !load("auto-include", true)) {
 }
 
 export const reloadLibrary = () => update(async () => {}, true, true);
+
+/** A file of a PATH directory, as the Library searches and opens it: by the shell's source where it reads it itself (the local program's page). */
+const pathItem = (path) => shell.pathItem?.(path) ?? { source: { path, name: path, library: true } };
 
 // Native choosers/CLI arguments use Windows separators; the lookup provider lists forward slashes.
 const filePath = (path) => shell.platform === "desktop" ? path.replace(/\\/g, "/") : path;
@@ -443,8 +446,7 @@ function render() {
   if (shell.pathPackages) paths().forEach((dir, index, all) => {
     const prefix = dir.replace(/\\/g, "/").replace(/\/$/, "") + "/";
     const files = (scanned.get(dir)?.files || []).map((path) => ({
-      path, name: path.startsWith(prefix) ? path.slice(prefix.length) : path,
-      source: { path, name: path, library: true },
+      path, name: path.startsWith(prefix) ? path.slice(prefix.length) : path, source: pathItem(path).source,
     }));
     append(groups, group(`path:${dir}`, dir, files, "path", { index, all, deep: deep.has(dir) }));
   });

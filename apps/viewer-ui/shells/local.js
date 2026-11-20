@@ -210,6 +210,21 @@ export default {
     await api("api/open", { method: "POST", body: { path: written.path } });
     return serverSource(written.path);
   },
+  /** Add PATH: a folder of the machine of the program, chosen as Include Folder's is. */
+  async pickPath() {
+    const chosen = await chooseOnServer(api, { kind: "folder", start: lastDir, title: m("Choose Folder"), browser: null, action: tr("Choose"), remember });
+    return chosen?.path ?? null;
+  },
+  /**
+   * The packages and netlists of a PATH folder, as lookup finds them there, and with `subfolders` those of the folders
+   * below it: the program lists a folder only when the settings have it as PATH (and with its sub-folders, for those).
+   */
+  pathPackages: (dir, subfolders = false) => api(`api/path?${new URLSearchParams({ dir, ...(subfolders ? { subfolders: "1" } : {}) })}`),
+  /** A file of a PATH folder, read from the machine as a file opened is. */
+  pathItem(path) {
+    const source = { ...serverSource(path), library: true };
+    return { source, read: web.poolItem(source).read };
+  },
   // the settings are the program's: in a file of the user's own
   loadSettings: async () => api("api/settings"),
   saveSetting: (key, value) => save(key, value).then(() => undefined),

@@ -17,7 +17,8 @@
  * @property {(kind: string) => Promise<object[]>} [include] Include files, a folder or a library package.
  * @property {(items: object[], reload?: boolean, refresh?: string[]) => Promise<string[]> | void} [setPool] Replace and index the search pool; reload rereads all files, refresh replaces named entries. Returns read errors.
  * @property {() => Promise<string | null>} [pickPath] Pick a desktop search directory.
- * @property {(dir: string) => Promise<string[]>} [pathPackages] Package and netlist paths in a desktop PATH directory.
+ * @property {(dir: string, subfolders?: boolean) => Promise<string[] | { files: string[], truncated?: boolean }>} [pathPackages] Package and netlist paths in a PATH directory (desktop, and the local program's page), with those of its sub-folders when asked.
+ * @property {(path: string) => { source: Source, read?: () => Promise<File> }} [pathItem] A file of a PATH directory as the Library searches and opens it, for a shell that reads it itself; without it, the shell builds from the path.
  * @property {(source: Source) => object} [poolItem] A web source's entry as a searchable file.
  * @property {() => Promise<Array<{name: string, title: string, extensions: string[], fallback: boolean}>>} [formats] The core's parse formats, in its order, for the Library's format menus before a Document lists them.
  * @property {() => Promise<{ bundled: boolean, catalog: string, fetched: string, packages: Array<{ name: string, version: string, kind: string, path: string }>, licenses: string[] }>} [bundledPackages] The public packages that this build bundles (desktop): none in the build without them; they are found without a network.
