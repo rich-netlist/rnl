@@ -822,5 +822,13 @@
   "1 instance": "1 個實例",
   "{0} instances": "{0} 個實例",
   "Kept: opens at once": "已快取：可立即開啟",
-  "Read in {0} s the last time": "上次讀取耗時 {0} 秒"
+  "Read in {0} s the last time": "上次讀取耗時 {0} 秒",
+  "Limit in memory (MiB)": "記憶體上限（MiB）",
+  "Limit in this browser's storage (MiB)": "此瀏覽器儲存空間上限（MiB）",
+  "Readings in memory: {0} ({1} MiB) · {2} hits, {3} misses": "記憶體中的讀取結果：{0} 個（{1} MiB）· 命中 {2} 次，未命中 {3} 次",
+  "Readings in this browser's storage: {0} ({1} MiB)": "此瀏覽器儲存空間中的讀取結果：{0} 個（{1} MiB）",
+  "This browser keeps nothing for the site, as in a private window: the readings are kept in memory alone.": "此瀏覽器不為本網站保存任何內容，如同在私密視窗中：讀取結果只保存在記憶體中。",
+  "Keep the reading of each file, so that a file shown again, also in a later visit, is not read again: in memory for this page, and in this browser's storage for this site. The least recently used go first. Set 0 to keep none there.": "保存每個檔案的讀取結果，再次顯示某個檔案時（包括之後再造訪時）不必重新讀取：在記憶體中為此頁面保存，在此瀏覽器的儲存空間中為本網站保存。優先移除最久未使用的結果。設為 0 則該處不保存。",
+  "Enter a whole number from 0 to 65536.": "請輸入 0 到 65536 之間的整數。",
+  "This build of the core keeps no readings: it does not say its version.": "此核心建置不保存讀取結果：它沒有提供自己的版本。"
 }

@@ -822,5 +822,13 @@
   "1 instance": "インスタンス 1 個",
   "{0} instances": "インスタンス {0} 個",
   "Kept: opens at once": "キャッシュ済み：すぐに開きます",
-  "Read in {0} s the last time": "前回の読み込みは {0} 秒"
+  "Read in {0} s the last time": "前回の読み込みは {0} 秒",
+  "Limit in memory (MiB)": "メモリの上限 (MiB)",
+  "Limit in this browser's storage (MiB)": "このブラウザのストレージの上限 (MiB)",
+  "Readings in memory: {0} ({1} MiB) · {2} hits, {3} misses": "メモリ内の読み込み結果：{0} 件（{1} MiB）· ヒット {2} 回、ミス {3} 回",
+  "Readings in this browser's storage: {0} ({1} MiB)": "このブラウザのストレージ内の読み込み結果：{0} 件（{1} MiB）",
+  "This browser keeps nothing for the site, as in a private window: the readings are kept in memory alone.": "このブラウザは、プライベートウィンドウのように、このサイトのデータを何も保存しません。読み込み結果はメモリにのみ保持されます。",
+  "Keep the reading of each file, so that a file shown again, also in a later visit, is not read again: in memory for this page, and in this browser's storage for this site. The least recently used go first. Set 0 to keep none there.": "各ファイルの読み込み結果を保持し、再び表示するファイルは、後で再訪したときも読み込み直しません。このページ用にはメモリに、このサイト用にはこのブラウザのストレージに保持します。最も長く使われていないものから削除されます。0に設定すると、そこには保持しません。",
+  "Enter a whole number from 0 to 65536.": "0から65536までの整数を入力してください。",
+  "This build of the core keeps no readings: it does not say its version.": "このコアのビルドは読み込み結果を保持しません。自身のバージョンを示さないためです。"
 }
