@@ -13,6 +13,7 @@ R2 mid bot 10k
 
 
 
+*! the port tags come from the fill of the standard package ($PORT_FILL_SET)
 * @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:ca0b1e338503f9a1.ad05c39eeaa64c43", numbering="591b5c4536d312bd") {
 *   %net_label_stub_R1_p = $NET_LABEL_STUB @ATTACH #R1::p;
 *   %net_label_stub_R2_n = $NET_LABEL_STUB @ATTACH #R2::n;

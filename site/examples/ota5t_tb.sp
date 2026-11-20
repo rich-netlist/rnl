@@ -99,9 +99,10 @@ CL  out 0 1p
 *   #XU1 is at @PLACE(20, 14);
 *   {#VIP #VIN #XU1 #CL} are in @ORDER("left-to-right");
 *   nets {&inp &inn &out &vdd &vb} are @ROUTE-NET;
+*   &inp has @TEXT("inp"); &inn has @TEXT("inn"); &vdd has @TEXT("vdd"); &out has @TEXT("out");
 *   at (-0.5, 24) there is a @TEXT("5T OTA testbench") => it @SET-STYLE to $note
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:f4ef6ff4f65e03f4.d35edb05f08d8cb8", numbering="fbe32a703a31ac83") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:4d9e482c9f11e5c0.8673ead7048bc0bc", numbering="a4a24d54cf4ff55f") {
 *   %ground_stub_XU1_vss = $GROUND_STUB @ATTACH(gap=3) #XU1:vss;
 *   %ground_stub_VDD_n = $GROUND_STUB @ATTACH(gap=3) #VDD::n;
 *   %ground_stub_VB_n = $GROUND_STUB @ATTACH(gap=3) #VB::n;
@@ -126,15 +127,15 @@ CL  out 0 1p
 *   %ground_stub_VIN_n::g @PLACE(6, 10) => @ORIENT("R0");
 *   %ground_stub_CL_n @PLACE(0, 0);
 *   %ground_stub_CL_n::g @PLACE(36, 12) => @ORIENT("R0");
-*   %#1 @PLACE(-0.5, 24);
-*   %#2 @PLACE(-0.5, 24);
+*   %#5 @PLACE(-0.5, 24);
+*   %#6 @PLACE(-0.5, 24);
 *   &inp @WIRE(mode="straight") {#VIP::p (-1, 16) #XU1:inp};
 *   &inn @WIRE(mode="straight") {#VIN::p #XU1:inn};
 *   &out @WIRE(mode="straight") {#XU1:out #CL::p};
 *   &vdd @WIRE(mode="straight") {#XU1:vdd (19, 26) #VDD::p};
 *   &vb @WIRE(mode="straight") {#VB::p #XU1:vbias};
-*   %#4 @WIRE(mode="straight") {#VDD::n (26, 26) %ground_stub_VDD_n::g::pin};
-*   %#7 @WIRE(mode="straight") {#VIN::n (6, 12) %ground_stub_VIN_n::g::pin};
-*   %#8 @WIRE(mode="straight") {#CL::n (36, 14) %ground_stub_CL_n::g::pin}
+*   %#8 @WIRE(mode="straight") {#VDD::n (26, 26) %ground_stub_VDD_n::g::pin};
+*   %#11 @WIRE(mode="straight") {#VIN::n (6, 12) %ground_stub_VIN_n::g::pin};
+*   %#12 @WIRE(mode="straight") {#CL::n (36, 14) %ground_stub_CL_n::g::pin}
 * }
 .end
