@@ -111,25 +111,6 @@ const remember = (dir) => {
 /** Keep a setting in the program's file. */
 const save = (key, value) => api("api/settings", { method: "PUT", body: { key, value } });
 
-/** The files of the machine that changed on disk since the page read them: said once each, with the key that reloads them. */
-let version = 0;
-async function watchChanges() {
-  try {
-    const unsaved = new Set([...dirtyPaths(), ...unappliedPaths()]).size; // (the program does not stop while the page has changes in it that are saved nowhere)
-    const { version: now, changed } = await api(`api/changes?since=${version}&unsaved=${unsaved}`);
-    version = now;
-    if (doc && changed.length) {
-      const shown = new Set(doc.files.map((f) => sourcePath(doc, f)));
-      const mine = changed.filter((p) => shown.has(p));
-      if (mine.length) note(m`${mine[0].split("/").pop()} changed on disk. F5 reloads the netlist.`);
-    }
-  } catch {
-    // the program is gone, or has not answered yet: the next time
-  }
-  setTimeout(watchChanges, 1000);
-}
-watchChanges();
-
 // A browser gives a file dropped on the page without its path, which the desktop's rules need (Save writes a file where it
 // is): the page says so, and opens nothing.
 document.addEventListener("drop", (e) => {
@@ -366,6 +347,12 @@ export default {
     }
     return { to: saved.to, written: saved.written, copied: saved.copied };
   },
+  /**
+   * What changed on disk since the version `since` (disk-changes.js): the program looks at the files the page read. The
+   * page asks once a second, which tells the program that it is still open, and how many files have changes saved
+   * nowhere (the program does not stop while there are).
+   */
+  fileChanges: (since) => api(`api/changes?since=${since}&unsaved=${new Set([...dirtyPaths(), ...unappliedPaths()]).size}`),
   /** A format chosen for a file of the machine is kept for the next start, as the desktop keeps it. */
   keepsFormat: (path) => machineFiles.has(path),
   /** A file of a PATH folder, read from the machine as a file opened is. */
