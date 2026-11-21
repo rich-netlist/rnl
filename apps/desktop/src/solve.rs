@@ -223,13 +223,13 @@ pub fn cancel_solve(solves: State<'_, Solves>) {
 /// Save a copy of the last solve shown where the user says: a file for a netlist that reads no
 /// other file, else a folder, which gets every file written and read, in their places. A place
 /// that would replace a file that was read is refused. None when the dialog is cancelled; else
-/// what was saved, for the page to say.
+/// what was saved ([`SavedSolve`]), which the page says in the user's language.
 #[tauri::command]
 pub async fn save_solved_copy(
     window: WebviewWindow,
     solves: State<'_, Solves>,
     encoding: Option<rnl_cli::codec::OutputEncoding>,
-) -> Result<Option<String>, String> {
+) -> Result<Option<SavedSolve>, String> {
     let run = solves.last.lock().map_err(|e| e.to_string())?.clone();
     let Some(SavedCopy { copy: run, in_memory }) = run else {
         return Err("solve the netlist first: there is no solve to save".to_string());
@@ -265,7 +265,7 @@ pub async fn save_solved_copy(
         tauri::async_runtime::spawn_blocking(move || save_copy_with_encoding(&run, &to, encoding).map(|w| (w, to)))
             .await
             .map_err(|e| e.to_string())??;
-    Ok(Some(said(&saved.0, &saved.1)))
+    Ok(Some(SavedSolve::of(&saved.0, &saved.1)))
 }
 
 /// The name a copy of one file is offered under: the file's, with `-solved` before its extension.
@@ -277,21 +277,20 @@ fn copy_name(entry: &Path) -> String {
     }
 }
 
-/// What was saved, in a sentence.
-fn said(w: &rnl_cli::solve::Writing, to: &Path) -> String {
-    let n = |k: usize, one: &str, many: &str| format!("{k} {}", if k == 1 { one } else { many });
-    if w.copied.is_empty() && w.written.len() == 1 && w.written[0] == to {
-        format!("Saved the solved copy as {}.", to.display())
-    } else {
-        let mut s = format!("Saved {} into {}", n(w.written.len(), "solved file", "solved files"), to.display());
-        if !w.copied.is_empty() {
-            s.push_str(&format!(
-                ", along with {} copied alongside them",
-                n(w.copied.len(), "other file", "other files")
-            ));
-        }
-        s.push('.');
-        s
+/// What a Save Solved Copy saved, for the page to say: where (`to`, the file of a netlist that
+/// reads no other file, else the folder), how many solved files were written there, and how many
+/// other files read by the netlist were copied beside them. One file written and none copied is
+/// the solved copy saved as `to`.
+#[derive(Serialize, Debug, PartialEq)]
+pub struct SavedSolve {
+    to: String,
+    written: usize,
+    copied: usize,
+}
+
+impl SavedSolve {
+    fn of(w: &rnl_cli::solve::Writing, to: &Path) -> Self {
+        SavedSolve { to: to.display().to_string(), written: w.written.len(), copied: w.copied.len() }
     }
 }
 
@@ -302,7 +301,13 @@ mod tests {
     use rnl_solver::SolverOptions;
     use serde_json::json;
 
-    use super::{check_solver_settings, copy_name, solver_table, SavedCopy, Settings, Solves};
+    use super::{check_solver_settings, copy_name, solver_table, SavedCopy, SavedSolve, Settings, Solves};
+
+    #[test]
+    fn a_saved_copy_is_told_to_the_page_as_where_and_how_many() {
+        let saved = SavedSolve { to: "/w/out".into(), written: 2, copied: 1 };
+        assert_eq!(serde_json::to_value(&saved).unwrap(), json!({ "to": "/w/out", "written": 2, "copied": 1 }));
+    }
 
     /// Export Image draws a preview from the files the last solve wrote: there are none before a
     /// solve, and after one they are what a read of that file gives, not the file as written.
