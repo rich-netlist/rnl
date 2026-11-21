@@ -3,9 +3,8 @@
 // same holds in each language of i18n/: the labels there have their own letters, or keep the English
 // one as `(&C)`; a label the catalog does not translate shows in English. An item is shown where its platforms say, and
 // only where the shell has the capability it names `with` (and not the one it names `unless`): the page of the local
-// program is a desktop, without what a browser cannot do (`quit`, `fileAssociations`) and, for now, the bundled packages
-// (`bundledPackages`); all of them read the files of a document one by one, and keep what they read (`reader`: Check All
-// Files, File › Memory Cache).
+// program is a desktop, without what a browser cannot do (`quit`, `fileAssociations`); all of them read the files of a
+// document one by one, and keep what they read (`reader`: Check All Files, File › Memory Cache).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -18,7 +17,7 @@ const languages = readdirSync(i18n).filter((lang) => existsSync(new URL(`${lang}
 const SHELLS = {
   desktop: { platform: 'desktop', has: ['solve', 'solverTable', 'reader', 'pathPackages', 'saveSolved', 'version', 'quit', 'fileAssociations', 'bundledPackages'] },
   web: { platform: 'web', has: ['solve', 'solverTable', 'reader', 'saveSolved', 'version'] },
-  local: { platform: 'desktop', has: ['solve', 'solverTable', 'reader', 'pathPackages', 'saveSolved', 'version'] },
+  local: { platform: 'desktop', has: ['solve', 'solverTable', 'reader', 'pathPackages', 'saveSolved', 'version', 'bundledPackages'] },
 };
 
 /** Whether `shell` shows `item`, as commands.js offers it. */

@@ -474,6 +474,42 @@ test("Save Solved Copy As saves the solve the program kept into a folder the use
   expect(readFileSync(join(work, "proj", "sim", "extra.inc"), "utf8")).toBe("* beside\n");
 });
 
+test("the public packages bundled beside the program are found by name, listed in the Library and said in Help, as the desktop's", async ({ page }) => {
+  server.kill();
+  const root = join(work, "public-packages");
+  mkdirSync(join(root, "acme", "1.0"), { recursive: true });
+  writeFileSync(join(root, "acme", "1.0", "acme.rnl"),
+    '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme", version="1.0") }\n@RNL { $acme = @DEFINE-STYLE(linewidth=1) {} }\n');
+  writeFileSync(join(root, "public-packages.json"), JSON.stringify({ packages: [{ name: "acme", version: "1.0", kind: "extension" }] }));
+  writeFileSync(join(work, "proj", "sim", "uses.sp"),
+    '* uses\n* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4"); @USE-PACKAGE(name="acme", version="1.0") }\nR1 a 0 1k\n.end\n');
+  // (a package that bundles them has the folder beside the program; the program is given this one, as the desktop's tests give theirs)
+  process.env.RNL_PUBLIC_PACKAGES = root;
+  try {
+    ({ child: server, base, address } = await start(join(work, "proj", "sim", "uses.sp")));
+  } finally {
+    delete process.env.RNL_PUBLIC_PACKAGES;
+  }
+  await open(page);
+  expect((await document(page)).diagnostics.some((d) => d.message.includes("acme 1.0 cannot be found"))).toBe(false);
+  await page.locator("#tab-files").click();
+  await expect(page.locator('.lib-group[data-group="public"]')).toHaveCount(1);
+  await page.evaluate(() => { void window.viewer.command("public-packages"); });
+  await expect(page.locator("dialog.dialog")).toContainText("This build bundles acme 1.0.");
+});
+
+test("the program alone bundles no public package: Help says so, and a package not found is hinted at as on the desktop", async ({ page }) => {
+  server.kill();
+  writeFileSync(join(work, "proj", "sim", "uses.sp"),
+    '* uses\n* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4"); @USE-PACKAGE(name="acme", version="1.0") }\nR1 a 0 1k\n.end\n');
+  ({ child: server, base, address } = await start(join(work, "proj", "sim", "uses.sp")));
+  await open(page);
+  expect((await document(page)).diagnostics.some((d) => d.message.includes("acme 1.0 cannot be found"))).toBe(true);
+  await expect(page.locator(".package-hint")).toContainText("Look for it in Help › Public Packages.");
+  await page.evaluate(() => { void window.viewer.command("public-packages"); });
+  await expect(page.locator("dialog.dialog")).toContainText("This build does not bundle the public packages.");
+});
+
 test("the format chosen for a file of the machine is kept for the next start", async ({ page }) => {
   await open(page);
   const top = (await document(page)).path;

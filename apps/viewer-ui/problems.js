@@ -75,7 +75,7 @@ new ResizeObserver(scheduleMore).observe(body);
 function packageHint(d, version) {
   // Path-based includes and alias failures need different remedies. Keep the core diagnostic intact.
   const missing = missingPackage(d);
-  // a desktop looks for packages online nowhere: with none bundled to look among (the local program, for now), no hint
+  // a desktop looks for packages online nowhere: with no bundled packages to look among, no hint
   if (!missing || (shell.platform === "desktop" && !shell.bundledPackages)) return null;
   const li = document.createElement("li");
   li.className = "diag hint package-hint";

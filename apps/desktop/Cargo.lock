@@ -3070,6 +3070,7 @@ version = "0.6.1"
 dependencies = [
  "rnl-cli",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

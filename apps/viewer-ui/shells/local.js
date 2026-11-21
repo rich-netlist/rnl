@@ -13,7 +13,7 @@ import { m, tr } from "../i18n.js";
 // the same as on the desktop; the page reads it, and the files it includes, from `/f/<path>`, which the program serves below
 // the folders it was told to allow (the folder of each file opened, and the one above it).
 
-import web from "./web.js";
+import web, { useBundledPackages } from "./web.js";
 import { decodeText } from "../core/client.js";
 import { chooseOnServer } from "../server-files.js";
 import { inform, offer } from "../dialog.js";
@@ -46,6 +46,15 @@ async function api(path, { method = "GET", body, bytes } = {}) {
 }
 
 const session = await api("api/session");
+
+/** The public packages bundled beside the program, as the desktop's: none in the program alone. */
+const publicPackages = () => api("api/public-packages");
+// their files, read once, for the core in the page to find packages in by name (web.js useBundledPackages)
+useBundledPackages(publicPackages().then(async (info) => {
+  const files = {};
+  for (const p of info.packages || []) files[p.path] = decodeText(await fileBytes(p.path));
+  return { files, dirs: info.dirs || [] };
+}));
 
 const encodePath = (path) => path.split("/").map(encodeURIComponent).join("/");
 /** Where the program serves a file of the machine, by its absolute path. */
@@ -263,6 +272,8 @@ export default {
    * below it: the program lists a folder only when the settings have it as PATH (and with its sub-folders, for those).
    */
   pathPackages: (dir, subfolders = false) => api(`api/path?${new URLSearchParams({ dir, ...(subfolders ? { subfolders: "1" } : {}) })}`),
+  /** The public packages bundled beside the program, which the Library lists and Help › Public Packages says, as the desktop's. */
+  bundledPackages: publicPackages,
   /** The bytes of a file of the machine, such as a PATH file that Save Project holds (project.js). */
   readFile: fileBytes,
   /** `text` as bytes in the encoding of the file of the machine at `path`, as Save writes it (project.js, for an edited file). */
