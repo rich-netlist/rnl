@@ -3054,6 +3054,7 @@ dependencies = [
  "rnl-runtime",
  "rnl-solver",
  "rnl-view",
+ "rnl-viewer-files",
  "serde",
  "serde_json",
  "tauri",
@@ -3061,6 +3062,14 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "rnl-viewer-files"
+version = "0.6.1"
+dependencies = [
+ "rnl-cli",
+ "serde",
 ]
 
 [[package]]

@@ -7,34 +7,14 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-pub use rnl_cli::codec::decode;
-use rnl_cli::codec::{self, OutputEncoding};
+use rnl_cli::codec::OutputEncoding;
 use rnl_runtime::source::{dirname, join, normalize, Layered, MemoryProvider, Provider};
-use serde::{Deserialize, Serialize};
 
 /// The texts to build over the files of a netlist, by the path the Document names each file by: a
 /// path relative to the directory of the netlist, unless it is rooted.
 pub type Edits = HashMap<String, String>;
 
-/// A file to save: the path the Document names it by, its name as shown, and its text as the file
-/// has it. `read` is the text of the file as the page read it, which the file on disk must still
-/// be, unless the user chose to overwrite it: none, and it is not looked at.
-#[derive(Debug, Deserialize)]
-pub struct SavedFile {
-    pub path: String,
-    pub name: String,
-    pub text: String,
-    #[serde(default)]
-    pub read: Option<String>,
-}
-
-/// What saving came to: a sentence that says what was written, or, with nothing written, the names
-/// of the files that are not what they were when they were read, which the user is to be asked about.
-#[derive(Debug, Default, PartialEq, Serialize)]
-pub struct Saved {
-    pub said: Option<String>,
-    pub changed: Vec<String>,
-}
+pub use rnl_viewer_files::save::{Saved, SavedFile};
 
 /// The file at `path`, as the Document names it, of the netlist `entry`: where it is on disk.
 pub fn located(entry: &str, path: &str) -> String {
@@ -90,76 +70,35 @@ pub fn layered<'a>(edits: &'a MemoryProvider, disk: &'a dyn Provider) -> Layered
     Layered { layers: vec![edits, disk] }
 }
 
-/// Save As keeps the source encoding even when the destination already exists in another encoding.
-/// A user choosing UTF-8 explicitly may change it. Encode before touching the destination.
+/// Save As: the text written as the file `to`, which the user chose in a dialog that asked before replacing a file of
+/// that name, in the encoding of `source` (the netlist it came from) unless the user chose UTF-8. A link is not written
+/// through (rnl-viewer-files).
 pub fn save_as(source: Option<&Path>, to: &Path, text: &str, encoding: OutputEncoding) -> Result<(), String> {
-    let bytes = codec::encode_file(source, text, encoding)?;
-    crate::atomic::write(to, &bytes).map_err(|e| format!("{}: {e}", to.display()))
+    rnl_viewer_files::save::save_as(source, to, text, encoding, true).map(|_| ())
 }
 
-/// A text with its line ends as `\n`, as the page keeps it.
-fn lf(text: &str) -> String {
-    text.replace("\r\n", "\n").replace('\r', "\n")
-}
-
-/// Whether the file at `at` still holds `read`, which the page read from it, line ends apart: a file
-/// that is gone, or that another program changed since, does not.
-fn unchanged(at: &Path, read: &str) -> bool {
-    std::fs::read(at).is_ok_and(|bytes| lf(&decode(&bytes)) == lf(read))
-}
-
-/// Write the files of the netlist `entry` where they were read from, each in its own encoding, and
-/// say which were written. Unless `overwrite`, a file that no longer holds what the page read from
-/// it, because another program changed it or took it away, is not written, and nor is any of the
-/// others: the names of those files are given back, for the user to say. Stops at the first that
-/// cannot be written, and says which had been.
+/// Write the files of the netlist `entry` where they were read from, each in its own encoding, and give their names.
+/// Unless `overwrite`, a file that no longer holds what the page read from it, because another program changed it or
+/// took it away, is not written, and nor is any of the others: their names are given back, for the user to say.
+#[cfg(test)]
 pub fn save_all(entry: &str, files: &[SavedFile], overwrite: bool) -> Result<Saved, String> {
     save_all_with_encoding(entry, files, overwrite, OutputEncoding::Preserve)
 }
 
-/// The explicit encoding choice applies to each edited file being saved. Encoding errors are
-/// checked for the whole batch before any write; an IO failure still reports earlier writes.
+/// As `save_all`, with the encoding the user chose for every file (UTF-8), or each file's own.
 pub fn save_all_with_encoding(
     entry: &str,
     files: &[SavedFile],
     overwrite: bool,
     encoding: OutputEncoding,
 ) -> Result<Saved, String> {
-    if !overwrite {
-        let changed: Vec<String> = files
-            .iter()
-            .filter(|f| f.read.as_deref().is_some_and(|read| !unchanged(Path::new(&located(entry, &f.path)), read)))
-            .map(|f| f.name.clone())
-            .collect();
-        if !changed.is_empty() {
-            return Ok(Saved { said: None, changed });
-        }
-    }
-    let prepared: Result<Vec<_>, String> = files
-        .iter()
-        .map(|f| {
-            let at = PathBuf::from(located(entry, &f.path));
-            let bytes = codec::encode_file(Some(&at), &f.text, encoding).map_err(|e| format!("{}: {e}", f.name))?;
-            Ok((f, at, bytes))
-        })
-        .collect();
-    let mut done: Vec<&str> = Vec::new();
-    for (f, at, bytes) in prepared? {
-        let written = crate::atomic::write(&at, &bytes).map_err(|e| format!("{}: {e}", at.display()));
-        if let Err(e) = written {
-            return Err(if done.is_empty() { e } else { format!("{e} (saved before it: {})", done.join(", ")) });
-        }
-        done.push(&f.name);
-    }
-    let said = match done.as_slice() {
-        [one] => format!("Saved {one}."),
-        many => format!("Saved {}.", many.join(", ")),
-    };
-    Ok(Saved { said: Some(said), changed: Vec::new() })
+    let at: Vec<_> = files.iter().map(|f| (f, PathBuf::from(located(entry, &f.path)))).collect();
+    rnl_viewer_files::save::save_all(&at, overwrite, encoding)
 }
 
 #[cfg(test)]
 mod tests {
+    use rnl_cli::codec;
     use rnl_cli::FsProvider;
     use rnl_view::{BuildOptions, Document};
 
@@ -265,17 +204,17 @@ mod tests {
             text: text.into(),
             read: None,
         };
-        let said = save_all(&entry, &[file("top.sp", "top.sp", "* top\r\nR1 a b 2k\r\n")], false).unwrap().said;
-        assert_eq!(said.as_deref(), Some("Saved top.sp."));
+        let written = save_all(&entry, &[file("top.sp", "top.sp", "* top\r\nR1 a b 2k\r\n")], false).unwrap().written;
+        assert_eq!(written, ["top.sp"]);
         assert_eq!(std::fs::read(dir.file("top.sp")).unwrap(), b"* top\r\nR1 a b 2k\r\n");
-        let said = save_all(
+        let written = save_all(
             &entry,
             &[file("top.sp", "top.sp", "* top\r\n"), file("sub/lib.inc", "sub/lib.inc", "* lib 2\n")],
             false,
         )
         .unwrap()
-        .said;
-        assert_eq!(said.as_deref(), Some("Saved top.sp, sub/lib.inc."));
+        .written;
+        assert_eq!(written, ["top.sp", "sub/lib.inc"]);
         assert_eq!(std::fs::read_to_string(dir.file("sub/lib.inc")).unwrap(), "* lib 2\n");
         // the file that was not given is as it was
         assert_eq!(std::fs::read_to_string(dir.file("other.inc")).unwrap(), "* other\n");
@@ -305,13 +244,13 @@ mod tests {
         let top = file("top.sp", "* top\nR1 a b 1k\n", "* top\r\nR1 a b 2k\r\n");
         let lib = file("lib.inc", "* lib\n", "* lib 2\n");
         let saved = save_all(&entry, &[top, lib], false).unwrap();
-        assert_eq!(saved, Saved { said: Some("Saved top.sp, lib.inc.".into()), changed: vec![] });
+        assert_eq!(saved, Saved { written: vec!["top.sp".into(), "lib.inc".into()], changed: vec![] });
         // another program changes the include; what the page read of it is no longer there
         std::fs::write(dir.file("lib.inc"), "* lib, changed elsewhere\n").unwrap();
         let top = file("top.sp", "* top\nR1 a b 2k\n", "* top\r\nR1 a b 3k\r\n");
         let lib = file("lib.inc", "* lib 2\n", "* lib 3\n");
         let saved = save_all(&entry, &[top, lib], false).unwrap();
-        assert_eq!(saved, Saved { said: None, changed: vec!["lib.inc".into()] });
+        assert_eq!(saved, Saved { written: vec![], changed: vec!["lib.inc".into()] });
         // nothing was written, the netlist's own change included
         assert_eq!(std::fs::read(dir.file("top.sp")).unwrap(), b"* top\r\nR1 a b 2k\r\n");
         assert_eq!(std::fs::read_to_string(dir.file("lib.inc")).unwrap(), "* lib, changed elsewhere\n");
@@ -325,7 +264,7 @@ mod tests {
         let files = [top, lib];
         assert!(save_all(&entry, &files, true).unwrap_err().contains("preserve its encoding"));
         let saved = save_all_with_encoding(&entry, &files, true, OutputEncoding::Utf8).unwrap();
-        assert_eq!(saved.said.as_deref(), Some("Saved top.sp, lib.inc."));
+        assert_eq!(saved.written, ["top.sp", "lib.inc"]);
         assert_eq!(std::fs::read(dir.file("top.sp")).unwrap(), b"* top\r\nR1 a b 3k\r\n");
         assert_eq!(std::fs::read_to_string(dir.file("lib.inc")).unwrap(), "* lib 3\n");
     }

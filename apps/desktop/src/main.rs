@@ -9,7 +9,6 @@
 // Viewer is a GUI application, including local fast/debug builds. The CLI keeps its console.
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
-mod atomic;
 mod core_thread;
 mod export;
 mod files;
@@ -130,14 +129,12 @@ async fn save_files(
 ) -> Result<Saved, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let entry = std::path::absolute(&entry).map_err(|e| format!("{entry}: {e}"))?;
-        match encoding.unwrap_or_default() {
-            rnl_cli::codec::OutputEncoding::Preserve => {
-                files::save_all(&entry.to_string_lossy(), &files, overwrite.unwrap_or(false))
-            }
-            choice => {
-                files::save_all_with_encoding(&entry.to_string_lossy(), &files, overwrite.unwrap_or(false), choice)
-            }
-        }
+        files::save_all_with_encoding(
+            &entry.to_string_lossy(),
+            &files,
+            overwrite.unwrap_or(false),
+            encoding.unwrap_or_default(),
+        )
     })
     .await
     .map_err(|e| e.to_string())?
@@ -145,7 +142,8 @@ async fn save_files(
 
 /// Ask where to save the text of the netlist, write it there, and give its path; None when the
 /// dialog is cancelled. `entry` is the file the netlist was opened from, if it was, for the folder
-/// the dialog starts in.
+/// the dialog starts in. The dialog has asked before a file of that name is replaced; a link is
+/// never written through (rnl-viewer-files).
 #[tauri::command]
 async fn save_file_as(
     window: WebviewWindow,

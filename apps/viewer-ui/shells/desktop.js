@@ -259,7 +259,7 @@ export default {
   // a file that is not what was read, because another program changed it, is not written: its name comes back
   save: (source, files, overwrite, encoding) =>
     invoke("save_files", { entry: source.path, files, overwrite: overwrite === true, encoding }).then((saved) =>
-      saved.changed.length > 0 ? { changed: saved.changed } : saved.said,
+      saved.changed.length > 0 ? { changed: saved.changed } : { written: saved.written },
     ),
   saveAs: (source, saved, encoding) =>
     invoke("save_file_as", { entry: source.path || null, name: saved.name, text: saved.text, encoding }).then(file),

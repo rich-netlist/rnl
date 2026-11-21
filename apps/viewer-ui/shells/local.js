@@ -197,7 +197,7 @@ export default {
         encoding: encoding ?? "preserve",
       },
     });
-    return saved.changed?.length ? { changed: saved.changed } : saved.said;
+    return saved.changed?.length ? { changed: saved.changed } : { written: saved.written };
   },
   /** Save As: where the user says, on the machine of the program; the file written is the netlist from then on. */
   async saveAs(source, file, encoding) {

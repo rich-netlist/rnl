@@ -500,6 +500,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "rnl-viewer-files"
+version = "0.6.1"
+dependencies = [
+ "rnl-cli",
+ "serde",
+]
+
+[[package]]
 name = "roxmltree"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

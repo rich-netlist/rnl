@@ -5,7 +5,7 @@
 //! and writes the archive to that one alone and a project's files only by their names within that folder, never through a
 //! link or a junction, and each file as Save writes one (atomic.rs): an archive that cannot be written whole leaves the
 //! old one as it was. A file of the folder that has other names, hard links, is the one exception: Save keeps them, but
-//! a project's file replaces it at its name in the folder alone (`atomic::write_own`), so that a name outside the folder
+//! a project's file replaces it at its name in the folder alone (`rnl_viewer_files::atomic::write_own`), so that a name outside the folder
 //! the user chose keeps what it had.
 
 use std::collections::HashMap;
@@ -73,11 +73,9 @@ pub async fn write_project_archive(
     };
     let path = choices.get(&window).archive.ok_or("no archive was chosen to save the project as")?;
     let bytes = bytes.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        crate::atomic::write(&path, &bytes).map_err(|e| format!("{}: {e}", path.display()))
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || rnl_viewer_files::save::write_chosen(&path, &bytes, true).map(|_| ()))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /// Write the request's bytes to the project's file its `path` header names (URI-encoded), relative to the folder the user
@@ -100,7 +98,7 @@ pub async fn write_project_file(
     tauri::async_runtime::spawn_blocking(move || {
         let path = inside(&root, &relative, true)?;
         // (a file of the folder with other names, hard links, is replaced at its name in the folder alone)
-        crate::atomic::write_own(&path, &bytes).map_err(|e| format!("{}: {e}", path.display()))
+        rnl_viewer_files::atomic::write_own(&path, &bytes).map_err(|e| format!("{}: {e}", path.display()))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -339,11 +337,11 @@ mod tests {
             return;
         }
         let at = inside(&root, "top.sp", true).unwrap();
-        crate::atomic::write_own(&at, b"* the project's\n").unwrap();
+        rnl_viewer_files::atomic::write_own(&at, b"* the project's\n").unwrap();
         assert_eq!(std::fs::read_to_string(&at).unwrap(), "* the project's\n");
         assert_eq!(std::fs::read_to_string(&outside).unwrap(), "* outside\n", "the name outside keeps what it had");
         // a file of one name is replaced as Save replaces it
-        crate::atomic::write_own(&outside, b"* again\n").unwrap();
+        rnl_viewer_files::atomic::write_own(&outside, b"* again\n").unwrap();
         assert_eq!(std::fs::read_to_string(&outside).unwrap(), "* again\n");
     }
 

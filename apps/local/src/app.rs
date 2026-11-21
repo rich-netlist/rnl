@@ -418,14 +418,14 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
             let saved =
                 files::save_all(&app.roots, &save.entry, &save.files, save.overwrite, encoding(&save.encoding)?)
                     .map_err(|e| Failure(500, e))?;
-            if saved.said.is_some() {
+            if !saved.written.is_empty() {
                 for f in &save.files {
                     if let Ok(at) = app.roots.check(&files::located(&save.entry, &f.path), true) {
                         app.watcher.wrote(&at);
                     }
                 }
             }
-            Ok(Response::json(200, &json!({ "said": saved.said, "changed": saved.changed })))
+            Ok(Response::json(200, &json!({ "written": saved.written, "changed": saved.changed })))
         }
         "/api/save-as" if method == "POST" => {
             #[derive(Deserialize)]
@@ -643,7 +643,7 @@ mod tests {
         let (head, body) = post("/api/save", &cookie, &save(true));
         let (status, _, answer) = ask(&app, &head, &body);
         let said: serde_json::Value = serde_json::from_slice(&answer).unwrap();
-        assert_eq!((status, said["said"].clone()), (200, json!("Saved top.sp.")));
+        assert_eq!((status, said["written"].clone()), (200, json!(["top.sp"])));
         assert_eq!(std::fs::read_to_string(&top).unwrap(), "R1 a b 2k\n.end\n");
         // the program's own write is not a change of the file under the page
         app.watcher.poll();

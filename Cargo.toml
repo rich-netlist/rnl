@@ -11,6 +11,7 @@ members = [
     "crates/rnl-solver-io",
     "crates/rnl-solver-cli",
     "crates/rnl-cli",
+    "crates/rnl-viewer-files",
     "bindings/runtime-wasm",
     "bindings/solver-wasm",
 ]

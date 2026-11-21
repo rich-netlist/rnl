@@ -13,8 +13,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use rnl_cli::codec::{self, OutputEncoding};
-use serde::{Deserialize, Serialize};
+use rnl_cli::codec::OutputEncoding;
+use serde::Serialize;
 
 /// The folders the page may use, and the single files it may use where their folder is too broad to give.
 #[derive(Default)]
@@ -233,24 +233,7 @@ pub fn modified(path: &Path) -> Option<u64> {
     Some(t.as_millis() as u64 ^ meta.len().rotate_left(40))
 }
 
-/// A file to save: the path the Document names it by, its name as shown, and its text as the file has it. `read` is the
-/// text of the file as the page read it, which the file on disk must still be, unless the user chose to overwrite it.
-#[derive(Debug, Deserialize)]
-pub struct SavedFile {
-    pub path: String,
-    pub name: String,
-    pub text: String,
-    #[serde(default)]
-    pub read: Option<String>,
-}
-
-/// What saving came to: a sentence that says what was written, or, with nothing written, the names of the files that are
-/// not what they were when they were read, which the user is to be asked about.
-#[derive(Debug, Default, PartialEq, Serialize)]
-pub struct Saved {
-    pub said: Option<String>,
-    pub changed: Vec<String>,
-}
+pub use rnl_viewer_files::save::{Saved, SavedAs, SavedFile};
 
 /// The file at `path`, as the Document names it, of the netlist `entry`: where it is on disk; a path that is rooted is its own.
 pub fn located(entry: &str, path: &str) -> PathBuf {
@@ -260,23 +243,10 @@ pub fn located(entry: &str, path: &str) -> PathBuf {
     machine_path(entry).parent().map_or_else(|| PathBuf::from("/"), Path::to_path_buf).join(path)
 }
 
-/// A text with its line ends as `\n`, as the page keeps it.
-fn lf(text: &str) -> String {
-    text.replace("\r\n", "\n").replace('\r', "\n")
-}
-
-/// Whether the file at `at` still holds `read`, which the page read from it, line ends apart: a file that is gone, or
-/// that another program changed since, does not.
-fn unchanged(at: &Path, read: &str) -> bool {
-    // (a file too large for the page to have read is not what it read)
-    std::fs::metadata(at).is_ok_and(|m| m.len() <= MAX_FILE)
-        && std::fs::read(at).is_ok_and(|bytes| lf(&codec::decode(&bytes)) == lf(read))
-}
-
-/// Write the files of the netlist `entry` where they were read from, each in its own encoding, and say which were
-/// written. Unless `overwrite`, a file that no longer holds what the page read from it is not written, and nor is any of
-/// the others: the names of those files are given back, for the user to say. Each path is checked against the folders
-/// allowed; a file that is not below one is an error before anything is written.
+/// Write the files of the netlist `entry` where they were read from, each in its own encoding, and give their names
+/// (rnl-viewer-files, as the desktop writes them). Unless `overwrite`, a file that no longer holds what the page read from
+/// it is not written, and nor is any of the others: their names are given back, for the user to say. Each path is checked
+/// against the folders allowed; a file that is not below one is an error before anything is written.
 pub fn save_all(
     roots: &Roots,
     entry: &str,
@@ -290,226 +260,14 @@ pub fn save_all(
         if !at.is_file() {
             return Err(format!("{}: not a regular file", f.name));
         }
-        targets.push(at);
+        targets.push((f, at));
     }
-    if !overwrite {
-        let changed: Vec<String> = files
-            .iter()
-            .zip(&targets)
-            .filter(|(f, at)| f.read.as_deref().is_some_and(|read| !unchanged(at, read)))
-            .map(|(f, _)| f.name.clone())
-            .collect();
-        if !changed.is_empty() {
-            return Ok(Saved { said: None, changed });
-        }
-    }
-    // (every encoding is settled before the first write)
-    let mut prepared = Vec::new();
-    for (f, at) in files.iter().zip(&targets) {
-        let bytes = codec::encode_file(Some(at), &f.text, encoding).map_err(|e| format!("{}: {e}", f.name))?;
-        prepared.push((f, at, bytes));
-    }
-    let mut done: Vec<&str> = Vec::new();
-    for (f, at, bytes) in prepared {
-        if let Err(e) = write_replacing(at, &bytes) {
-            let before = if done.is_empty() { String::new() } else { format!(" ({} had been saved)", done.join(", ")) };
-            return Err(format!("{}: {e}{before}", at.display()));
-        }
-        done.push(&f.name);
-    }
-    let said = match done.as_slice() {
-        [one] => format!("Saved {one}."),
-        many => format!("Saved {} files.", many.len()),
-    };
-    Ok(Saved { said: Some(said), changed: Vec::new() })
-}
-
-/// Replace the contents of a file that is there. Where it can be done without changing anything else of the file, whole or
-/// not at all: the bytes are written to a new file of its folder with the owner, group and mode the file has, flushed to
-/// the disk, and renamed over it, so that a program that stops, a disk that fills or a reader at that moment sees the old
-/// file or the new, never half. A rename makes another file, so where that would change what is the file's (it has other
-/// names, hard links; it is another user's or another group's, which the user cannot give to the new one; the folder is
-/// not the user's to write in, or has the sticky bit), the bytes are written in place instead, and read back to see that
-/// they are what was meant. A file the user may not write is not replaced either way.
-///
-/// What a rename does not keep and nothing here can: ACLs and extended attributes (the new file has those of its folder's
-/// defaults). A group's netlist is the case it is for: the group stays, the mode stays.
-fn write_replacing(at: &Path, bytes: &[u8]) -> Result<(), String> {
-    let say = |e: std::io::Error| format!("{}: {e}", at.display());
-    // (a rename would replace a file the user may read only, as a write would not)
-    std::fs::OpenOptions::new().write(true).open(at).map_err(say)?;
-    let meta = std::fs::metadata(at).map_err(say)?;
-    if replaced_by_rename(at, bytes, &meta).map_err(say)? {
-        return Ok(());
-    }
-    write_in_place(at, bytes).map_err(say)
-}
-
-/// What `overwrite` needs of a file, so that its failures can be tried: to read what it holds, to put bytes at its start, to cut
-/// it at a length, and to flush it.
-trait Target {
-    fn read_all(&mut self) -> std::io::Result<Vec<u8>>;
-    fn put(&mut self, bytes: &[u8]) -> std::io::Result<()>;
-    fn set_len(&mut self, len: u64) -> std::io::Result<()>;
-    fn sync(&mut self) -> std::io::Result<()>;
-}
-
-impl Target for std::fs::File {
-    fn read_all(&mut self) -> std::io::Result<Vec<u8>> {
-        use std::io::{Read, Seek, SeekFrom};
-        self.seek(SeekFrom::Start(0))?;
-        let mut bytes = Vec::new();
-        self.read_to_end(&mut bytes)?;
-        Ok(bytes)
-    }
-
-    fn put(&mut self, bytes: &[u8]) -> std::io::Result<()> {
-        use std::io::{Seek, SeekFrom, Write};
-        self.seek(SeekFrom::Start(0))?;
-        self.write_all(bytes)
-    }
-
-    fn set_len(&mut self, len: u64) -> std::io::Result<()> {
-        std::fs::File::set_len(self, len)
-    }
-
-    fn sync(&mut self) -> std::io::Result<()> {
-        self.sync_all()
-    }
-}
-
-/// Make a file hold `new`, in place, so that it holds that or what it held, and never less of either. The file is not
-/// emptied first: a disk that is full, a quota that is used up or a failing disk would leave it empty or cut off, and the file
-/// would be lost to a save. The new bytes are written over the old from the start, flushed, and only then is the file cut to
-/// the new length; read back, they must be what was meant. On any failure the old bytes, which are kept in memory, are put
-/// back and the length is restored, which takes no block that the file does not have already, and the error is given.
-fn overwrite<T: Target>(file: &mut T, new: &[u8]) -> std::io::Result<()> {
-    let old = file.read_all()?;
-    let written = (|| -> std::io::Result<()> {
-        file.put(new)?;
-        file.sync()?;
-        file.set_len(new.len() as u64)?;
-        file.sync()?;
-        if file.read_all()? != new {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "what was written is not what is read back",
-            ));
-        }
-        Ok(())
-    })();
-    if let Err(e) = written {
-        // (what cannot be put back, the error says too)
-        let restored = file.put(&old).and_then(|()| file.set_len(old.len() as u64)).and_then(|()| file.sync());
-        return Err(match restored {
-            Ok(()) => e,
-            Err(again) => {
-                std::io::Error::new(e.kind(), format!("{e}; and the old text could not be put back: {again}"))
-            }
-        });
-    }
-    Ok(())
-}
-
-/// Write the bytes over the file, in place (see `overwrite`).
-fn write_in_place(at: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    let mut file = std::fs::OpenOptions::new().read(true).write(true).open(at)?;
-    // (the old text is kept in memory while it is written over)
-    if file.metadata()?.len() > MAX_FILE {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "the file is too large to be saved in place",
-        ));
-    }
-    overwrite(&mut file, bytes)
-}
-
-/// Replace the file by a new one with the same owner, group and mode: Ok(true) when it is, Ok(false) when that cannot be
-/// done without changing something of the file (nothing is left of the attempt), and an error when it fails for another
-/// reason, such as a disk that is full.
-#[cfg(unix)]
-fn replaced_by_rename(at: &Path, bytes: &[u8], old: &std::fs::Metadata) -> std::io::Result<bool> {
-    use std::io::{ErrorKind, Write};
-    use std::os::unix::fs::{fchown, MetadataExt};
-    let Some(dir) = at.parent() else { return Ok(false) };
-    // another name of the file would keep the old contents
-    if old.nlink() > 1 {
-        return Ok(false);
-    }
-    let temp = dir.join(format!(".rnl-save-{}", &crate::security::random_hex()[..16]));
-    let mut file = match std::fs::OpenOptions::new().write(true).create_new(true).open(&temp) {
-        Ok(file) => file,
-        // (a folder that is not the user's to write in, or whose sticky bit would not let the file be replaced)
-        Err(e) if e.kind() == ErrorKind::PermissionDenied || e.kind() == ErrorKind::ReadOnlyFilesystem => {
-            return Ok(false)
-        }
-        Err(e) => return Err(e),
-    };
-    let done = (|| -> std::io::Result<bool> {
-        let now = file.metadata()?;
-        // the owner and group of the file, which the new one has not unless the user is the owner and the folder's group is
-        // the file's: set them, and where the system does not let the user (another user's file, a group the user is not in),
-        // the file is not replaced
-        if (now.uid(), now.gid()) != (old.uid(), old.gid()) {
-            match fchown(&file, Some(old.uid()), Some(old.gid())) {
-                Ok(()) => {}
-                Err(e) if e.kind() == ErrorKind::PermissionDenied => return Ok(false),
-                Err(e) => return Err(e),
-            }
-        }
-        // (after the owner: changing it may clear the mode's set-user-id and set-group-id)
-        file.set_permissions(old.permissions())?;
-        file.write_all(bytes)?;
-        file.sync_all()?;
-        match std::fs::rename(&temp, at) {
-            Ok(()) => {}
-            // (a folder with the sticky bit does not let one user replace the file of another)
-            Err(e) if e.kind() == ErrorKind::PermissionDenied => return Ok(false),
-            Err(e) => return Err(e),
-        }
-        // (the rename is in the folder: flushed too, so that it is not undone by a crash)
-        if let Ok(folder) = std::fs::File::open(dir) {
-            let _ = folder.sync_all();
-        }
-        Ok(true)
-    })();
-    drop(file);
-    if !matches!(done, Ok(true)) {
-        let _ = std::fs::remove_file(&temp);
-    }
-    done
-}
-
-#[cfg(not(unix))]
-fn replaced_by_rename(at: &Path, bytes: &[u8], old: &std::fs::Metadata) -> std::io::Result<bool> {
-    use std::io::Write;
-    let Some(dir) = at.parent() else { return Ok(false) };
-    let temp = dir.join(format!(".rnl-save-{}", &crate::security::random_hex()[..16]));
-    let done = (|| -> std::io::Result<()> {
-        let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(&temp)?;
-        file.set_permissions(old.permissions())?;
-        file.write_all(bytes)?;
-        file.sync_all()?;
-        drop(file);
-        std::fs::rename(&temp, at)
-    })();
-    if done.is_err() {
-        let _ = std::fs::remove_file(&temp);
-    }
-    done.map(|()| true)
-}
-
-/// What Save As came to: the file written, or the file that is there already, which is not replaced unless the user said so.
-#[derive(Debug, PartialEq)]
-pub enum SavedAs {
-    Written(PathBuf),
-    Exists(PathBuf),
+    rnl_viewer_files::save::save_all(&targets, overwrite, encoding)
 }
 
 /// Save As: the text of a netlist written to a file the user chose, which the folders allowed must hold, in the encoding
-/// of the netlist it came from (`source`, which must be a file the page may read too), unless the user chose UTF-8. Encoded
-/// before the destination is touched. A file of that name that is there is not replaced unless `overwrite`, and a link is
-/// never written through, whatever it points to: the name chosen is a file of its folder or it is not written.
+/// of the netlist it came from (`source`, which must be a file the page may read too), unless the user chose UTF-8. A file
+/// of that name that is there is not replaced unless `overwrite`, and a link is never written through (rnl-viewer-files).
 pub fn save_as(
     roots: &Roots,
     source: Option<&Path>,
@@ -519,29 +277,13 @@ pub fn save_as(
     overwrite: bool,
 ) -> Result<SavedAs, String> {
     let to = roots.check(to, false)?;
-    let source = source
-        .and_then(|s| roots.check(s, true).ok())
-        .filter(|s| std::fs::metadata(s).is_ok_and(|m| m.is_file() && m.len() <= MAX_FILE));
-    let bytes = codec::encode_file(source.as_deref(), text, encoding)?;
-    match std::fs::symlink_metadata(&to) {
-        Ok(meta) if meta.file_type().is_symlink() => {
-            return Err(format!("{} is a link: it is not written through; choose another name", to.display()))
-        }
-        Ok(meta) if !meta.is_file() => return Err(format!("{} is not a file", to.display())),
-        Ok(_) if !overwrite => return Ok(SavedAs::Exists(to)),
-        Ok(_) => write_replacing(&to, &bytes)?,
-        // (create_new does not follow a link that appeared since the look above: it fails)
-        Err(_) => {
-            use std::io::Write;
-            let mut file = std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&to)
-                .map_err(|e| format!("{}: {e}", to.display()))?;
-            file.write_all(&bytes).and_then(|()| file.sync_all()).map_err(|e| format!("{}: {e}", to.display()))?;
-        }
-    }
-    Ok(SavedAs::Written(to))
+    // a source the page may not read is not read for its encoding; one that is gone is given, and its encoding is not known
+    let source = source.and_then(|s| match roots.check(s, true) {
+        Ok(at) => Some(at),
+        Err(_) if std::fs::symlink_metadata(s).is_err() => Some(s.to_path_buf()),
+        Err(_) => None,
+    });
+    rnl_viewer_files::save::save_as(source.as_deref(), &to, text, encoding, overwrite)
 }
 
 #[cfg(test)]
@@ -674,7 +416,7 @@ mod tests {
             OutputEncoding::Preserve,
         )
         .unwrap();
-        assert_eq!(asked, Saved { said: None, changed: vec!["top.sp".into()] });
+        assert_eq!(asked, Saved { written: vec![], changed: vec!["top.sp".into()] });
         assert_eq!(std::fs::read(&top).unwrap(), b"R1 a b 2k\r\n.end\r\n");
         // the user said to overwrite
         let done = save_all(
@@ -685,7 +427,7 @@ mod tests {
             OutputEncoding::Preserve,
         )
         .unwrap();
-        assert_eq!(done.said.as_deref(), Some("Saved top.sp."));
+        assert_eq!(done.written, ["top.sp"]);
         assert_eq!(std::fs::read(&top).unwrap(), b"R1 a b 3k\n.end\n");
         // a file that is what was read is written, line ends apart
         std::fs::write(&top, "R1 a b 1k\r\n").unwrap();
@@ -815,7 +557,7 @@ mod tests {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&top, std::fs::Permissions::from_mode(0o640)).unwrap();
         }
-        write_replacing(&top, b"new text\n").unwrap();
+        rnl_viewer_files::atomic::write(&top, b"new text\n").unwrap();
         assert_eq!(std::fs::read(&top).unwrap(), b"new text\n");
         #[cfg(unix)]
         {
@@ -831,7 +573,7 @@ mod tests {
         std::fs::set_permissions(&top, mode).unwrap();
         // (root may write what it likes: the check is the user's)
         if std::fs::OpenOptions::new().write(true).open(&top).is_err() {
-            assert!(write_replacing(&top, b"x").is_err());
+            assert!(rnl_viewer_files::atomic::write(&top, b"x").is_err());
             assert_eq!(std::fs::read(&top).unwrap(), b"new text\n");
         }
         let mut mode = std::fs::metadata(&top).unwrap().permissions();
@@ -849,7 +591,7 @@ mod tests {
         std::fs::write(&top, "old\n").unwrap();
         std::fs::set_permissions(&top, std::fs::Permissions::from_mode(0o660)).unwrap();
         let before = std::fs::metadata(&top).unwrap();
-        write_replacing(&top, b"new\n").unwrap();
+        rnl_viewer_files::atomic::write(&top, b"new\n").unwrap();
         let after = std::fs::metadata(&top).unwrap();
         assert_eq!((after.uid(), after.gid(), after.mode() & 0o7777), (before.uid(), before.gid(), 0o660));
         assert_eq!(std::fs::read(&top).unwrap(), b"new\n");
@@ -863,14 +605,14 @@ mod tests {
         if let Some(other) = groups.split_whitespace().filter_map(|g| g.parse::<u32>().ok()).find(|g| *g != after.gid())
         {
             std::os::unix::fs::chown(&top, None, Some(other)).unwrap();
-            write_replacing(&top, b"newer\n").unwrap();
+            rnl_viewer_files::atomic::write(&top, b"newer\n").unwrap();
             assert_eq!(std::fs::metadata(&top).unwrap().gid(), other, "the group of the file stays");
         }
         // a file with another name is written in place, so that the other name has the text too
         let linked = dir.join("linked.sp");
         std::fs::hard_link(&top, &linked).unwrap();
         let inode = std::fs::metadata(&top).unwrap().ino();
-        write_replacing(&top, b"both\n").unwrap();
+        rnl_viewer_files::atomic::write(&top, b"both\n").unwrap();
         assert_eq!(std::fs::read(&linked).unwrap(), b"both\n");
         assert_eq!(std::fs::metadata(&top).unwrap().ino(), inode);
         assert_eq!(std::fs::metadata(&top).unwrap().nlink(), 2);
@@ -888,7 +630,7 @@ mod tests {
         // (the super-user may write in any folder: there, the file is replaced, which is as well)
         let may_write_in_it = std::fs::File::create(dir.join("probe")).is_ok();
         let _ = std::fs::remove_file(dir.join("probe"));
-        let saved = write_replacing(&top, b"new text\n");
+        let saved = rnl_viewer_files::atomic::write(&top, b"new text\n");
         std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
         saved.unwrap();
         assert_eq!(std::fs::read(&top).unwrap(), b"new text\n");
@@ -905,98 +647,10 @@ mod tests {
         let dir = temp("large");
         let top = dir.join("top.sp");
         std::fs::write(&top, "R1 a b 1k\n").unwrap();
-        assert!(unchanged(&top, "R1 a b 1k\n"));
+        assert!(rnl_viewer_files::save::unchanged(&top, "R1 a b 1k\n"));
         let big = std::fs::File::create(dir.join("big.sp")).unwrap();
         big.set_len(MAX_FILE + 1).unwrap();
-        assert!(!unchanged(&dir.join("big.sp"), ""));
-    }
-
-    /// A file that is a few bytes in memory, that fails as a disk does: a write that would take a block the file has not got, a
-    /// flush that fails.
-    struct Failing {
-        data: Vec<u8>,
-        /// The most the file may hold: the blocks it has (what a full disk lets it write over, and no more).
-        room: usize,
-        fail_sync: bool,
-        syncs: u32,
-    }
-
-    impl Target for Failing {
-        fn read_all(&mut self) -> std::io::Result<Vec<u8>> {
-            Ok(self.data.clone())
-        }
-
-        fn put(&mut self, bytes: &[u8]) -> std::io::Result<()> {
-            for (i, b) in bytes.iter().enumerate() {
-                if i >= self.room {
-                    return Err(std::io::Error::new(std::io::ErrorKind::StorageFull, "no space left on device"));
-                }
-                if i < self.data.len() {
-                    self.data[i] = *b;
-                } else {
-                    self.data.push(*b);
-                }
-            }
-            Ok(())
-        }
-
-        fn set_len(&mut self, len: u64) -> std::io::Result<()> {
-            self.data.resize(len as usize, 0);
-            Ok(())
-        }
-
-        fn sync(&mut self) -> std::io::Result<()> {
-            self.syncs += 1;
-            if self.fail_sync && self.syncs == 1 {
-                return Err(std::io::Error::other("input/output error"));
-            }
-            Ok(())
-        }
-    }
-
-    #[test]
-    fn a_write_in_place_that_fails_leaves_the_file_as_it_was() {
-        // the disk is full: the new text is longer than the room the file has. Half of it has been written when it fails
-        let mut file = Failing { data: b"the old text of the file\n".to_vec(), room: 25, fail_sync: false, syncs: 0 };
-        let old = file.data.clone();
-        let err = overwrite(&mut file, b"a new text that is longer than the old one, and does not fit\n").unwrap_err();
-        assert_eq!(err.kind(), std::io::ErrorKind::StorageFull);
-        assert_eq!(file.data, old, "byte for byte");
-        // a flush that fails after all of a shorter text was written over the start of the old one
-        let mut file = Failing {
-            data: b"the old text of the file, which is long\n".to_vec(),
-            room: 100,
-            fail_sync: true,
-            syncs: 0,
-        };
-        let old = file.data.clone();
-        assert!(overwrite(&mut file, b"short\n").is_err());
-        assert_eq!(file.data, old, "byte for byte");
-        // what fits is written whole, cut to its length, and a longer file is made shorter
-        let mut file = Failing {
-            data: b"the old text of the file, which is long\n".to_vec(),
-            room: 100,
-            fail_sync: false,
-            syncs: 0,
-        };
-        overwrite(&mut file, b"short\n").unwrap();
-        assert_eq!(file.data, b"short\n");
-        let mut file = Failing { data: b"ab".to_vec(), room: 100, fail_sync: false, syncs: 0 };
-        overwrite(&mut file, b"longer than it was\n").unwrap();
-        assert_eq!(file.data, b"longer than it was\n");
-    }
-
-    #[test]
-    fn a_write_in_place_on_a_real_file_goes_whole_and_is_cut_to_length() {
-        let dir = temp("inplace");
-        let top = dir.join("top.sp");
-        std::fs::write(&top, "a long old text, of many bytes\n").unwrap();
-        write_in_place(&top, b"short\n").unwrap();
-        assert_eq!(std::fs::read(&top).unwrap(), b"short\n");
-        write_in_place(&top, b"a longer text again\n").unwrap();
-        assert_eq!(std::fs::read(&top).unwrap(), b"a longer text again\n");
-        write_in_place(&top, b"").unwrap();
-        assert_eq!(std::fs::read(&top).unwrap(), b"");
+        assert!(!rnl_viewer_files::save::unchanged(&dir.join("big.sp"), ""));
     }
 
     #[test]

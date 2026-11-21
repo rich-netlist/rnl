@@ -130,9 +130,9 @@
  * @property {(handler: (event: SolveEvent) => void) => void} [onSolveProgress] Call `handler` with each
  *   event of the solve under way, as it comes (the panel of solve-progress.js and the status bar follow them).
  *   A shell that cannot tell has no events: the solve then shows its status line alone.
- * @property {(source: Source, files: SavedFile[], overwrite?: boolean, encoding?: "preserve" | "utf8") => Promise<string | { changed: string[] }>} [save]
+ * @property {(source: Source, files: SavedFile[], overwrite?: boolean, encoding?: "preserve" | "utf8") => Promise<{ written?: string[], changed?: string[] }>} [save]
  *   Write the text of the files where they were read from, which the user has asked for with File >
- *   Save (decision 0011): a sentence that says what was saved. Unless `overwrite`, a file that is no
+ *   Save (decision 0011): `{ written }`, the names of the files written, which the page says. Unless `overwrite`, a file that is no
  *   longer what it was when it was read (`SavedFile.read`), because another program changed it or
  *   took it away, is not written, nor are the others: `{ changed }`, the names of those files, for
  *   the user to say. On the web, which cannot write files, download them. Rejects with a message when
