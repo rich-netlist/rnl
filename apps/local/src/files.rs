@@ -226,13 +226,6 @@ pub fn list_dir(dir: &Path) -> Result<(PathBuf, Vec<Entry>, bool), String> {
     Ok((real, entries, truncated))
 }
 
-/// The modification time of a file in milliseconds since 1970: what the program watches for a change; None when it is gone.
-pub fn modified(path: &Path) -> Option<u64> {
-    let meta = std::fs::metadata(path).ok()?;
-    let t = meta.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?;
-    Some(t.as_millis() as u64 ^ meta.len().rotate_left(40))
-}
-
 pub use rnl_viewer_files::save::{Saved, SavedAs, SavedFile};
 
 /// The file at `path`, as the Document names it, of the netlist `entry`: where it is on disk; a path that is rooted is its own.

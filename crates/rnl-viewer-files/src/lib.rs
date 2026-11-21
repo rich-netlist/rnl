@@ -8,3 +8,4 @@
 pub mod atomic;
 pub mod project;
 pub mod save;
+pub mod watch;

@@ -35,7 +35,7 @@ use crate::files::{self, Roots, SavedAs, SavedFile};
 use crate::http::{encode_path, Rejected, Request, Response};
 use crate::security::{self, Auth};
 use crate::settings::Settings;
-use crate::watch::Watcher;
+use rnl_viewer_files::watch::Watcher;
 
 /// The most a request that saves or solves may carry: the files of a netlist and its Library.
 pub const MAX_BODY: usize = 512 * 1024 * 1024;
@@ -572,6 +572,7 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
             }
             let since = request.param("since").and_then(|s| s.parse().ok()).unwrap_or(0);
             let (version, changed) = app.watcher.since(since);
+            let changed: Vec<String> = changed.iter().map(|p| files::page_path(p)).collect();
             Ok(Response::json(200, &json!({ "version": version, "changed": changed })))
         }
         path if path.starts_with("/f/") && get => file(app, &path[2..]),
@@ -752,7 +753,7 @@ mod tests {
         assert_eq!(std::fs::read_to_string(&top).unwrap(), "R1 a b 2k\n.end\n");
         // the program's own write is not a change of the file under the page
         app.watcher.poll();
-        assert_eq!(app.watcher.since(0).1, Vec::<String>::new());
+        assert_eq!(app.watcher.since(0).1, Vec::<PathBuf>::new());
     }
 
     #[test]
