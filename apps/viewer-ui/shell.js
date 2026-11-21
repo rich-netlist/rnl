@@ -39,9 +39,11 @@
  * @property {() => Promise<Array<{name: string, version: string, path: string, description: string, builtin: boolean}>>} [publicPackages] Published package metadata for lookup hints.
  * @property {(pkg: {name: string, version: string}, signal?: AbortSignal) => Promise<object[]>} [includePackage] Include an exact published package.
  * @property {(kind: string) => Promise<object[]>} [include] Include files, a folder or a library package.
- * @property {(items: object[], reload?: boolean, refresh?: string[]) => Promise<string[]> | void} [setPool] Replace and index the search pool; reload rereads all files, refresh replaces named entries. Returns read errors.
+ * @property {(items: object[], reload?: boolean, refresh?: string[], searched?: string[]) => Promise<string[]> | void} [setPool] Replace and index the search pool; reload rereads all files, refresh replaces named entries. Returns read errors.
+ *   The items of PATH have `searchPath`, and `searched` is the folders PATH searches, in order (the `dirs` of each
+ *   `pathPackages` answer): a shell whose core does not read the disk gives them to it as folders, not in the pool.
  * @property {() => Promise<string | null>} [pickPath] Pick a desktop search directory.
- * @property {(dir: string, subfolders?: boolean) => Promise<string[] | { files: string[], truncated?: boolean }>} [pathPackages] Package and netlist paths in a PATH directory (desktop, and the local program's page), with those of its sub-folders when asked.
+ * @property {(dir: string, subfolders?: boolean) => Promise<string[] | { files: string[], dirs?: string[], truncated?: boolean }>} [pathPackages] Package and netlist paths in a PATH directory (desktop, and the local program's page), with those of its sub-folders when asked, and the folders lookup searches for it, in order (`dirs`, rnl_cli::walk).
  * @property {(path: string) => { source: Source, read?: () => Promise<File> }} [pathItem] A file of a PATH directory as the Library searches and opens it, for a shell that reads it itself; without it, the shell builds from the path.
  * @property {(source: Source) => object} [poolItem] A web source's entry as a searchable file.
  * @property {() => Promise<Array<{name: string, title: string, extensions: string[], fallback: boolean}>>} [formats] The core's parse formats, in its order, for the Library's format menus before a Document lists them.

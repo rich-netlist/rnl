@@ -16,6 +16,11 @@ let work, server, base, address, output;
 
 /** Start the program on a netlist: the address it printed, which works once. */
 async function start(...files) {
+  // Solve > Ask to Solve on Open is off to begin with, as in the page's tests (tests/viewer/fake-shell.js): a netlist with
+  // components not drawn would ask first, and its dialog would stand before what a test clicks
+  const kept = join(work, "settings.json");
+  const values = existsSync(kept) ? JSON.parse(readFileSync(kept, "utf8")) : {};
+  if (!Object.hasOwn(values, "solve-on-open")) writeFileSync(kept, JSON.stringify({ ...values, "solve-on-open": false }));
   const args = ["--no-browser", "--settings", join(work, "settings.json"), ...(process.env.RNL_LOCAL_SITE ? ["--site", process.env.RNL_LOCAL_SITE] : []), ...files];
   const child = spawn(exe, args, { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, XDG_CONFIG_HOME: join(work, "config"), XDG_CACHE_HOME: join(work, "cache") } });
   output = "";
@@ -382,6 +387,27 @@ test("New Window opens the file of the machine in a new tab, with the changes ap
   expect(await other.evaluate(() => window.viewer.doc.files[0].text)).toContain("* applied here");
   // the file on disk is as it was: nothing was saved
   expect(readFileSync(join(work, "proj", "sim", "top.sp"), "utf8")).not.toContain("* applied here");
+});
+
+test("PATH is searched as the desktop searches it: folder by folder, a bare include in each folder itself, not in its version folders", async ({ page }) => {
+  server.kill();
+  // the first PATH folder has part.inc only in a version folder; the second has it itself
+  mkdirSync(join(work, "pa", "1.0"), { recursive: true });
+  mkdirSync(join(work, "pb"), { recursive: true });
+  writeFileSync(join(work, "pa", "1.0", "part.inc"), "* in a version folder\nR1 a 0 1k\n");
+  writeFileSync(join(work, "pb", "part.inc"), "* in the folder\nR2 a 0 2k\n");
+  writeFileSync(join(work, "proj", "sim", "uses.sp"), "* uses\n.include part.inc\n.end\n");
+  const pagePath = (p) => (process.platform === "win32" ? `/${p.replaceAll("\\", "/")}` : p);
+  writeFileSync(join(work, "settings.json"), JSON.stringify({ "search-paths": [pagePath(join(work, "pa")), pagePath(join(work, "pb"))] }));
+  ({ child: server, base, address } = await start(join(work, "proj", "sim", "uses.sp")));
+  await open(page);
+  // (the netlist is read again once PATH is listed)
+  await page.locator("#tab-files").click();
+  await expect(page.locator("#library-groups")).not.toHaveAttribute("aria-busy", "true");
+  await page.waitForFunction(() => window.viewer.doc?.files.length > 1 && !document.body.classList.contains("busy"));
+  const read = (await document(page)).files.map((f) => f.path);
+  expect(read.some((p) => p.endsWith("pb/part.inc"))).toBe(true);
+  expect(read.some((p) => p.endsWith("1.0/part.inc"))).toBe(false);
 });
 
 test("Save Project holds the files of a PATH folder, read from the machine", async ({ page }) => {
