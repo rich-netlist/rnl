@@ -282,6 +282,7 @@ fn main() {
         .manage(Core::new())
         .manage(library::Library::default())
         .manage(project::Choices::default())
+        .manage(menu::Drawn::default())
         .manage(startup)
         .setup(|app| {
             public_packages::init(app.handle());
@@ -347,7 +348,7 @@ fn main() {
             formats::detect_format,
             menu::set_view_check,
             menu::set_command_enabled,
-            menu::set_ui_language,
+            menu::set_menu,
             menu::ui_languages,
             menu::ui_catalog,
             solve::solve_preview,
