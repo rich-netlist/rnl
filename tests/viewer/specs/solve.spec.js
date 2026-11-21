@@ -293,7 +293,7 @@ test.describe("on the desktop", () => {
     await expect(dialog(page)).toContainText("The copy was not saved: a copy is never saved over a file that was read");
     await dialog(page).getByRole("button", { name: "Close" }).click();
     await dialogGone(page);
-    expect(await viewer.calls("saveSolved")).toHaveLength(2);
+    expect(await viewer.calls("saveSolved")).toHaveLength(3);
   });
 
   test("a solve that fails says why, and shows no preview", async ({ page, viewer }) => {
