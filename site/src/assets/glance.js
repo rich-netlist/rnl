@@ -428,7 +428,7 @@
           li.addEventListener('blur', off);
         });
         top.innerHTML = '<span class="chip chip-err"><en>3 errors</en></span>';
-        cap.innerHTML = '<en>Three records: the designer’s semantics, the editor’s move (high) and the solver’s coordinates, written after both when the file was solved again. A bad statement disables only itself. Hover over a diagnostic above to see which line and which device it points to.</en>';
+        cap.innerHTML = '<en>Three records: the designer’s semantics, the editor’s edits (high: M5 fixed, M2 moved) and the solver’s coordinates, written after both when the file was solved again. A bad statement disables only itself. Hover over a diagnostic above to see which line and which device it points to.</en>';
       }
     };
 

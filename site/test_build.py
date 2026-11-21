@@ -234,7 +234,7 @@ class SiteExamples(unittest.TestCase):
         errors = build.check_examples(files, drifted)
         self.assertTrue(any("from U in" in e for e in errors), errors)
         # the lines of the solver's record that the fifth example shows are those of its file
-        drifted = dict(ex, **{"ota5t-edits.sp": ex["ota5t-edits.sp"].replace("#M5 @PLACE(12, 9)", "#M5 @PLACE(13, 9)")})
+        drifted = dict(ex, **{"ota5t-edits.sp": ex["ota5t-edits.sp"].replace("#M1 @PLACE(2, 16)", "#M1 @PLACE(3, 16)")})
         errors = build.check_examples(files, drifted)
         self.assertTrue(any("E5_LINES" in e for e in errors), errors)
 

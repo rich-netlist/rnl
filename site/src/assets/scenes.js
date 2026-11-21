@@ -133,27 +133,28 @@
     { t: '*   {#M1 #M2 #M9} @ALIGN("y")', cls: 'is-err', d: 'm9' },
     { t: '* }' },
     { t: '* @RNL(author="rnl-editor") {', d: 'move' },
+    { t: '*   #M5 @PLACE(10, 9, priority="high");', r: 'M5', d: 'move' },
     { t: '*   #M2 @PLACE(x=18, priority="high");', r: 'M2', d: 'move' },
     { t: '*   #M4 @PLACE(2O, 26, priority="high")', r: 'M4', cls: 'is-err', d: 'bad' },
     { t: '* }' },
-    { t: '* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:a0c875a9451d0e20.3cb60203afe238d5", numbering="9912cd934557ce94") {', d: 'solve' },
-    { t: '*   #M1 @PLACE(6, 16) => @ORIENT("R0");', r: 'M1', d: 'move' },
+    { t: '* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:3c602f17d0958d06.0da4cfa1e61b6e96", numbering="de3412fe99dc17e0") {', d: 'solve' },
+    { t: '*   #M1 @PLACE(2, 16) => @ORIENT("R0");', r: 'M1', d: 'move' },
     { t: '*   #M2 @PLACE(18, 16) => @ORIENT("MY");', r: 'M2', d: 'move' },
-    { t: '*   #M3 @PLACE(6, 26) => @ORIENT("MY");', r: 'M3', d: 'move' },
+    { t: '*   #M3 @PLACE(2, 26) => @ORIENT("MY");', r: 'M3', d: 'move' },
     { t: '*   #M4 @PLACE(18, 26) => @ORIENT("R0");', r: 'M4', d: 'bad' },
-    { t: '*   #M5 @PLACE(12, 9) => @ORIENT("R0");', r: 'M5', d: 'move' },
+    { t: '*   #M5 @PLACE(10, 9) => @ORIENT("R0");', r: 'M5', d: 'move' },
     { t: '*   /* <en>more wires, junctions, ports, supplies and the ground follow; left out here</en> */', fold: true },
     { t: '* }' },
     { t: '.ends ota5t' }
   ];
 
   /* What the core says of the file (rnl check site/examples/ota5t-edits.sp): 3 errors, two of them the missing M9 and
-     the ALIGN it fails; solved again after the editor's move, so nothing conflicts. The two statements in error are
+     the ALIGN it fails; solved again after the editor fixed M5 and moved M2, so nothing conflicts. The two statements in error are
      left out of what the solver reads, so its record and hash are those of the file without them */
   var E5_DIAG = [
     { k: 'err', id: 'm9', icon: 'cross', html: '<en><code>{#M1 #M2 #M9} @ALIGN("y")</code>: this level has no instance M9, and ALIGN is strict about its members, so the whole statement fails too: two errors, the second caused by the first. It does not fall back to “align only M1 and M2”.</en>', refs: [] },
     { k: 'err', id: 'bad', icon: 'cross', html: '<en><code>#M4 @PLACE(2O, 26, …)</code>: a number cannot be followed by a letter, and “2O” contains the letter O. Only this statement fails; the solver places M4, at (18, 26) above M2.</en>', refs: ['M4'] },
-    { k: 'ok', id: 'move', icon: 'check', html: '<en>The editor’s <code>#M2 @PLACE(x=18, …)</code> is a record like the author’s, and high; it sets only M2’s x, and nothing else is fixed. Solved again, the solver keeps the amplifier’s shape and moves it as a whole 2 to the right, so that M2 is at x = 18: M1 goes from x = 4 to 6 and the tail M5 from 10 to 12, M3 and M4 stay above M1 and M2, and the wires stay straight. To move a device, write where it goes in a record of your own and solve again.</en>', refs: ['M1', 'M2', 'M4', 'M5'] },
+    { k: 'ok', id: 'move', icon: 'check', html: '<en>The editor’s record does what one does in an editor: <code>#M5 @PLACE(10, 9, …)</code> fixes the tail where it was, and <code>#M2 @PLACE(x=18, …)</code> drags M2 2 to the right; both are high, and nothing else is fixed. Solved again under these two, the solver arranges the rest: the pair stays symmetric about M5, so M1 moves from x = 4 to 2 as M2 moves from 16 to 18 and the pair widens from 12 to 16; M3 and M4 stay above M1 and M2, and the wires stay straight. To fix a device or to move one, write it in a record of your own and let the solver arrange the rest.</en>', refs: ['M1', 'M2', 'M3', 'M4', 'M5'] },
     { k: 'info', id: 'solve', icon: 'info', html: '<en>The solver writes its record after the others, with a <code>hash</code> of what it read. Had the editor’s record been added without solving again, the hash would no longer match: the viewer would still show the old drawing and suggest solving again.</en>', refs: [] },
     { k: 'ok', id: 'ok', icon: 'check', html: '<en>Everything else takes effect: the differential pair and its tail, the current mirror, the orientations and the other coordinates.</en>', refs: ['M1', 'M2', 'M5'] }
   ];
