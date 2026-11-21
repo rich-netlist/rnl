@@ -32,12 +32,13 @@ if (!askSolve) {
     if (localStorage.getItem(`${STORAGE_PREFIX}solve-on-open`) === null) localStorage.setItem(`${STORAGE_PREFIX}solve-on-open`, "false");
   } catch { /* no storage */ }
 }
-// the core's parse formats, as Document.formats lists them
+// the core's parse formats, as Document.formats lists them, with the suffixes a frontend lists (rnl_view::formats)
 const FORMATS = [
-  { name: "spice", title: "SPICE", extensions: [], fallback: true },
-  { name: "spectre", title: "Spectre", extensions: ["scs"], fallback: false },
-  { name: "rnl", title: "RNL package", extensions: ["rnl"], fallback: false },
-  { name: "text", title: "Text", extensions: ["va", "vams", "v", "vh", "sv", "svh", "vhd", "vhdl"], fallback: false },
+  { name: "spice", title: "SPICE", extensions: [], fallback: true,
+    listed: ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "inc", "lib"], entries: ["sp", "spi", "spice", "cir", "ckt", "net", "netlist"] },
+  { name: "spectre", title: "Spectre", extensions: ["scs"], fallback: false, listed: ["scs"], entries: ["scs"] },
+  { name: "rnl", title: "RNL package", extensions: ["rnl"], fallback: false, listed: ["rnl"], entries: [] },
+  { name: "text", title: "Text", extensions: ["va", "vams", "v", "vh", "sv", "svh", "vhd", "vhdl"], fallback: false, listed: ["va", "vams"], entries: [] },
 ];
 // as the core detects (rnl_view::detect_format): by the suffix, and a package by its header record with PACKAGE
 const detect = (path, text = "") => (/\.scs$/i.test(path) ? "spectre"

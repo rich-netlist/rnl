@@ -59,12 +59,21 @@ test("several dropped netlists ask which one to open; another drop cannot replac
   await page.evaluate((paths) => { window.nativePaths = paths; }, paths);
   await deliver(page, "drop", paths);
   const dialog = page.locator("dialog.dialog");
-  await expect(dialog.locator(".dialog-title")).toHaveText("Open Netlist");
+  await expect(dialog.locator(".dialog-title")).toHaveText("Open");
   await deliver(page, "drop", ["C:\\other.sp"]);
   await dialog.getByRole("option", { name: paths[1], exact: true }).click();
   await dialog.getByRole("button", { name: "Open", exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.nativeOpened)).toEqual([{ path: paths[1], name: paths[1] }]);
   expect(await page.evaluate(() => window.nativeInvokes.filter(([cmd]) => cmd === "dropped_files"))).toHaveLength(1);
+});
+
+test("a netlist dropped with the files it includes opens at once, as on the web: the entry is the one netlist", async ({ page, viewer }) => {
+  await nativeDrop(page, viewer);
+  const paths = ["C:\\lib.inc", "C:\\top.sp", "C:\\cell.rnl"];
+  await page.evaluate((paths) => { window.nativePaths = paths; }, paths);
+  await deliver(page, "drop", paths);
+  await expect.poll(() => page.evaluate(() => window.nativeOpened)).toEqual([{ path: paths[1], name: paths[1] }]);
+  await expect(page.locator("dialog.dialog")).toHaveCount(0);
 });
 
 test("a drop asks before leaving unapplied edits, and Cancel retains the text", async ({ page, viewer }) => {
