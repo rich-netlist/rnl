@@ -6,12 +6,12 @@ import { append, m, setAttr, setText } from "../i18n.js";
 // module Workers. Each candidate keeps its own lazy drawings until the page accepts it. The page's own
 // opens read the file shown alone, in the context of its entry (`perFile`): the outline of the whole
 // document, then the reading of that one file (collectOutline, collectFile), which is kept (file-results.js,
-// result-cache.js): in memory, and in the site's IndexedDB where the browser lets it, and read again only
+// result-cache.js) in memory for the page, nothing of it in the browser's storage, and read again only
 // when what it depends on has changed. `checkFiles` reads the other files of the document so, one by one, for the
 // problems of every file (file-checks.js).
 
 import { collect, collectFile, collectOutline, coreVersion, decodeText, fileResultFormat, startCore } from "../core/client.js";
-import { MEMORY_LIMIT, openStore, ResultCache, STORE_LIMIT, storeLimit } from "../result-cache.js";
+import { MEMORY_LIMIT, removeOldStore, ResultCache } from "../result-cache.js";
 import { holds, readingKey, requestPath, textHash } from "../file-results.js";
 import { loadManifest, readManifest } from "../manifest.js";
 import { ask, choose, inform, modal } from "../dialog.js";
@@ -161,17 +161,15 @@ const MIB = 1024 * 1024;
  * viewer reads no setting and keeps nothing in the browser's storage, as it keeps none of its preferences: the default
  * in memory, and no store.
  */
-const cacheLimits = async () => (embed ? { memoryLimit: MEMORY_LIMIT, storeLimit: 0 } : {
-  memoryLimit: load("file-cache-memory-mib", MEMORY_LIMIT / MIB) * MIB,
-  storeLimit: await storeLimit(load("file-cache-store-mib", STORE_LIMIT / MIB) * MIB),
-});
+const cacheLimits = () => ({ memoryLimit: embed ? MEMORY_LIMIT : load("file-cache-memory-mib", MEMORY_LIMIT / MIB) * MIB });
 /**
  * The readings of one file kept, once the store is open: none for a core that does not say its version, as one built
  * from the sources does not (version.js), and in memory alone where the browser keeps nothing.
  */
 const readings = coreVersion === null ? null : (async () => {
-  const store = embed ? null : await openStore({ core: coreVersion, format: fileResultFormat });
-  return new ResultCache({ store, ...(await cacheLimits()) });
+  // the store of results earlier versions of the page kept in the browser's storage is deleted; an embed touches none
+  if (!embed) removeOldStore();
+  return new ResultCache(cacheLimits());
 })();
 // the Documents given from the kept readings: the core shown holds no drawings of theirs until it reads them again
 const kept = new WeakSet();
@@ -1366,7 +1364,7 @@ export default {
     async memoryCache(clear = false) {
       const cache = await readings;
       if (!cache) throw m("This build of the core keeps no readings: it does not say its version.");
-      await cache.setLimits(await cacheLimits());
+      await cache.setLimits(cacheLimits());
       if (clear) await cache.clear();
       return cache.stats();
     },

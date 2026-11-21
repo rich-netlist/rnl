@@ -129,12 +129,13 @@ test('a file read before is shown again from the readings kept, until a file it 
   expect(await shown(page)).toMatchObject({ file: 'cells.inc', levels: ['cell'] });
 });
 
-test('the readings kept are found again by another visit of the page', async ({ page }) => {
+test('the readings are kept in memory alone: another visit of the page reads the file again', async ({ page }) => {
   await open(page);
-  await expect.poll(async () => (await kept(page)).stored ?? 0).toBeGreaterThan(0);
+  await expect.poll(async () => (await kept(page)).entries).toBe(1);
   await open(page);
-  expect(await kept(page)).toMatchObject({ hits: 1, misses: 0, persistent: true });
+  expect(await kept(page)).toMatchObject({ entries: 1, hits: 0, misses: 1 });
   expect(await shown(page)).toMatchObject({ file: 'top.sp', levels: ['top.sp', 't'] });
+  expect(await page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name))).toEqual([]);
 });
 
 test('an included file opens from the Library in the context of the entry, and Add to Library makes it a Library file', async ({ page }) => {
