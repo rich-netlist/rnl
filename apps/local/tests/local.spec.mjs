@@ -348,23 +348,6 @@ test("Save As asks before it replaces a file, and nothing is written until the u
   await expect.poll(() => readFileSync(other, "utf8")).toContain("A top level");
 });
 
-test("a file opened from the browser's computer is downloaded by Save, as the web does: the program does not write it", async ({ page }) => {
-  await open(page);
-  await page.locator("#file-input").setInputFiles({ name: "here.sp", mimeType: "text/plain", buffer: Buffer.from("* from the browser\nR1 a 0 1k\n.end\n") });
-  await page.waitForFunction(() => window.viewer.doc?.name === "here.sp" && !document.body.classList.contains("busy"), null, { timeout: 90000 });
-  await page.evaluate(() => window.viewer.command("toggle-edit"));
-  const area = page.locator("#source .editor:not([hidden]) textarea").first();
-  await area.fill(`${await area.inputValue()}* edited here\n`);
-  await page.locator("#apply-edits").click();
-  await page.waitForFunction(() => !document.body.classList.contains("busy"));
-  const download = page.waitForEvent("download");
-  await page.evaluate(() => window.viewer.command("save"));
-  const file = await download;
-  expect(file.suggestedFilename()).toBe("here.sp");
-  expect(readFileSync(await file.path(), "utf8")).toContain("* edited here");
-  await expect(page.locator("dialog.dialog")).toHaveCount(0);
-});
-
 test("Download Project holds the files of a PATH folder, read from the machine", async ({ page }) => {
   server.kill();
   mkdirSync(join(work, "lib"), { recursive: true });
@@ -376,11 +359,13 @@ test("Download Project holds the files of a PATH folder, read from the machine",
   await open(page);
   await page.locator("#tab-files").click();
   await expect(page.locator("#library-groups")).not.toHaveAttribute("aria-busy", "true");
+  // (the browser's own save dialog, where it has one, is not one a test can answer: the archive is downloaded)
+  await page.evaluate(() => { window.showSaveFilePicker = undefined; });
   const download = page.waitForEvent("download");
-  await page.evaluate(() => window.viewer.command("save-project"));
-  const dialog = page.locator("dialog.dialog");
-  const result = await Promise.race([download, dialog.waitFor().then(async () => { throw new Error(await dialog.innerText()); })]);
-  const zip = readFileSync(await result.path(), "latin1");
+  // the command waits for the dialog of what the archive holds, which is answered
+  await page.evaluate(() => { void window.viewer.command("save-project"); });
+  await page.locator("dialog.dialog").getByRole("button", { name: "Download", exact: true }).click();
+  const zip = readFileSync(await (await download).path(), "latin1");
   expect(zip.startsWith("PK")).toBe(true);
   expect(zip).toContain("PATH/1-lib/amp.sp");
   expect(zip).toContain("R5 in out 5k");

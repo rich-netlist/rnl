@@ -81,8 +81,6 @@ export function serverSource(path) {
   return {
     name: path,
     path,
-    // a file of the machine, which the program writes where it is (Save); a file of the browser's computer is downloaded
-    machine: true,
     // read at once, while the Library is indexed and the core loads, not when they are done (the web shell's build)
     prefetch: true,
     async open(again) {
@@ -188,12 +186,8 @@ export default {
     return onMachine(full) ? serverSource(full) : web.sourceForFile(source, document, index);
   },
   sourceForPath: (source, full) => (onMachine(full) ? serverSource(full) : web.sourceForPath(source, full)),
-  /**
-   * Write the files where they were read from, as the desktop does (decision 0011): asked about one that changed on disk.
-   * A document opened from the browser's computer, which the program cannot write to, is downloaded, as the web does.
-   */
+  /** Write the files where they were read from, as the desktop does (decision 0011): asked about one that changed on disk. */
   async save(source, files, overwrite, encoding) {
-    if (!source?.machine) return web.save(source, files, overwrite, encoding);
     const saved = await api("api/save", {
       method: "POST",
       body: {
