@@ -1,6 +1,6 @@
-// The cache of the core's results by file (result-cache.js): keys, the memory kept within its limit and given again only
-// while the inputs a result records hold, and the site's IndexedDB store, which another page finds, which is emptied when
-// it was written by another format, and which keeps within its limit too. Each test has a store of its own.
+// The cache of the core's results by file (result-cache.js): keys, and the memory kept within its limit and given again
+// only while the inputs a result records hold. Nothing is kept in the browser's storage, and the store that earlier
+// versions kept in the site's IndexedDB is deleted.
 
 import { expect, test } from "../viewer.js";
 
@@ -59,47 +59,32 @@ test("in memory: a result is given while its inputs hold, dropped when they do n
   expect(seen.afterDrop).toBe(1);
   expect(seen.kept).toEqual(["one", "four", "five", "six"]);
   expect(seen.huge).toBeNull();
-  expect(seen.empty).toMatchObject({ entries: 0, used: 0, limit: 0, persistent: false, hits: 3, misses: 2 });
+  expect(seen.empty).toEqual({ kind: "readings", entries: 0, used: 0, limit: 0, hits: 3, misses: 2 });
 });
 
-test("in the site's store: another page finds a result, a store of another format is emptied, and it keeps within its limit", async ({ page }) => {
-  const name = `results-test-${test.info().project.name}-${test.info().workerIndex}-${Date.now()}`;
+test("the store of results an earlier version kept in the site's IndexedDB is deleted, and nothing is stored", async ({ page }) => {
   const seen = await inPage(page, `
-    const [name] = arg;
-    const one = new rc.ResultCache({ store: await rc.openStore({ core: "0.6.1", shape: 1 }, name) });
-    const value = { levels: [{ title: "top", svg: "<svg/>".repeat(200) }], diagnostics: [] };
-    await one.put("k1", value, [["body", "/p/top.sp", "h1"]]);
-    // another page, with a memory of its own, finds it in the store, with its inputs
-    const two = new rc.ResultCache({ store: await rc.openStore({ core: "0.6.1", shape: 1 }, name) });
-    let inputs = null;
-    const found = await two.get("k1", async (given) => { inputs = given; return true; });
-    const persistent = two.stats().persistent;
-    // a store written by another core is emptied when it is opened
-    const other = new rc.ResultCache({ store: await rc.openStore({ core: "0.6.2", shape: 1 }, name) });
-    const afterUpgrade = await other.get("k1");
-    // within the limit: the least recently used goes first
-    const small = new rc.ResultCache({ memoryLimit: 0, storeLimit: 1e9, store: await rc.openStore({ core: "0.6.2", shape: 1 }, name) });
-    const noise = (n) => ({ noise: Array.from({ length: 400 }, (_, k) => (k * 7919 + n * 104729) % 1000003) });
-    await small.put("a", noise(1), []);
-    await small.put("b", noise(2), []);
-    await small.put("c", noise(3), []);
-    const each = small.stats().stored / 3;
-    await small.get("a");
-    await small.setLimits({ storeLimit: Math.ceil(each * 2.5) });
-    const left = [await small.get("a"), await small.get("b"), await small.get("c")].map((v) => v !== null);
-    await small.clear();
-    const cleared = await small.get("a");
-    indexedDB.deleteDatabase((await import("./storage-prefix.js")).STORAGE_PREFIX + name);
-    return { found, inputs, persistent, afterUpgrade, left, cleared };
-  `, [name]);
-  expect(seen.persistent).toBe(true);
-  expect(seen.found.levels[0].title).toBe("top");
-  expect(seen.found.levels[0].svg.length).toBe(1200);
-  expect(seen.inputs).toEqual([["body", "/p/top.sp", "h1"]]);
-  expect(seen.afterUpgrade).toBeNull();
-  // "a" was used after "b" and "c" were written, so "b", the least recently used, went
-  expect(seen.left).toEqual([true, false, true]);
-  expect(seen.cleared).toBeNull();
+    const { STORAGE_PREFIX } = await import("./storage-prefix.js");
+    const name = STORAGE_PREFIX + "results-test-" + Math.random().toString(16).slice(2);
+    const done = (r) => new Promise((resolve, reject) => { r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
+    // a store as an earlier version left it
+    const opening = indexedDB.open(name, 1);
+    opening.onupgradeneeded = () => opening.result.createObjectStore("entries", { keyPath: "key" });
+    (await done(opening)).close();
+    const named = async () => (await indexedDB.databases()).some((d) => d.name === name);
+    const before = await named();
+    rc.removeOldStore(name.slice(STORAGE_PREFIX.length));
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const after = await named();
+    // a cache keeps what it is given in memory alone
+    const cache = new rc.ResultCache();
+    await cache.put("one", { n: 1 }, []);
+    return { before, after, found: await cache.get("one"), stats: cache.stats() };
+  `);
+  expect(seen.before).toBe(true);
+  expect(seen.after).toBe(false);
+  expect(seen.found).toEqual({ n: 1 });
+  expect(Object.keys(seen.stats).sort()).toEqual(["entries", "hits", "kind", "limit", "misses", "used"]);
 });
 
 test("peek looks at a result without using it: no hit or miss, no order changed, nothing dropped", async ({ page }) => {

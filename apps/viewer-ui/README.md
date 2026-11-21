@@ -91,7 +91,7 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `dialog.js` | Dialogs in the page's style for what a shell or the page asks: one of a list, with a filter; a line of text; several values in a form, such as the grid's settings; a message; a message with a button that acts. They are modal: the page's keys and its menu bar wait while one is shown. |
 | `updates.js` | Help > Check for Updates: the newest release of the viewer on GitHub against the version that runs, compared by Semantic Versioning, in a dialog. |
 | `file-results.js` | The readings of one file kept, for a shell that reads the file shown alone: the key a `FileResult` is kept under, and whether the inputs it records still hold (see [Reading the file shown alone](#reading-the-file-shown-alone)). |
-| `result-cache.js` | The cache of what the core gives for each file, for loading a design file by file: a result is kept under a key with the inputs it records, and given again only while they hold. In memory, and in the site's IndexedDB where the browser lets it, each within a limit in bytes, the least recently used first out; a store written by another core or result shape is emptied when it is opened. A result can be looked at without being used (`peek`), as the entry page does. Nothing in it knows what a result holds, and a failure of the browser's storage is a miss. |
+| `result-cache.js` | The cache of what the core gives for each file, for loading a design file by file: a result is kept under a key with the inputs it records, and given again only while they hold. In memory for the page alone, within a limit in bytes, the least recently used first out; nothing is written to the browser's storage, and the store of results earlier versions kept in the site's IndexedDB is deleted when the page starts (`removeOldStore`). A result can be looked at without being used (`peek`), as the entry page does. Nothing in it knows what a result holds. |
 | `storage-prefix.js` | The prefix of the names the page keeps in the browser's storage (`util.js`): none, and the web build writes the one `RNL_STORAGE_PREFIX` names over it, for a frozen build beside the current one. |
 | `util.js` | Small helpers for building the page, and for keeping values in the shell’s settings store (native `settings.json` on desktop, `localStorage` on web), read and written so that a page without it starts from its defaults. |
 | `embed.js`, `embed.css` | Web-only canvas controls, hierarchy path and postMessage API; started only when the web shell has `embed=1`. See [Embedding](../web/README.md#embedding). |
@@ -149,22 +149,19 @@ view of it: the entry's source with `view`, the file as the document names it (`
   the text; a double click or Enter opens the module it names, below on the path. A Verilog-A file of the document
   shown by itself, from the Library say, shows its first module. The parameters an instance gives a module are not shown, and the
   desktop, which reads the whole document, has no outline and lists no modules.
-- **The readings are kept** (`file-results.js`, `result-cache.js`): in memory, and in the site's IndexedDB where the
-  browser lets it (stamped with the core's version and the shape of its results), so that showing a file again, in
-  this page or a later visit, asks the core only for the outline. A reading is found by the core, the options that
+- **The readings are kept** (`file-results.js`, `result-cache.js`) in memory for the page alone, so that showing a
+  file again asks the core only for the outline. Nothing of them is written to the browser's storage, and the store
+  earlier versions of the page kept in the site's IndexedDB is deleted when the page starts. A reading is found by the core, the options that
   change it, the entry, the file and the hash of its text, and given again only while what it recorded it depends
   on holds: the text of each file and package it read (a bundled package goes with the core), where each name it
   instantiates is defined and the global nets, as the outline has them now, the Library (a stamp of its files: a package or a definition it did not find may be there now), and
   the host levels it names. Reload reads the file again and keeps the new reading; a reading of a document that
   misses a file is not kept. The core shown holds no drawings of a kept reading's objects without a position: the
   Not drawn list has it read the file again first.
-- **File › Memory Cache** (`memory-cache.js`, `shell.memoryCache`) sets the limits of the readings kept: in memory for
-  the page (256 MiB by default) and in the browser's storage for the site (1024 MiB by default, and no more than half
-  of what the browser says the site may keep). Each is kept in the page's settings; 0 keeps none there, and a limit of
-  0 in the browser's storage reads nothing from it either. The dialog says how many readings each holds and their
-  size, with the hits and misses of the page, and Clear Cache empties both, the document shown staying as it is. A
-  browser that keeps nothing for the site, as in a private window, has the limit in memory alone. An embedded viewer
-  has no menu, and keeps its readings in memory alone.
+- **File › Memory Cache** (`memory-cache.js`, `shell.memoryCache`) sets the limit of the readings kept in memory for
+  the page (256 MiB by default, `file-cache-memory-mib` in the page's settings; 0 keeps none). The dialog says how many
+  readings it holds and their size, with the hits and misses of the page, and Clear Cache empties it, the document
+  shown staying as it is. An embedded viewer has no menu, and keeps its readings with the default limit.
 - **The problems** (`file-checks.js`, `problems.js`) are those of the file shown: the reading of a file has the
   problems of the files above it too, which it reads in its context, and of the packages it uses; the list has those
   of its own file, of no file and of a package. **All Files**, a switch at the right of the problems' heading, adds
