@@ -1,4 +1,4 @@
-// File › Memory Cache in the web viewer (memory-cache.js, shells/web.js `memoryCache`): the readings of each file kept
+// File › Memory Cache in the web viewer (memory-cache.js, file-reading.js `memoryCache`): the readings of each file kept
 // in memory for the page, with its limit, 0 keeping none, and Clear Cache empties it. Nothing is kept in the browser's
 // storage.
 import { test, expect } from '@playwright/test';
@@ -28,7 +28,7 @@ async function open(page) {
 }
 const idle = (page) => page.waitForFunction(() => window.viewer.doc && !document.body.classList.contains('busy'));
 const dialog = (page) => page.locator('dialog.dialog');
-const stats = (page) => page.evaluate(async () => (await import('./shells/web.js')).default.readingStats());
+const stats = (page) => page.evaluate(async () => (await import('./file-reading.js')).readingStats());
 async function openCache(page) {
   await page.getByRole('menuitem', { name: 'File', exact: true }).click();
   await page.getByRole('menuitem', { name: /Memory Cache/ }).click();

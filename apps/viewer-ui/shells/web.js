@@ -4,15 +4,14 @@ import { append, m, setAttr, setText } from "../i18n.js";
 // files the user chooses or drops, a folder, or a URL; reads only the files a document needs, as
 // collect in the core's client asks for them; and builds the Document with the core as WebAssembly in
 // module Workers. Each candidate keeps its own lazy drawings until the page accepts it. The page's own
-// opens read the file shown alone, in the context of its entry (`perFile`): the outline of the whole
-// document, then the reading of that one file (collectOutline, collectFile), which is kept (file-results.js,
-// result-cache.js) in memory for the page, nothing of it in the browser's storage, and read again only
-// when what it depends on has changed. `checkFiles` reads the other files of the document so, one by one, for the
-// problems of every file (file-checks.js).
+// opens read the file shown alone, in the context of its entry (`reader`, which file-reading.js reads with):
+// the outline of the whole document, then the reading of that one file (collectOutline, collectFile). What is
+// kept of them, and when, is the page's (file-reading.js); nothing of it is in the browser's storage. An
+// embedded viewer, and the viewer API, read the whole document (`build`).
 
 import { collect, collectFile, collectOutline, coreVersion, decodeText, fileResultFormat, startCore } from "../core/client.js";
-import { MEMORY_LIMIT, removeOldStore, ResultCache } from "../result-cache.js";
-import { holds, readingKey, requestPath, textHash } from "../file-results.js";
+import { removeOldStore } from "../result-cache.js";
+import { libraryStamps, requestPath, textHash } from "../file-results.js";
 import { loadManifest, readManifest } from "../manifest.js";
 import { ask, choose, inform, modal } from "../dialog.js";
 import { openWebWindow, receiveWebSession } from "../window-session.js";
@@ -154,37 +153,16 @@ async function indexLibrary(worker, snapshot) {
   indexedLibraries.set(worker, snapshot);
   return errors;
 }
-const MIB = 1024 * 1024;
-/**
- * The limits of the readings kept, in bytes, as File › Memory Cache sets them (memory-cache.js): in memory, and in the
- * browser's storage, no more than half of what the browser says the site may keep. 0 keeps none there. An embedded
- * viewer reads no setting and keeps nothing in the browser's storage, as it keeps none of its preferences: the default
- * in memory, and no store.
- */
-const cacheLimits = () => ({ memoryLimit: embed ? MEMORY_LIMIT : load("file-cache-memory-mib", MEMORY_LIMIT / MIB) * MIB });
-/**
- * The readings of one file kept, once the store is open: none for a core that does not say its version, as one built
- * from the sources does not (version.js), and in memory alone where the browser keeps nothing.
- */
-const readings = coreVersion === null ? null : (async () => {
-  // the store of results earlier versions of the page kept in the browser's storage is deleted; an embed touches none
-  if (!embed) removeOldStore();
-  return new ResultCache(cacheLimits());
-})();
-// the Documents given from the kept readings: the core shown holds no drawings of theirs until it reads them again
+// the store of results earlier versions of the page kept in the browser's storage is deleted; an embed touches none
+if (!embed) removeOldStore();
+// the Documents given from the readings kept (file-reading.js): the core shown holds no drawings of theirs until it
+// reads them again
 const kept = new WeakSet();
 const primed = new WeakSet();
-// the hash of each file of a Library snapshot, made once
-const libraryHashes = new WeakMap();
-/**
- * The stamp of the Library a reading is made with: its files and their texts, but those the document reads by the same
- * names (`own`), whose texts the reading checks itself: the files opened join the Library, and that changes nothing.
- */
-async function libraryStamp(snapshot, own) {
-  if (!libraryHashes.has(snapshot)) libraryHashes.set(snapshot, Promise.all([...snapshot.texts].map(async ([path, text]) => [path, await textHash(text)])));
-  const hashes = (await libraryHashes.get(snapshot)).filter(([path]) => !own.has(path));
-  return textHash(JSON.stringify(hashes.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))));
-}
+// the stamps of each Library snapshot (file-results.js libraryStamps), made once
+const stamped = new WeakMap();
+/** The options of a request that change a reading, as the key of one kept has them (file-reading.js). */
+const READING_OPTIONS = ["svg", "primitives", "flylines", "hints", "lazy_unplaced", "auto_include", "library_prefix", "formats", "dialect"];
 let lastUrl = ""; // the URL opened last, which Open URL offers again
 // The files of the document shown that a server served, by their workspace paths, and its origin: the
 // format chosen for one of them is kept by its address, as the page can read it again; a file chosen
@@ -209,6 +187,74 @@ function requestFormats(origin, poolPath = (path) => path) {
     out[poolPath(path)] = name;
   }
   return out;
+}
+
+/** The files of a Document of `source` a server served, by their workspace paths, and its origin (`servedFiles`). */
+const served = (source, doc) => source.url
+  ? { origin: new URL(source.url).origin, paths: new Set(doc.files.filter((f) => f.format).map((f) => sourcePath(doc, f)).filter((p) => !p.startsWith("/<"))) }
+  : { origin: null, paths: new Set() };
+
+/**
+ * What a reading of `source`, the entry's source of a view, asks the core for, and how the files it asks for are read:
+ * the request, with the Library's files under their names in it, a manifest's, `edits` over the texts and the API
+ * packages; `read(path)`, which reads a file the core asks for; the Library snapshot the request has. A file at an
+ * address is asked for before the Library is ready, which takes longer than it does on a slow network.
+ */
+async function prepare(source, edits, suppliedPackages, progress, { bind, constraints } = {}) {
+  source = entrySource(source);
+  const again = built.has(source);
+  built.add(source);
+  // an error of the file asked for early is told where it is awaited
+  const reading = source.prefetch && source.text === undefined ? source.open(again, progress) : null;
+  reading?.catch(() => {});
+  await poolReady;
+  const library = librarySnapshot;
+  progress?.("reading");
+  const held = source.text !== undefined;
+  const entry = held ? { path: source.path || `/${source.name}`, text: source.text } : await (reading ?? source.open(again, progress));
+  const dir = entry.path.slice(0, entry.path.lastIndexOf("/"));
+  const files = {};
+  // An independently opened source owns its relative paths. Put the pool in a separate
+  // namespace so preloaded pool text cannot hide a source-relative file collect has yet to read.
+  const poolPath = (path) => source.fromPool ? path : `/<pool>${path}`;
+  for (const [path, text] of library.texts) {
+    files[poolPath(path)] = path === entry.path ? entry.text : text;
+  }
+  files[entry.path] = entry.text;
+  Object.assign(files, source.snapshot || {});
+  for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
+  // a manifest's pool first, in its order, then the Library's files
+  const pool = [...(source.pool || []), ...[...library.texts.keys()].map(poolPath)];
+  // the files of a manifest are indexed as the Library's are, for Auto Include, from the build
+  // that opens it on: the Library has them only after it (pool.js)
+  for (const [path, text] of Object.entries(source.external?.files || {})) {
+    if (library.texts.has(path) || files[poolPath(path)] !== undefined) continue;
+    files[poolPath(path)] = text;
+    pool.push(poolPath(path));
+  }
+  // flylines and the layout hints are asked for, not left to the core's default: View > Show Flylines hides the flylines (flylines.js), and the problems list has the hints (problems.js)
+  const request = { entry: entry.path, files, pool, svg: true, primitives: false, flylines: true, hints: true, lazy_unplaced: true,
+    auto_include: load("auto-include", true) === true, library_prefix: source.fromPool ? "" : "/<pool>",
+    formats: requestFormats(source.url ? new URL(source.url).origin : null, poolPath),
+    library_edits: Object.fromEntries(Object.entries(edits || {}).map(([path, text]) => {
+      const full = joined(dir, path);
+      return [full.replace(/^\/<pool>(?=\/)/, ""), text];
+    })) };
+  // the parameters of a subcircuit to build with, for showing (params-dialog.js)
+  if (bind) request.bind = bind;
+  // the constraints of each level, for the Solve view (constraints.js)
+  if (constraints) request.constraints = true;
+  // API packages are request-local until the newest request commits them to Library.
+  for (const item of suppliedPackages || []) {
+    const path = `/<api>${item.path}`;
+    request.files[path] = decodeText(await (await item.read()).arrayBuffer());
+    request.pool.push(path);
+  }
+  const read = held ? async () => null : (path) => {
+    progress?.("reading");
+    return path.startsWith("/<pool>/") ? Promise.resolve(null) : source.read(path, again);
+  };
+  return { source, entry, request, read, library };
 }
 
 /** A core to ask what needs no document: the one shown, or the warm spare. */
@@ -961,7 +1007,8 @@ export default {
       }
       poolFiles = next;
       poolTexts = texts;
-      librarySnapshot = { texts, epoch: librarySnapshot.epoch + (reload ? 1 : 0) };
+      // (the files that joined the Library by being opened, which its stamps tell apart)
+      librarySnapshot = { texts, epoch: librarySnapshot.epoch + (reload ? 1 : 0), opened: new Set(items.filter((item) => item.opened).map((item) => item.path)) };
       if (!spare && !core) spare = warmCore();
       const indexed = await indexLibrary(spare?.worker ?? core, librarySnapshot);
       return [...errors, ...indexed];
@@ -998,140 +1045,33 @@ export default {
     return Promise.resolve(null);
   },
   /**
-   * Read the files the document needs, as SVG for the page to draw, and name the browser tab. A
-   * source that holds its text, such as the clipboard's, can use the file pool for includes. The
-   * texts of `edits`, by the paths the Document names the files by, are those of the files, not what
-   * is read. With `perFile` and `check` ({ files, each }), each file of `check.files` is read too, in the context
-   * of the entry, before the file of the source, and given to `check.each` (checkFiles).
+   * Read the whole document the source reads, as SVG for the page to draw, as an embedded viewer and the viewer API
+   * read it; the page reads the file shown alone with `reader`. A source that holds its text, such as the clipboard's,
+   * can use the file pool for includes. The texts of `edits`, by the paths the Document names the files by, are those
+   * of the files, not what is read.
    */
-  async build(source, edits, progress, suppliedPackages, signal, { bind, constraints, perFile, fresh, check } = {}) {
-    // the file of a view of a file of a document, read alone in the context of its entry (visit-source.js)
-    const view = source.view;
-    source = entrySource(source);
-    const again = built.has(source);
-    built.add(source);
-    // a file at an address is asked for before the Library is indexed and the core is loaded, which take longer than it
-    // does on a slow network; an error of it is told where it is awaited
-    const reading = source.prefetch && source.text === undefined ? source.open(again, progress) : null;
-    reading?.catch(() => {});
-    await poolReady;
-    const library = librarySnapshot;
+  async build(source, edits, progress, suppliedPackages, signal, { bind, constraints } = {}) {
     let buildingCore;
     const abort = () => buildingCore?.terminate();
     try {
-      progress?.("reading");
-      const held = source.text !== undefined;
-      const entry = held ? { path: source.path || `/${source.name}`, text: source.text } : await (reading ?? source.open(again, progress));
-      const dir = entry.path.slice(0, entry.path.lastIndexOf("/"));
-      const files = {};
-      // An independently opened source owns its relative paths. Put the pool in a separate
-      // namespace so preloaded pool text cannot hide a source-relative file collect has yet to read.
-      const poolPath = (path) => source.fromPool ? path : `/<pool>${path}`;
-      for (const [path, text] of library.texts) {
-        files[poolPath(path)] = path === entry.path ? entry.text : text;
-      }
-      files[entry.path] = entry.text;
-      Object.assign(files, source.snapshot || {});
-      for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
-      // a manifest's pool first, in its order, then the Library's files
-      const pool = [...(source.pool || []), ...[...library.texts.keys()].map(poolPath)];
-      // the files of a manifest are indexed as the Library's are, for Auto Include, from the build
-      // that opens it on: the Library has them only after it (pool.js)
-      for (const [path, text] of Object.entries(source.external?.files || {})) {
-        if (library.texts.has(path) || files[poolPath(path)] !== undefined) continue;
-        files[poolPath(path)] = text;
-        pool.push(poolPath(path));
-      }
-      // flylines and the layout hints are asked for, not left to the core's default: View > Show Flylines hides the flylines (flylines.js), and the problems list has the hints (problems.js)
-      const request = { entry: entry.path, files, pool, svg: true, primitives: false, flylines: true, hints: true, lazy_unplaced: true,
-        auto_include: load("auto-include", true) === true, library_prefix: source.fromPool ? "" : "/<pool>",
-        formats: requestFormats(source.url ? new URL(source.url).origin : null, poolPath),
-        library_edits: Object.fromEntries(Object.entries(edits || {}).map(([path, text]) => {
-          const full = joined(dir, path);
-          return [full.replace(/^\/<pool>(?=\/)/, ""), text];
-        })) };
-      // the parameters of a subcircuit to build with, for showing (params-dialog.js)
-      if (bind) request.bind = bind;
-      // the constraints of each level, for the Solve view (constraints.js)
-      if (constraints) request.constraints = true;
-      // API packages are request-local until the newest request commits them to Library.
-      for (const item of suppliedPackages || []) {
-        const path = `/<api>${item.path}`;
-        request.files[path] = decodeText(await (await item.read()).arrayBuffer());
-        request.pool.push(path);
-      }
-      const read = held ? async () => null : (path) => {
-        progress?.("reading");
-        return path.startsWith("/<pool>/") ? Promise.resolve(null) : source.read(path, again);
-      };
+      const prepared = await prepare(source, edits, suppliedPackages, progress, { bind, constraints });
+      const { request, read, library } = prepared;
+      source = prepared.source;
       // An incoming candidate may be declined or superseded after building. Its lazy
       // drawings must not replace those of the retained document until display commits it.
       if (signal?.aborted) throw new Error("superseded");
-      const prepared = spare ?? warmCore();
+      const warm = spare ?? warmCore();
       spare = null;
-      buildingCore = prepared.worker;
+      buildingCore = warm.worker;
       pendingCores.add(buildingCore);
       signal?.addEventListener("abort", abort, { once: true });
-      await prepared.ready;
+      await warm.ready;
       await indexLibrary(buildingCore, library);
       const builder = { build: (request) => {
         if (signal?.aborted) throw new Error("superseded");
         progress?.("parsing"); return buildingCore.build(request);
       } };
-      let doc, collected;
-      if (perFile && !embed) {
-        // the outline of the whole document, which reads every file it includes, then the file shown alone
-        const outliner = { outline: (request) => {
-          if (signal?.aborted) throw new Error("superseded");
-          progress?.("parsing"); return buildingCore.outline(request);
-        } };
-        const outlined = await collectOutline(outliner, request, read);
-        request.file = view ?? outlined.outline.files[0]?.path ?? entry.path.slice(entry.path.lastIndexOf("/") + 1);
-        // the reading kept, while what it depends on holds; Reload reads it again
-        const cache = await readings;
-        const now = { outline: outlined.outline, textOf: (path) => outlined.files[path], library: await libraryStamp(library, new Set(Object.keys(outlined.files))) };
-        /** The reading of `file` alone, the one kept or a new one, which is kept. */
-        const readFile = async (file, fresh) => {
-          const body = outlined.files[requestPath(entry.path, file)];
-          const key = cache && body !== undefined ? await readingKey({ version: coreVersion, format: fileResultFormat }, request, file, body) : null;
-          const found = key && !fresh ? await cache.get(key, (stored) => holds(stored, now)) : null;
-          if (found) {
-            const result = structuredClone(found.result);
-            kept.add(result);
-            return { result, files: outlined.files };
-          }
-          const reader = { buildFile: (request) => {
-            if (signal?.aborted) throw new Error("superseded");
-            progress?.("parsing"); return buildingCore.buildFile(request);
-          } };
-          const started = performance.now();
-          const read1 = await collectFile(reader, { ...request, file, files: outlined.files }, read);
-          // kept when the document has every file it asks for, with how long it took to read (the entry page tells it)
-          if (key && !signal?.aborted && read1.result.missing.length === 0) {
-            const stored = { result: structuredClone(read1.result), library: now.library, took: performance.now() - started };
-            cache.put(key, stored, stored).catch(() => {});
-          }
-          return read1;
-        };
-        // the other files to check, each told as it is read, or why it could not be; the file of the source last, so that
-        // the core keeps its drawings
-        for (const file of check?.files ?? []) {
-          if (signal?.aborted) throw new Error("superseded");
-          try { check.each(file, (await readFile(file, false)).result, null); }
-          catch (e) {
-            if (signal?.aborted) throw e;
-            check.each(file, null, e instanceof Error ? e.message : String(e));
-          }
-        }
-        ({ result: doc, files: collected } = await readFile(request.file, fresh));
-        // the texts of the other files, which the reading of one leaves out, for the netlist pane
-        for (const f of doc.files) {
-          if (f.text) continue;
-          const full = sourcePath(doc, f);
-          f.text = collected[full] ?? collected[full.replace(/^<pool>\//, "/<pool>/")] ?? "";
-        }
-        doc.outline = outlined.outline;
-      } else ({ document: doc, files: collected } = await collect(builder, request, read));
+      let { document: doc, files: collected } = await collect(builder, request, read);
       if (embed) {
         // Embeds have no Library controls. Resolve named public dependencies with the same
         // catalog and verification as Include Public Package; keep downloads request-local.
@@ -1159,9 +1099,7 @@ export default {
       }
       candidates.set(doc, buildingCore);
       builtRequests.set(doc, { ...request, files: collected });
-      servedFiles = source.url
-        ? { origin: new URL(source.url).origin, paths: new Set(doc.files.filter((f) => f.format).map((f) => sourcePath(doc, f)).filter((p) => !p.startsWith("/<"))) }
-        : { origin: null, paths: new Set() };
+      servedFiles = served(source, doc);
       return doc;
     } catch (e) {
       buildingCore?.terminate();
@@ -1172,7 +1110,11 @@ export default {
   },
   commitBuild(doc) {
     const candidate = candidates.get(doc);
-    if (!candidate) return;
+    // a Document given from the readings kept, read with no core: the core shown stays, and reads it when asked to
+    if (!candidate) {
+      if (builtRequests.has(doc)) lastBuilt = doc;
+      return;
+    }
     lastBuilt = doc;
     if (core) {
       if (!spare) spare = { worker: core, ready: Promise.resolve() };
@@ -1183,15 +1125,114 @@ export default {
     pendingCores.delete(candidate);
     replenishCore();
   },
-  /**
-   * Read each of `files`, files of the document `source` reads as `build` with `perFile` names them, alone in the
-   * context of its entry, with `edits` over the texts, and give each to `each(file, result, error)` as it is read: the
-   * reading (a FileResult), or null and why it could not be read. The readings are kept as an open keeps them.
-   */
-  async checkFiles(source, edits, files, each, signal) {
-    const doc = await this.build(source, edits, undefined, undefined, signal, { perFile: true, check: { files, each } });
-    this.discardBuild(doc);
-  },
+  ...(embed ? {} : {
+    /**
+     * What the page reads a document file by file with (file-reading.js, shell.js `Reader`): the files the source reads,
+     * with the Library and `edits` over them, read and hashed as the core reads them, and a core, which starts only when
+     * the outline or a reading is asked for. A reading with `keep` holds the drawings of what has no position: the
+     * reader's core does, and becomes the core shown when the page shows the Document.
+     */
+    async reader(source, edits, { progress, signal, bind, constraints } = {}) {
+      const prepared = await prepare(source, edits, [], progress, { bind, constraints });
+      const { entry, request, read, library } = prepared;
+      // the texts known, by the paths of the request, and those read, once each
+      const texts = { ...request.files };
+      const reads = new Map();
+      const textOf = (path) => {
+        if (texts[path] !== undefined) return Promise.resolve(texts[path]);
+        if (!reads.has(path)) {
+          reads.set(path, Promise.resolve(read(path)).then((t) => (typeof t === "string" ? (texts[path] = t) : null), () => null));
+        }
+        return reads.get(path);
+      };
+      const hashes = new Map();
+      let worker = null, starting = null, failed = false;
+      const abort = () => worker?.terminate();
+      const stopped = () => { if (signal?.aborted) throw new Error("superseded"); };
+      const useCore = () => (starting ??= (async () => {
+        stopped();
+        const warm = spare ?? warmCore();
+        spare = null;
+        worker = warm.worker;
+        pendingCores.add(worker);
+        signal?.addEventListener("abort", abort, { once: true });
+        await warm.ready;
+        await indexLibrary(worker, library);
+        return worker;
+      })());
+      const asking = (name) => async (r) => {
+        stopped();
+        const w = await useCore();
+        stopped();
+        progress?.("parsing");
+        return w[name](r);
+      };
+      const failing = async (job) => {
+        try { return await job(); }
+        catch (e) { failed = true; throw e instanceof Error ? e.message : String(e); }
+      };
+      return {
+        core: coreVersion === null ? null : { version: coreVersion, format: fileResultFormat },
+        entry: entry.path,
+        options: Object.fromEntries(READING_OPTIONS.filter((k) => request[k] !== undefined).map((k) => [k, request[k]])),
+        async hashes(paths) {
+          const out = new Map();
+          await Promise.all(paths.map(async (path) => {
+            if (!hashes.has(path)) hashes.set(path, textOf(requestPath(entry.path, path)).then((t) => (t === null ? null : textHash(t))));
+            out.set(path, await hashes.get(path));
+          }));
+          return out;
+        },
+        outline: () => failing(async () => {
+          const got = await collectOutline({ outline: asking("outline") }, { ...request, files: texts }, read);
+          Object.assign(texts, got.files);
+          return got.outline;
+        }),
+        readFile: (file) => failing(async () => {
+          const got = await collectFile({ buildFile: asking("buildFile") }, { ...request, file, files: texts }, read);
+          Object.assign(texts, got.files);
+          return got.result;
+        }),
+        // the texts of the other files, which the reading of one leaves out, for the netlist pane
+        async texts(doc) {
+          for (const f of doc.files) {
+            if (f.text) continue;
+            const full = sourcePath(doc, f);
+            f.text = texts[full] ?? texts[full.replace(/^<pool>\//, "/<pool>/")] ?? (await textOf(requestPath(entry.path, f.path))) ?? "";
+          }
+        },
+        async symbols(file) {
+          return (core ?? (await someCore())).symbols({ ...request, files: texts, symbols: file });
+        },
+        finish(doc, hit) {
+          signal?.removeEventListener("abort", abort);
+          if (!doc) {
+            if (!worker) return;
+            pendingCores.delete(worker);
+            if (!failed && !spare && !signal?.aborted) spare = { worker, ready: Promise.resolve() };
+            else worker.terminate();
+            replenishCore();
+            return;
+          }
+          if (worker) candidates.set(doc, worker);
+          // a Document given from a reading kept: the core holds no drawings of it until it reads it again
+          if (hit) kept.add(doc);
+          builtRequests.set(doc, { ...request, file: doc.file, files: texts });
+          servedFiles = served(prepared.source, doc);
+        },
+      };
+    },
+    /** The stamps of the Library now (file-results.js libraryStamps), once what it is given is read. */
+    async libraryStamps() {
+      await poolReady.catch(() => {});
+      const snapshot = librarySnapshot;
+      if (!stamped.has(snapshot)) {
+        stamped.set(snapshot, libraryStamps([...snapshot.texts.keys()].map((path) => ({ path, opened: !!snapshot.opened?.has(path) })),
+          (path) => textHash(snapshot.texts.get(path))));
+      }
+      return stamped.get(snapshot);
+    },
+  }),
   discardBuild(doc) {
     const candidate = candidates.get(doc);
     if (!candidate) return;
@@ -1322,53 +1363,14 @@ export default {
    */
   async unplacedDrawings(level, items, names) {
     if (lastBuilt && kept.has(lastBuilt) && !primed.has(lastBuilt)) {
+      core ??= await someCore();
+      if (spare?.worker === core) spare = null;
+      await indexLibrary(core, librarySnapshot);
       await core.buildFile(builtRequests.get(lastBuilt));
       primed.add(lastBuilt);
     }
     return core.drawings({ drawings: { level, items, names } });
   },
-  /**
-   * Of each of `files`, files of the document shown as its outline names them, for the entry page (entry-page.js): the
-   * symbols its subcircuits give themselves (`FileSymbols.subckts`, or null when they cannot be read), whether a
-   * reading of it is kept that still holds, and how long that reading took, in milliseconds (null when not known).
-   */
-  async fileSummaries(files) {
-    const doc = lastBuilt;
-    const request = doc && builtRequests.get(doc);
-    if (!request || !doc.outline) return {};
-    const cache = await readings;
-    const now = { outline: doc.outline, textOf: (path) => request.files[path],
-      library: await libraryStamp(librarySnapshot, new Set(Object.keys(request.files))) };
-    const out = {};
-    for (const file of files) {
-      let subckts = null;
-      try { subckts = (await core.symbols({ ...request, symbols: file })).subckts; } catch { /* no symbols: the page draws a box */ }
-      const body = request.files[requestPath(request.entry, file)];
-      const key = cache && body !== undefined ? await readingKey({ version: coreVersion, format: fileResultFormat }, request, file, body) : null;
-      const found = key ? await cache.peek(key, (stored) => holds(stored, now)) : null;
-      // how long the last reading took, also of one that no longer holds
-      const last = found ?? (key ? await cache.peek(key) : null);
-      out[file] = { subckts, kept: !!found, took: last?.took ?? null };
-    }
-    return out;
-  },
-  /** What the kept readings hold, for File > Memory Cache: as `ResultCache.stats` gives it; null when none are kept. */
-  async readingStats() {
-    return (await readings)?.stats() ?? null;
-  },
-  ...(embed ? {} : {
-    /**
-     * File › Memory Cache (memory-cache.js): apply the limits saved to the readings kept, empty them with `clear`, and
-     * tell what they hold, as `ResultCache.stats` gives it. Fails for a core that keeps none (one built from the sources).
-     */
-    async memoryCache(clear = false) {
-      const cache = await readings;
-      if (!cache) throw m("This build of the core keeps no readings: it does not say its version.");
-      await cache.setLimits(cacheLimits());
-      if (clear) await cache.clear();
-      return cache.stats();
-    },
-  }),
   /** Download the files: the web cannot write them where they were read from (decision 0011). */
   async save(source, files) {
     for (const f of files) download(f.name.split("/").pop(), f.text);

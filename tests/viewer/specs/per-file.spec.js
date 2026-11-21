@@ -97,8 +97,8 @@ test('a level of another file picked in the index is that file\'s reading, as th
   expect(await shown(page)).toMatchObject({ file: 'top.sp', level: 't', path: ['t'] });
 });
 
-/** What the readings kept say of themselves (result-cache.js `stats`). */
-const kept = (page) => page.evaluate(async () => (await import('./shells/web.js')).default.readingStats());
+/** What the readings kept say of themselves (file-reading.js, result-cache.js `stats`). */
+const kept = (page) => page.evaluate(async () => (await import('./file-reading.js')).readingStats());
 const descendNamed = async (page, name) => {
   await page.evaluate((name) => import('./subcircuits.js').then(s => s.descend(window.viewer.doc.objects.findIndex(o => o.kind === 'instance' && o.name === name))), name);
   await idle(page);

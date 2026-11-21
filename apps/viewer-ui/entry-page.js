@@ -1,12 +1,12 @@
 import { append, m, setAttr, setText } from "./i18n.js";
-// The entry page: an entry that only includes other files, read alone (a shell with `perFile`), has an empty top level,
+// The entry page: an entry that only includes other files, read alone (a shell with `reader`), has an empty top level,
 // and the subcircuits that nothing calls are in the other files (roots.js). In place of the empty drawing, a card says
 // so and lists those subcircuits, each with its symbol, the file that defines it, its instances, and whether its file's
-// reading is kept, else how long it took the last time (`shell.fileSummaries`); a click opens it, as the index does.
+// reading is kept, else how long it took the last time (file-reading.js `fileSummaries`); a click opens it, as the index does.
 // With one alone, a file opened opens it at once, and the card shows meanwhile.
 
 import { current, doc } from "./state.js";
-import { shell } from "./shell.js";
+import { fileSummaries, readsByFile } from "./file-reading.js";
 import { levelTree, localLevel } from "./level-tree.js";
 import { uncalledRoots } from "./roots.js";
 import { enterHost } from "./subcircuits.js";
@@ -75,14 +75,14 @@ function rootItem(host) {
   return { row, thumb, status };
 }
 
-/** Fill in the symbols the roots give themselves, and the state of their files' readings, when the shell tells them. */
+/** Fill in the symbols the roots give themselves, and the state of their files' readings, when they are known. */
 async function summarize(roots, items) {
-  if (!shell.fileSummaries) return;
+  if (!readsByFile()) return;
   const shown = doc;
   const { nodes } = levelTree();
   const files = [...new Set(roots.map((h) => nodes[h].file).filter((f) => f !== null))];
   let summaries;
-  try { summaries = await shell.fileSummaries(files); } catch { return; }
+  try { summaries = await fileSummaries(files); } catch { return; }
   if (doc !== shown || card.hidden) return;
   for (const host of roots) {
     const s = summaries[nodes[host].file];

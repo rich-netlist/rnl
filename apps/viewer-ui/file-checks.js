@@ -1,5 +1,5 @@
 import { m } from "./i18n.js";
-// The problems of the files of a document read one by one (per-file loading: a shell with `perFile`, shells/web.js).
+// The problems of the files of a document read one by one (per-file loading: a shell with `reader`, file-reading.js).
 // The reading of the file shown has the problems of its own file, and of the files above it that it reads too; the
 // problems list shows those of its own file (problems.js). For the other files, it keeps the problems of each file of
 // the document as its own reading gave them, when one was shown or checked, and gives those of the outline (reading
@@ -11,7 +11,7 @@ import { m } from "./i18n.js";
 // text, starts it again.
 
 import { doc } from "./state.js";
-import { shell } from "./shell.js";
+import { checkFiles, readsByFile } from "./file-reading.js";
 import { changes } from "./edits.js";
 import { currentSource } from "./open.js";
 
@@ -123,7 +123,7 @@ export function otherFiles(d) {
 
 /** Whether Check All Files has files to read for the document shown, and is not reading them already. */
 export function canCheckAll() {
-  if (!shell.checkFiles || running || readFileIndex(doc) < 0) return false;
+  if (!readsByFile() || running || readFileIndex(doc) < 0) return false;
   const into = keptFor(doc);
   return doc.outline.files.some((f) => !into.files.has(f.path));
 }
@@ -143,7 +143,7 @@ export async function checkAllFiles() {
   const run = (running = { controller, done: 0, total: files.length });
   changed();
   try {
-    await shell.checkFiles(source, changes(true), files, (file, result, error) => {
+    await checkFiles(source, changes(true), files, (file, result, error) => {
       if (kept !== into || controller.signal.aborted) return;
       run.done++;
       if (result) keep(into, result, documentFiles);

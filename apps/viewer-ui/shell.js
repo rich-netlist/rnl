@@ -3,6 +3,28 @@
 // how the platform reads files or shows a menu.
 
 /**
+ * What the page reads one document with, file by file (`shell.reader`, file-reading.js), for one reading: an open, a
+ * Check All Files. Paths are those of the files as the document names them (`SourceFile.path`, relative to the
+ * entry's folder, or a path of their own) and of packages as `FileInput.path` names them.
+ *
+ * @typedef {object} Reader
+ * @property {{ version: string, format: number } | null} core The core's version and the shape of its readings, which
+ *   the key of a reading kept has; null for a core that does not say its version, whose readings are not kept.
+ * @property {string} entry The entry, as the key of a reading kept names it.
+ * @property {object} options The options of the shell's readings that change one, as the key of a reading kept has them.
+ * @property {(paths: string[]) => Promise<Map<string, string | null>>} hashes The hash of the text of each file, as the
+ *   core reads it and hashes it (`OutlineFile.text_hash`), null for one that is not there. No core is started.
+ * @property {() => Promise<object>} outline The outline of the whole document (`Outline`), which the core makes.
+ * @property {(file: string, keep: boolean) => Promise<object>} readFile The reading of `file` alone, in the context of the
+ *   entry (`FileResult`); with `keep`, the core keeps the drawings of what it lists with no position, for
+ *   `unplacedDrawings` once the page shows it.
+ * @property {(doc: object) => Promise<void>} texts Fill in the texts of the files of a reading that it leaves out.
+ * @property {(file: string) => Promise<{ subckts: object[] }>} symbols The symbols the subcircuits of `file` give themselves (`FileSymbols`).
+ * @property {(doc: object | null, hit: boolean) => void} finish The reading is done: `doc` the Document it gave (a
+ *   reading kept, with `hit`), or null for none to show, after which the reader is not used.
+ */
+
+/**
  * What the page asks of its platform.
  *
  * @typedef {object} Shell
@@ -38,24 +60,20 @@
  * @property {boolean} [overwrites] A shell of the "web" platform that writes the files where they were read from, as the
  *   desktop's does (the local shell, whose server writes them): Save is Save, not Download File, and offers the desktop's
  *   Save As; it has `save`, and `saveAs` when the user may choose another file.
- * @property {boolean} [perFile] Whether `build` with `{ perFile: true }` reads the file of the source alone, in the
- *   context of its entry, and gives its `FileResult` with the outline of the whole document as `outline` (see the
- *   README's Reading the file shown alone); the page then names the file by the source's `view` (visit-source.js).
- * @property {(source: Source, edits: Edits | undefined, files: string[], each: (file: string, result: object | null, error: string | null) => void, signal?: AbortSignal) => Promise<void>} [checkFiles]
- *   With `perFile`, read each of `files` of the document `source` reads, alone in the context of its entry, and give
- *   each reading, or why it could not be read, to `each` as it is read: Check All Files (file-checks.js).
- * @property {(files: string[]) => Promise<Record<string, { subckts: object[] | null, kept: boolean, took: number | null }>>} [fileSummaries]
- *   With `perFile`, of each of `files` of the document shown: the symbols its subcircuits give themselves, whether its
- *   reading is kept, and how long it took: the entry page (entry-page.js).
+ * @property {boolean} [perFile] Whether the page reads the file of a source alone, in the context of its entry, with
+ *   `reader` (file-reading.js; see the README's Reading the file shown alone); the page then names the file by the
+ *   source's `view` (visit-source.js).
+ * @property {(source: Source, edits: Edits | undefined, options?: { progress?: (stage: string) => void, signal?: AbortSignal, bind?: { subckt: string, params: Record<string, string> }, constraints?: boolean }) => Promise<Reader>} [reader]
+ *   With `perFile`, what the page reads the document `source` (an entry's own source) file by file with, `edits` over
+ *   its files: the shell reads the files and starts the core; what is kept, and when, is the page's (file-reading.js).
+ * @property {() => Promise<{ user: string, all: string }>} [libraryStamps] With `reader`, the stamps of the Library as it
+ *   is now, once what it was given is read (file-results.js `libraryStamps`).
  * @property {boolean} nativeMenu Whether the platform shows the menu bar itself; if not, the page shows
  *   its own (menubar.js).
  * @property {() => Promise<Source | null>} initial What to open at start, if anything: on the desktop,
  *   the file named on the command line.
  * @property {(kind: string) => Promise<Source | null>} pick Ask for something to open: kind "file", and on
  *   the web also "url". Null when nothing is chosen.
- * @property {(clear?: boolean) => Promise<{ limit: number, used: number, entries: number, hits: number, misses: number, prefetched?: number, stored?: number | null, kind?: string }>} [memoryCache]
- *   File > Memory Cache: apply the saved limits and optionally clear retained results. The desktop's render cache, or
- *   the web shell's readings of each file kept in memory (`ResultCache.stats`, whose `kind` is "readings").
  * @property {(source: Source, edits?: Edits, progress?: (stage: string) => void, packages?: object[], signal?: AbortSignal, options?: { fresh?: boolean, constraints?: boolean, perFile?: boolean, bind?: { subckt: string, params: Record<string, string> } }) => Promise<import("../../crates/rnl-view/types/document.js").Document>} build
  *   Read a source and build its Document; rejects with a message when it cannot. With `edits`, the
  *   texts of some of its files are those, not what is read: Edit > Apply Changes (editor.js). The
@@ -63,7 +81,8 @@
  *   crates/rnl-view/types/document.d.ts, for checking the page; nothing is loaded from there at
  *   run time.
  *   Web API packages are request-local pool items; signal cancels an obsolete build.
- * @property {(doc: object) => void} [commitBuild] Adopt a web candidate's lazy drawing provider when displayed.
+ * @property {(doc: object) => void} [commitBuild] The Document `build` or a reader gave is shown: the web shell adopts its
+ *   candidate's lazy drawing provider, the desktop's names the window after it.
  * @property {(doc: object) => void} [discardBuild] Dispose of an unaccepted web candidate; harmless after commit.
  * @property {(level: number, items: number[], names: string[]) => Promise<{ svg?: string }[]>} [unplacedDrawings]
  *   The drawings of the objects at `items` of `levels[level].unplaced` of the Document `build` gave

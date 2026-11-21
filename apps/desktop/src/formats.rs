@@ -1,6 +1,6 @@
 //! The parse formats: the core's list, and the format it detects for a Library file that the
 //! document shown does not read. The page keeps the formats chosen for files and gives them with each
-//! build, preload, solve and Library update, as `{ path: format }`.
+//! reading, solve and Library update, as `{ path: format }`.
 use std::collections::BTreeMap;
 
 use rnl_cli::FsProvider;

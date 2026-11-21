@@ -90,7 +90,8 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `menubar.js` | The page's own menu bar. |
 | `dialog.js` | Dialogs in the page's style for what a shell or the page asks: one of a list, with a filter; a line of text; several values in a form, such as the grid's settings; a message; a message with a button that acts. They are modal: the page's keys and its menu bar wait while one is shown. |
 | `updates.js` | Help > Check for Updates: the newest release of the viewer on GitHub against the version that runs, compared by Semantic Versioning, in a dialog. |
-| `file-results.js` | The readings of one file kept, for a shell that reads the file shown alone: the key a `FileResult` is kept under, and whether the inputs it records still hold (see [Reading the file shown alone](#reading-the-file-shown-alone)). |
+| `file-reading.js` | Reading a document file by file, the same in every shell that reads the file shown alone: the outline, then the file shown, each kept in memory and given again while it holds, with no core started; Check All Files, what the entry page tells of each file, and File › Memory Cache (see [Reading the file shown alone](#reading-the-file-shown-alone)). |
+| `file-results.js` | The rules of the readings kept: the key an outline and a `FileResult` are kept under, the shape of an outline, the stamps of the Library, and whether what was kept still holds (see [Reading the file shown alone](#reading-the-file-shown-alone)). |
 | `result-cache.js` | The cache of what the core gives for each file, for loading a design file by file: a result is kept under a key with the inputs it records, and given again only while they hold. In memory for the page alone, within a limit in bytes, the least recently used first out; nothing is written to the browser's storage, and the store of results earlier versions kept in the site's IndexedDB is deleted when the page starts (`removeOldStore`). A result can be looked at without being used (`peek`), as the entry page does. Nothing in it knows what a result holds. |
 | `storage-prefix.js` | The prefix of the names the page keeps in the browser's storage (`util.js`): none, and the web build writes the one `RNL_STORAGE_PREFIX` names over it, for a frozen build beside the current one. |
 | `util.js` | Small helpers for building the page, and for keeping values in the shell’s settings store (native `settings.json` on desktop, `localStorage` on web), read and written so that a page without it starts from its defaults. |
@@ -109,11 +110,8 @@ The indicator appears after 120 ms, so quick opens do not flash or wait for prog
 Completion and errors clear the indicator. Embedded viewers use the same stages, and a late result
 from an older open cannot clear the newer open's indicator. Reduced-motion preferences stop the bar's animation.
 
-The desktop shell keeps a bounded LRU of compiled documents, SVGs and lazy drawings; a hit reports
-**Using cached drawing…**. File > Memory Cache configures its per-window budget (256 MiB by default).
-`shell.build` takes an optional fourth argument `{ fresh }`; Reload sets it to true so F5 always
-rebuilds. The optional `shell.memoryCache(clear)` returns native cache statistics and can clear it.
-The web shell continues building in its Worker and does not expose this native cache setting.
+Reload (F5) reads the document again with `{ fresh: true }`: no reading kept is used, and those it makes are kept
+(see [Reading the file shown alone](#reading-the-file-shown-alone)).
 
 Files over 200 lines keep their full text and lexical state but render only the viewport and 40
 overscan rows on each side. Diagnostics, selected statements, scope and not-drawn marks are attached
@@ -123,12 +121,14 @@ Editing continues to use a native textarea containing the complete file.
 
 ### Reading the file shown alone
 
-A shell with `perFile` (the web shell, and so the local program's page; not the desktop's yet, nor an embed) reads
-the file shown alone, in the context of its entry: `openSource` and Apply Changes ask `shell.build` with
-`{ perFile: true }`, and the shell gives the outline of the whole document (the core's `collectOutline`, which reads
-every file the document includes) and the reading of that one file (`collectFile`), a `FileResult` with the outline
-as `doc.outline`. The texts of the other files, which the reading leaves out, are filled in from what was read, for
-the netlist pane. The source of the file shown is the entry's own source, or, for another file of the document, a
+Every shell with a menu reads the file shown alone, in the context of its entry, the same way: the desktop's, the web
+shell's, and so the local program's page (`shell.perFile`, `shell.reader`); an embed reads the whole document.
+`openSource` and Apply Changes read with `readDocument` (`file-reading.js`): the outline of the whole document, which
+reads every file the document includes, and the reading of that one file, a `FileResult` with the outline as
+`doc.outline`. The shell gives only what reads the files and starts the core (`Reader` in `shell.js`): the web shell
+with the core's `collectOutline` and `collectFile` in a Worker, the desktop's with the app's `read_outline` and
+`read_file` (reading.rs); what is kept, and when it holds, is the page's. The texts of the other files, which the
+reading leaves out, are filled in from what was read, for the netlist pane. The source of the file shown is the entry's own source, or, for another file of the document, a
 view of it: the entry's source with `view`, the file as the document names it (`visit-source.js` `fileView`).
 
 - **The hierarchy** lists the levels of every file, from the outline (`level-tree.js`), by their host levels: a level
@@ -147,20 +147,25 @@ view of it: the entry's source with `view`, the file as the document names it (`
   shows the module (`module-view.js`): a symbol of its ports, in the order the module writes them, a note, and its
   instances, each with the module it names and its line (`OutlineCall.lines`). A click on an instance shows its line in
   the text; a double click or Enter opens the module it names, below on the path. A Verilog-A file of the document
-  shown by itself, from the Library say, shows its first module. The parameters an instance gives a module are not shown, and the
-  desktop, which reads the whole document, has no outline and lists no modules.
-- **The readings are kept** (`file-results.js`, `result-cache.js`) in memory for the page alone, so that showing a
-  file again asks the core only for the outline. Nothing of them is written to the browser's storage, and the store
-  earlier versions of the page kept in the site's IndexedDB is deleted when the page starts. A reading is found by the core, the options that
-  change it, the entry, the file and the hash of its text, and given again only while what it recorded it depends
-  on holds: the text of each file and package it read (a bundled package goes with the core), where each name it
-  instantiates is defined and the global nets, as the outline has them now, the Library (a stamp of its files: a package or a definition it did not find may be there now), and
-  the host levels it names. Reload reads the file again and keeps the new reading; a reading of a document that
-  misses a file is not kept. The core shown holds no drawings of a kept reading's objects without a position: the
-  Not drawn list has it read the file again first.
-- **File › Memory Cache** (`memory-cache.js`, `shell.memoryCache`) sets the limit of the readings kept in memory for
-  the page (256 MiB by default, `file-cache-memory-mib` in the page's settings; 0 keeps none). The dialog says how many
-  readings it holds and their size, with the hits and misses of the page, and Clear Cache empties it, the document
+  shown by itself, from the Library say, shows its first module. The parameters an instance gives a module are not shown.
+- **The readings are kept** (`file-reading.js`, by the rules of `file-results.js`, in `result-cache.js`) in memory for
+  the window or the page alone, the same in every shell, so that showing a file again starts no core and makes no
+  outline. Nothing of them is written to the computer: the store earlier versions of the web page kept in the site's
+  IndexedDB is deleted when the page starts. A reading is found by the core, the options that change it, the entry,
+  the file and the hash of its text, and given again only while the hash of each file and package it read is the same
+  (a bundled package goes with the core), the outline has the same shape (its files and levels, their numbers and
+  calls; not its lines, nor the values, positions or records of a file: `outlineShape`), and, for a reading that
+  depends on the Library (`inputs.library`), the Library is the same. The outline is kept too, by the entry and the
+  options, while the hash of each file it read is the same and those it found missing are still missing. The netlist
+  is not read to tell. A real change of the Library, a file added, removed or read again with another text, empties
+  the cache; a scan of it that finds the same files with the same texts, and a file that joins it by being opened, do
+  not (`libraryChanged`, `libraryStamps`). A reading with the parameters of a subcircuit bound, or with the constraints
+  of the Solve view, is not kept, nor a solve's preview; Reload reads the file again and keeps the new reading; a
+  reading of a document that misses a file is not kept. The core holds no drawings of a kept reading's objects without
+  a position: the Not drawn list has it read the file again first.
+- **File › Memory Cache** (`memory-cache.js`, `file-reading.js` `memoryCache`) is the same dialog in every shell: the
+  limit of the readings kept in memory (256 MiB by default, `file-cache-memory-mib` in the settings; 0 keeps none), how
+  many readings it holds and their size, with the hits and misses, and Clear Cache, which empties it, the document
   shown staying as it is. An embedded viewer has no menu, and keeps its readings with the default limit.
 - **The problems** (`file-checks.js`, `problems.js`) are those of the file shown: the reading of a file has the
   problems of the files above it too, which it reads in its context, and of the packages it uses; the list has those
@@ -169,15 +174,14 @@ view of it: the entry's source with `view`, the file as the document names it (`
   the outline gives them (reading the netlist: an include not found, a subcircuit defined twice) for a file not read
   yet, and says how many of the files were read ("2 of 3 files checked"). **Edit › Check All Files** (and the button
   beside the count) reads the files not read yet, one by one, in the background, alone in the context of the entry
-  and with the edits applied (`shell.checkFiles`), most of them kept from before; the count goes up as each is read.
+  and with the edits applied (`checkFiles` of `file-reading.js`), most of them kept from before; the count goes up as each is read.
   What is kept belongs to the document as it is (its entry and the text of each file, the outline's hashes): a file
   changed, edited or included anew, or a package that a reading used read with another text, starts it again. The
-  numbers of the lines are coloured by the problems listed. The desktop reads the whole document, whose list has the
-  problems of every file, and has no switch.
+  numbers of the lines are coloured by the problems listed.
 - **The entry page** (`entry-page.js`). An entry that only includes other files has an empty top level, and the
   subcircuits nothing calls (`roots.js`) are in the other files: reading the entry alone is quick, but none of them is
   read yet. In place of the empty drawing, a card says that the file only includes other files and lists them, each
-  with its symbol (the one it gives itself, `shell.fileSummaries` asking the core for the symbols of its file, else a
+  with its symbol (the one it gives itself, `fileSummaries` of `file-reading.js` asking the core for the symbols of its file, else a
   box of its ports), the file that defines it, its instances, and whether its file's reading is kept ("Kept: opens at
   once"), else how long it took the last time. A click opens it, as the index does. With one alone, a file opened
   opens it at once, the card showing meanwhile; shown again later, the entry stays on its card. An entry that has
@@ -250,7 +254,7 @@ The tree marks the row of the path when the path starts at the top level, and el
 
 A subcircuit with parameters has a bar of them under the path (`params.js`, `#params-bar`, between the path and the drawing, in the row that follows the manifest bar). Each parameter is `name = value` with where the value comes from: `from X1` for a value the instance it was entered through writes (`Child.effective` of that instance, when it is on the level above in this document), `default` for the definition's own (`Level.params`, which is what a view of the file alone shows), `changed` for a value bound to it, and a `?` in the warning colour for a parameter that has none. A value that cannot be evaluated (`number` is null) stays as written, with a question mark. More than four parameters, or a row that wraps, fold into a summary of the counts, "12 parameters: 3 from X1, 9 default", which Show all unfolds for as long as the page is open. The drawing keeps the text it is written with, `${w}`; the values are only here. The bar is not part of the embedded viewer.
 
-Edit Parameters... on the bar, or Edit › Subcircuit Parameters..., opens a dialog in the middle of the window with a field for each parameter, its default and where its value comes from. Apply reads the fields: those left empty, or written as the default, are the default; the rest are the values to bind. When they differ from what is shown, the Document is built again from the files as they are applied, with `bind: { subckt, params }` in the build (the web request, and `open_document` and `open_text` of the desktop, which do not keep such a build among the entries their cache reuses), by `openSource` with `options.bind`; the level, the view and the selection stay, as when a file is read again. The Document is remembered as built with them (`bindings` in `state.js`): the values the instance gave stay `from X1` until changed, and Restore the values of X1 puts them back; any other build of the files, such as Apply Changes or Reload, shows the instance's values again. Nothing in the netlist changes. A subcircuit shown by itself (a pick in the index, or a file opened directly) that has a parameter with no default, which the core calls `unset`, asks for the values when it is shown, once for each Document (`askMissing`); one with defaults is shown as it is, and one reached through an instance never asks.
+Edit Parameters... on the bar, or Edit › Subcircuit Parameters..., opens a dialog in the middle of the window with a field for each parameter, its default and where its value comes from. Apply reads the fields: those left empty, or written as the default, are the default; the rest are the values to bind. When they differ from what is shown, the Document is built again from the files as they are applied, with `bind: { subckt, params }` in the build (in the request of the reading, which is not kept: `file-reading.js`), by `openSource` with `options.bind`; the level, the view and the selection stay, as when a file is read again. The Document is remembered as built with them (`bindings` in `state.js`): the values the instance gave stay `from X1` until changed, and Restore the values of X1 puts them back; any other build of the files, such as Apply Changes or Reload, shows the instance's values again. Nothing in the netlist changes. A subcircuit shown by itself (a pick in the index, or a file opened directly) that has a parameter with no default, which the core calls `unset`, asks for the values when it is shown, once for each Document (`askMissing`); one with defaults is shown as it is, and one reached through an instance never asks.
 
 ## Subcircuits that nothing calls
 
@@ -349,7 +353,7 @@ Everything platform-specific goes through the shell, chosen at start: `shells/de
 | `nativeMenu` | Whether the platform shows the menu bar itself; if not, the page shows its own. |
 | `initial()` | What to open at start, or null; on the desktop, the file on the command line. |
 | `pick(kind)` | Ask for something to open: `"file"`, and on the web also `"folder"` or `"url"`; null when nothing is chosen. |
-| `build(source, edits, progress, packages, signal, options)` | Read a source and return its Document; rejects with a message when it cannot. Optional `progress(stage)` reports `reading` or `parsing`. Web API imports can supply request-local `packages` and an abort `signal`; desktop `options.fresh` bypasses cached compilation on explicit reload. With `edits`, `{ path: text }` by the path the Document names a file by, the texts of those files are the ones given, not what is read: Edit > Apply Changes. A source that holds its text takes the text of its one file. The Document's TypeScript declarations are generated from the core's Rust types ([`crates/rnl-view/types`](../../crates/rnl-view/README.md#type-definitions)); `shell.js` refers to them in its JSDoc, which loads nothing at run time. |
+| `build(source, edits, progress, packages, signal, options)` | Read a source and return its Document; rejects with a message when it cannot. Optional `progress(stage)` reports `reading` or `parsing`. Web API imports can supply request-local `packages` and an abort `signal`. An embed and the viewer API read the whole document with it; the page reads a document file by file with `shell.reader` where the shell has one (`file-reading.js`). With `edits`, `{ path: text }` by the path the Document names a file by, the texts of those files are the ones given, not what is read: Edit > Apply Changes. A source that holds its text takes the text of its one file. The Document's TypeScript declarations are generated from the core's Rust types ([`crates/rnl-view/types`](../../crates/rnl-view/README.md#type-definitions)); `shell.js` refers to them in its JSDoc, which loads nothing at run time. |
 | `setCheck(id, checked)` | Show a check-mark command's state in the platform's menu. |
 | `onCommand(handler)` | Call `handler(id)` for each command chosen in the platform's menu. |
 | `onOpen(handler)` | Optional. Call `handler(source)` for each source opened without `pick`, such as files dropped on the page. Startup awaits listener registration before opening the initial source. Desktop drops use Tauri's native WebView drag/drop events. |
@@ -370,7 +374,7 @@ Everything platform-specific goes through the shell, chosen at start: `shells/de
 | `onCloseRequested(handler)` | Optional. Call `handler()` when the user asks to close the window while `setDirty(true)` was the last word: the window stays until the page calls `quit()`. |
 | `version()` | Optional. The version of the app that runs, which the desktop shell has from Tauri, for Help > Check for Updates, the command `check-updates` that the table offers on the desktop only. The page asks GitHub's API for the releases itself (`updates.js`), as the desktop app's content security policy allows, and only when the command runs; without `version`, the command does nothing. |
 
-A Source is the shell's own object: the page keeps it to read it again and shows its `name`. Its optional `path` identifies a real file in the Library; native backslashes are normalized to forward slashes for matching and deduplication. On the desktop it is a file path; on the web, files chosen or dropped, a folder or a URL, each with a way to read its entry and its other files. A URL updates its workspace path after redirects. The source that the page makes for File › Load from Clipboard holds its `text` and is marked `temporary`: each shell builds that text, with the file pool available, as the file `name`, such as `clipboard.sp`, whose extension says how it is read: the desktop with the app's `open_text` command, the web in the core's Worker.
+A Source is the shell's own object: the page keeps it to read it again and shows its `name`. Its optional `path` identifies a real file in the Library; native backslashes are normalized to forward slashes for matching and deduplication. On the desktop it is a file path; on the web, files chosen or dropped, a folder or a URL, each with a way to read its entry and its other files. A URL updates its workspace path after redirects. The source that the page makes for File › Load from Clipboard holds its `text` and is marked `temporary`: each shell builds that text, with the file pool available, as the file `name`, such as `clipboard.sp`, whose extension says how it is read: the desktop with the app's reading commands (reading.rs), given the text, the web in the core's Worker.
 
 The web shell takes each candidate from a prewarmed standby module Worker, adopts its lazy drawing provider only when the document is displayed, and recycles the previous or rejected candidate as the next standby. Superseded builds terminate their worker. Each worker retains its Library index; changed files are synchronized before reuse, and Reload Library invalidates both indexes on their next use. It prepares a standby in the background when none can be reused; `ready` waits for the standby actually used by the first open. The displayed document stays isolated so a rejected build cannot replace its lazy drawings. It loads the core as WebAssembly from `core/client.js` next to the page ([`bindings/runtime-wasm`](../../bindings/runtime-wasm/README.md), which [`apps/web`](../web/README.md) puts there), and asks for the SVG only. `collect` reads the files a document needs, decoded with `decodeText`, each named in the workspace by a rooted path: files chosen with Open or dropped at `/NAME`, a folder's at `/FOLDER/SUB/NAME`, and a URL's by their paths on the server that served the netlist, after any redirect, fetched relative to that address; a server that sends nothing for 30 seconds is given up. When more than one file could be the netlist, it asks which with `dialog.js`. It names the browser tab after the document, as the desktop app names its window. Its file inputs have the ids `file-input` and `folder-input`, for tests: files set on one while no chooser is shown open as if chosen with Open File or Include Folder.
 
@@ -396,7 +400,7 @@ The desktop app builds its native menu from the table ([`src/menu.rs`](../deskto
 
 ## The constraints of a solve
 
-The Solve view of the side panel (tab 7, on both platforms) lists the constraints of the netlist: what the solver takes in after the structures are expanded, which the core gives with the Document as `Level.constraints` when a build asks for them (`constraints` of the build, an **experimental** interface that the core does not promise to keep as it is). The page asks once the Solve view has been opened: a Document built without them is built again, once, as File > Reload does, keeping the view and the selection, and the builds after it ask for them (`constraintsWanted` in `state.js`); not while text is edited and not applied, which a build would drop. A solve's Document has them already. The desktop's builds that ask for them are not kept in its cache.
+The Solve view of the side panel (tab 7, on both platforms) lists the constraints of the netlist: what the solver takes in after the structures are expanded, which the core gives with the Document as `Level.constraints` when a build asks for them (`constraints` of the build, an **experimental** interface that the core does not promise to keep as it is). The page asks once the Solve view has been opened: a Document built without them is built again, once, as File > Reload does, keeping the view and the selection, and the builds after it ask for them (`constraintsWanted` in `state.js`); not while text is edited and not applied, which a build would drop. A solve's Document has them already. Readings that ask for them are not kept (`file-reading.js`).
 
 The Constraints view, shown when the Solve view is opened, lists level by level every fact the solver is given, in the order it takes them (8.5): the rank, what the fact says (`what`, with the handle `%name = ` when it has one), its priority, the structure it comes from (the outermost usage of its chain, such as `$BRANCH %ac1_branch`, or *written in the netlist*; the whole chain is the row's tooltip), and, when it has a line, an arrow button (no number; named *Show in the netlist*) that shows the line in the netlist without choosing the row. Once the netlist is solved, each row says what became of it too, from the solve's report, when the report's level has the same host and the same `input` as the level's constraints (then `report.facts[k]` is `constraints.facts[k]`); the report itself is a button away, **Report**, which is there only for a solve. The mark is told by the status first (`status`: what the solver's resolution decided), and by `holds` (whether the fact holds on the drawing as solved, measured where the texts of the solve are read back; true, false, or null) only for a fact that is kept: **✓** kept and it holds; **✗** kept and it does not, which is the solver's own fault, drawn larger and in the colour of an error; **!** discarded (a conflict, with the facts it conflicts with under the row) or failed (the fact contradicts itself); **?** undecided, even when the drawing happens to satisfy it; **no mark** for a kept fact that cannot be measured (`holds` null). Each mark has a tooltip, and an accessible name, that says it in words: the two **!** say *conflicts with other constraints* and *contradicts itself* apart, and **?** says what was measured (it holds, it does not, it cannot be measured). The Report's own grouping, by status, is as it was. The filter keeps the rows that hold every word typed, of what they say, their priority, structure or result. A file with no constraints, such as a package file, shows a note instead.
 
@@ -491,36 +495,6 @@ View > Language switches the language immediately, in both the web page and desk
 
 Keep action tokens, menu IDs, shell return types, solver options, netlist/source text, filenames and parser/solver diagnostic payloads raw. Translate their surrounding UI only; dialog buttons render a translated label but return the original action token. Do not construct HTML from translated strings. Add catalog entries for new messages and run `i18n.spec.js`, plus the affected UI tests. Real web Save and the desktop smoke test cover the shell boundaries.
 
-
-### Idle preloading (desktop)
-
-File > Memory Cache also controls **Preload nearby netlists while idle**, enabled by default.
-After 1.5 seconds without pointer, wheel or keyboard input, the scheduler walks the currently
-shown subcircuit tree breadth first (direct children first), then the Library/PATH netlists.
-It deduplicates cycles/files and limits each plan to 128 candidates. This reads, interprets and
-renders each candidate as an independent entry with the current Auto Include setting: visit
-history and the parent file's includes never supply its scope. Preparation neither navigates nor
-adds hypothetical files to Files. It does not invoke the placement solver or write files.
-
-One separate native compiler runs at a time, using Windows background processing priority.
-Between jobs it rests for at least 1.5 seconds and three times the preceding job's duration,
-targeting roughly 25% of one core across repeated jobs, not a hard instantaneous CPU limit.
-New jobs pause while interacting, hidden, editing, unsaved, solving or displaying a dialog/preview.
-Foreground navigation and library changes invalidate in-flight results. A compiler already
-interpreting can finish at background priority; foreground commands never wait for it.
-
-Completed JSON, SVG and lazy Not drawn data transfer into the existing bounded cache. WStr's
-immutable strings use Arc so the exported drawing model is Send; interpreter contexts remain
-thread-local. Speculation uses spare cache space only and is evicted before visited entries.
-Cache hits still validate complete observed inputs, including missing files, package resolution
-and Auto Include conflicts. Clear/disable, reload and generation checks prevent old work from
-repopulating invalidated results. Cached hits are reactivated only by an actual open.
-
-Speculation pauses below 1 GiB available system memory, skips inputs exceeding min(8 MiB,
-remaining cache budget / 8), and stops the current plan when cache space is exhausted. These
-limits bound retained results and speculative input, not the compiler's transient working set.
-Oversized files still open normally. The web shell continues using its existing Worker; it does
-not expose native PATH preloading or its memory-cache controls.
 
 ## Netlist colour scheme
 

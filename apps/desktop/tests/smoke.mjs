@@ -978,8 +978,8 @@ async function filePoolSmoke(page) {
   same(await page.evaluate(`window.viewer.doc.diagnostics.filter(d => d.severity === 'error')`), [], "pool search diagnostics");
   check(await page.evaluate(`window.viewer.doc.files.some(f => f.text.includes('Rpool'))`), "the pooled include was not read");
   const pasted = await page.evaluate(`(async () => {
-    const shell = (await import('./shells/desktop.js')).default;
-    const doc = await shell.build({ name: 'clipboard.sp', text: '* clipboard\\n.include "part.inc"\\n.end\\n' },
+    const { readDocument } = await import('./file-reading.js');
+    const doc = await readDocument({ name: 'clipboard.sp', text: '* clipboard\\n.include "part.inc"\\n.end\\n' },
       { [${JSON.stringify(slashed(inc))}]: 'Redited a 0 2k\\n' });
     return doc.files.map(f => f.text);
   })()`);
@@ -1007,7 +1007,6 @@ async function filePoolSmoke(page) {
   same(JSON.parse(fs.readFileSync(settings, "utf8"))["search-paths"], [slashed(parts)], "native settings file PATH");
   await autoIncludeSmoke(page, work, parts, pkg);
   await memoryCacheSmoke(page, work);
-  await preloadSmoke(page, work);
   check(await page.evaluate(`Array.from(document.querySelectorAll('[data-group="builtin"] .pool-row')).every(r => !r.textContent.includes('Exclude'))`), "a built-in can be excluded");
   await page.evaluate(`document.querySelector('[data-group="builtin"] .lib-toggle').click()`);
   await page.evaluate(`document.querySelector('[aria-label="Open 0.4/rnl-std-basic.rnl"]').click()`);
@@ -1043,7 +1042,10 @@ async function filePoolSmoke(page) {
   console.log("The native core bundles only standard packages and offers the public-package website on missing USE-PACKAGE");
 }
 
-/** File transitions exercise the real disk reader and build cache, not a fixture shell. */
+/**
+ * Entering a subcircuit another file defines, with the real disk reader, not a fixture shell: the file is read alone in
+ * the context of the same entry, whose includes reach it, and nothing joins Files; the path leads back.
+ */
 async function independentNavigationSmoke(page) {
   const work = path.dirname(netlist);
   const top = path.join(work, 'visit-top.sp'), cell = path.join(work, 'visit-cell.inc'), leaf = path.join(work, 'visit-leaf.inc');
@@ -1058,10 +1060,13 @@ async function independentNavigationSmoke(page) {
     await openSource({path:${JSON.stringify(top)},name:'visit-top.sp'},false);
     await descend(window.viewer.doc.objects.findIndex(o => o.name === 'Xcell'));
     const v=window.viewer;
-    const isolated={entry:v.doc.path, files:v.doc.files.length, opens:v.doc.objects.find(o => o.name === 'Xleaf').opens,
+    // (the reading of one file has the levels of that file alone: a subcircuit another file defines is a child of it,
+    // with that file and the host level that draws it)
+    const leaf=()=>v.doc.children.find(c=>c.master.toLowerCase()==='visit_leaf');
+    const isolated={entry:v.doc.path, file:v.doc.file, files:v.doc.files.length, leaf:leaf(),
       path:namedPath().map(s=>s.title), listed:poolSnapshot().some(i=>i.path.endsWith('/visit-cell.inc'))};
     await toggleAutoInclude(true);
-    const resolved=v.doc.objects.find(o=>o.name==='Xleaf').opens !== null;
+    const resolved=leaf()?.file==='visit-leaf.inc' && leaf()?.host !== null;
     await descend(v.doc.objects.findIndex(o=>o.name==='Xleaf'));
     const deep=namedPath().map(s=>s.title);
     await backTo(0);
@@ -1070,120 +1075,76 @@ async function independentNavigationSmoke(page) {
     await ascend();
     return {isolated,resolved,deep,back,entry:v.doc.path};
   })()`);
-  same(result.isolated.files,1,'child independently reads one disk file');
-  same(result.isolated.opens,null,'parent include definitions are absent with Auto Include off');
-  check(result.isolated.entry.replaceAll('\\','/').endsWith('/visit-cell.inc'),'child did not become the entry');
-  same(result.isolated.listed,true,'visited disk file joins Files');
+  same(result.isolated.file,'visit-cell.inc','the file of the subcircuit is the file read');
+  check(result.isolated.entry.replaceAll('\\','/').endsWith('/visit-top.sp'),'the file was not read in the context of its entry');
+  same(result.isolated.files,3,'the reading lists every file of the document');
+  check(result.isolated.leaf?.file==='visit-leaf.inc' && result.isolated.leaf?.host !== null,
+    `the definitions the entry includes do not reach the file read in its context: ${JSON.stringify(result.isolated.leaf)}`);
+  same(result.isolated.listed,false,'a file of the document shown joined Files');
   same(result.isolated.path,['visit-top.sp','visit_cell'],'cross-file descent history');
-  same(result.resolved,true,'Auto Include resolves the leaf using the Library index');
+  same(result.resolved,true,'the leaf opens with Auto Include on too');
   same(result.deep,['visit-top.sp','visit_cell','visit_leaf'],'deep cross-file history');
   same(result.back,{path:['visit-top.sp'],selected:'Xcell'},'cross-level breadcrumb jump restores prefix and selection');
   check(result.entry.replaceAll('\\','/').endsWith('/visit-top.sp'),'ascend did not reopen the top entry');
-  console.log('Cross-file disk navigation isolates includes, adds Library files, and restores visit history');
+  console.log('Cross-file disk navigation reads the file in the context of its entry, adds nothing to Files, and restores visit history');
 }
 
+/**
+ * The readings kept by the page (file-reading.js), with the app reading each file: a file shown again is not read again,
+ * the drawings of a kept reading's objects without a position are read again when asked for, an edit on disk of the
+ * same size is seen, Reload reads again, and Clear Cache and a limit of 0 keep nothing.
+ */
 async function memoryCacheSmoke(page, work) {
   const file = path.join(work, 'cache-a.sp');
   fs.writeFileSync(file, '* a\nRcache a 0 1k\n.end\n');
   const first = await page.evaluate(`(async () => {
     const { shell } = await import('./shell.js');
-    await shell.memoryCache(true);
-    const before = await shell.memoryCache();
+    const reading = await import('./file-reading.js');
+    await reading.memoryCache(true);
+    const before = reading.readingStats();
     const a = { path: ${JSON.stringify(file)}, name: 'cache-a.sp' };
     const b = { name: 'cache-b.sp', text: '* b\\nCcache b 0 1p\\n.end\\n' };
-    const cold = await shell.build(a);
-    await shell.build(b);
-    const warm = await shell.build(a);
-    const stats = await shell.memoryCache();
-    if (JSON.stringify(cold) !== JSON.stringify(warm)) throw Error('cache changed the document');
+    const cold = await reading.readDocument(a);
+    await reading.readDocument(b);
+    const warm = await reading.readDocument(a);
+    const stats = reading.readingStats();
+    if (JSON.stringify(cold) !== JSON.stringify(warm)) throw Error('the reading kept is not the reading made');
+    shell.commitBuild(warm);
     const drawings = await shell.unplacedDrawings(0, [0], ['Rcache']);
     return { before, stats, hasSvg: !!drawings[0].svg };
   })()`);
-  same(first.stats.hits - first.before.hits, 1, 'native cached switch hit');
-  same(first.stats.misses - first.before.misses, 2, 'native cold builds');
-  check(first.hasSvg && first.stats.used <= first.stats.limit, 'cached drawings or budget are invalid');
+  same(first.stats.hits - first.before.hits, 1, 'a file shown again is a hit');
+  same(first.stats.misses - first.before.misses, 2, 'two files read');
+  check(first.hasSvg && first.stats.used <= first.stats.limit, 'the drawings of a kept reading, or the limit, are wrong');
   fs.writeFileSync(file, '* a\nRcache a 0 9k\n.end\n');
   const changed = await page.evaluate(`(async () => {
     const { shell } = await import('./shell.js');
+    const reading = await import('./file-reading.js');
     const a = { path: ${JSON.stringify(file)}, name: 'cache-a.sp' };
-    const doc = await shell.build(a);
-    const changed = await shell.memoryCache();
-    await shell.build(a, undefined, undefined, undefined, undefined, { fresh: true });
-    const fresh = await shell.memoryCache();
-    await shell.memoryCache(true);
-    const after = await shell.memoryCache();
+    const doc = await reading.readDocument(a);
+    const changed = reading.readingStats();
+    await reading.readDocument(a, undefined, undefined, undefined, { fresh: true });
+    const fresh = reading.readingStats();
+    await reading.memoryCache(true);
+    const after = reading.readingStats();
+    shell.commitBuild(doc);
     const drawings = await shell.unplacedDrawings(0, [0], ['Rcache']);
     const { save } = await import('./util.js');
-    await save('render-cache-mib', 0);
-    await shell.build(a);
-    const disabled = await shell.memoryCache();
-    await save('render-cache-mib', 256);
-    await shell.memoryCache();
+    await save('file-cache-memory-mib', 0);
+    await reading.memoryCache();
+    await reading.readDocument(a);
+    const disabled = reading.readingStats();
+    await save('file-cache-memory-mib', 256);
+    await reading.memoryCache();
     return { text: doc.files[0].text, changed, fresh, after, disabled, hasSvg: !!drawings[0].svg };
   })()`);
-  check(changed.text.includes('9k'), 'same-size source edit reused old text');
-  same(changed.changed.misses, first.stats.misses + 1, 'source edit did not invalidate the cache');
-  same(changed.fresh.misses, changed.changed.misses + 1, 'forced reload reused the cache');
-  same(changed.after.entries, 0, 'Clear Cache kept entries');
-  check(changed.hasSvg, 'Clear Cache lost current unplaced drawings');
-  same(changed.disabled.used, 0, 'disabled cache retained a result');
-  console.log('Native cache reuses JSON/SVG, restores lazy drawings, detects same-size edits, forces reload and respects clear/disable');
-}
-
-/** The native preloader never activates a document, inherits parent includes, or promotes Files. */
-async function preloadSmoke(page, work) {
-  const child = path.join(work, 'preload-cell.inc'), leaf = path.join(work, 'preload-leaf.inc');
-  fs.writeFileSync(child, '* cell\n.subckt preload_cell p n\nXleaf p n preload_leaf\n.ends\n');
-  fs.writeFileSync(leaf, '* leaf\n.subckt preload_leaf p n\nRleaf p n 1k\n.ends\n');
-  const result = await page.evaluate(`(async () => {
-    const {shell} = await import('./shell.js');
-    const {save} = await import('./util.js');
-    const {poolSnapshot} = await import('./pool.js');
-    const shown = window.viewer.doc;
-    const listed = poolSnapshot().map(i=>i.path);
-    await save('background-preload', true);
-    await save('auto-include', false);
-    await shell.memoryCache(true);
-    await shell.setPool([{path:${JSON.stringify(leaf)}, source:{path:${JSON.stringify(leaf)}}}]);
-    await shell.build({name:'active.sp',text:'* active\\nRactive a 0 1k\\n.end\\n'});
-    const before = await shell.memoryCache();
-    const source = {path:${JSON.stringify(child)}, name:'preload-cell.inc'};
-    const ticket = await window.__TAURI__.core.invoke('preload_ticket');
-    await shell.cancelPreload();
-    const late = await window.__TAURI__.core.invoke('preload_document', {
-      path:source.path, pool:[], autoInclude:false, ticket });
-    let status;
-    for(let i=0;i<30;i++) {
-      status = await shell.preload(source);
-      if(status !== 'busy' && status !== 'cancelled') break;
-      await new Promise(r=>setTimeout(r,100));
-    }
-    const prepared = await shell.memoryCache();
-    const drawn = await shell.unplacedDrawings(0,[0],['Ractive']);
-    const isolated = await shell.build(source);
-    const after = await shell.memoryCache();
-    const noLeaf = isolated.objects.find(o=>o.name==='Xleaf').opens === null;
-    await save('auto-include', true);
-    const automatic = await shell.preload(source);
-    const resolved = await shell.build(source);
-    await save('background-preload', false);
-    const disabled = await shell.preload(source);
-    await save('background-preload', true);
-    return {status,automatic,disabled,late,noLeaf,resolved:resolved.objects.find(o=>o.name==='Xleaf').opens !== null,
-      retained:prepared.prefetched, hit:after.hits-before.hits, misses:after.misses-before.misses,
-      hasSvg:!!drawn[0].svg, sameView:shown===window.viewer.doc,
-      sameLibrary:JSON.stringify(listed)===JSON.stringify(poolSnapshot().map(i=>i.path))};
-  })()`);
-  same(result.status,'ready','native preload completes');
-  same(result.late,'cancelled','a late asynchronous IPC cannot adopt the post-cancel generation');
-  same(result.retained,1,'native cache retains a speculative document');
-  same(result.hit,1,'first independent open uses the preloaded document');
-  same(result.misses,0,'preloaded open did not compile again');
-  check(result.hasSvg && result.sameView && result.sameLibrary,'preloading changed active drawings, view or Files');
-  check(result.noLeaf && result.resolved,'preloading did not respect independent Auto Include scopes');
-  same(result.automatic,'ready','Auto Include uses its own cache key');
-  same(result.disabled,'disabled','preload preference is respected');
-  console.log('Background native compile/SVG reuses its first open, preserves active drawings/Files and isolates Auto Include scopes');
+  check(changed.text.includes('9k'), 'a same-size edit on disk read the old text');
+  same(changed.changed.misses, first.stats.misses + 1, 'an edit on disk did not make the file read again');
+  same(changed.fresh.hits, changed.changed.hits, 'Reload used a reading kept');
+  same(changed.after.entries, 0, 'Clear Cache kept readings');
+  check(changed.hasSvg, 'Clear Cache lost the drawings of the reading shown');
+  same(changed.disabled.used, 0, 'a limit of 0 kept a reading');
+  console.log('The page keeps the readings, reads the drawings of a kept one again, sees same-size edits, reads again on Reload and keeps none at 0');
 }
 
 async function autoIncludeSmoke(page, work, parts, pkg) {

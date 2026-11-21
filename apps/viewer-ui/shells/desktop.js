@@ -1,11 +1,15 @@
 import { m, tr } from "../i18n.js";
 // The desktop shell: the page inside the RNL Viewer app (apps/desktop), which reads files and builds
 // documents natively and shows the menu bar itself. The only module that uses window.__TAURI__.
+// The page reads a document file by file with `reader` (file-reading.js), as in every shell: the app reads the files,
+// makes the outline and the reading of one file with the core (reading.rs), and keeps nothing of them but the drawings
+// of the reading shown. What is kept, and when it holds, is the page's.
 
 import { flushSettings, load } from "../util.js";
 import { choose, decide, inform, modal } from "../dialog.js";
 import { sourcePath } from "../source-path.js";
 import { fileFormats, isPackagePath } from "../formats.js";
+import { libraryStamps } from "../file-results.js";
 
 let pool = [];
 let poolReady = Promise.resolve();
@@ -13,17 +17,28 @@ const tauri = window.__TAURI__;
 // (the options are the third argument: write_project_file and save_image take their file's path, name and kind from its
 // headers)
 const invoke = (cmd, args, options) => tauri.core.invoke(cmd, args, options);
-let preloadGeneration = 0;
-const cancelPreload = () => { preloadGeneration++; return invoke("cancel_preload"); };
+// the files given to the Library last, with `opened` for those that joined it by being opened, and their stamps
+let poolItems = [];
+let stamps = null;
+// the version of the core and of the shape of its readings, asked for once
+let readingCore = null;
+// what each Document given was read with, and the Document shown (commitBuild): its drawings are the app's while
+// `drawn` is the number of the last reading that kept drawings (`kept`)
+const readOf = new WeakMap();
+let shownRead = null;
+let kept = 0;
 // Windows and macOS file systems ignore case, so a file's format choice is kept by its path in lower case
 // there; the core compares the paths it reads the same way (Provider::path_key).
 const caseless = /^(Win|Mac)/i.test(navigator.platform || "");
 
 /** A file on disk, named by its path; null for no path. */
 const file = (path) => (path ? { name: path, path } : null);
+// a view of a file of a document (visit-source.js) keeps the file it shows and its entry's own source
 const sessionSource = source => source ? { path: source.path, name: source.name,
   text: source.path && !source.readonly ? undefined : source.text, readonly: source.readonly,
-  temporary: source.temporary } : null;
+  temporary: source.temporary, ...(source.view ? { view: source.view, entrySource: sessionSource(source.entrySource) } : {}) } : null;
+/** What the app reads a source from: the file at its path, or the text it holds as the file of its name. */
+const reading = (source) => source.text === undefined ? { path: source.path } : { name: source.name, text: source.text };
 let openingDrop = false;
 // the project archive this window opened or saved last, where Save Project offers to save again
 let lastProject = null;
@@ -35,6 +50,7 @@ let projectFolder = null;
 /** @type {import("../shell.js").Shell} */
 export default {
   platform: "desktop",
+  perFile: true,
   sourceForFile(source, document, index) {
     const f = document.files[index], path = sourcePath(document, f);
     return path.startsWith('<') ? { path, name: f.name, text: f.text, readonly: true } : file(path);
@@ -67,7 +83,7 @@ export default {
   // a PATH directory's files, with those of its sub-folders when it was added with them
   pathPackages: (dir, subfolders = false) => invoke("path_packages", { dir, subfolders }),
   setPool: (items, reload = false, refresh = []) => {
-    cancelPreload().catch(() => {});
+    poolItems = items;
     const paths = items.filter((item) => !item.builtin).map((item) => item.path);
     // PATH packages retain the provider's per-directory precedence. Netlists may also resolve
     // bare includes; both kinds enter the subcircuit index, independently of package lookup.
@@ -126,40 +142,86 @@ export default {
     });
   },
   pick: (kind) => (kind === "file" ? invoke("pick_file").then(file) : Promise.resolve(null)),
-  // a file by its path, or text held by the source, with edits to it and its includes
-  memoryCache: async (clear = false) => {
-    if (clear) await cancelPreload();
-    await flushSettings(); return invoke("memory_cache", { clear });
-  },
-  preloadCandidates: () => pool.map(file),
-  cancelPreload,
-  preload: async source => {
-    const generation = preloadGeneration;
-    await poolReady;
-    await flushSettings();
-    if (generation !== preloadGeneration) return "cancelled";
-    const ticket = await invoke("preload_ticket");
-    if (generation !== preloadGeneration) return "cancelled";
-    return invoke("preload_document", { path: source.path, pool, ticket, autoInclude: load("auto-include", true) === true, formats: fileFormats() });
-  },
-  build: async (source, edits, progress, _packages, _signal, { fresh = false, bind = null, constraints = false } = {}) => {
-    cancelPreload().catch(() => {});
+  /**
+   * What the page reads a document file by file with (file-reading.js, shell.js `Reader`): the files of `source`, with
+   * `edits` over them, the file pool, PATH and the Library, as the app reads them.
+   */
+  async reader(source, edits, { progress, bind = null, constraints = false } = {}) {
     await flushSettings();
     await poolReady;
-    const autoInclude = load("auto-include", true) === true, formats = fileFormats();
+    const args = { ...reading(source), edits: edits || null, pool, autoInclude: load("auto-include", true) === true, formats: fileFormats() };
+    const core = await (readingCore ??= invoke("reading_core"));
     const requestId = progress ? crypto.randomUUID() : null;
-    const unlisten = progress ? await tauri.event.listen("load-stage", ({ payload }) => {
-      if (payload.id === requestId) progress(payload.stage);
-    }) : null;
-    try {
-      progress?.("reading");
-      return await (source.text === undefined
-        ? invoke("open_document", { path: source.path, edits: edits || null, pool, requestId, autoInclude, fresh, formats, bind, constraints })
-        : invoke("open_text", { name: source.name, text: source.text, edits: edits || null, pool, requestId, autoInclude, fresh, formats, bind, constraints }));
-    } finally { unlisten?.(); }
+    let unlisten = null;
+    const listening = async () => {
+      if (progress && !unlisten) unlisten = await tauri.event.listen("load-stage", ({ payload }) => { if (payload.id === requestId) progress(payload.stage); });
+    };
+    const hashes = new Map();
+    let drawn = null;
+    progress?.("reading");
+    return {
+      core,
+      entry: source.text === undefined ? source.path.replaceAll("\\", "/") : `/${source.name}`,
+      options: { autoInclude: args.autoInclude, formats: args.formats },
+      async hashes(paths) {
+        const wanted = [...new Set(paths.filter((p) => !hashes.has(p)))];
+        if (wanted.length) {
+          const got = await invoke("file_hashes", { source: args, paths: wanted });
+          wanted.forEach((p, k) => hashes.set(p, got[k] ?? null));
+        }
+        return new Map(paths.map((p) => [p, hashes.get(p)]));
+      },
+      async outline() {
+        await listening();
+        return invoke("read_outline", { source: args, requestId });
+      },
+      async readFile(file, keep) {
+        await listening();
+        const result = await invoke("read_file", { source: args, file, keep, bind, constraints, requestId });
+        if (keep) drawn = ++kept;
+        return result;
+      },
+      // the texts of the other files, which the reading of one leaves out, for the netlist pane
+      async texts(doc) {
+        const missing = doc.files.filter((f) => !f.text);
+        if (!missing.length) return;
+        const got = await invoke("file_texts", { source: args, paths: missing.map((f) => f.path) });
+        missing.forEach((f, k) => { f.text = got[k] ?? ""; });
+      },
+      symbols: (file) => invoke("file_symbols", { source: args, file }),
+      finish(doc) {
+        unlisten?.();
+        if (doc) readOf.set(doc, { args, file: doc.file, bind, constraints, drawn });
+      },
+    };
   },
-  // the drawings of the objects listed without a position, which the app keeps from the last build
-  unplacedDrawings: (level, items, names) => invoke("unplaced_drawings", { level, items, names }),
+  /** The Document `doc` is shown: the window is named after it, and its drawings are asked for (unplacedDrawings). */
+  commitBuild(doc) {
+    const read = readOf.get(doc);
+    if (!read) return;
+    shownRead = read;
+    invoke("show_document", { name: doc.name }).catch(() => {});
+  },
+  /** The stamps of the Library now (file-results.js libraryStamps), once what it is given is read. */
+  async libraryStamps() {
+    await poolReady.catch(() => {});
+    if (stamps?.items !== poolItems) {
+      const items = poolItems;
+      const hashes = await invoke("library_hashes");
+      stamps = { items, stamps: libraryStamps(items.filter((i) => !i.builtin).map((i) => ({ path: i.path, opened: !!i.opened })), async (p) => hashes[p] ?? null) };
+    }
+    return stamps.stamps;
+  },
+  // the drawings of the objects listed without a position, which the app keeps from the reading shown: one given from
+  // the readings kept, or one another reading has taken the place of, is read again first, with its drawings
+  async unplacedDrawings(level, items, names) {
+    const read = shownRead;
+    if (read && read.drawn !== kept) {
+      await invoke("read_file", { source: read.args, file: read.file, keep: true, bind: read.bind, constraints: read.constraints });
+      read.drawn = ++kept;
+    }
+    return invoke("unplaced_drawings", { level, items, names });
+  },
   setCheck(id, checked) {
     invoke("set_view_check", { id, checked }).catch(() => {});
   },
@@ -172,7 +234,6 @@ export default {
   browse: (url) => invoke("plugin:opener|open_url", { url }),
   // the Solve menu (decision 0010): solved natively on a thread of the app's, nothing written
   solve: async (source, settings, edits) => {
-    cancelPreload().catch(() => {});
     await flushSettings();
     await poolReady;
     const autoInclude = load("auto-include", true) === true;
@@ -210,7 +271,7 @@ export default {
   exportSvg: async ({ level, title, overlays, source, edits, preview }) => {
     await flushSettings();
     await poolReady;
-    const args = { level, title, overlays, preview: preview === true, edits: edits || null, pool, autoInclude: load("auto-include", true) === true, formats: fileFormats() };
+    const args = { level, title, overlays, preview: preview === true, file: source.view ?? null, edits: edits || null, pool, autoInclude: load("auto-include", true) === true, formats: fileFormats() };
     return invoke("export_svg", source.text === undefined ? { ...args, path: source.path } : { ...args, name: source.name, text: source.text });
   },
   saveImage: async (name, blob, kind) =>

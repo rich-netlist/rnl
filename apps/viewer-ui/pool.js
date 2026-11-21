@@ -139,7 +139,8 @@ export async function sourceOpened(source, doc, add, applied = false) {
     currentPath = path;
     if (add && !source.readonly && !items.some((i) => i.path === path && i.builtin)) {
       source.path = path;
-      const item = shell.poolItem?.(source) || { path, name: source.name, source };
+      // (it joined the Library by being opened: the readings kept are not emptied for it, file-results.js libraryStamps)
+      const item = { ...(shell.poolItem?.(source) || { path, name: source.name, source }), ...(source.library ? {} : { opened: true }) };
       // Keep Include's display name/read handle when opening its own source again.
       if (!items.some((i) => i.path === item.path && (i.source === source || source.library))) {
         // Selecting a PATH row promotes it to Files but does not change its contents. Its
