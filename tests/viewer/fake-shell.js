@@ -455,8 +455,8 @@ export default {
   },
   keepsFormat: () => fake.keepsFormat,
   ...(platform === "desktop" ? { version, ...solving } : {}),
-  // a shell's defaults over the solver's, as the web viewer has them: `solver-defaults` in the address, as JSON
-  ...(params.has("solver-defaults") ? { solverDefaults: JSON.parse(params.get("solver-defaults")) } : {}),
+  // the web viewer's version, as the site's about.json gives it: `version=VERSION` in the address
+  ...(platform !== "desktop" && params.has("version") ? { version } : {}),
   async initial() {
     fake.calls.push(["initial"]);
     if (params.has("fail-start")) throw params.get("fail-start");

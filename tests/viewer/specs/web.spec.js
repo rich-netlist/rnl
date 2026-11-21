@@ -1027,6 +1027,11 @@ test("Help > About names the version and the commit the site was built from", as
   const dialog = page.locator("dialog.dialog");
   await expect(dialog.locator(".dialog-title")).toHaveText("About RNL Viewer");
   await expect(dialog.locator(".dialog-name")).toHaveText(`RNL Viewer ${about.version}${about.commit ? ` (${about.commit})` : ""}`);
+  // the box is the page's, the same in every shell: the core's version, what is done with the files and where the core runs
+  await expect(dialog).toContainText(`RNL core ${about.coreVersion}`);
+  await expect(dialog).toContainText("Download File downloads the file shown.");
+  await expect(dialog).toContainText("The RNL core runs in this page as WebAssembly.");
+  await expect(dialog).toContainText("Noto Sans SC");
   await dialog.getByRole("button", { name: "Close" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.locator("#level-name")).toHaveText("01-rc-lowpass.sp");

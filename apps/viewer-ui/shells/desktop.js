@@ -64,14 +64,10 @@ export default {
   formats: () => invoke("formats"),
   detectFormat: (path) => invoke("detect_format", { path }),
   formatKey: (path) => caseless ? path.toLowerCase() : path,
-  async about() {
+  // Help > About (commands.js): the app's version, the core's and the commit they were built from
+  async buildInfo() {
     const core = await invoke("core_build_info");
-    await inform({ title: m("About RNL Viewer"), paragraphs: [
-      `RNL Viewer ${await tauri.app.getVersion()}`,
-      `RNL core ${core.version} (${core.commit})`,
-      m`${m("Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; ")}${m("nothing is written to a file until you save.")}`,
-      m("The drawing uses Noto Sans SC, copyright 2014–2021 Adobe, under the SIL Open Font License 1.1."),
-    ] });
+    return { viewer: await tauri.app.getVersion(), core: core.version, commit: core.commit, corePage: false };
   },
   loadSettings: (legacy) => invoke("load_settings", { legacy }),
   saveSetting: (key, value) => invoke("save_setting", { key, value }),
@@ -195,12 +191,15 @@ export default {
       },
     };
   },
-  /** The Document `doc` is shown: the window is named after it, and its drawings are asked for (unplacedDrawings). */
+  /** The Document `doc` is shown: its drawings are asked for (unplacedDrawings). */
   commitBuild(doc) {
     const read = readOf.get(doc);
     if (!read) return;
     shownRead = read;
-    invoke("show_document", { name: doc.name }).catch(() => {});
+  },
+  /** The window's title, as the page writes it (window-title.js). */
+  setTitle(title) {
+    invoke("set_title", { title }).catch(() => {});
   },
   /** The stamps of the Library now (file-results.js libraryStamps), once what it is given is read. */
   async libraryStamps() {

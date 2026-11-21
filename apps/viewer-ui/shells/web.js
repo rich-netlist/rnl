@@ -1,5 +1,5 @@
 import "./local-key.js"; // (first: on the local program's page, the key goes with every request below; elsewhere it does nothing)
-import { append, m, setAttr, setText } from "../i18n.js";
+import { append, m, setAttr } from "../i18n.js";
 // The web shell: the page in a browser, served with the core next to it as core/ (apps/web). It opens
 // files the user chooses or drops, a folder, or a URL; reads only the files a document needs, as
 // collect in the core's client asks for them; and builds the Document with the core as WebAssembly in
@@ -842,8 +842,8 @@ function download(name, content) {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
-/** The About box: what the viewer is, and the version and commit the site was built from. */
-async function about() {
+/** The version and commit the site was built from, and the core's version (about.json); none where it cannot be read. */
+async function buildInfo() {
   let site = {};
   try {
     const response = await fetch("about.json", { cache: "no-cache" });
@@ -851,19 +851,7 @@ async function about() {
   } catch {
     // the box just names no version
   }
-  const version = [site.version, site.commit && `(${site.commit})`].filter(Boolean).join(" ");
-  const name = document.createElement("p");
-  name.className = "dialog-name";
-  setText(name, version ? `RNL Viewer ${version}` : "RNL Viewer");
-  await inform({
-    title: m("About RNL Viewer"),
-    paragraphs: [
-      name,
-      `RNL core ${site.coreVersion || "?"} (${site.commit || "unknown"})`,
-      m`${m("Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; ")}${m("Download File downloads the file shown. Download Project saves the library's files and how they are set up as a ZIP, which Open Project reads again.")}`,
-      m`${m("The RNL core runs in this page as WebAssembly. Files opened from this computer are read here ")}${m("and sent nowhere; a URL's files are fetched from its server.")}`,
-    ],
-  });
+  return { viewer: site.version ?? null, core: site.coreVersion ?? null, commit: site.commit ?? null, corePage: true };
 }
 
 /**
@@ -897,8 +885,6 @@ export default {
   platform: "web",
   // the page's opens read the file shown alone, in the context of its entry (per-file loading); an embed reads its document whole
   perFile: !embed,
-  // the web viewer's defaults over the solver's, as Solve > Settings shows them and a solve takes them (solve-settings.js)
-  solverDefaults: { reroute_nets: true },
   // the core's parse formats, the one it detects for a Library file the document shown does not read,
   // and the key a choice is kept by: the address of a file a server served, else its path
   formats: async () => (await (await someCore()).formats({ formats: {} })).list,
@@ -1460,7 +1446,9 @@ export default {
   onOpen(handler) {
     opened = handler;
   },
-  about,
+  buildInfo,
+  // Help > Check for Updates (updates.js): the version the site was built from
+  version: async () => (await buildInfo()).viewer,
   /** Show a web page in a new tab, with no hold on this one. */
   browse(url) {
     window.open(url, "_blank", "noopener");

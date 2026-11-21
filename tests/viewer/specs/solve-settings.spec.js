@@ -133,12 +133,12 @@ test.describe("on the desktop", () => {
     // an objective that this version does not compute says so
     await expect(objective(page, "labels").locator(".objective-what")).toContainText("(not computed by this version)");
     await expect(objective(page, "turns").locator(".objective-what")).not.toContainText("not computed");
-    await expect(asText(page)).toHaveText("The defaults of rnl solve.");
+    await expect(asText(page)).toHaveText("Equivalent CLI command: rnl solve --solver-config 'reroute_nets=true'");
     // Cancel keeps nothing, and a solve gets the defaults
     await dialog(page).getByRole("button", { name: "Cancel" }).click();
     await dialogGone(page);
     expect(await viewer.stored("solve-config")).toBeNull();
-    expect(await solved(page, viewer)).toEqual({ config: "", timeall: null });
+    expect(await solved(page, viewer)).toEqual({ config: "reroute_nets=true", timeall: null });
   });
 
   test("a setting's conditions: the spacing is not used outside the lines layout, the work and the seconds follow the limit", async ({ page }) => {
@@ -170,11 +170,11 @@ test.describe("on the desktop", () => {
     await field(page, "layout").selectOption("rows");
     await field(page, "beam").fill("8");
     // the spacing is the lines layout's: kept, but not given to the solver under rows
-    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'beam=8,layout="rows"'`);
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'beam=8,layout="rows",reroute_nets=true'`);
     await ok(page);
     expect(await viewer.stored("solve-config")).toEqual({ beam: 8, layout: "rows", spacing_x: 3 });
-    expect((await viewer.calls("checkSettings")).at(-1)).toEqual(['beam=8,layout="rows"']);
-    expect(await solved(page, viewer)).toEqual({ config: 'beam=8,layout="rows"', timeall: null });
+    expect((await viewer.calls("checkSettings")).at(-1)).toEqual(['beam=8,layout="rows",reroute_nets=true']);
+    expect(await solved(page, viewer)).toEqual({ config: 'beam=8,layout="rows",reroute_nets=true', timeall: null });
     // what was kept shows again
     await open(page);
     await expect(field(page, "layout")).toHaveValue("rows");
@@ -185,7 +185,7 @@ test.describe("on the desktop", () => {
     await expect(field(page, "spacing_x")).toHaveValue("0");
     await ok(page);
     expect(await viewer.stored("solve-config")).toEqual({});
-    expect(await solved(page, viewer)).toEqual({ config: "", timeall: null });
+    expect(await solved(page, viewer)).toEqual({ config: "reroute_nets=true", timeall: null });
   });
 
   test("a limit of work, no rounding to a grid, and a junction given or not: each as the table types it", async ({ page, viewer }) => {
@@ -199,9 +199,9 @@ test.describe("on the desktop", () => {
     await setting(page, "junction").getByLabel("set").check();
     await expect(field(page, "junction")).toBeEnabled();
     await field(page, "junction").fill("$JUNCTION");
-    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'grid=false,junction="$JUNCTION",limit="work",work=5000'`);
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'grid=false,junction="$JUNCTION",limit="work",reroute_nets=true,work=5000'`);
     await ok(page);
-    expect(await solved(page, viewer)).toEqual({ config: 'grid=false,junction="$JUNCTION",limit="work",work=5000', timeall: null });
+    expect(await solved(page, viewer)).toEqual({ config: 'grid=false,junction="$JUNCTION",limit="work",reroute_nets=true,work=5000', timeall: null });
     // a number for the grid again, and the junction not given
     await open(page);
     await expect(field(page, "Positions are not rounded to a grid.")).toBeChecked();
@@ -221,20 +221,20 @@ test.describe("on the desktop", () => {
     await expect(row).toBeVisible();
     await expect(set).not.toBeChecked();
     await expect(field(page, "tree_work")).toBeDisabled();
-    await expect(asText(page)).toHaveText("The defaults of rnl solve.");
+    await expect(asText(page)).toHaveText("Equivalent CLI command: rnl solve --solver-config 'reroute_nets=true'");
     // a number: given with the others, in the order of their names
     await set.check();
     await expect(field(page, "tree_work")).toBeEnabled();
     await field(page, "tree_work").fill("81000");
-    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'tree_work=81000'`);
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'reroute_nets=true,tree_work=81000'`);
     await field(page, "limit").selectOption("work");
     await field(page, "work").fill("243750");
     await expect(row).toBeVisible();
-    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'limit="work",tree_work=81000,work=243750'`);
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'limit="work",reroute_nets=true,tree_work=81000,work=243750'`);
     // false says what it means, and puts the number box out
     await unlimited.check();
     await expect(field(page, "tree_work")).toBeDisabled();
-    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'limit="work",tree_work=false,work=243750'`);
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'limit="work",reroute_nets=true,tree_work=false,work=243750'`);
     await unlimited.uncheck();
     // the bounds of the table
     await field(page, "tree_work").fill("-1");
@@ -257,8 +257,8 @@ test.describe("on the desktop", () => {
     await field(page, "layout").selectOption("lines");
     await ok(page);
     expect(await viewer.stored("solve-config")).toEqual({ limit: "work", tree_work: 81000, work: 243750 });
-    expect(await solved(page, viewer)).toEqual({ config: 'limit="work",tree_work=81000,work=243750', timeall: null });
-    expect((await viewer.calls("checkSettings")).at(-1)).toEqual(['limit="work",tree_work=81000,work=243750']);
+    expect(await solved(page, viewer)).toEqual({ config: 'limit="work",reroute_nets=true,tree_work=81000,work=243750', timeall: null });
+    expect((await viewer.calls("checkSettings")).at(-1)).toEqual(['limit="work",reroute_nets=true,tree_work=81000,work=243750']);
     // kept for the next time, still a number
     await open(page);
     await expect(set).toBeChecked();
@@ -279,11 +279,11 @@ test.describe("on the desktop", () => {
     await expect(row.locator(".settings-element")).toHaveText(["crossing", "bend"]);
     await expect(crossing).toHaveValue("1");
     await expect(bend).toHaveValue("4");
-    await expect(asText(page)).toHaveText("The defaults of rnl solve.");
+    await expect(asText(page)).toHaveText("Equivalent CLI command: rnl solve --solver-config 'reroute_nets=true'");
     // the weights are given as one array, in the order of the table, and as the CLI writes it
     await crossing.fill("2");
     await bend.fill("3");
-    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'lines_weights=[2,3]'`);
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'lines_weights=[2,3],reroute_nets=true'`);
     // out of the bounds of each, or not a number, is refused where it is, in the words of the box
     await bend.fill("1001");
     await dialog(page).getByRole("button", { name: "OK" }).click();
@@ -309,13 +309,13 @@ test.describe("on the desktop", () => {
     await field(page, "layout").selectOption("rows");
     await expect(row).toBeHidden();
     await expect(setting(page, "lines_order")).toBeHidden();
-    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'layout="rows"'`);
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'layout="rows",reroute_nets=true'`);
     await field(page, "layout").selectOption("lines");
     await expect(crossing).toHaveValue("2");
     await ok(page);
     expect(await viewer.stored("solve-config")).toEqual({ lines_weights: [2, 3] });
-    expect(await solved(page, viewer)).toEqual({ config: "lines_weights=[2,3]", timeall: null });
-    expect((await viewer.calls("checkSettings")).at(-1)).toEqual(["lines_weights=[2,3]"]);
+    expect(await solved(page, viewer)).toEqual({ config: "lines_weights=[2,3],reroute_nets=true", timeall: null });
+    expect((await viewer.calls("checkSettings")).at(-1)).toEqual(["lines_weights=[2,3],reroute_nets=true"]);
     // the weights the table gives as the default are no change at all
     await open(page);
     await expect(crossing).toHaveValue("2");
@@ -354,7 +354,7 @@ test.describe("on the desktop", () => {
     expect((await order(page))[0]).toEqual(["signal_flow", false]);
     await ok(page);
     expect(await viewer.stored("solve-config")).toEqual({ layout: "rows", objectives: moved.join(",") });
-    expect((await solved(page, viewer)).config).toBe(`layout="rows",objectives="${moved.join(",")}"`);
+    expect((await solved(page, viewer)).config).toBe(`layout="rows",objectives="${moved.join(",")}",reroute_nets=true`);
     // moved back, they are the defaults again, and nothing is kept for them
     await open(page);
     await expect(objective(page, "signal_flow")).toHaveClass(/off/);
@@ -377,13 +377,13 @@ test.describe("on the desktop", () => {
     const on = DEFAULT_ORDER.filter((n) => n !== "turns").concat("signal_flow");
     await expect(asText(page)).toContainText(`objectives="${on.join(",")}"`);
     await ok(page);
-    expect((await solved(page, viewer)).config).toBe(`layout="rows",objectives="${on.join(",")}"`);
+    expect((await solved(page, viewer)).config).toBe(`layout="rows",objectives="${on.join(",")}",reroute_nets=true`);
     // all of them off is no objective at all: the solver only satisfies the facts
     await open(page);
     for (const name of on) await objective(page, name).getByLabel(`${name} is on`).uncheck();
     await expect(asText(page)).toContainText('objectives="none"');
     await ok(page);
-    expect((await solved(page, viewer)).config).toBe('layout="rows",objectives="none"');
+    expect((await solved(page, viewer)).config).toBe('layout="rows",objectives="none",reroute_nets=true');
   });
 
   test("objectives share a level with weights, and the level has a tolerance", async ({ page, viewer }) => {
@@ -438,7 +438,7 @@ test.describe("on the desktop", () => {
     await expect(objective(page, "symbol_lines", "lines_order").locator(".objective-level")).toHaveText("7");
     await expect(objective(page, "wire_lines", "lines_order").locator(".objective-level")).toHaveText("+");
     await expect(objective(page, "wire_lines", "lines_order").getByLabel("with the one above")).toBeChecked();
-    await expect(asText(page)).toHaveText("The defaults of rnl solve.");
+    await expect(asText(page)).toHaveText("Equivalent CLI command: rnl solve --solver-config 'reroute_nets=true'");
     // the wire lines weigh 2, the current is turned off, rail_heights is on after the area, and the area goes up past the length
     await objective(page, "wire_lines", "lines_order").getByLabel("weight").fill("2");
     await objective(page, "current", "lines_order").getByLabel("current is on").uncheck();
@@ -449,11 +449,11 @@ test.describe("on the desktop", () => {
     await up.click();
     await expect(up).toBeFocused();
     const text = "crossings_and_bends,hidden_ports,mirror_pairs,dots_near_pins,area,length,symbol_lines+wire_lines*2,rail_heights";
-    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'lines_order="${text}"'`);
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'lines_order="${text}",reroute_nets=true'`);
     await ok(page);
     expect(await viewer.stored("solve-config")).toEqual({ lines_order: text });
-    expect(await solved(page, viewer)).toEqual({ config: `lines_order="${text}"`, timeall: null });
-    expect((await viewer.calls("checkSettings")).at(-1)).toEqual([`lines_order="${text}"`]);
+    expect(await solved(page, viewer)).toEqual({ config: `lines_order="${text}",reroute_nets=true`, timeall: null });
+    expect((await viewer.calls("checkSettings")).at(-1)).toEqual([`lines_order="${text}",reroute_nets=true`]);
     // shown again as it was kept, the fixed ranks where they were
     await open(page);
     expect((await ranks(page)).map(([n]) => n)).toEqual([...FIXED, "crossings_and_bends", "hidden_ports", "mirror_pairs", "dots_near_pins", "area", "length", "symbol_lines", "wire_lines", "rail_heights", "current"]);
@@ -488,16 +488,16 @@ test.describe("on the desktop", () => {
     await dialog(page).getByRole("button", { name: "OK" }).click();
     await expect(dialog(page).locator(".dialog-error")).toHaveText("timeall must be a positive number of seconds.");
     await field(page, "timeall").fill("90");
-    await expect(asText(page)).toHaveText("Equivalent CLI command: rnl solve --timeall 90");
+    await expect(asText(page)).toHaveText("Equivalent CLI command: rnl solve --timeall 90 --solver-config 'reroute_nets=true'");
     await field(page, "layout").selectOption("rows");
     await field(page, "beam").fill("8");
-    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --timeall 90 --solver-config 'beam=8,layout="rows"'`);
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --timeall 90 --solver-config 'beam=8,layout="rows",reroute_nets=true'`);
     await ok(page);
     expect(await viewer.stored("solve-timeall")).toBe(90);
     expect(await viewer.stored("solve-config")).toEqual({ beam: 8, layout: "rows" });
     // the solver is asked about the settings alone (rnl solve --check refuses a time for the file)
-    expect((await viewer.calls("checkSettings")).at(-1)).toEqual(['beam=8,layout="rows"']);
-    expect(await solved(page, viewer)).toEqual({ config: 'beam=8,layout="rows"', timeall: 90 });
+    expect((await viewer.calls("checkSettings")).at(-1)).toEqual(['beam=8,layout="rows",reroute_nets=true']);
+    expect(await solved(page, viewer)).toEqual({ config: 'beam=8,layout="rows",reroute_nets=true', timeall: 90 });
     // what was kept shows again, and Restore Defaults takes it away
     await open(page);
     await expect(field(page, "timeall")).toHaveValue("90");
@@ -505,7 +505,7 @@ test.describe("on the desktop", () => {
     await expect(field(page, "timeall")).toBeDisabled();
     await ok(page);
     expect(await viewer.stored("solve-timeall")).toBeNull();
-    expect(await solved(page, viewer)).toEqual({ config: "", timeall: null });
+    expect(await solved(page, viewer)).toEqual({ config: "reroute_nets=true", timeall: null });
   });
 
   test("a value out of the bounds the table gives is refused where it is, and the solver's refusal is shown at its setting", async ({ page, viewer }) => {
@@ -547,7 +547,7 @@ test.describe("on the desktop", () => {
     await expect(setting(page, "tolerance")).toHaveClass(/refused/);
     await expect(setting(page, "beam")).not.toHaveClass(/refused/);
     await expect(dialog(page)).toHaveCount(1);
-    expect(await viewer.calls("checkSettings")).toEqual([['layout="rows",tolerance=0.5']]);
+    expect(await viewer.calls("checkSettings")).toEqual([['layout="rows",reroute_nets=true,tolerance=0.5']]);
     expect(await viewer.stored("solve-config")).toBeNull();
     // and the dialog is usable again: a value that will do keeps it
     await page.evaluate(() => (window.fakeShell.settingErrors = []));
@@ -568,7 +568,7 @@ test.describe("on the desktop", () => {
     await expect(field(page, "beam")).toHaveValue("6");
     await dialog(page).getByRole("button", { name: "Cancel" }).click();
     await dialogGone(page);
-    expect(await solved(page, viewer)).toEqual({ config: 'beam=6,layout="rows"', timeall: null });
+    expect(await solved(page, viewer)).toEqual({ config: 'beam=6,layout="rows",reroute_nets=true', timeall: null });
   });
 
   test("the dialog says what the netlist and its packages give, from the last solve, which a value set here wins over", async ({ page, viewer }) => {
@@ -662,20 +662,20 @@ test.describe("on the desktop", () => {
     await expect(other).toContainText("1 of the settings keeps a value you set.");
     await field(page, "layout").selectOption("rows");
     await expect(field(page, "beam")).toHaveValue("9");
-    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'beam=9,layout="rows"'`);
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'beam=9,layout="rows",reroute_nets=true'`);
     // and under lines it is not what the solver or the command line gets, though it is kept
     await field(page, "layout").selectOption("lines");
-    await expect(asText(page)).toHaveText("The defaults of rnl solve.");
+    await expect(asText(page)).toHaveText("Equivalent CLI command: rnl solve --solver-config 'reroute_nets=true'");
     await ok(page);
     expect(await viewer.stored("solve-config")).toEqual({ beam: 9 });
-    expect(await solved(page, viewer)).toEqual({ config: "", timeall: null });
-    expect((await viewer.calls("checkSettings")).at(-1)).toEqual([""]);
+    expect(await solved(page, viewer)).toEqual({ config: "reroute_nets=true", timeall: null });
+    expect((await viewer.calls("checkSettings")).at(-1)).toEqual(["reroute_nets=true"]);
     // rows again: what was kept is there, and now given
     await open(page);
     await field(page, "layout").selectOption("rows");
     await expect(field(page, "beam")).toHaveValue("9");
     await ok(page);
-    expect((await solved(page, viewer)).config).toBe('beam=9,layout="rows"');
+    expect((await solved(page, viewer)).config).toBe('beam=9,layout="rows",reroute_nets=true');
   });
 
   test.describe("a ranking kept with a layer in another order", () => {
@@ -695,7 +695,7 @@ test.describe("on the desktop", () => {
 
     test("is no change at all", async ({ page, viewer }) => {
       await open(page);
-      await expect(asText(page)).toHaveText("The defaults of rnl solve.");
+      await expect(asText(page)).toHaveText("Equivalent CLI command: rnl solve --solver-config 'reroute_nets=true'");
       await ok(page);
       expect(await viewer.stored("solve-config")).toEqual({});
     });
@@ -717,30 +717,29 @@ test.describe("on the desktop", () => {
       await expect(objective(page, "crowding").locator(".objective-level")).toHaveText("+");
       // crossings is in a tier of its own that lines does not take: hidden, but where the user put it
       await expect(objective(page, "crossings")).toBeHidden();
-      await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'objectives="overlaps,turns+crowding"'`);
+      await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'objectives="overlaps,turns+crowding",reroute_nets=true'`);
       await ok(page);
       // kept whole, given without the tier that holds none
       expect(await viewer.stored("solve-config")).toEqual({ objectives: "overlaps,turns+crowding,crossings" });
-      expect((await solved(page, viewer)).config).toBe('objectives="overlaps,turns+crowding"');
-      expect((await viewer.calls("checkSettings")).at(-1)).toEqual(['objectives="overlaps,turns+crowding"']);
+      expect((await solved(page, viewer)).config).toBe('objectives="overlaps,turns+crowding",reroute_nets=true');
+      expect((await viewer.calls("checkSettings")).at(-1)).toEqual(['objectives="overlaps,turns+crowding",reroute_nets=true']);
       // rows takes them all, crossings too
       await open(page);
       await field(page, "layout").selectOption("rows");
       await expect(objective(page, "crossings")).toBeVisible();
       await expect(objective(page, "turns").locator(".objective-tag")).toBeHidden();
       await ok(page);
-      expect((await solved(page, viewer)).config).toBe('layout="rows",objectives="overlaps,turns+crowding,crossings"');
+      expect((await solved(page, viewer)).config).toBe('layout="rows",objectives="overlaps,turns+crowding,crossings",reroute_nets=true');
     });
   });
 });
 
-// A shell's defaults over the solver's (`solverDefaults`): the web viewer routes each net again, which the solver does
-// not do by default. The dialog shows them as the defaults; a solve is given what differs from the solver's own.
-test.describe("a shell with defaults of its own, as the web viewer has reroute_nets", () => {
-  const WEB_DEFAULTS = { ...DESKTOP, "solver-defaults": JSON.stringify({ reroute_nets: true }) };
-
-  test("a solve is given the shell's default, before the dialog is ever shown, and the dialog shows it as the default", async ({ page, viewer }) => {
-    await viewer.open(T4, WEB_DEFAULTS);
+// The viewers' own defaults over the solver's, the same in every shell (solve-settings.js): each net is routed again,
+// which `rnl solve` and the solver do not do by default. The dialog shows them as the defaults; a solve is given what
+// differs from the solver's own.
+test.describe("the viewers route each net again, which rnl solve does not do by default", () => {
+  test("a solve is given the viewers' default, before the dialog is ever shown, and the dialog shows it as the default", async ({ page, viewer }) => {
+    await viewer.open(T4, DESKTOP);
     expect(await solved(page, viewer)).toEqual({ config: "reroute_nets=true", timeall: null });
     // (nothing changed: the table is not asked for before the solve)
     expect(await viewer.calls("solverTable")).toEqual([]);
@@ -752,14 +751,14 @@ test.describe("a shell with defaults of its own, as the web viewer has reroute_n
     await field(page, "layout").selectOption("rows");
     await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'layout="rows",reroute_nets=true'`);
     await ok(page);
-    // kept: what differs from the dialog's defaults; given: the shell's default with it
+    // kept: what differs from the dialog's defaults; given: the viewers' default with it
     expect(await viewer.stored("solve-config")).toEqual({ layout: "rows" });
     expect((await viewer.calls("checkSettings")).at(-1)).toEqual(['layout="rows",reroute_nets=true']);
     expect(await solved(page, viewer)).toEqual({ config: 'layout="rows",reroute_nets=true', timeall: null });
   });
 
   test("turned off, it is kept off and the solver's own default is given, as nothing; Restore Defaults turns it on again", async ({ page, viewer }) => {
-    await viewer.open(T4, WEB_DEFAULTS);
+    await viewer.open(T4, DESKTOP);
     await open(page);
     await field(page, "reroute_nets").uncheck();
     await expect(asText(page)).toHaveText("The defaults of rnl solve.");
@@ -776,17 +775,10 @@ test.describe("a shell with defaults of its own, as the web viewer has reroute_n
     expect(await solved(page, viewer)).toEqual({ config: "reroute_nets=true", timeall: null });
   });
 
-  test("settings kept before keep their values, and the shell's default joins them", async ({ page, viewer }) => {
+  test("settings kept before keep their values, and the viewers' default joins them", async ({ page, viewer }) => {
     await viewer.keep({ "solve-config": { beam: 6, layout: "rows" } });
-    await viewer.open(T4, WEB_DEFAULTS);
+    await viewer.open(T4, DESKTOP);
     expect(await solved(page, viewer)).toEqual({ config: 'beam=6,layout="rows",reroute_nets=true', timeall: null });
     expect(await viewer.stored("solve-config")).toEqual({ beam: 6, layout: "rows" });
   });
-});
-
-test("without defaults of its own, a shell's solve is given none: the desktop and rnl solve leave reroute_nets off", async ({ page, viewer }) => {
-  await viewer.open(T4, DESKTOP);
-  expect(await solved(page, viewer)).toEqual({ config: "", timeall: null });
-  await open(page);
-  await expect(field(page, "reroute_nets")).not.toBeChecked();
 });

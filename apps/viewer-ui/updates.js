@@ -1,5 +1,5 @@
 import { append, m, setText, tr } from "./i18n.js";
-// Help > Check for Updates, on a platform whose shell has `version` and `browse` (the desktop): the
+// Help > Check for Updates, in every shell that has `version` and `browse` (the desktop, the web, the local program): the
 // newest release of the viewer on GitHub against the version that runs, in a dialog that offers to
 // open the release's page. It looks only when the user asks, never by itself. The shell says the
 // version and opens the page in the default browser (shell.js); the list of releases comes from

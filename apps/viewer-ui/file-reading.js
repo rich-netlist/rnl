@@ -106,6 +106,8 @@ export async function readDocument(source, edits, progress, signal, options = {}
     const outline = await outlineOf(reader, lib, fresh);
     ({ result: doc, hit } = await readOne(reader, outline, fileOf(source, outline, reader), lib,
       { fresh, keep: true, unkept: !!bind || !!constraints }));
+    // the loading indicator says so, in every shell
+    if (hit) progress?.("cached");
     doc.outline = outline;
     await reader.texts(doc);
     readWith.set(doc, { reader, outline });

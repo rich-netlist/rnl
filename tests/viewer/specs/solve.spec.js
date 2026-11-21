@@ -59,7 +59,7 @@ test.describe("on the desktop", () => {
     const builds = await viewer.builds();
     await solve(page, () => page.keyboard.press("F9"));
     // the default options of rnl solve, and nothing read again for the drawing
-    expect(await solves(viewer)).toEqual([[T4, { config: "", timeall: null, level: `${T4}.sp` }]]);
+    expect(await solves(viewer)).toEqual([[T4, { config: "reroute_nets=true", timeall: null, level: `${T4}.sp` }]]);
     expect(await viewer.builds()).toBe(builds);
     await expect(page.locator("#preview-badge")).toHaveText("Solved preview: the files are unchanged");
     await expect(page.locator("#solve-step")).toHaveText(/^Solved: (1 level|\d+ levels), (1 fact|\d+ facts) not kept\. A preview: the files are unchanged\./);
@@ -150,7 +150,7 @@ test.describe("on the desktop", () => {
       [T4, true, null],
     ]);
     // the spacing is the settings', and a time for the whole file is not given to a respace
-    expect(calls[1][1].config).toBe("");
+    expect(calls[1][1].config).toBe("reroute_nets=true");
     // a solve after it is a solve again
     await solve(page);
     await expect(page.locator("#solve-step")).toContainText("Solved:");
@@ -324,7 +324,7 @@ test.describe("on the desktop", () => {
       // and the next solve, whose table is kept, begins and gives its result
       await page.evaluate(() => (window.fakeShell.holdTable = false));
       await solve(page);
-      expect(await solves(viewer)).toEqual([[T4, { config: 'beam=6,layout="rows"', timeall: null, level: `${T4}.sp` }]]);
+      expect(await solves(viewer)).toEqual([[T4, { config: 'beam=6,layout="rows",reroute_nets=true', timeall: null, level: `${T4}.sp` }]]);
     });
 
     test("a solve whose table is read without a Cancel goes on to the shell with what the settings take", async ({ page, viewer }) => {
@@ -334,7 +334,7 @@ test.describe("on the desktop", () => {
       expect(await solves(viewer)).toEqual([]);
       await page.evaluate(() => window.fakeShell.releaseTable());
       await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"));
-      expect(await solves(viewer)).toEqual([[T4, { config: 'beam=6,layout="rows"', timeall: null, level: `${T4}.sp` }]]);
+      expect(await solves(viewer)).toEqual([[T4, { config: 'beam=6,layout="rows",reroute_nets=true', timeall: null, level: `${T4}.sp` }]]);
     });
   });
 });

@@ -40,28 +40,25 @@ function changed() {
 
 let tableKept = null;
 
-// A shell may have defaults of its own over the solver's (`solverDefaults`, the web viewer's `reroute_nets=true`). The
-// dialog shows them as the defaults, so what is kept is what differs from them; what a solve, the check and the command
-// line get is what differs from the solver's own defaults, the shell's defaults among it where the user did not change
-// them. So a netlist that sets such a setting itself is overridden only where the shell's default is still in effect.
+// The viewers have defaults of their own over the solver's, the same in every shell: each net is routed again
+// (`reroute_nets=true`), which `rnl solve` and the solver do not do by default. The dialog shows them as the defaults, so
+// what is kept is what differs from them; what a solve, the check and the command line get is what differs from the
+// solver's own defaults, the viewers' defaults among it where the user did not change them. So a netlist that sets such
+// a setting itself is overridden only where the viewers' default is still in effect. Each is one the default layout
+// takes.
+const VIEWER_DEFAULTS = Object.freeze({ reroute_nets: true });
 
-/** The shell's defaults over the solver's, by key; none where it has none. */
-function shellDefaults() {
-  const given = shell?.solverDefaults;
-  return given !== null && typeof given === "object" && !Array.isArray(given) ? given : {};
-}
-
-/** The solver's table with the shell's defaults as the defaults, the solver's own kept as `solverDefault`. */
-function withShellDefaults(table) {
-  const own = shellDefaults();
-  if (!table || !Array.isArray(table.settings) || Object.keys(own).length === 0) return table;
+/** The solver's table with the viewers' defaults as the defaults, the solver's own kept as `solverDefault`. */
+function withViewerDefaults(table) {
+  const own = VIEWER_DEFAULTS;
+  if (!table || !Array.isArray(table.settings)) return table;
   const settings = table.settings.map((s) => (Object.hasOwn(own, s.key) ? { ...s, default: own[s.key], solverDefault: s.default } : s));
   return { ...table, settings };
 }
 
-/** The shell's table, with the shell's defaults; rejects as the shell does. */
+/** The shell's table, with the viewers' defaults; rejects as the shell does. */
 async function readTable() {
-  return withShellDefaults(await shell.solverTable());
+  return withViewerDefaults(await shell.solverTable());
 }
 
 /** The solver's table, asked for once; null where the shell has none or it cannot be read. */
@@ -77,7 +74,7 @@ async function solverTable() {
 }
 
 /**
- * What a solve is given of `kept` (what differs from the dialog's defaults): the shell's defaults with `kept` over them,
+ * What a solve is given of `kept` (what differs from the dialog's defaults): the viewers' defaults with `kept` over them,
  * less what is the solver's own default, of what the layout takes.
  */
 function forSolver(table, kept) {
@@ -160,10 +157,10 @@ export function takenValues(table, values) {
 export async function solverSettings() {
   const values = changed();
   // (nothing differs from the defaults: nothing to take from, and the table, which the browser reads from the solver's
-  // module, is not asked for before the solve, which a Cancel could not stop yet; the shell's defaults are then given
+  // module, is not asked for before the solve, which a Cancel could not stop yet; the viewers' defaults are then given
   // as they are, for the default layout, which takes them)
   const table = Object.keys(values).length === 0 ? null : await solverTable();
-  return { config: configText(table ? forSolver(table, values) : shellDefaults()), timeall: keptTimeall() };
+  return { config: configText(table ? forSolver(table, values) : VIEWER_DEFAULTS), timeall: keptTimeall() };
 }
 
 /** A number as RNL writes it: with no exponent. */
