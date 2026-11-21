@@ -18,7 +18,9 @@
  * @property {string} entry The path of the file to open, as the frontend names it, such as `/w/top.sp`.
  * @property {Record<string, string>} [files] The texts of the workspace by path, the entry's among them.
  * @property {string[]} [package_dirs] The directories, among the paths of `files`, whose packages are
- *   found by name.
+ *   found by name, in order, after `pool`: in each, `NAME.rnl` first.
+ * @property {string[]} [search_paths] The directories, among the paths of `files`, searched in order for a
+ *   bare include name not beside the file that includes it, after `pool`: `DIR/NAME` in each.
  * @property {"spice" | "spectre" | "rnl" | "text"} [dialect] The format of the entry, instead of guessing it from the entry.
  * @property {Record<string, string>} [formats] The format set for files, by path as in `files`: only
  *   those the user set. A file not among them is read by its own suffix and first lines; an unknown
@@ -63,6 +65,7 @@
  *   including RNL 0.4 pin identities and fixed text direction.
  * @property {Record<string, string>} [files] Further files, such as packages.
  * @property {string[]} [package_dirs]
+ * @property {string[]} [search_paths]
  * @property {boolean} [std]
  * @property {string} [std_version]
  * @property {boolean} [svg]
@@ -82,6 +85,7 @@
  * @property {Record<string, string>} [files] The texts of the workspace by path, the entry's among them.
  * @property {string[]} [pool] Explicit temporary files searched before package directories.
  * @property {string[]} [package_dirs]
+ * @property {string[]} [search_paths]
  * @property {"spice" | "spectre"} [dialect] The format of the entry, instead of guessing it.
  * @property {Record<string, string>} [formats]
  * @property {boolean} [std]

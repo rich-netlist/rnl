@@ -73,8 +73,10 @@ export interface Request {
   entry: string;
   /** The texts of the workspace by path, the entry's among them. */
   files?: Record<string, string>;
-  /** The directories, among the paths of `files`, whose packages are found by name (16.2). */
+  /** The directories, among the paths of `files`, whose packages are found by name (16.2), in order, after `pool`: in each, `NAME.rnl` first. */
   package_dirs?: string[];
+  /** The directories, among the paths of `files`, searched in order for a bare include name not beside the file that includes it, after `pool`: `DIR/NAME` in each. A frontend gives its PATH folders as these and as `package_dirs`, their files in `files` but not in `pool`. */
+  search_paths?: string[];
   /** Explicit temporary files, searched before package directories. */
   pool?: string[];
   /** Opt-in indexed lookup of undefined subcircuits. */
@@ -392,6 +394,7 @@ export interface WriteRequest {
   /** Further files, such as packages; the netlist is the entry. */
   files?: Record<string, string>;
   package_dirs?: string[];
+  search_paths?: string[];
   std?: boolean;
   include_std?: boolean;
   std_version?: string;
@@ -430,6 +433,7 @@ export interface ReplaceRecordsRequest {
   /** Explicit temporary files, searched before package directories. */
   pool?: string[];
   package_dirs?: string[];
+  search_paths?: string[];
   /** The format of the entry, instead of guessing it from the entry. */
   dialect?: "spice" | "spectre";
   /** The format set for files, by path as in `files`. */

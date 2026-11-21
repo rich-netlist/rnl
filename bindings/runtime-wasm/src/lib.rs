@@ -60,9 +60,16 @@ pub struct Request {
     /// The texts of the workspace by path, the entry's among them.
     #[serde(default)]
     pub files: BTreeMap<String, String>,
-    /// The directories, among the paths of `files`, whose packages are found by name (16.2).
+    /// The directories, among the paths of `files`, whose packages are found by name (16.2), in
+    /// order, after the files of `pool`: in each, `NAME.rnl` first.
     #[serde(default)]
     pub package_dirs: Vec<String>,
+    /// The directories, among the paths of `files`, searched in order for a bare include name that
+    /// is not beside the file that includes it, after the files of `pool`: `DIR/NAME` in each. A
+    /// frontend gives its PATH folders as these and as `package_dirs`, and their files in `files`
+    /// but not in `pool`, so that they are searched as the desktop viewer and the CLI search them.
+    #[serde(default)]
+    pub search_paths: Vec<String>,
     /// "spice" or "spectre", instead of guessing from the entry.
     pub dialect: Option<String>,
     /// The format set for files, by path as in `files` ([`rnl_view::BuildOptions::formats`]); the
@@ -164,6 +171,9 @@ pub struct WriteRequest {
     pub files: BTreeMap<String, String>,
     #[serde(default)]
     pub package_dirs: Vec<String>,
+    /// As in a [`Request`].
+    #[serde(default)]
+    pub search_paths: Vec<String>,
     #[serde(default = "yes")]
     pub std: bool,
     /// Add the standard package to the main file (16.3); false when omitted.
@@ -207,6 +217,9 @@ pub struct ReplaceRequest {
     pub files: BTreeMap<String, String>,
     #[serde(default)]
     pub package_dirs: Vec<String>,
+    /// As in a [`Request`].
+    #[serde(default)]
+    pub search_paths: Vec<String>,
     /// "spice" or "spectre", instead of guessing from the entry.
     pub dialect: Option<String>,
     #[serde(default)]
@@ -398,7 +411,7 @@ pub fn respond(request: &[u8]) -> Response {
             Ok(update) => {
                 let files = MemoryProvider {
                     files: update.files.into_iter().map(|(p, t)| (normalize(&p), t)).collect(),
-                    package_dirs: Vec::new(),
+                    ..MemoryProvider::default()
                 };
                 let pool: Vec<_> = update.pool.iter().map(|p| normalize(p)).collect();
                 let files = rnl_runtime::source::FilePool { files: &files, paths: &pool };
@@ -479,7 +492,7 @@ pub fn respond(request: &[u8]) -> Response {
         }
     }
     let files = request.files.into_iter().map(|(path, text)| (normalize(&path), text)).collect();
-    let files = MemoryProvider { files, package_dirs: request.package_dirs };
+    let files = MemoryProvider { files, package_dirs: request.package_dirs, search_paths: request.search_paths };
     let paths: Vec<String> = request.pool.iter().map(|p| normalize(p)).collect();
     let files = rnl_runtime::source::FilePool { files: &files, paths: &paths };
     let canonical: Vec<_> =
@@ -488,7 +501,7 @@ pub fn respond(request: &[u8]) -> Response {
     let pool = rnl_runtime::source::FilePool { files: &namespace, paths: &canonical };
     let edits = MemoryProvider {
         files: request.library_edits.into_iter().map(|(p, t)| (normalize(&p), t)).collect(),
-        package_dirs: Vec::new(),
+        ..MemoryProvider::default()
     };
     // the index reads the canonical paths, as the formats set for them name them
     let prefix = request.library_prefix.as_str();
@@ -669,7 +682,7 @@ fn drawings(query: DrawingsQuery) -> Response {
 /// Write, then build what was written as the entry, among the request's files.
 fn write(request: WriteRequest) -> Response {
     let files = request.files.into_iter().map(|(path, text)| (normalize(&path), text)).collect();
-    let mut files = MemoryProvider { files, package_dirs: request.package_dirs };
+    let mut files = MemoryProvider { files, package_dirs: request.package_dirs, search_paths: request.search_paths };
     let runtime = Options {
         std: request.std,
         include_std: request.include_std,
@@ -730,7 +743,7 @@ fn write(request: WriteRequest) -> Response {
 /// Replace the records of a level in the file that holds it, with the records the request gives.
 fn replace_records(request: ReplaceRequest) -> Response {
     let files = request.files.into_iter().map(|(path, text)| (normalize(&path), text)).collect();
-    let files = MemoryProvider { files, package_dirs: request.package_dirs };
+    let files = MemoryProvider { files, package_dirs: request.package_dirs, search_paths: request.search_paths };
     let paths: Vec<String> = request.pool.iter().map(|p| normalize(p)).collect();
     let files = rnl_runtime::source::FilePool { files: &files, paths: &paths };
     let options = Options {
@@ -760,7 +773,7 @@ fn replace_records(request: ReplaceRequest) -> Response {
 /// List the packages a catalog request asks for.
 fn catalog(request: CatalogRequest) -> Response {
     let files = request.files.into_iter().map(|(path, text)| (normalize(&path), text)).collect();
-    let files = MemoryProvider { files, package_dirs: request.package_dirs };
+    let files = MemoryProvider { files, package_dirs: request.package_dirs, ..MemoryProvider::default() };
     let options = CatalogOptions {
         packages: request.catalog.packages,
         all_versions: request.catalog.all_versions,
@@ -946,6 +959,32 @@ C1 a 0 1p
             .unwrap()
             .iter()
             .any(|d| d["message"].as_str().unwrap().contains("/pool/part.inc")));
+    }
+
+    #[test]
+    fn path_folders_are_searched_as_the_desktop_searches_them() {
+        // PATH folders /A and /B, given as folders and not as pool files: a bare include is DIR/NAME in each in order,
+        // not a file of that name in a version folder; the pool is searched before them
+        let top = "* top\n.include \"part.inc\"\n.end\n";
+        let files = json!({
+            "/work/top.sp": top,
+            "/A/1.0/part.inc": "R1 a 0 1k\n",
+            "/B/part.inc": "R2 a 0 1k\n",
+            "/pool/part.inc": "R3 a 0 1k\n"
+        });
+        let named = |v: &serde_json::Value, path: &str| {
+            v["document"]["diagnostics"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|d| d["message"].as_str().unwrap().contains(path))
+        };
+        let path = json!({ "entry": "/work/top.sp", "files": files, "package_dirs": ["/A", "/B"], "search_paths": ["/A", "/B"] });
+        let v = answer(path.clone());
+        assert!(named(&v, "/B/part.inc") && !named(&v, "/A/1.0/part.inc"), "{v}");
+        let mut pooled = path;
+        pooled["pool"] = json!(["/pool/part.inc"]);
+        assert!(named(&answer(pooled), "/pool/part.inc"));
     }
 
     #[test]

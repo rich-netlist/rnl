@@ -90,8 +90,9 @@ fn file_argument(args: impl IntoIterator<Item = OsString>) -> Option<OsString> {
     None
 }
 
-/// The extensions offered first in the open dialog.
-const NETLISTS: [&str; 11] = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "inc", "lib", "scs", "rnl"];
+/// The extensions offered first in the open and save dialogs: those the core lists
+/// ([`rnl_view::listed_suffixes`]), as every viewer does.
+static NETLISTS: std::sync::LazyLock<Vec<&str>> = std::sync::LazyLock::new(rnl_view::listed_suffixes);
 
 /// Name the window `title`, which the page writes the same in every shell (apps/viewer-ui/window-title.js): the
 /// document shown, with a dot before it while its files have changes not saved.
@@ -160,7 +161,7 @@ async fn save_file_as(
         .set_parent(&window)
         .set_title(menu::text(window.app_handle(), "Save As"))
         .set_file_name(name)
-        .add_filter(menu::text(window.app_handle(), "Netlists and packages"), &NETLISTS);
+        .add_filter(menu::text(window.app_handle(), "Netlists and packages"), &NETLISTS[..]);
     if let Some(dir) =
         entry.as_ref().map(PathBuf::from).and_then(|p| p.parent().map(PathBuf::from)).filter(|d| d.is_dir())
     {
@@ -209,7 +210,7 @@ async fn pick_file(window: WebviewWindow) -> Option<String> {
         .file()
         .set_parent(&window)
         .set_title(menu::text(window.app_handle(), "Open Netlist"))
-        .add_filter(menu::text(window.app_handle(), "Netlists and packages"), &NETLISTS)
+        .add_filter(menu::text(window.app_handle(), "Netlists and packages"), &NETLISTS[..])
         .add_filter(menu::text(window.app_handle(), "All files"), &["*"]);
     let picked = tauri::async_runtime::spawn_blocking(move || dialog.blocking_pick_file()).await.ok()??;
     picked.into_path().ok().map(|p| p.to_string_lossy().into_owned())
