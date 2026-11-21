@@ -476,8 +476,9 @@ function render() {
   });
   // the public packages this build bundles, read only, searched after the PATH directories above
   if (bundledPackages.length) {
+    // (read as a file of PATH is, by a shell that reads it itself: the local program's page)
     const files = bundledPackages.map((p) => ({ path: p.path, name: `${p.name} ${p.version}`,
-      source: { path: p.path, name: p.path, library: true, readonly: true } }));
+      source: { ...(shell.pathItem?.(p.path)?.source ?? { path: p.path, name: p.path }), library: true, readonly: true } }));
     append(groups, group("public", m("Public packages (bundled)"), files, "public"));
   }
   if (external && shell.externalFile) {
@@ -497,7 +498,7 @@ export async function startPool() {
   const listing = shell.formats?.().then(setFormatList, () => {});
   if (shell.pathPackages) await listing;
   $("auto-include").addEventListener("change", (e) => toggleAutoInclude(e.target.checked));
-  // the desktop's bundled public packages, in a group of their own; none in the build without them
+  // the public packages a desktop bundles (the local program's too), in a group of their own; none in the build without them
   if (shell.bundledPackages) bundledPackages = await shell.bundledPackages().then((info) => info.packages || [], () => []);
   if (shell.bundledFiles) {
     const bundled = await shell.bundledFiles();
