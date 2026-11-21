@@ -261,6 +261,28 @@ async function prepare(source, edits, suppliedPackages, progress, { bind, constr
   return { source, entry, request, read, library };
 }
 
+/**
+ * What a solve reads, as the last build read it (crates/rnl-view RequestFiles): its files with the texts of `edits`
+ * applied over them, its Library (`pool`), the folders it searched, Auto Include and the Library's edits; so that a solve
+ * finds what the build found, an include from the Library and a subcircuit that Auto Include added among them.
+ */
+function solveFiles(request, edits) {
+  const dir = request.entry.slice(0, request.entry.lastIndexOf("/"));
+  const files = { ...request.files };
+  const libraryEdits = { ...(request.library_edits || {}) };
+  for (const [path, text] of Object.entries(edits || {})) {
+    const full = joined(dir, path);
+    files[full] = text;
+    // (as the build names them: prepare)
+    libraryEdits[full.replace(/^\/<pool>(?=\/)/, "")] = text;
+  }
+  return {
+    entry: request.entry, files, pool: request.pool ?? [], package_dirs: request.package_dirs ?? [], search_paths: request.search_paths ?? [],
+    auto_include: request.auto_include === true, library_prefix: request.library_prefix ?? "", library_edits: libraryEdits,
+    formats: request.formats ?? {},
+  };
+}
+
 /** A core to ask what needs no document: the one shown, or the warm spare. */
 async function someCore() {
   if (core) return core;
@@ -1246,17 +1268,15 @@ export default {
     async solve(_source, settings, edits) {
       const request = lastBuilt && builtRequests.get(lastBuilt);
       if (!request) throw "Open a netlist first.";
-      const dir = request.entry.slice(0, request.entry.lastIndexOf("/"));
-      const files = { ...request.files };
-      for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
+      const read = solveFiles(request, edits);
       const own = new AbortController();
       solving = own;
       try {
         const response = await fetch(new URL("rnl-solver/solve", location.href), { method: "POST", signal: own.signal,
           // (X-RNL: the local program, which serves the page to one browser, asks for it of every request that does anything)
           headers: { "Content-Type": "application/json", "X-RNL": "1" },
-          // (formats: those set for files when the netlist was opened, as the build read them)
-          body: JSON.stringify({ entry: request.entry, files, pool: request.pool, formats: request.formats ?? {}, config: settings?.config || "", timeall: settings?.timeall ?? null, respace: settings?.respace === true, level: settings?.level ?? null, stream: true }) });
+          // (the files as the build read them, with the formats set for them when the netlist was opened)
+          body: JSON.stringify({ ...read, config: settings?.config || "", timeall: settings?.timeall ?? null, respace: settings?.respace === true, level: settings?.level ?? null, stream: true }) });
         if (!/^application\/x-ndjson/.test(response.headers.get("Content-Type") || "")) {
           const answer = await response.json().catch(() => ({ error: `the solver service answered ${response.status}` }));
           if (!response.ok) throw answer.error || `the solver service answered ${response.status}`;
@@ -1314,25 +1334,22 @@ export default {
      * them, are its request, and it gives the Document of the netlist as solved and the report, as the desktop's
      * Solve does, of the one level `settings.level` names or of every level. The events of the solve
      * (docs/solver-progress.md) go to `onSolveProgress`'s handler as they happen. Cancelling stops the Worker, and
-     * the next solve starts another. The Library's packages are found by name as the development server's solve
-     * finds them, by the directories of its package files; its other files are found where a file includes them.
+     * the next solve starts another. It reads the files as the build did (`solveFiles`), as the development
+     * server's solve does.
      */
     async solve(_source, settings, edits) {
       const request = lastBuilt && builtRequests.get(lastBuilt);
       if (!request) throw "Open a netlist first.";
-      const dir = request.entry.slice(0, request.entry.lastIndexOf("/"));
-      const files = { ...request.files };
-      for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
-      const packageDirs = [...new Set(request.pool.filter((p) => p.endsWith(".rnl")).map((p) => p.slice(0, p.lastIndexOf("/"))))];
+      const read = solveFiles(request, edits);
       const own = new AbortController();
       solving = own;
       own.signal.addEventListener("abort", () => stopSolver("the solve was cancelled"), { once: true });
       try {
-        const answer = await callSolver(inBrowser, { request: { entry: request.entry, files, package_dirs: packageDirs, formats: request.formats ?? {},
+        const answer = await callSolver(inBrowser, { request: { ...read,
           solver_config: settings?.config || "", ...(settings?.timeall ? { timeall: settings.timeall } : {}), ...(settings?.respace ? { respace: true } : {}), level: settings?.level ?? null } }, (event) => solveProgress?.(event));
         if (answer.cancelled) throw "the solve was cancelled";
         if (answer.error !== undefined) throw answer.error;
-        lastSolved = { request: { ...request, files }, written: answer.files ?? {} };
+        lastSolved = { request: { ...request, files: read.files }, written: answer.files ?? {} };
         return answer;
       } finally {
         if (solving === own) solving = null;

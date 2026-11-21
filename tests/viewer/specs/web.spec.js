@@ -1778,6 +1778,10 @@ test("the Solve view lists the constraints of a netlist before any solve; a deve
     expect(posts[0].entry).toMatch(/10-constraints-and-priority\.sp$/);
     // the web viewer's own default over the solver's (solve-settings.js)
     expect(posts[0].config).toBe("reroute_nets=true");
+    // the files as the build read them: Auto Include and the Library's place among them
+    expect(posts[0].auto_include).toBe(true);
+    expect(posts[0].library_prefix).toBe("/<pool>");
+    expect(posts[0].search_paths).toEqual([]);
     await expect(page.locator("#solve-views")).toBeVisible();
     const rows = page.locator("#constraints-list li.constraint");
     expect(await rows.count()).toBe(22);
@@ -1869,6 +1873,30 @@ test("the web viewer solves in the browser: its Worker starts at the first Solve
   // Close Preview shows the netlist as read
   await page.evaluate(() => window.viewer.command("solve-close"));
   await expect(page.locator("#preview-badge")).toBeHidden();
+});
+
+test("a solve in the browser reads the files as the build did: a subcircuit of the Library that Auto Include added is solved too", async ({ page }) => {
+  test.setTimeout(120000);
+  await watchSolverWorker(page);
+  await start(page);
+  await page.locator("#include-input").setInputFiles({ name: "cell.inc", mimeType: "text/plain", buffer: Buffer.from("* cell\n.subckt cell p n\nR1 p n 1k\n.ends\n") });
+  await expect(page.getByRole("button", { name: "Exclude cell.inc", exact: true })).toBeVisible();
+  await page.locator("#file-input").setInputFiles({ name: "top.sp", mimeType: "text/plain", buffer: Buffer.from("* top\nX1 a 0 cell\n.end\n") });
+  const built = await shown(page);
+  expect(built.files).toHaveLength(2);
+  await page.keyboard.press("F9");
+  await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"), null, { timeout: 90000 });
+  // the request is the build's: its Library, the directories it searched and Auto Include
+  const [request] = await page.evaluate(() => window.__solver.requests);
+  expect(request.pool).toEqual(["/<pool>/cell.inc"]);
+  expect(request.auto_include).toBe(true);
+  expect(request.library_prefix).toBe("/<pool>");
+  expect(request).toHaveProperty("package_dirs");
+  expect(request).toHaveProperty("search_paths");
+  // the solved Document holds the Library's file, as the one built did
+  const solved = await page.evaluate(() => window.viewer.doc);
+  expect(solved.files.map((f) => f.path)).toEqual(built.files.map((f) => f.path));
+  await expect(page.locator("#solve-step")).toContainText("Solved:");
 });
 
 test("Save Solved Copy downloads the solve shown: the netlist alone under its name with -solved, else a ZIP of the files in their places", async ({ page }) => {
