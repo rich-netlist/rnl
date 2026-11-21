@@ -16,6 +16,11 @@ let work, server, base, address, output;
 
 /** Start the program on a netlist: the address it printed, which works once. */
 async function start(...files) {
+  // Solve > Ask to Solve on Open is off to begin with, as in the page's tests (tests/viewer/fake-shell.js): a netlist with
+  // components not drawn would ask first, and its dialog would stand before what a test clicks
+  const kept = join(work, "settings.json");
+  const values = existsSync(kept) ? JSON.parse(readFileSync(kept, "utf8")) : {};
+  if (!Object.hasOwn(values, "solve-on-open")) writeFileSync(kept, JSON.stringify({ ...values, "solve-on-open": false }));
   const args = ["--no-browser", "--settings", join(work, "settings.json"), ...(process.env.RNL_LOCAL_SITE ? ["--site", process.env.RNL_LOCAL_SITE] : []), ...files];
   const child = spawn(exe, args, { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, XDG_CONFIG_HOME: join(work, "config"), XDG_CACHE_HOME: join(work, "cache") } });
   output = "";
