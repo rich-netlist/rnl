@@ -22,14 +22,18 @@ import { sourcePath } from "../source-path.js";
 import { doc } from "../state.js";
 import { dirtyPaths, unappliedPaths } from "../edits.js";
 
-/** The program's own API, as the page of the program may call it: with the header it asks of every request that does anything (the key of the session goes with every request: local-key.js). */
-async function api(path, { method = "GET", body } = {}) {
+/**
+ * The program's own API, as the page of the program may call it: with the header it asks of every request that does
+ * anything (the key of the session goes with every request: local-key.js). `body` is sent as JSON, `bytes` as they are.
+ */
+async function api(path, { method = "GET", body, bytes } = {}) {
+  const type = bytes !== undefined ? "application/octet-stream" : body !== undefined ? "application/json" : null;
   const response = await fetch(new URL(path, location.href), {
-    method,
+    method: bytes !== undefined ? "POST" : method,
     cache: "no-store",
     credentials: "same-origin",
-    headers: { "X-RNL": "1", ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    headers: { "X-RNL": "1", ...(type ? { "Content-Type": type } : {}) },
+    body: bytes !== undefined ? bytes : body === undefined ? undefined : JSON.stringify(body),
   });
   let json = null;
   try {
@@ -107,41 +111,6 @@ const remember = (dir) => {
 /** Keep a setting in the program's file. */
 const save = (key, value) => api("api/settings", { method: "PUT", body: { key, value } });
 
-const NETLISTS = /\.(sp|spi|spice|cir|ckt|net|netlist|scs|inc|lib|rnl)$/i;
-
-/** The netlists and packages in a folder, and in the folders below it, as the Library's Include Folder lists them. */
-async function folderFiles(dir, found = [], depth = 0, seen = { cut: 0 }) {
-  const listing = await api(`api/ls?${new URLSearchParams({ dir })}`);
-  // (a folder with more entries than the program lists is included in part: said, with how many it lists)
-  if (listing.truncated) seen.cut = listing.entries.length;
-  for (const entry of listing.entries) {
-    const path = `${listing.dir.replace(/\/$/, "")}/${entry.name}`;
-    if (entry.dir) {
-      if (depth < 8 && found.length < 2000) await folderFiles(path, found, depth + 1, seen);
-    } else if (NETLISTS.test(entry.name)) found.push(path);
-  }
-  return found;
-}
-
-/** The files of the machine that changed on disk since the page read them: said once each, with the key that reloads them. */
-let version = 0;
-async function watchChanges() {
-  try {
-    const unsaved = new Set([...dirtyPaths(), ...unappliedPaths()]).size; // (the program does not stop while the page has changes in it that are saved nowhere)
-    const { version: now, changed } = await api(`api/changes?since=${version}&unsaved=${unsaved}`);
-    version = now;
-    if (doc && changed.length) {
-      const shown = new Set(doc.files.map((f) => sourcePath(doc, f)));
-      const mine = changed.filter((p) => shown.has(p));
-      if (mine.length) note(m`${mine[0].split("/").pop()} changed on disk. F5 reloads the netlist.`);
-    }
-  } catch {
-    // the program is gone, or has not answered yet: the next time
-  }
-  setTimeout(watchChanges, 1000);
-}
-watchChanges();
-
 // A browser gives a file dropped on the page without its path, which the desktop's rules need (Save writes a file where it
 // is): the page says so, and opens nothing.
 document.addEventListener("drop", (e) => {
@@ -152,8 +121,38 @@ document.addEventListener("drop", (e) => {
 // what the web shell has that is the web's own: none of it here (a URL, a manifest, public packages online, the Viewer API)
 const {
   includeLibrary: _library, publicPackages: _published, includePackage: _include, externalFile: _external,
-  pickManifest: _pickManifest, sourceFromManifestJson: _manifestJson, saveManifest: _saveManifest, ...shared
+  pickManifest: _pickManifest, sourceFromManifestJson: _manifestJson, saveManifest: _saveManifest,
+  // (the web's limit is of a page that holds a project's texts in its core; the desktop has none, nor has this)
+  projectLimits: _limits, ...shared
 } = web;
+
+/**
+ * Bytes the page made (a project's archive, an image), written by the program as the file the user chose in the chooser
+ * of the machine's files, as Save As writes one: a file that is there is replaced only when the user says so. What was
+ * written, or null when the user cancelled.
+ */
+async function writeChosen({ name, start, title }, make) {
+  const chosen = await chooseOnServer(api, { kind: "save", start, name, title, action: tr("Save"), remember });
+  if (!chosen) return null;
+  // (the bytes are made once the place is known, as the desktop makes them after its dialog)
+  const bytes = await make();
+  const at = (overwrite) => `api/write?${new URLSearchParams({ to: chosen.path, ...(overwrite ? { overwrite: "1" } : {}) })}`;
+  let written = await api(at(false), { bytes });
+  if (written.exists) {
+    const replace = await offer({ title, paragraphs: [m`${written.exists} exists already. Replace it?`], action: tr("Replace") });
+    if (!replace) return null;
+    written = await api(at(true), { bytes });
+  }
+  return written.path;
+}
+
+const folderOf = (path) => (path ? path.slice(0, path.lastIndexOf("/")) || "/" : "");
+// the archive of the project saved or opened last, whose folder and name Save Project offers again, as the desktop does
+let lastProject = null;
+// the folder the user chose to open a project in, ending in "/" (projectRoot)
+let projectFolder = null;
+// the last solve shown: whether its copy is one file, and the file solved (Save Solved Copy As)
+let solved = null;
 
 /** @type {import("../shell.js").Shell} */
 export default {
@@ -207,11 +206,11 @@ export default {
       await api("api/open", { method: "POST", body: { path: chosen.path } });
       return [web.poolItem(serverSource(chosen.path))];
     }
-    await api("api/allow", { method: "POST", body: { dir: chosen.path } });
-    const seen = { cut: 0 };
-    const paths = await folderFiles(chosen.path, [], 0, seen);
-    if (seen.cut) note(m`Only the first ${seen.cut} entries are listed.`);
-    return paths.map((path) => web.poolItem(serverSource(path)));
+    // the program allows the folder and lists it as the desktop's Include Folder does (rnl_cli::walk), by the core's suffixes
+    const { files, truncated } = await api("api/folder", { method: "POST", body: { dir: chosen.path } });
+    // (a folder with more files than are listed is included in part: said, with how many)
+    if (truncated) note(m`Only the first ${files.length} entries are listed.`);
+    return files.map((path) => web.poolItem(serverSource(path)));
   },
   // another file of the document, opened from the Library, a diagnostic or an include: read from the machine too
   sourceForFile(source, document, index) {
@@ -264,8 +263,96 @@ export default {
    * below it: the program lists a folder only when the settings have it as PATH (and with its sub-folders, for those).
    */
   pathPackages: (dir, subfolders = false) => api(`api/path?${new URLSearchParams({ dir, ...(subfolders ? { subfolders: "1" } : {}) })}`),
-  /** The bytes of a file of the machine, such as a PATH file that Download Project holds (project.js). */
+  /** The bytes of a file of the machine, such as a PATH file that Save Project holds (project.js). */
   readFile: fileBytes,
+  /** `text` as bytes in the encoding of the file of the machine at `path`, as Save writes it (project.js, for an edited file). */
+  async encodeLike(path, text) {
+    const response = await fetch(new URL("api/encode-like", location.href), {
+      method: "POST", cache: "no-store", credentials: "same-origin",
+      headers: { "X-RNL": "1", "Content-Type": "application/json" }, body: JSON.stringify({ path, text }),
+    });
+    if (!response.ok) throw new Error(`the program answered ${response.status} ${response.statusText}`);
+    return new Uint8Array(await response.arrayBuffer());
+  },
+  /** Save Project, as the desktop's: the archive written where the user says, on the machine of the program. */
+  async saveProject(name, build) {
+    const offered = lastProject ? lastProject.split("/").pop() : name;
+    const path = await writeChosen({ name: offered, start: folderOf(lastProject) || lastDir, title: m("Save Project") },
+      async () => new Uint8Array(await (await build()).arrayBuffer()));
+    if (!path) return false;
+    lastProject = path;
+    return path;
+  },
+  /** Open Project, as the desktop's: an archive of the machine of the program. */
+  async pickProject() {
+    const chosen = await chooseOnServer(api, { kind: "file", start: folderOf(lastProject) || lastDir, title: m("Open Project"), browser: null, remember });
+    if (!chosen) return null;
+    const { path } = await api("api/open", { method: "POST", body: { path: chosen.path } });
+    return { name: path.split("/").pop(), path, bytes: await fileBytes(path) };
+  },
+  /** The folder to open a project in, which the user chooses; files of the project already there are replaced only when the user says. */
+  async projectRoot(picked, manifest) {
+    const chosen = await chooseOnServer(api, { kind: "folder", start: folderOf(picked.path) || lastDir, title: m("Choose the folder to open the project in"), browser: null, action: tr("Choose"), remember });
+    if (!chosen) return null;
+    const { dir } = await api("api/project-folder", { method: "POST", body: { dir: chosen.path } });
+    const { existing } = await api("api/project-existing", { method: "POST", body: { paths: manifest.files.map((f) => f.path) } });
+    if (existing.length) {
+      const shown = existing.slice(0, 5).join(", ") + (existing.length > 5 ? m`, and ${existing.length - 5} more` : "");
+      const replace = await offer({ title: m("Open Project"), paragraphs: [m`The folder already has files of this project: ${shown}.`, m("Replace them?")], action: tr("Replace") });
+      if (!replace) return null;
+    }
+    projectFolder = `${dir.replace(/\/$/, "")}/`;
+    return projectFolder;
+  },
+  /** Write a project read into its folder, on the machine of the program: its entry, and its pool as Library files. */
+  async projectSource(read, picked) {
+    for (const [path, bytes] of Object.entries(read.bytes)) {
+      if (!projectFolder || !path.startsWith(projectFolder)) throw new Error(`${path} is not in the folder chosen for the project.`);
+      await api(`api/project-file?${new URLSearchParams({ path: path.slice(projectFolder.length) })}`, { bytes });
+    }
+    lastProject = picked.path ?? lastProject;
+    return { source: serverSource(read.entry), items: read.pool.map((path) => web.poolItem(serverSource(path))) };
+  },
+  /** Export Image, as the desktop's: the image written where the user says. */
+  saveImage: (name, blob) =>
+    writeChosen({ name, start: folderOf(doc?.path) || lastDir, title: m("Export Image") }, async () => new Uint8Array(await blob.arrayBuffer())),
+  /** Solve, as the web shell's with the program's solver; the program keeps the solve, for Save Solved Copy As. */
+  async solve(source, settings, edits) {
+    const answer = await web.solve(source, settings, edits);
+    solved = { oneFile: answer.report?.one_file === true, entry: answer.document?.path ?? doc?.path ?? "" };
+    return answer;
+  },
+  /**
+   * Save Solved Copy As, as the desktop's: the program saves the copy of the last solve it kept, as one file where the
+   * user says, or into a folder the user chooses, with the files it read beside it; never over a file it read.
+   */
+  async saveSolved(encoding) {
+    if (!solved) throw "solve the netlist first: there is no solve to save";
+    const name = solved.entry.split("/").pop() || "netlist";
+    const dot = name.lastIndexOf(".");
+    const copy = dot > 0 ? `${name.slice(0, dot)}-solved${name.slice(dot)}` : `${name}-solved`;
+    const start = folderOf(solved.entry) || lastDir;
+    const chosen = solved.oneFile
+      ? await chooseOnServer(api, { kind: "save", start, name: copy, title: m("Save Solved Copy As"), action: tr("Save"), remember })
+      : await chooseOnServer(api, { kind: "folder", start, title: m("Save the Solved Files Into a Folder"), browser: null, action: tr("Choose"), remember });
+    if (!chosen) return null;
+    // (a folder chosen is allowed as one included is: the copy is written into it)
+    if (!solved.oneFile) await api("api/allow", { method: "POST", body: { dir: chosen.path } });
+    const body = { to: chosen.path, encoding: encoding ?? "preserve" };
+    let saved = await api("api/save-solved", { method: "POST", body });
+    if (saved.exists) {
+      const replace = await offer({ title: m("Save Solved Copy As"), paragraphs: [m`${saved.exists} exists already. Replace it?`], action: tr("Replace") });
+      if (!replace) return null;
+      saved = await api("api/save-solved", { method: "POST", body: { ...body, overwrite: true } });
+    }
+    return { to: saved.to, written: saved.written, copied: saved.copied };
+  },
+  /**
+   * What changed on disk since the version `since` (disk-changes.js): the program looks at the files the page read. The
+   * page asks once a second, which tells the program that it is still open, and how many files have changes saved
+   * nowhere (the program does not stop while there are).
+   */
+  fileChanges: (since) => api(`api/changes?since=${since}&unsaved=${new Set([...dirtyPaths(), ...unappliedPaths()]).size}`),
   /** A format chosen for a file of the machine is kept for the next start, as the desktop keeps it. */
   keepsFormat: (path) => machineFiles.has(path),
   /** A file of a PATH folder, read from the machine as a file opened is. */

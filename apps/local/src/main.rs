@@ -22,7 +22,6 @@ mod launch;
 mod security;
 mod service;
 mod settings;
-mod watch;
 
 use std::cell::Cell;
 use std::net::{Ipv4Addr, Shutdown, SocketAddr, TcpListener, TcpStream};
@@ -198,7 +197,7 @@ fn run(options: Options) -> Result<(), String> {
         auth,
         roots,
         settings,
-        watcher: watch::Watcher::default(),
+        watcher: rnl_viewer_files::watch::Watcher::default(),
         initial,
         heartbeat: Mutex::new(None),
         unsaved: AtomicUsize::new(0),
@@ -206,6 +205,8 @@ fn run(options: Options) -> Result<(), String> {
         address_file: Mutex::new(None),
         run_dirs: Mutex::new(Vec::new()),
         bodies: AtomicUsize::new(0),
+        last_solve: Default::default(),
+        project_root: Mutex::new(None),
     });
     for file in &app.initial {
         app.watcher.watch(file);

@@ -16,6 +16,11 @@ let work, server, base, address, output;
 
 /** Start the program on a netlist: the address it printed, which works once. */
 async function start(...files) {
+  // Solve > Ask to Solve on Open is off to begin with, as in the page's tests (tests/viewer/fake-shell.js): a netlist with
+  // components not drawn would ask first, and its dialog would stand before what a test clicks
+  const kept = join(work, "settings.json");
+  const values = existsSync(kept) ? JSON.parse(readFileSync(kept, "utf8")) : {};
+  if (!Object.hasOwn(values, "solve-on-open")) writeFileSync(kept, JSON.stringify({ ...values, "solve-on-open": false }));
   const args = ["--no-browser", "--settings", join(work, "settings.json"), ...(process.env.RNL_LOCAL_SITE ? ["--site", process.env.RNL_LOCAL_SITE] : []), ...files];
   const child = spawn(exe, args, { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, XDG_CONFIG_HOME: join(work, "config"), XDG_CACHE_HOME: join(work, "cache") } });
   output = "";
@@ -384,6 +389,27 @@ test("New Window opens the file of the machine in a new tab, with the changes ap
   expect(readFileSync(join(work, "proj", "sim", "top.sp"), "utf8")).not.toContain("* applied here");
 });
 
+test("PATH is searched as the desktop searches it: folder by folder, a bare include in each folder itself, not in its version folders", async ({ page }) => {
+  server.kill();
+  // the first PATH folder has part.inc only in a version folder; the second has it itself
+  mkdirSync(join(work, "pa", "1.0"), { recursive: true });
+  mkdirSync(join(work, "pb"), { recursive: true });
+  writeFileSync(join(work, "pa", "1.0", "part.inc"), "* in a version folder\nR1 a 0 1k\n");
+  writeFileSync(join(work, "pb", "part.inc"), "* in the folder\nR2 a 0 2k\n");
+  writeFileSync(join(work, "proj", "sim", "uses.sp"), "* uses\n.include part.inc\n.end\n");
+  const pagePath = (p) => (process.platform === "win32" ? `/${p.replaceAll("\\", "/")}` : p);
+  writeFileSync(join(work, "settings.json"), JSON.stringify({ "search-paths": [pagePath(join(work, "pa")), pagePath(join(work, "pb"))] }));
+  ({ child: server, base, address } = await start(join(work, "proj", "sim", "uses.sp")));
+  await open(page);
+  // (the netlist is read again once PATH is listed)
+  await page.locator("#tab-files").click();
+  await expect(page.locator("#library-groups")).not.toHaveAttribute("aria-busy", "true");
+  await page.waitForFunction(() => window.viewer.doc?.files.length > 1 && !document.body.classList.contains("busy"));
+  const read = (await document(page)).files.map((f) => f.path);
+  expect(read.some((p) => p.endsWith("pb/part.inc"))).toBe(true);
+  expect(read.some((p) => p.endsWith("1.0/part.inc"))).toBe(false);
+});
+
 test("Save Project holds the files of a PATH folder, read from the machine", async ({ page }) => {
   server.kill();
   mkdirSync(join(work, "lib"), { recursive: true });
@@ -395,16 +421,57 @@ test("Save Project holds the files of a PATH folder, read from the machine", asy
   await open(page);
   await page.locator("#tab-files").click();
   await expect(page.locator("#library-groups")).not.toHaveAttribute("aria-busy", "true");
-  // (the archive is still saved by the browser here: its own save dialog, where it has one, is not one a test can answer)
-  await page.evaluate(() => { window.showSaveFilePicker = undefined; });
-  const download = page.waitForEvent("download");
   // the command waits for the dialog of what the archive holds, which is answered as the desktop's is
   await page.evaluate(() => { void window.viewer.command("save-project"); });
-  await page.locator("dialog.dialog").getByRole("button", { name: "Save", exact: true }).click();
-  const zip = readFileSync(await (await download).path(), "latin1");
+  const dialog = page.locator("dialog.dialog");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  // then where: the chooser of the machine's files, in the folder of the netlist; the program writes the archive there
+  await dialog.locator(".dialog-option", { hasText: "Save in this folder" }).click();
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await dialog.locator("input").fill("saved.zip");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  const archive = join(work, "proj", "sim", "saved.zip");
+  await expect.poll(() => existsSync(archive)).toBe(true);
+  const zip = readFileSync(archive, "latin1");
   expect(zip.startsWith("PK")).toBe(true);
   expect(zip).toContain("PATH/1-lib/amp.sp");
   expect(zip).toContain("R5 in out 5k");
+});
+
+test("Export Image writes the image where the user says, as the desktop does", async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => { void window.viewer.command("export-svg"); });
+  const dialog = page.locator("dialog.dialog");
+  await expect(dialog.locator(".dialog-title")).toHaveText("Export Image");
+  await dialog.locator(".dialog-option", { hasText: "Save in this folder" }).click();
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await dialog.locator("input").fill("drawn.svg");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  const image = join(work, "proj", "sim", "drawn.svg");
+  await expect.poll(() => existsSync(image)).toBe(true);
+  expect(readFileSync(image, "utf8")).toContain("<svg");
+});
+
+test("Save Solved Copy As saves the solve the program kept into a folder the user chooses, as the desktop does", async ({ page }) => {
+  mkdirSync(join(work, "proj", "out"));
+  await open(page);
+  await page.evaluate(() => window.viewer.command("solve"));
+  await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"), null, { timeout: 120000 });
+  // the netlist reads other files: the copy is a folder, with the files it read beside the one solved
+  await page.evaluate(() => { void window.viewer.command("solve-save"); });
+  const dialog = page.locator("dialog.dialog");
+  const options = dialog.locator(".dialog-option");
+  await expect(dialog.locator(".dialog-title")).toHaveText("Save the Solved Files Into a Folder");
+  await options.filter({ hasText: "Parent folder" }).click();
+  await dialog.getByRole("button", { name: "Choose" }).click();
+  await options.filter({ hasText: "out/" }).dblclick();
+  await options.filter({ hasText: "Choose this folder" }).click();
+  await dialog.getByRole("button", { name: "Choose" }).click();
+  await expect.poll(() => existsSync(join(work, "proj", "out", "top.sp"))).toBe(true);
+  expect(readFileSync(join(work, "proj", "out", "top.sp"), "utf8")).toContain("A top level");
+  expect(existsSync(join(work, "proj", "out", "extra.inc"))).toBe(true);
+  // the files read are as they were
+  expect(readFileSync(join(work, "proj", "sim", "extra.inc"), "utf8")).toBe("* beside\n");
 });
 
 test("the format chosen for a file of the machine is kept for the next start", async ({ page }) => {

@@ -9,7 +9,7 @@ import { flushSettings, load } from "../util.js";
 import { decide, inform, modal } from "../dialog.js";
 import { chooseEntry, listedText } from "../incoming.js";
 import { sourcePath } from "../source-path.js";
-import { fileFormats, isPackagePath } from "../formats.js";
+import { fileFormats } from "../formats.js";
 import { libraryStamps } from "../file-results.js";
 
 let pool = [];
@@ -83,9 +83,9 @@ export default {
   setPool: (items, reload = false, refresh = []) => {
     poolItems = items;
     const paths = items.filter((item) => !item.builtin).map((item) => item.path);
-    // PATH packages retain the provider's per-directory precedence. Netlists may also resolve
-    // bare includes; both kinds enter the subcircuit index, independently of package lookup.
-    pool = items.filter((item) => !item.builtin && (!item.searchPath || !isPackagePath(item.path))).map((item) => item.path);
+    // PATH is searched by the app itself, folder by folder (rnl_cli FsProvider), as the CLI searches it: its files are
+    // not in the pool, which is searched first, every file alike; they enter the subcircuit index all the same (`paths`)
+    pool = items.filter((item) => !item.builtin && !item.searchPath).map((item) => item.path);
     poolReady = poolReady.catch(() => {}).then(() => invoke("update_library", { pool: paths, reload, refresh, formats: fileFormats() }));
     return poolReady;
   },
@@ -263,6 +263,11 @@ export default {
   setDirty(dirty) {
     invoke("set_dirty", { dirty }).catch(() => {});
   },
+  // a file of the document shown that changed on disk (disk-changes.js): the app looks at those the page gives it
+  watchFiles(paths) {
+    invoke("watch_files", { paths }).catch(() => {});
+  },
+  fileChanges: (since) => invoke("file_changes", { since }),
   // File > Export Image: the core draws the level again, with the overlays, from what the document shown was built from
   // (a solve's preview: from the files the solve wrote)
   exportSvg: async ({ level, title, overlays, source, edits, preview }) => {

@@ -573,6 +573,11 @@ export default {
   ...(platform === "desktop"
     ? {
         saveAs,
+        // the files of the document shown, which the page gives to be looked at, and what a test says changed on disk
+        watchFiles(paths) {
+          fake.watched = paths;
+        },
+        fileChanges: async (since) => fake.changesOnDisk ?? { version: since, changed: [] },
         onCloseRequested(h) {
           closing = h;
         },
