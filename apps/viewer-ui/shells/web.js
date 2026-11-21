@@ -15,6 +15,7 @@ import { libraryStamps, requestPath, textHash } from "../file-results.js";
 import { loadManifest, readManifest } from "../manifest.js";
 import { ask, choose, inform, modal } from "../dialog.js";
 import { libraryZip } from "../zip.js";
+import { chooseEntry, listedOnly } from "../incoming.js";
 import { openWebWindow, receiveWebSession } from "../window-session.js";
 import { load } from "../util.js";
 import { sourcePath } from "../source-path.js";
@@ -22,10 +23,6 @@ import { entrySource } from "../visit-source.js";
 import { chooseFormat, fileFormats } from "../formats.js";
 import { DEFAULT_CATALOG, readCatalog, readPublicPackage, latestPackages } from "../public-packages.js";
 
-/** The extensions of netlists that are opened on their own, listed first as the file to open. */
-const NETLISTS = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "scs"];
-/** The extensions of files mostly included or used by a netlist, listed after the netlists: Verilog-A and Verilog-AMS among them. */
-const PARTS = ["inc", "lib", "rnl", "va", "vams"];
 /** How long a server may send nothing, before or during its answer, until a fetch is given up (ms). */
 const STALL = 30000;
 const embed = new URLSearchParams(location.search).get("embed") === "1";
@@ -596,57 +593,18 @@ export async function prepareViewer() {
   return (await response.json()).version;
 }
 
-/** The extension of a path's file name, in lower case; "" when it has none. */
-function extension(path) {
-  const name = path.slice(path.lastIndexOf("/") + 1);
-  const dot = name.lastIndexOf(".");
-  return dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
-}
-
-const byPath = (a, b) => a.localeCompare(b, undefined, { numeric: true });
-
-/**
- * The entry among `files`, by path, each shown relative to the directory `dir`. Any file can be the
- * netlist, whatever its name: the netlists are listed first, then the files mostly included, then
- * the others. Of files chosen or dropped, the entry is the only one not mostly included, or the only
- * file; when more than one could be, the user picks. In a folder, named by `folder` ("" for several
- * things dropped, a folder among them), the user always picks, with a filter. Null when the user
- * cancels.
- *
- * @param {Map<string, unknown>} files
- * @param {string} dir
- * @param {string | null} folder
- * @returns {Promise<string | null>}
- */
-function chooseEntry(files, dir, folder) {
-  const rank = (p) => (NETLISTS.includes(extension(p)) ? 0 : PARTS.includes(extension(p)) ? 1 : 2);
-  const offered = [...files.keys()].sort((a, b) => rank(a) - rank(b) || byPath(a, b));
-  if (folder === null) {
-    const entries = offered.filter((p) => rank(p) !== 1);
-    if (entries.length === 1) return Promise.resolve(entries[0]);
-    if (offered.length === 1) return Promise.resolve(offered[0]);
-  }
-  let text = m("Select the top-level netlist to open:");
-  if (folder !== null) text = folder ? m`The netlist to open in ${folder}:` : m("The netlist to open:");
-  return choose({
-    title: folder === null ? m("Open") : m("Open Folder"),
-    text,
-    items: offered.map((p) => ({ label: within(p, dir), value: p })),
-    filter: folder !== null,
-  });
-}
 
 /** Files chosen, or dropped without a folder: each at /<name> in the workspace. */
 async function openFiles(files) {
   if (files.length === 0) return null;
   const all = new Map(files.map((f) => [`/${f.name}`, () => f]));
-  const entry = await chooseEntry(all, "", null);
+  const entry = await chooseEntry(all.keys(), { label: (p) => within(p, "") });
   return entry && filesSource(all, entry);
 }
 
-/** Pool files retain their directory structure, but only the current pool supplies siblings. */
-function poolItems(files, folder = false) {
-  return files.filter((f) => !folder || [...NETLISTS, ...PARTS].includes(extension(f.name))).map((f) => {
+/** Pool files retain their directory structure, but only the current pool supplies siblings; a folder's, those the viewer lists. */
+async function poolItems(files, folder = false) {
+  return (folder ? await listedOnly(files, (f) => f.name) : files).map((f) => {
     const path = `/${f.webkitRelativePath || f.name}`;
     const read = () => f;
     return { path, name: path.slice(1), read, source: { ...filesSource(new Map([[path, read]]), path), fromPool: true } };
@@ -748,7 +706,7 @@ function input(id, folder, accept = null) {
     el.value = "";
     if (waiting) chosen(files);
     else if (!modal() && !accept) {
-      if ((folder || id === "include-input") && included) included(poolItems(files, folder));
+      if ((folder || id === "include-input") && included) poolItems(files, folder).then(included);
       else if (opened) openFiles(files).then((source) => source && opened(source));
     }
   });
@@ -831,12 +789,13 @@ async function dropped(entries, files) {
   if (all.size === 0) return null;
   const folders = entries.filter((entry) => entry.isDirectory);
   if (folders.length > 0 && included) {
-    included([...all].filter(([path]) => [...NETLISTS, ...PARTS].includes(extension(path))).map(([path, read]) =>
+    included((await listedOnly([...all], ([path]) => path)).map(([path, read]) =>
       ({ path, name: path.slice(1), read, source: { ...filesSource(new Map([[path, read]]), path), fromPool: true } })));
     return null;
   }
   const folder = folders.length === 0 ? null : entries.length === 1 ? folders[0].name : "";
-  const entry = await chooseEntry(all, entries.length === 1 && folder ? `/${folder}` : "", folder);
+  const dir = entries.length === 1 && folder ? `/${folder}` : "";
+  const entry = await chooseEntry(all.keys(), { folder, label: (p) => within(p, dir) });
   return entry && filesSource(all, entry);
 }
 

@@ -6,7 +6,8 @@ import { m, tr } from "../i18n.js";
 // of the reading shown. What is kept, and when it holds, is the page's.
 
 import { flushSettings, load } from "../util.js";
-import { choose, decide, inform, modal } from "../dialog.js";
+import { decide, inform, modal } from "../dialog.js";
+import { chooseEntry, listedText } from "../incoming.js";
 import { sourcePath } from "../source-path.js";
 import { fileFormats, isPackagePath } from "../formats.js";
 import { libraryStamps } from "../file-results.js";
@@ -108,10 +109,8 @@ export default {
     await tauri.event.listen('opened-files', ({payload}) => {
       pending = pending.catch(() => {}).then(async () => {
         const paths = await invoke('dropped_files', {paths:payload});
-        const path = paths.length === 1 ? paths[0] : paths.length ? await choose({
-          title:m('Open Netlist'), text:m('Choose the dropped file to open.'), filter:true,
-          items:paths.map(path=>({label:path,value:path})),
-        }) : null;
+        // the file to open, as the page chooses it in every shell (incoming.js)
+        const path = paths.length ? await chooseEntry(paths) : null;
         if (path) await handler(file(path));
       });
     });
@@ -123,13 +122,11 @@ export default {
       try {
         const paths = await invoke("dropped_files", { paths: payload.paths });
         if (!paths.length) {
-          await inform({ title: m("Open"), paragraphs: [m("Drop a netlist or RNL package file (.sp, .spi, .spice, .cir, .ckt, .net, .netlist, .inc, .lib, .scs or .rnl).")] });
+          await inform({ title: m("Open"), paragraphs: [m("Drop a netlist or RNL package file ({0}).", await listedText())] });
           return;
         }
-        const path = paths.length === 1 ? paths[0] : await choose({
-          title: m("Open Netlist"), text: m("Choose the dropped file to open."), filter: true,
-          items: paths.map((path) => ({ label: path, value: path })),
-        });
+        // the file to open, as the page chooses it in every shell (incoming.js)
+        const path = await chooseEntry(paths);
         if (path) await handler(file(path));
       } catch (error) {
         await inform({ title: m("Open"), paragraphs: [m`The dropped files could not be opened: ${error.message || error}`] });
