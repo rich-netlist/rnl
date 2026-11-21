@@ -500,7 +500,7 @@ export async function startPool() {
   if (shell.bundledFiles) {
     const bundled = await shell.bundledFiles();
     items = Object.entries(bundled).map(([path, text]) => ({ path, name: path.replace("<bundled>/", ""), builtin: true,
-      source: { path, name: path, text: shell.platform === "web" ? text : undefined, readonly: true } }));
+      source: { path, name: path, text: shell.coreInPage ? text : undefined, readonly: true } }));
   }
   $("include-file").addEventListener("click", () => includeFiles("file"));
   $("include-folder").addEventListener("click", () => includeFiles("folder"));

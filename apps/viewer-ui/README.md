@@ -365,7 +365,6 @@ Everything platform-specific goes through the shell, chosen at start: `shells/de
 | Member | |
 | --- | --- |
 | `platform` | `"desktop"` or `"web"`: which commands of the table it offers. |
-| `overwrites` | Optional, of a shell of the `"web"` platform that writes the files where they were read from (the local shell, whose program writes them): Save is *Save*, not *Download File*, with the desktop's Save As and the question before leaving files with changes that offers to save them (`downloads()` in `shell.js`; the commands of the table that name `with: "overwrites"` or `unless: "overwrites"`). |
 | `nativeMenu` | Whether the platform shows the menu bar itself; if not, the page shows its own. |
 | `initial()` | What to open at start, or null; on the desktop, the file on the command line. |
 | `pick(kind)` | Ask for something to open: `"file"`, and on the web also `"folder"` or `"url"`; null when nothing is chosen. |
@@ -408,8 +407,8 @@ The web shell takes each candidate from a prewarmed standby module Worker, adopt
 | `check` | Whether it has a check mark. |
 | `radio` | Whether, with `check`, it is one of a group of which the page checks one: the page's menu bar shows a dot, a native menu a check mark. |
 | `page` | Whether the page always handles its key, as for Enter, Backspace and G: no menu accelerator would take the key from a text box. |
-| `platforms` | The platforms that offer it; all when not given. |
-| `with` | A capability of the shell, such as `solve`: the command is offered wherever the shell has it too, whatever its `platforms` (the web shell of a development server that runs a solver has `solve`, so it shows the Solve view and its menu items). |
+| `platforms` | The platforms that offer it, `web` or `desktop`; all when not given. The local program's page is a desktop: it has the desktop's commands, and none of the web's own (Open URL, manifests, public packages online). |
+| `with` | A capability of the shell, such as `solve`: the command is offered only where the shell has it, on the platforms it names (the web shell of a development server that runs a solver has `solve`, so it shows the Solve view and its menu items; the local program's page has no `fileAssociations`, so it has no File Associations). |
 | `windowsOnly` | Offer this command only on Windows, in addition to its `platforms` restriction. |
 
 The desktop app's native menu is planned by the page, from the table, as its own menu bar is (`native-menu.js`: the commands the shell offers, by `platforms`, `with` and `unless`, translated), and drawn by the app ([`src/menu.rs`](../desktop/src/menu.rs), `setMenu`), at start and again in another language: on Windows the page handles the keys and the menu shows them after a tab; elsewhere the menu's accelerators handle them; on macOS the first menu is the application's, with About and Quit. A native menu toggles a check item when it is chosen, so the page sets the marks of a command's group again after running it, whether or not they changed. In the page's own menu bar, pointing at a submenu's entry opens the submenu beside it; from the keyboard, ArrowRight, Enter or the entry's letter opens it, and ArrowLeft or Escape closes it. The page runs keys by the same table. A key with Ctrl compares Shift only for a letter, since typing `+` may need Shift; a key without Ctrl that types or deletes does not count while Ctrl or Alt is held. In a text box or list only Ctrl keys and function keys count. E and Enter open a selected subcircuit instance, Escape clears the selection, and F5 reads the document again instead of reloading the page. Ctrl+R toggles usage overlays.

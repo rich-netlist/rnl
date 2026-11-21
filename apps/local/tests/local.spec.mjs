@@ -193,11 +193,11 @@ test("the chooser lists the machine's files, goes up and in, and opens the one c
   const dialog = page.locator("dialog.dialog");
   await expect(dialog.locator(".dialog-title")).toHaveText("Open Netlist");
   await expect(dialog).toContainText("sim");
-  // the folder shown, its files, the way up, and last the browser's own chooser
+  // the folder shown, its files and the way up; not the browser's own chooser, as on the desktop: the files are the machine's
   const options = dialog.locator(".dialog-option");
   await expect(options.filter({ hasText: "other.sp" })).toHaveCount(1);
   await expect(options.filter({ hasText: "Parent folder" })).toHaveCount(1);
-  expect(await options.last().innerText()).toContain("From the computer of the browser");
+  await expect(options.filter({ hasText: "From the computer of the browser" })).toHaveCount(0);
   // up, and down into models
   await options.filter({ hasText: "Parent folder" }).click();
   await dialog.getByRole("button", { name: "Open" }).click();
@@ -348,7 +348,43 @@ test("Save As asks before it replaces a file, and nothing is written until the u
   await expect.poll(() => readFileSync(other, "utf8")).toContain("A top level");
 });
 
-test("Download Project holds the files of a PATH folder, read from the machine", async ({ page }) => {
+test("the page is the desktop viewer: none of the web's own commands, and a file dropped is not opened", async ({ page }) => {
+  await open(page);
+  const offered = (id) => page.locator(`#menubar .menu-item[data-id="${id}"]`);
+  for (const id of ["open-url", "load-manifest", "download-manifest", "include-library", "desktop-viewer"]) await expect(offered(id)).toHaveCount(0);
+  for (const id of ["save", "save-as", "save-project", "add-path-subfolders"]) await expect(offered(id)).not.toHaveCount(0);
+  await expect(page.locator("#include-library")).toBeHidden();
+  const before = (await document(page)).path;
+  // a browser gives a dropped file without its path: the page says so, and the document shown stays
+  const files = await page.evaluateHandle(() => {
+    const data = new DataTransfer();
+    data.items.add(new File(["* dropped\nR1 a 0 1k\n.end\n"], "dropped.sp"));
+    return data;
+  });
+  await page.dispatchEvent("body", "drop", { dataTransfer: files });
+  await expect(page.locator("dialog.dialog")).toContainText("A browser does not tell the page where a dropped file is.");
+  expect((await document(page)).path).toBe(before);
+});
+
+test("New Window opens the file of the machine in a new tab, with the changes applied and not saved", async ({ page, context }) => {
+  await open(page);
+  await page.evaluate(() => window.viewer.command("toggle-edit"));
+  const area = page.locator("#source .editor:not([hidden]) textarea").first();
+  await area.fill(`${await area.inputValue()}* applied here\n`);
+  await page.locator("#apply-edits").click();
+  await page.waitForFunction(() => !document.body.classList.contains("busy"));
+  const opened = context.waitForEvent("page");
+  await page.evaluate(() => { void window.viewer.command("new-window"); });
+  const other = await opened;
+  await other.waitForFunction(() => window.viewer?.doc && !document.body.classList.contains("busy") && window.viewer.edits.unsaved.length > 0, null, { timeout: 90000 });
+  expect((await document(other)).path).toBe((await document(page)).path);
+  expect(await other.evaluate(() => window.viewer.edits)).toEqual(await page.evaluate(() => window.viewer.edits));
+  expect(await other.evaluate(() => window.viewer.doc.files[0].text)).toContain("* applied here");
+  // the file on disk is as it was: nothing was saved
+  expect(readFileSync(join(work, "proj", "sim", "top.sp"), "utf8")).not.toContain("* applied here");
+});
+
+test("Save Project holds the files of a PATH folder, read from the machine", async ({ page }) => {
   server.kill();
   mkdirSync(join(work, "lib"), { recursive: true });
   writeFileSync(join(work, "lib", "amp.sp"), "* An amplifier\nR5 in out 5k\n.end\n");
@@ -359,12 +395,12 @@ test("Download Project holds the files of a PATH folder, read from the machine",
   await open(page);
   await page.locator("#tab-files").click();
   await expect(page.locator("#library-groups")).not.toHaveAttribute("aria-busy", "true");
-  // (the browser's own save dialog, where it has one, is not one a test can answer: the archive is downloaded)
+  // (the archive is still saved by the browser here: its own save dialog, where it has one, is not one a test can answer)
   await page.evaluate(() => { window.showSaveFilePicker = undefined; });
   const download = page.waitForEvent("download");
-  // the command waits for the dialog of what the archive holds, which is answered
+  // the command waits for the dialog of what the archive holds, which is answered as the desktop's is
   await page.evaluate(() => { void window.viewer.command("save-project"); });
-  await page.locator("dialog.dialog").getByRole("button", { name: "Download", exact: true }).click();
+  await page.locator("dialog.dialog").getByRole("button", { name: "Save", exact: true }).click();
   const zip = readFileSync(await (await download).path(), "latin1");
   expect(zip.startsWith("PK")).toBe(true);
   expect(zip).toContain("PATH/1-lib/amp.sp");

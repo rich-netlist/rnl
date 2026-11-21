@@ -58,9 +58,8 @@
  *   shows as not saved (navigation.js restoreSession).
  * @property {() => Promise<object | null>} [initialSession] Consume the one-use startup session, before initial().
  * @property {(id: string, enabled: boolean) => void} [setEnabled] Update a native command enabled state.
- * @property {boolean} [overwrites] A shell of the "web" platform that writes the files where they were read from, as the
- *   desktop's does (the local shell, whose server writes them): Save is Save, not Download File, and offers the desktop's
- *   Save As; it has `save`, and `saveAs` when the user may choose another file.
+ * @property {boolean} [coreInPage] Whether the core runs in the page, as WebAssembly (the web's and the local program's
+ *   shells): it is given the texts of the built-in files, which the desktop's core reads itself.
  * @property {boolean} [perFile] Whether the page reads the file of a source alone, in the context of its entry, with
  *   `reader` (file-reading.js; see the README's Reading the file shown alone); the page then names the file by the
  *   source's `view` (visit-source.js).
@@ -268,9 +267,9 @@ export let shell = null;
 
 /**
  * Whether File > Save downloads the files, as the web shell does, rather than writes them where they were read from, as
- * the desktop shell does and the local shell too, which says so with `overwrites`.
+ * the desktop shell does and the local shell too, which is a desktop.
  */
-export const downloads = () => shell.platform === "web" && !shell.overwrites;
+export const downloads = () => shell.platform === "web";
 
 /**
  * Choose the shell and load it: shells/desktop.js when the page runs in the desktop viewer

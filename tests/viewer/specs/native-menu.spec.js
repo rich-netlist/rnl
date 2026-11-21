@@ -31,12 +31,15 @@ test("the desktop is given the menu bar the page plans, at start", async ({ page
   expect(drawn.texts["Netlists and packages"]).toBe("Netlists and packages");
 });
 
-test("a command the shell offers by what it has is in the desktop's menu: with, and not unless", async ({ page, viewer }) => {
+test("a command that names `with` is in the desktop's menu only where the shell has it", async ({ page, viewer }) => {
   await viewer.open("04-hierarchy", DESKTOP);
   const { menus } = await plan(page, "windows");
   // the fake desktop solves: the Solve menu's commands, which name `with: solve`
   expect(item(menus, "solve")).toBeTruthy();
-  // Save writes, Download File (unless overwrites) is the web's
+  // it quits (`with: quit`), and sets no file associations (`with: fileAssociations`), as the local program's page sets none
+  expect(item(menus, "exit")).toBeTruthy();
+  expect(item(menus, "file-associations")).toBeUndefined();
+  // Save writes; Download File is the web's
   const saves = flat(menus).filter((e) => e.kind === "item" && e.id === "save");
   expect(saves.map((e) => e.text.split("\t")[0])).toEqual(["&Save"]);
 });
