@@ -129,31 +129,31 @@
     { t: 'M4 out  x     vdd  vdd pch W=4u L=0.5u', r: 'M4' },
     { t: 'M5 tail vbias vss  vss nch W=4u L=1u', r: 'M5' },
     { t: '* @RNL {' },
-    { t: '*   %dp1 = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;', r: 'M1 M2 M5', d: 'conflict' },
+    { t: '*   %dp1 = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;', r: 'M1 M2 M5' },
     { t: '*   {#M1 #M2 #M9} @ALIGN("y")', cls: 'is-err', d: 'm9' },
     { t: '* }' },
-    { t: '* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:edea2dac05e41f41.a52325ef217ada41", numbering="d4bd4a77786955a8") {', d: 'fp' },
-    { t: '*   #M1 @PLACE(4, 16) => @ORIENT("R0");', r: 'M1' },
-    { t: '*   #M2 @PLACE(16, 16) => @ORIENT("MY");', r: 'M2' },
-    { t: '*   #M3 @PLACE(4, 26) => @ORIENT("MY");', r: 'M3' },
-    { t: '*   #M4 @PLACE(16, 26) => @ORIENT("R0");', r: 'M4', d: 'bad' },
-    { t: '*   #M5 @PLACE(10, 9) => @ORIENT("R0");', r: 'M5' },
-    { t: '*   /* <en>more wires, junctions, ports, supplies and the ground follow; left out here</en> */', fold: true },
-    { t: '* }' },
-    { t: '* @RNL(author="rnl-editor") {', d: 'fp' },
-    { t: '*   #M2 @PLACE(x=18, priority="high");', r: 'M2', d: 'conflict' },
+    { t: '* @RNL(author="rnl-editor") {', d: 'move' },
+    { t: '*   #M2 @PLACE(x=18, priority="high");', r: 'M2', d: 'move' },
     { t: '*   #M4 @PLACE(2O, 26, priority="high")', r: 'M4', cls: 'is-err', d: 'bad' },
+    { t: '* }' },
+    { t: '* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:a0c875a9451d0e20.3cb60203afe238d5", numbering="9912cd934557ce94") {', d: 'solve' },
+    { t: '*   #M1 @PLACE(6, 16) => @ORIENT("R0");', r: 'M1', d: 'move' },
+    { t: '*   #M2 @PLACE(18, 16) => @ORIENT("MY");', r: 'M2', d: 'move' },
+    { t: '*   #M3 @PLACE(6, 26) => @ORIENT("MY");', r: 'M3', d: 'move' },
+    { t: '*   #M4 @PLACE(18, 26) => @ORIENT("R0");', r: 'M4', d: 'bad' },
+    { t: '*   #M5 @PLACE(12, 9) => @ORIENT("R0");', r: 'M5', d: 'move' },
+    { t: '*   /* <en>more wires, junctions, ports, supplies and the ground follow; left out here</en> */', fold: true },
     { t: '* }' },
     { t: '.ends ota5t' }
   ];
 
   /* What the core says of the file (rnl check site/examples/ota5t-edits.sp, with the two statements shown as errors
-     taken out of their comments) */
+     taken out of their comments): solved again after the editor's move, so nothing conflicts */
   var E5_DIAG = [
     { k: 'err', id: 'm9', icon: 'cross', html: '<en><code>{#M1 #M2 #M9} @ALIGN("y")</code>: this level has no instance M9. ALIGN is strict about its members, so the whole statement fails; it does not fall back to “align only M1 and M2”.</en>', refs: [] },
-    { k: 'err', id: 'bad', icon: 'cross', html: '<en><code>#M4 @PLACE(2O, 26, …)</code>: a number cannot be followed by a letter, and “2O” contains the letter O. Only this statement fails; M4 keeps the solver’s (16, 26).</en>', refs: ['M4'] },
-    { k: 'warn', id: 'conflict', icon: 'warn', html: '<en>The editor’s <code>#M2 @PLACE(x=18, …)</code> is high and written later, so it overrides the solver’s x = 16, which is discarded. M1 stays at x = 4, M4 above M2 at x = 16 and M5 at x = 10, so the pair is no longer even about its tail: four low facts of the structures conflict with these high coordinates and give way, the tail centered under the pair, the pair’s own center, the axis of its mirror image and the column of M4 and M2 that <code>%right</code> makes. A low fact giving way is expected and noted no further.</en>', refs: ['M1', 'M2', 'M4', 'M5'] },
-    { k: 'info', id: 'fp', icon: 'info', html: '<en>The solver record’s <code>hash</code> no longer matches the current input: the editor added a record after solving. The viewer suggests solving again; the old result still displays.</en>', refs: [] },
+    { k: 'err', id: 'bad', icon: 'cross', html: '<en><code>#M4 @PLACE(2O, 26, …)</code>: a number cannot be followed by a letter, and “2O” contains the letter O. Only this statement fails; the solver places M4, at (18, 26) above M2.</en>', refs: ['M4'] },
+    { k: 'ok', id: 'move', icon: 'check', html: '<en>The editor’s <code>#M2 @PLACE(x=18, …)</code> is a record like the author’s, and high. Solved again, M2 stays at x = 18 and the solver lays out the rest around it: M1 moves to x = 6, M4 stays above M2 and the tail M5 stays centered under the pair, at x = 12. To move a device, write where it goes in a record of your own and let the solver arrange the rest.</en>', refs: ['M1', 'M2', 'M4', 'M5'] },
+    { k: 'info', id: 'solve', icon: 'info', html: '<en>The solver writes its record after the others, with a <code>hash</code> of what it read. Had the editor’s record been added without solving again, the hash would no longer match: the viewer would still show the old drawing and suggest solving again.</en>', refs: [] },
     { k: 'ok', id: 'ok', icon: 'check', html: '<en>Everything else takes effect: the differential pair and its tail, the current mirror, the orientations and the other coordinates.</en>', refs: ['M1', 'M2', 'M5'] }
   ];
 

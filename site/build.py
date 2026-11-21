@@ -762,7 +762,7 @@ def check_examples_rnl(rnl):
     """Check that every file in site/examples/ (*.sp, and cases/*.sp) passes `rnl check` with 0 errors, 0 violations
     and 0 warnings, renders with `rnl render`, and that the record of the solver of each of its levels is up to date
     (`rnl view --status`: solved, or fixed for a level that has nothing to solve), so that the viewer shows what it
-    shows and solving it again gives the same; but ota5t-edits.sp, whose editor's record came after the solve."""
+    shows and solving it again gives the same."""
     errors = []
     with tempfile.TemporaryDirectory() as tmp:
         for idx, path in enumerate(sorted(EXAMPLES.glob("*.sp")) + sorted(EXAMPLES.glob("cases/*.sp"))):
@@ -794,12 +794,6 @@ def check_examples_rnl(rnl):
             except (ValueError, KeyError):
                 status = {None: "unread"}
             bad = {k: v for k, v in status.items() if v not in ("solved", "fixed")}
-            if path.name == "ota5t-edits.sp":
-                # the editor's record came after the solve: the viewer shows the old result and suggests solving again
-                if status.get("ota5t") != "stale":
-                    errors.append("%s: the level ota5t is %s, not stale: its editor's record must come after the solve"
-                                  % (rel, status.get("ota5t")))
-                bad.pop("ota5t", None)
             if bad:
                 errors.append("%s: the levels %s are not solved: solve the file again with rnl solve"
                               % (rel, ", ".join("%s (%s)" % kv for kv in sorted(bad.items(), key=str))))

@@ -402,7 +402,7 @@
         setOpen('ota5t-edits.sp');
         var lines = SC.E5_LINES;
         C.render(codeEl, lines);
-        /* the file as the viewer shows it before solving again: the solver's record, with M2 where the editor put it */
+        /* the file solved again after the editor moved M2: the solver's record keeps M2 where the editor put it */
         var linker = null;
         var view = SC.coreView(fig, 'edits', function (ref) { if (linker) linker.markRef(ref); });
         if (view) view.svg.setAttribute('aria-label', '<en>Example schematic</en>');
@@ -427,8 +427,8 @@
           li.addEventListener('mouseleave', off);
           li.addEventListener('blur', off);
         });
-        top.innerHTML = '<span class="chip chip-err"><en>2 errors</en></span><span class="chip chip-warn"><en>1 conflict</en></span>';
-        cap.innerHTML = '<en>Three records: the designer’s semantics, the solver’s coordinates (high) and the editor’s later changes (high, written after). A bad statement disables only itself; a conflict is not an error, and priority, then order, decides which fact stays. Hover over a diagnostic above to see which line and which device it points to.</en>';
+        top.innerHTML = '<span class="chip chip-err"><en>2 errors</en></span>';
+        cap.innerHTML = '<en>Three records: the designer’s semantics, the editor’s move (high) and the solver’s coordinates, written after both when the file was solved again. A bad statement disables only itself. Hover over a diagnostic above to see which line and which device it points to.</en>';
       }
     };
 
