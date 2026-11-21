@@ -85,8 +85,15 @@ level 2 while keeping the desktop shell in the development profile. Large hierar
 spend seconds interpreting their circuits even when the Library's definition index is already warm.
 Release builds retain their usual profile.
 
-Each desktop window keeps a **256 MiB LRU memory cache** of compiled documents, SVG drawings
-and lazy drawings for the Not drawn pane. Switching back to an unchanged file reuses them;
+The app reads the file shown alone, in the context of its entry, as the web viewer does ([Reading the file shown
+alone](../viewer-ui/README.md#reading-the-file-shown-alone)): an open reads the outline of the whole document
+(`rnl_view::outline`, which reads every file it includes and interprets no RNL) and the file shown
+(`rnl_view::build_file`), the entry's own or the one the page asks for, and gives the page the file's reading with the
+outline. The entry page, the modules of Verilog-A, the problems of All Files and Edit › Check All Files (`check_file`,
+one file at a time) come with it, as on the web. A solve's preview is still the whole document, as the solver gives it.
+
+Each desktop window keeps a **256 MiB LRU memory cache** of these readings, one for each entry, file, choice of
+formats and Auto Include, with their SVG drawings and lazy drawings for the Not drawn pane. Switching back to an unchanged file reuses them;
 the least recently used results are evicted first. **File > Memory Cache…** shows its retained
 budget and hit count, changes the limit (0 disables caching), or clears it. An oversized document
 still opens but is not retained. The budget conservatively estimates owned cache data, including
@@ -288,7 +295,8 @@ The app runs on the WebView2 Runtime, which Windows 10 and 11 come with and the 
 
 | Path | Content |
 | --- | --- |
-| `src/main.rs` | The Tauri application, and the commands to open a file, ask for a file and read the file named on the command line. Opening a file builds its Document with [`rnl-view`](../../crates/rnl-view/README.md) from the files on disk: one SVG per level with what on it can be clicked, the source files with the places of their records, the instances and nets of every level with the places that name them, and the diagnostics. The Document leaves out the drawings of the objects that have no position, which the Not drawn list asks for (`unplaced_drawings`) as it adds rows. |
+| `src/main.rs` | The Tauri application, and the commands to open a file, ask for a file and read the file named on the command line. Opening a file reads the file shown, alone in the context of its entry, with [`rnl-view`](../../crates/rnl-view/README.md) from the files on disk (`build_file`, with the `outline` of the whole document), and the commands of Check All Files (`check_file`) and the entry page (`file_summaries`) read the other files so: one SVG per level with what on it can be clicked, the source files with the places of their records, the instances and nets of every level with the places that name them, and the diagnostics. The Document leaves out the drawings of the objects that have no position, which the Not drawn list asks for (`unplaced_drawings`) as it adds rows. |
+| `src/build_cache.rs` | The readings kept, one for each entry, file, choice of formats and Auto Include, each with what it read, checked again before it is used. |
 | `src/core_thread.rs` | The thread that builds the documents, and keeps the drawings of the objects that the last build listed without a position: they hold what the model does, which is not `Send`, so a build and a request for drawings both run there, one after the other. |
 | `src/menu.rs` | The menu bar, built from the page's command table, and the command that sets its check marks; the languages of the interface and their catalogs, which translate the menu and which the page asks for (`ui_languages`, `ui_catalog`). |
 | `build.rs` | Besides Tauri's build, the languages of the interface: those of [`i18n/languages.json`](../../i18n/languages.json) that are `published` and have a catalog of the viewers, `i18n/<lang>/viewer.json`, built into the app with their catalogs (decision 0015). |

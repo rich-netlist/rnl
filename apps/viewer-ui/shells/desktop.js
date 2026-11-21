@@ -1,6 +1,8 @@
 import { m, tr } from "../i18n.js";
 // The desktop shell: the page inside the RNL Viewer app (apps/desktop), which reads files and builds
 // documents natively and shows the menu bar itself. The only module that uses window.__TAURI__.
+// It reads the file shown alone, in the context of its entry (`perFile`): the app gives the file's reading with the
+// outline of the whole document, and keeps the readings (build_cache.rs).
 
 import { flushSettings, load } from "../util.js";
 import { choose, decide, inform, modal } from "../dialog.js";
@@ -21,9 +23,14 @@ const caseless = /^(Win|Mac)/i.test(navigator.platform || "");
 
 /** A file on disk, named by its path; null for no path. */
 const file = (path) => (path ? { name: path, path } : null);
+// a view of a file of a document (visit-source.js) keeps the file it shows and its entry's own source
 const sessionSource = source => source ? { path: source.path, name: source.name,
   text: source.path && !source.readonly ? undefined : source.text, readonly: source.readonly,
-  temporary: source.temporary } : null;
+  temporary: source.temporary, ...(source.view ? { view: source.view, entrySource: sessionSource(source.entrySource) } : {}) } : null;
+/** What the app reads a source from: the file at its path, or the text it holds as the file of its name. */
+const reading = (source) => source.text === undefined ? { path: source.path } : { name: source.name, text: source.text };
+// what the last build read, which the entry page asks about (fileSummaries)
+let lastRead = null;
 let openingDrop = false;
 // the project archive this window opened or saved last, where Save Project offers to save again
 let lastProject = null;
@@ -35,6 +42,7 @@ let projectFolder = null;
 /** @type {import("../shell.js").Shell} */
 export default {
   platform: "desktop",
+  perFile: true,
   sourceForFile(source, document, index) {
     const f = document.files[index], path = sourcePath(document, f);
     return path.startsWith('<') ? { path, name: f.name, text: f.text, readonly: true } : file(path);
@@ -142,6 +150,7 @@ export default {
     if (generation !== preloadGeneration) return "cancelled";
     return invoke("preload_document", { path: source.path, pool, ticket, autoInclude: load("auto-include", true) === true, formats: fileFormats() });
   },
+  // the file the source shows (`view`), or the entry's own, alone in the context of the entry
   build: async (source, edits, progress, _packages, _signal, { fresh = false, bind = null, constraints = false } = {}) => {
     cancelPreload().catch(() => {});
     await flushSettings();
@@ -153,10 +162,36 @@ export default {
     }) : null;
     try {
       progress?.("reading");
-      return await (source.text === undefined
-        ? invoke("open_document", { path: source.path, edits: edits || null, pool, requestId, autoInclude, fresh, formats, bind, constraints })
-        : invoke("open_text", { name: source.name, text: source.text, edits: edits || null, pool, requestId, autoInclude, fresh, formats, bind, constraints }));
+      const file = source.view ?? null;
+      const doc = await (source.text === undefined
+        ? invoke("open_document", { path: source.path, file, edits: edits || null, pool, requestId, autoInclude, fresh, formats, bind, constraints })
+        : invoke("open_text", { name: source.name, text: source.text, file, edits: edits || null, pool, requestId, autoInclude, fresh, formats, bind, constraints }));
+      lastRead = { ...reading(source), edits: edits || null, pool, autoInclude, formats };
+      return doc;
     } finally { unlisten?.(); }
+  },
+  /**
+   * Check All Files (file-checks.js): each of `files` of the document `source` reads, read by the app alone in the
+   * context of its entry, one by one, each told to `each` as it is read, or why it could not be; the readings are kept.
+   * Another build in between waits for none of them, and `signal` stops before the next.
+   */
+  async checkFiles(source, edits, files, each, signal) {
+    await flushSettings();
+    await poolReady;
+    const args = { ...reading(source), edits: edits || null, pool, autoInclude: load("auto-include", true) === true, formats: fileFormats() };
+    for (const file of files) {
+      if (signal?.aborted) throw new Error("superseded");
+      let result = null, error = null;
+      try { result = await invoke("check_file", { ...args, file }); }
+      catch (e) { error = e instanceof Error ? e.message : String(e); }
+      if (signal?.aborted) throw new Error("superseded");
+      each(file, result, error);
+    }
+  },
+  /** The entry page (entry-page.js): of each of `files` of the document shown, its symbols and whether its reading is kept. */
+  async fileSummaries(files) {
+    if (!lastRead) return {};
+    try { return await invoke("file_summaries", { ...lastRead, files }); } catch { return {}; }
   },
   // the drawings of the objects listed without a position, which the app keeps from the last build
   unplacedDrawings: (level, items, names) => invoke("unplaced_drawings", { level, items, names }),
@@ -210,7 +245,7 @@ export default {
   exportSvg: async ({ level, title, overlays, source, edits, preview }) => {
     await flushSettings();
     await poolReady;
-    const args = { level, title, overlays, preview: preview === true, edits: edits || null, pool, autoInclude: load("auto-include", true) === true, formats: fileFormats() };
+    const args = { level, title, overlays, preview: preview === true, file: source.view ?? null, edits: edits || null, pool, autoInclude: load("auto-include", true) === true, formats: fileFormats() };
     return invoke("export_svg", source.text === undefined ? { ...args, path: source.path } : { ...args, name: source.name, text: source.text });
   },
   saveImage: async (name, blob, kind) =>

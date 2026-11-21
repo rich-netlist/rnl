@@ -102,11 +102,13 @@ fn file_argument(args: impl IntoIterator<Item = OsString>) -> Option<OsString> {
 /// The extensions offered first in the open dialog.
 const NETLISTS: [&str; 11] = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "inc", "lib", "scs", "rnl"];
 
-/// Read and draw a file, and name the window after it. With `edits`, the texts of some of its
-/// files are those, over what is on disk. The drawings of the objects it lists without a position
-/// are kept for `unplaced_drawings`, in place of those of the last document. With `bind`, the parameters of a
-/// subcircuit are built with those values, to show; with `constraints`, the levels have their constraints
-/// (`Level.constraints`), which the Solve view lists; such a document is not kept among those the cache reuses.
+/// Read and draw `file` of the netlist at `path`, alone in the context of the netlist, its entry, or the entry's own
+/// file when `file` is None (README: Reading the file shown alone), and name the window after it: the file's reading
+/// (`rnl_view::FileResult`) with the outline of the whole document as `outline`. With `edits`, the texts of some of its
+/// files are those, over what is on disk. The drawings of the objects it lists without a position are kept for
+/// `unplaced_drawings`, in place of those of the last reading. With `bind`, the parameters of a subcircuit are built
+/// with those values, to show; with `constraints`, the levels have their constraints (`Level.constraints`), which the
+/// Solve view lists; such a reading is not kept among those the cache reuses.
 #[tauri::command]
 // Tauri injects the window and managed state alongside the separate IPC arguments.
 #[allow(clippy::too_many_arguments)]
@@ -119,6 +121,7 @@ async fn open_document(
     auto_include: Option<bool>,
     pool: Option<Vec<String>>,
     path: String,
+    file: Option<String>,
     edits: Option<Edits>,
     request_id: Option<String>,
     fresh: Option<bool>,
@@ -152,8 +155,10 @@ async fn open_document(
             let provider = load_progress::LoadingProvider::new(&layered, &progress_window, request_id.as_deref());
             drawn.set_limit(cache_limit);
             let built = match (&bind, constraints.unwrap_or(false)) {
-                (None, false) => drawn.build(&entry, &provider, &formats, fresh.unwrap_or(false))?,
-                (bind, constraints) => drawn.build_unkept(&entry, &provider, &formats, bind.as_ref(), constraints)?,
+                (None, false) => drawn.build(&entry, file.as_deref(), &provider, &formats, fresh.unwrap_or(false))?,
+                (bind, constraints) => {
+                    drawn.build_unkept(&entry, file.as_deref(), &provider, &formats, bind.as_ref(), constraints)?
+                }
             };
             if built.hit {
                 provider.cached();
@@ -168,7 +173,8 @@ async fn open_document(
 }
 
 /// Draw a netlist held in memory, such as one from the clipboard, as the file `name`, whose
-/// extension says how it is read. Bare includes can use the file pool and PATH.
+/// extension says how it is read, as `open_document` draws one: `file` of it, or its own. Bare includes can use the
+/// file pool and PATH.
 #[tauri::command]
 // Tauri injects the window and managed state alongside the separate IPC arguments.
 #[allow(clippy::too_many_arguments)]
@@ -182,6 +188,7 @@ async fn open_text(
     pool: Option<Vec<String>>,
     name: String,
     text: String,
+    file: Option<String>,
     edits: Option<Edits>,
     request_id: Option<String>,
     fresh: Option<bool>,
@@ -210,8 +217,10 @@ async fn open_text(
             let provider = load_progress::LoadingProvider::new(&files, &progress_window, request_id.as_deref());
             drawn.set_limit(cache_limit);
             let built = match (&bind, constraints.unwrap_or(false)) {
-                (None, false) => drawn.build(&entry, &provider, &formats, fresh.unwrap_or(false))?,
-                (bind, constraints) => drawn.build_unkept(&entry, &provider, &formats, bind.as_ref(), constraints)?,
+                (None, false) => drawn.build(&entry, file.as_deref(), &provider, &formats, fresh.unwrap_or(false))?,
+                (bind, constraints) => {
+                    drawn.build_unkept(&entry, file.as_deref(), &provider, &formats, bind.as_ref(), constraints)?
+                }
             };
             if built.hit {
                 provider.cached();
@@ -239,6 +248,110 @@ async fn unplaced_drawings(
     tauri::async_runtime::spawn_blocking(move || core.run(move |drawn| drawn.unplaced(level, &items, &names)))
         .await
         .map_err(|e| e.to_string())??
+}
+
+/// Run `job` on the core thread with the cache and the files of the netlist at `path`, or of the text held as the file
+/// `name`, as an open reads them: with `edits` over them, the file pool, PATH and the Library, Auto Include when
+/// `auto_include`. `job` gets the entry, as the core names it, and the files.
+// the arguments are those of a command's request, which open_document takes one by one too
+#[allow(clippy::too_many_arguments)]
+async fn with_files<T: Send + 'static>(
+    core: &Core,
+    settings: &settings::Settings,
+    library: &library::Library,
+    auto_include: Option<bool>,
+    pool: Option<Vec<String>>,
+    (path, name, text): (Option<String>, Option<String>, Option<String>),
+    edits: Option<Edits>,
+    job: impl FnOnce(&mut build_cache::BuildCache, &str, &dyn rnl_runtime::source::Provider) -> Result<T, String>
+        + Send
+        + 'static,
+) -> Result<T, String> {
+    let core = core.clone();
+    let paths = settings.paths()?;
+    let library = library.snapshot()?;
+    let pool = pool.unwrap_or_default();
+    tauri::async_runtime::spawn_blocking(move || {
+        core.run(move |cache| {
+            let (entry, held) = files::entry_held(path, name, text, &edits.unwrap_or_default())?;
+            let disk = crate::public_packages::provider(&paths);
+            let disk = rnl_runtime::source::FilePool { files: &disk, paths: &pool };
+            let layered = files::layered(&held, &disk);
+            let index = library.with_edits(&held, &layered);
+            let files =
+                rnl_view::LibraryProvider { files: &layered, index: &index, enabled: auto_include.unwrap_or(false) };
+            job(cache, &entry, &files)
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())??
+}
+
+/// Check All Files (file-checks.js): the reading of `file` of the netlist at `path`, or of the text held as `name`,
+/// alone in the context of its entry, as `open_document` reads it, but without the outline: the drawings shown stay
+/// those of the file shown. The reading is kept, the first to go when the cache is full.
+#[tauri::command]
+// Tauri injects the managed state alongside the separate IPC arguments.
+#[allow(clippy::too_many_arguments)]
+async fn check_file(
+    core: State<'_, Core>,
+    settings: State<'_, settings::Settings>,
+    library: State<'_, library::Library>,
+    auto_include: Option<bool>,
+    pool: Option<Vec<String>>,
+    path: Option<String>,
+    name: Option<String>,
+    text: Option<String>,
+    edits: Option<Edits>,
+    formats: Option<formats::Formats>,
+    file: String,
+) -> Result<tauri::ipc::Response, String> {
+    let formats = formats.unwrap_or_default();
+    let json = with_files(
+        &core,
+        &settings,
+        &library,
+        auto_include,
+        pool,
+        (path, name, text),
+        edits,
+        move |cache, entry, files| cache.check(entry, &file, files, &formats),
+    )
+    .await?;
+    Ok(tauri::ipc::Response::new(json))
+}
+
+/// The entry page (entry-page.js): of each of `files`, files of the netlist at `path` or of the text held as `name` as
+/// its outline names them, the symbols its subcircuits give themselves, whether a reading of it is kept that still
+/// holds, and how long the last one kept took (`build_cache::Summary`).
+#[tauri::command]
+// Tauri injects the managed state alongside the separate IPC arguments.
+#[allow(clippy::too_many_arguments)]
+async fn file_summaries(
+    core: State<'_, Core>,
+    settings: State<'_, settings::Settings>,
+    library: State<'_, library::Library>,
+    auto_include: Option<bool>,
+    pool: Option<Vec<String>>,
+    path: Option<String>,
+    name: Option<String>,
+    text: Option<String>,
+    edits: Option<Edits>,
+    formats: Option<formats::Formats>,
+    files: Vec<String>,
+) -> Result<std::collections::BTreeMap<String, build_cache::Summary>, String> {
+    let formats = formats.unwrap_or_default();
+    with_files(
+        &core,
+        &settings,
+        &library,
+        auto_include,
+        pool,
+        (path, name, text),
+        edits,
+        move |cache, entry, provider| Ok(cache.summaries(entry, &files, provider, &formats)),
+    )
+    .await
 }
 
 /// Inspect/configure the bounded cache without changing the document currently displayed.
@@ -465,6 +578,8 @@ fn main() {
             preload::preload_ticket,
             open_document,
             open_text,
+            check_file,
+            file_summaries,
             unplaced_drawings,
             memory_cache,
             save_files,

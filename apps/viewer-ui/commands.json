@@ -45,7 +45,7 @@
         { "id": "apply-edits", "label": "&Apply and Exit Editing", "keys": ["Ctrl+Enter"] },
         { "id": "discard-edits", "label": "&Discard Changes" },
         { "id": "find-text", "label": "&Find in Netlist...", "keys": ["Ctrl+F"], "page": true },
-        { "id": "check-all-files", "label": "&Check All Files", "platforms": [], "with": "checkFiles" },
+        { "id": "check-all-files", "label": "&Check All Files", "platforms": ["desktop"], "with": "checkFiles" },
         "-",
         { "id": "descend", "label": "Open &Subcircuit", "keys": ["E", "Enter"], "page": true },
         { "id": "descend-new-window", "label": "Open Subcircuit in New &Window", "keys": ["Shift+E", "Shift+Enter"], "page": true },

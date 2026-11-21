@@ -558,6 +558,7 @@ mod tests {
                 apply,
                 item("discard-edits", "&Discard Changes", None),
                 item("find-text", if tabbed { "&Find in Netlist...\tCtrl+F" } else { "&Find in Netlist..." }, None),
+                item("check-all-files", "&Check All Files", None),
                 Shown::Separator,
                 item("descend", if tabbed { "Open &Subcircuit\tE" } else { "Open &Subcircuit" }, None),
                 item(

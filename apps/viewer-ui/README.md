@@ -123,11 +123,12 @@ Editing continues to use a native textarea containing the complete file.
 
 ### Reading the file shown alone
 
-A shell with `perFile` (the web shell, and so the local program's page; not the desktop's yet, nor an embed) reads
+A shell with `perFile` (the web shell, and so the local program's page, and the desktop's; not an embed) reads
 the file shown alone, in the context of its entry: `openSource` and Apply Changes ask `shell.build` with
 `{ perFile: true }`, and the shell gives the outline of the whole document (the core's `collectOutline`, which reads
 every file the document includes) and the reading of that one file (`collectFile`), a `FileResult` with the outline
-as `doc.outline`. The texts of the other files, which the reading leaves out, are filled in from what was read, for
+as `doc.outline`. On the desktop the app does both (`open_document` and `open_text` with the file, which
+`rnl_view::outline` and `rnl_view::build_file` read, [`build_cache.rs`](../desktop/src/build_cache.rs)). The texts of the other files, which the reading leaves out, are filled in from what was read, for
 the netlist pane. The source of the file shown is the entry's own source, or, for another file of the document, a
 view of it: the entry's source with `view`, the file as the document names it (`visit-source.js` `fileView`).
 
@@ -147,8 +148,7 @@ view of it: the entry's source with `view`, the file as the document names it (`
   shows the module (`module-view.js`): a symbol of its ports, in the order the module writes them, a note, and its
   instances, each with the module it names and its line (`OutlineCall.lines`). A click on an instance shows its line in
   the text; a double click or Enter opens the module it names, below on the path. A Verilog-A file of the document
-  shown by itself, from the Library say, shows its first module. The parameters an instance gives a module are not shown, and the
-  desktop, which reads the whole document, has no outline and lists no modules.
+  shown by itself, from the Library say, shows its first module. The parameters an instance gives a module are not shown.
 - **The readings are kept** (`file-results.js`, `result-cache.js`): in memory, and in the site's IndexedDB where the
   browser lets it (stamped with the core's version and the shape of its results), so that showing a file again, in
   this page or a later visit, asks the core only for the outline. A reading is found by the core, the options that
@@ -157,7 +157,8 @@ view of it: the entry's source with `view`, the file as the document names it (`
   instantiates is defined and the global nets, as the outline has them now, the Library (a stamp of its files: a package or a definition it did not find may be there now), and
   the host levels it names. Reload reads the file again and keeps the new reading; a reading of a document that
   misses a file is not kept. The core shown holds no drawings of a kept reading's objects without a position: the
-  Not drawn list has it read the file again first.
+  Not drawn list has it read the file again first. The desktop app keeps its readings itself, with their drawings,
+  and checks every file each one read ([the app](../desktop/README.md)).
 - **File › Memory Cache** (`memory-cache.js`, `shell.memoryCache`) sets the limits of the readings kept: in memory for
   the page (256 MiB by default) and in the browser's storage for the site (1024 MiB by default, and no more than half
   of what the browser says the site may keep). Each is kept in the page's settings; 0 keeps none there, and a limit of
@@ -175,8 +176,8 @@ view of it: the entry's source with `view`, the file as the document names it (`
   and with the edits applied (`shell.checkFiles`), most of them kept from before; the count goes up as each is read.
   What is kept belongs to the document as it is (its entry and the text of each file, the outline's hashes): a file
   changed, edited or included anew, or a package that a reading used read with another text, starts it again. The
-  numbers of the lines are coloured by the problems listed. The desktop reads the whole document, whose list has the
-  problems of every file, and has no switch.
+  numbers of the lines are coloured by the problems listed. On the desktop, the app reads each file
+  (`check_file`) and keeps what it reads.
 - **The entry page** (`entry-page.js`). An entry that only includes other files has an empty top level, and the
   subcircuits nothing calls (`roots.js`) are in the other files: reading the entry alone is quick, but none of them is
   read yet. In place of the empty drawing, a card says that the file only includes other files and lists them, each

@@ -2,8 +2,6 @@
 //! with the overlays the page shows ([`rnl_view::overlays::svg`]), and the app saves the image the
 //! page makes of it where the user says. Nothing is written anywhere else.
 
-use std::path::PathBuf;
-
 use tauri::ipc::{InvokeBody, Request};
 use tauri::{Manager, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
@@ -12,11 +10,11 @@ use rnl_runtime::source::Layered;
 
 use crate::{files, formats, library, menu, settings, solve};
 
-/// The SVG of `levels[level]` of the document at `path`, or of `text` held as the file `name`, built
-/// as `open_document` and `open_text` build it, with `overlays`. `title` must name that level, as
-/// the page's document does: a document that is not the one shown is refused. With `preview`, the
-/// document is the last solve's, drawn as `solve_preview` builds it: the files the solve wrote over
-/// the files as they are, so that the image is the preview shown and not the netlist as written.
+/// The SVG of `levels[level]` of the reading of `file` of the document at `path`, or of `text` held as the file
+/// `name`, or of the entry's own file when `file` is None, read as `open_document` and `open_text` read it, with
+/// `overlays`. `title` must name that level, as the page's document does: a document that is not the one shown is
+/// refused. With `preview`, the document is the last solve's, drawn as `solve_preview` builds it, whole: the files the
+/// solve wrote over the files as they are, so that the image is the preview shown and not the netlist as written.
 #[tauri::command]
 // Tauri injects the managed state alongside the separate IPC arguments.
 #[allow(clippy::too_many_arguments)]
@@ -29,6 +27,7 @@ pub async fn export_svg(
     path: Option<String>,
     name: Option<String>,
     text: Option<String>,
+    file: Option<String>,
     edits: Option<files::Edits>,
     formats: Option<formats::Formats>,
     level: usize,
@@ -47,25 +46,7 @@ pub async fn export_svg(
     // flylines are asked for, so that the export can leave them out as the page shows (export-image.js)
     let options = rnl_view::BuildOptions { formats: formats.unwrap_or_default(), flylines: true, ..Default::default() };
     tauri::async_runtime::spawn_blocking(move || {
-        let edits = edits.unwrap_or_default();
-        let (entry, held) = match (path, name, text) {
-            (Some(path), _, _) => {
-                let path = if path.starts_with(rnl_view::BUNDLED_DIR) {
-                    PathBuf::from(&path)
-                } else {
-                    std::path::absolute(&path).map_err(|e| format!("{path}: {e}"))?
-                };
-                let entry = path.to_string_lossy().into_owned();
-                let held = files::held(&entry, &edits);
-                (entry, held)
-            }
-            (None, Some(name), Some(text)) => {
-                let entry = format!("/{name}");
-                let held = files::held_text(&entry, &text, &edits);
-                (entry, held)
-            }
-            _ => return Err("export_svg needs a path, or a name and a text".to_string()),
-        };
+        let (entry, held) = files::entry_held(path, name, text, &edits.unwrap_or_default())?;
         let disk = crate::public_packages::provider(&paths);
         let disk = rnl_runtime::source::FilePool { files: &disk, paths: &pool };
         let layered = files::layered(&held, &disk);
@@ -75,7 +56,19 @@ pub async fn export_svg(
         let doc = match &solved {
             // the solve's files over the others, as the preview was built (rnl_cli::preview)
             Some(written) => rnl_view::build(&entry, &Layered { layers: vec![written, &provider] }, &options)?,
-            None => rnl_view::build(&entry, &provider, &options)?,
+            // the file shown, read alone in the context of its entry, as it was opened
+            None => {
+                let file = match file {
+                    Some(file) => file,
+                    None => rnl_view::outline(&entry, &provider, &options)?
+                        .files
+                        .into_iter()
+                        .next()
+                        .map(|f| f.path)
+                        .ok_or_else(|| format!("{entry} has no file to read"))?,
+                };
+                rnl_view::build_file(&entry, &file, &provider, &options)?.document
+            }
         };
         let shown = doc.levels.get(level).filter(|l| l.title == title).ok_or_else(|| {
             format!(

@@ -1,13 +1,15 @@
-//! Per-window LRU of serialized documents and their lazy drawings. A hit checks the complete
+//! Per-window LRU of the readings of one file of a document in the context of its entry (`rnl_view::build_file`),
+//! serialized, and their lazy drawings. A hit checks the complete
 //! observed input: source/package text (including failed reads), lookup order and auto-includes.
 //! The foreground core owns this cache; completed background builds may be offered to it.
 use std::cell::RefCell;
 use std::collections::{BTreeMap, VecDeque};
 use std::mem::size_of;
 use std::sync::Arc;
+use std::time::Instant;
 
-use rnl_runtime::source::{normalize, LibraryDefinition, LibraryLookup, Provider};
-use rnl_view::{Bind, BuildOptions, Drawings, UnplacedDrawing};
+use rnl_runtime::source::{dirname, join, normalize, LibraryDefinition, LibraryLookup, Provider};
+use rnl_view::{Bind, BuildOptions, Drawings, Outline, UnplacedDrawing};
 
 use crate::formats::Formats;
 use serde::Serialize;
@@ -122,8 +124,15 @@ impl LibraryLookup for Observed<'_> {
     }
 }
 
+/// The reading of one file of a document, in the context of its entry (`rnl_view::build_file`), as it is kept: its
+/// FileResult as JSON, with the texts of the document's other files filled in for the netlist pane, what it read,
+/// and the drawings of its objects without a position.
 pub struct Prepared {
-    path: String,
+    entry: String,
+    /// The file read, as the document names it (`SourceFile::path`).
+    file: String,
+    /// Whether the file is the entry's own, the first of the outline's: the one an open of the entry shows.
+    own: bool,
     auto_include: bool,
     /// The formats chosen for files that it was built with: another choice is another entry.
     formats: Formats,
@@ -133,9 +142,12 @@ pub struct Prepared {
     drawings: Arc<Drawings>,
     bytes: usize,
     speculative: bool,
+    /// How long the reading took, in milliseconds.
+    took: f64,
 }
 
 pub struct Built {
+    /// The FileResult, with the outline of the whole document as `outline`.
     pub json: String,
     pub name: String,
     pub hit: bool,
@@ -151,6 +163,16 @@ pub struct Stats {
     pub prefetched: usize,
 }
 
+/// Of a file of the document shown, for the entry page (entry-page.js): the symbols its subcircuits give themselves
+/// (`FileSymbols::subckts`, None when they cannot be read), whether a reading of it is kept that still holds, and how
+/// long the last reading of it kept took, in milliseconds.
+#[derive(Serialize)]
+pub struct Summary {
+    pub subckts: Option<Vec<rnl_view::SubcktSymbol>>,
+    pub kept: bool,
+    pub took: Option<f64>,
+}
+
 pub struct BuildCache {
     entries: VecDeque<Prepared>, // least recently used first
     active: Option<Arc<Drawings>>,
@@ -164,6 +186,47 @@ impl Default for BuildCache {
         Self { entries: VecDeque::new(), active: None, limit: DEFAULT_LIMIT, used: 0, hits: 0, misses: 0 }
     }
 }
+
+/// The options a reading is built with: flylines and the layout hints are asked for, not left to the core's default:
+/// View > Show Flylines hides the flylines (flylines.js), and the problems list has the hints (problems.js).
+fn options(formats: &Formats, bind: Option<&Bind>, constraints: bool) -> BuildOptions {
+    BuildOptions {
+        formats: formats.clone(),
+        bind: bind.cloned(),
+        constraints,
+        flylines: true,
+        hints: true,
+        ..BuildOptions::default()
+    }
+}
+
+/// The outline of the document `entry` (`rnl_view::outline`), which reads every file it includes, and the file to read:
+/// `file`, or the entry's own, the first of the outline's.
+fn outline_of(
+    entry: &str,
+    file: Option<&str>,
+    files: &dyn Provider,
+    formats: &Formats,
+) -> Result<(Outline, String), String> {
+    let outline = rnl_view::outline(entry, files, &options(formats, None, false))?;
+    let file = match file {
+        Some(file) => file.to_string(),
+        None => outline.files.first().map(|f| f.path.clone()).ok_or_else(|| format!("{entry} has no file to read"))?,
+    };
+    Ok((outline, file))
+}
+
+/// The JSON of a reading, `json`, an object, with the outline as its `outline`, as the page takes it (`doc.outline`).
+fn with_outline(json: &str, outline: &Outline) -> Result<String, String> {
+    let outline = serde_json::to_string(outline).map_err(|e| e.to_string())?;
+    let body = json.strip_suffix('}').ok_or("a reading is not an object")?;
+    Ok(if body.ends_with('{') {
+        format!("{body}\"outline\":{outline}}}")
+    } else {
+        format!("{body},\"outline\":{outline}}}")
+    })
+}
+
 impl BuildCache {
     pub fn stats(&self) -> Stats {
         Stats {
@@ -200,28 +263,23 @@ impl BuildCache {
         self.active.as_ref().ok_or_else(|| "no document has kept drawings".to_string())?.unplaced(level, items, names)
     }
 
-    pub fn build(&mut self, path: &str, files: &dyn Provider, formats: &Formats, fresh: bool) -> Result<Built, String> {
-        let path = normalize(path);
-        let automatic = files.auto_include().is_some();
-        if let Some(at) =
-            self.entries.iter().position(|e| e.path == path && e.auto_include == automatic && e.formats == *formats)
-        {
-            let mut entry = self.entries.remove(at).unwrap();
-            self.used -= entry.bytes;
-            if !fresh && entry.inputs.valid(files) {
-                entry.speculative = false;
-                self.active = Some(entry.drawings.clone());
-                let built = Built { json: entry.json.clone(), name: entry.name.clone(), hit: true };
-                self.used += entry.bytes;
-                self.entries.push_back(entry);
-                self.hits += 1;
-                return Ok(built);
-            }
-        }
-        self.misses += 1;
-        let entry = Prepared::build(&path, files, formats)?;
-        self.active = Some(entry.drawings.clone());
-        let built = Built { json: entry.json.clone(), name: entry.name.clone(), hit: false };
+    fn position(&self, entry: &str, file: &str, auto_include: bool, formats: &Formats) -> Option<usize> {
+        self.entries
+            .iter()
+            .position(|e| e.entry == entry && e.file == file && e.auto_include == auto_include && e.formats == *formats)
+    }
+
+    /// The reading kept of `file` of `entry`, taken out of the entries, when it still holds for `files`; one that does
+    /// not hold is dropped.
+    fn take_valid(&mut self, entry: &str, file: &str, files: &dyn Provider, formats: &Formats) -> Option<Prepared> {
+        let at = self.position(entry, file, files.auto_include().is_some(), formats)?;
+        let entry = self.entries.remove(at).unwrap();
+        self.used -= entry.bytes;
+        entry.inputs.valid(files).then_some(entry)
+    }
+
+    /// Keep `entry` as the most recently used, when it fits.
+    fn keep(&mut self, entry: Prepared) {
         if entry.bytes <= self.limit {
             while self.used > self.limit - entry.bytes {
                 self.evict();
@@ -229,33 +287,116 @@ impl BuildCache {
             self.used += entry.bytes;
             self.entries.push_back(entry);
         }
+    }
+
+    /// Read `file` of the document `entry`, alone in the context of the entry, or the entry's own file when `file` is
+    /// None: the reading kept while what it read holds (unless `fresh`), else a new one, which is kept. Its drawings
+    /// become the active ones. The result has the outline of the whole document, which is read each time.
+    pub fn build(
+        &mut self,
+        entry: &str,
+        file: Option<&str>,
+        files: &dyn Provider,
+        formats: &Formats,
+        fresh: bool,
+    ) -> Result<Built, String> {
+        let entry = normalize(entry);
+        let (outline, file) = outline_of(&entry, file, files, formats)?;
+        if let Some(mut kept) = self.take_valid(&entry, &file, files, formats).filter(|_| !fresh) {
+            kept.speculative = false;
+            self.active = Some(kept.drawings.clone());
+            let built = Built { json: with_outline(&kept.json, &outline)?, name: kept.name.clone(), hit: true };
+            self.used += kept.bytes;
+            self.entries.push_back(kept);
+            self.hits += 1;
+            return Ok(built);
+        }
+        self.misses += 1;
+        let own = outline.files.first().is_some_and(|f| f.path == file);
+        let read = Prepared::build_with(&entry, &file, own, files, formats, None, false)?;
+        self.active = Some(read.drawings.clone());
+        let built = Built { json: with_outline(&read.json, &outline)?, name: read.name.clone(), hit: false };
+        self.keep(read);
         Ok(built)
     }
 
-    /// Build with the parameters of a subcircuit bound (`bind`), to show, or with the constraints of the levels
-    /// (`constraints`), which the entries do not hold: it is the document whose drawings are kept now, but it is not
-    /// kept among the entries, which are the files' own, as the next time the same file is opened its parameters are
-    /// its own again.
+    /// Read as `build` does, with the parameters of a subcircuit bound (`bind`), to show, or with the constraints of the
+    /// levels (`constraints`), which the entries do not hold: its drawings are the active ones now, but it is not kept
+    /// among the entries, which are the files' own, as the next time the same file is opened its parameters are its own
+    /// again.
     pub fn build_unkept(
         &mut self,
-        path: &str,
+        entry: &str,
+        file: Option<&str>,
         files: &dyn Provider,
         formats: &Formats,
         bind: Option<&Bind>,
         constraints: bool,
     ) -> Result<Built, String> {
-        let path = normalize(path);
+        let entry = normalize(entry);
+        let (outline, file) = outline_of(&entry, file, files, formats)?;
         self.misses += 1;
-        let entry = Prepared::build_with(&path, files, formats, bind, constraints)?;
-        self.active = Some(entry.drawings.clone());
-        Ok(Built { json: entry.json, name: entry.name, hit: false })
+        let read = Prepared::build_with(&entry, &file, false, files, formats, bind, constraints)?;
+        self.active = Some(read.drawings.clone());
+        Ok(Built { json: with_outline(&read.json, &outline)?, name: read.name, hit: false })
+    }
+
+    /// The reading of `file` of `entry`, as `build` gives it but without the outline and without changing the active
+    /// drawings: Check All Files. A new reading is kept as a speculative one is, the first to go.
+    pub fn check(
+        &mut self,
+        entry: &str,
+        file: &str,
+        files: &dyn Provider,
+        formats: &Formats,
+    ) -> Result<String, String> {
+        let entry = normalize(entry);
+        if let Some(kept) = self.take_valid(&entry, file, files, formats) {
+            let json = kept.json.clone();
+            self.used += kept.bytes;
+            self.entries.push_back(kept);
+            self.hits += 1;
+            return Ok(json);
+        }
+        self.misses += 1;
+        let mut read = Prepared::build_with(&entry, file, false, files, formats, None, false)?;
+        read.speculative = true;
+        let json = read.json.clone();
+        self.keep(read);
+        Ok(json)
+    }
+
+    /// Of each of `wanted`, files of the document `entry`: its summary for the entry page, read with `files`. Looking
+    /// does not use the readings kept: it changes neither their order nor the hits and misses.
+    pub fn summaries(
+        &self,
+        entry: &str,
+        wanted: &[String],
+        files: &dyn Provider,
+        formats: &Formats,
+    ) -> BTreeMap<String, Summary> {
+        let entry = normalize(entry);
+        let automatic = files.auto_include().is_some();
+        let options = options(formats, None, false);
+        wanted
+            .iter()
+            .map(|file| {
+                let subckts = rnl_view::symbols(&entry, file, files, &options).ok().map(|s| s.subckts);
+                let kept = self.position(&entry, file, automatic, formats).map(|at| &self.entries[at]);
+                let summary =
+                    Summary { subckts, kept: kept.is_some_and(|k| k.inputs.valid(files)), took: kept.map(|k| k.took) };
+                (file.clone(), summary)
+            })
+            .collect()
     }
 
     /// Do not waste background CPU on an already retained entry. Foreground hits still validate
     /// every dependency, including negative reads and library lookups, before using its result.
-    pub fn contains(&self, path: &str, auto_include: bool, formats: &Formats) -> bool {
-        let path = normalize(path);
-        self.entries.iter().any(|e| e.path == path && e.auto_include == auto_include && e.formats == *formats)
+    pub fn contains(&self, entry: &str, auto_include: bool, formats: &Formats) -> bool {
+        let entry = normalize(entry);
+        self.entries
+            .iter()
+            .any(|e| e.entry == entry && e.own && e.auto_include == auto_include && e.formats == *formats)
     }
 
     pub fn room(&self) -> usize {
@@ -265,7 +406,9 @@ impl BuildCache {
     /// Speculation may use spare space, but must never evict a result the user visited (or a
     /// higher-priority candidate already prepared). It does not change active lazy drawings.
     pub fn offer(&mut self, mut entry: Prepared) -> bool {
-        if self.contains(&entry.path, entry.auto_include, &entry.formats) || entry.bytes > self.room() {
+        if self.position(&entry.entry, &entry.file, entry.auto_include, &entry.formats).is_some()
+            || entry.bytes > self.room()
+        {
             return false;
         }
         entry.speculative = true;
@@ -276,52 +419,62 @@ impl BuildCache {
 }
 
 impl Prepared {
-    pub fn build(path: &str, files: &dyn Provider, formats: &Formats) -> Result<Self, String> {
-        Self::build_with(path, files, formats, None, false)
+    /// The reading of the entry's own file of the document `entry`, as an open of the entry reads it: for preloading.
+    pub fn build(entry: &str, files: &dyn Provider, formats: &Formats) -> Result<Self, String> {
+        let entry = normalize(entry);
+        let (_, file) = outline_of(&entry, None, files, formats)?;
+        Self::build_with(&entry, &file, true, files, formats, None, false)
     }
 
-    /// As `build`, with the parameters of a subcircuit bound, and the constraints of the levels.
+    /// The reading of `file` of `entry` (a normalized path), with the parameters of a subcircuit bound, and the
+    /// constraints of the levels.
     fn build_with(
-        path: &str,
+        entry: &str,
+        file: &str,
+        own: bool,
         files: &dyn Provider,
         formats: &Formats,
         bind: Option<&Bind>,
         constraints: bool,
     ) -> Result<Self, String> {
-        let path = normalize(path);
+        let started = Instant::now();
         let observed = Observed { files, inputs: RefCell::new(Inputs::default()) };
-        // flylines and the layout hints are asked for, not left to the core's default: View > Show Flylines hides the flylines (flylines.js),
-        // and the problems list has the hints (problems.js)
-        let options = BuildOptions {
-            formats: formats.clone(),
-            bind: bind.cloned(),
-            constraints,
-            flylines: true,
-            hints: true,
-            ..BuildOptions::default()
-        };
-        let (doc, drawings) = rnl_view::build_drawn(&path, &observed, &options)?;
-        let json = serde_json::to_string(&doc).map_err(|e| e.to_string())?;
+        let (mut result, drawings) =
+            rnl_view::build_file_drawn(entry, file, &observed, &options(formats, bind, constraints))?;
+        // the texts of the other files, which the reading of one leaves out, for the netlist pane: what they read now
+        let dir = dirname(entry);
+        for f in result.document.files.iter_mut().filter(|f| f.text.is_empty()) {
+            let path = if f.path.starts_with('<') { f.path.clone() } else { join(&dir, &f.path) };
+            if let Some(text) = observed.read(&path) {
+                f.text = text;
+            }
+        }
+        let json = serde_json::to_string(&result).map_err(|e| e.to_string())?;
         let drawings = Arc::new(drawings);
         let inputs = observed.inputs.into_inner();
+        let name = std::mem::take(&mut result.document.name);
         let bytes = 2 * size_of::<Prepared>()
             + 128
-            + string_bytes(&path)
+            + 2 * entry.len()
+            + 2 * file.len()
             + string_bytes(&json)
-            + string_bytes(&doc.name)
+            + string_bytes(&name)
             + formats.iter().map(|(p, f)| string_bytes(p) + string_bytes(f)).sum::<usize>()
             + inputs.bytes()
             + drawings.retained_bytes();
         Ok(Self {
-            path,
+            entry: entry.to_string(),
+            file: file.to_string(),
+            own,
             auto_include: files.auto_include().is_some(),
             formats: formats.clone(),
             inputs,
             json,
-            name: doc.name,
+            name,
             drawings,
             bytes,
             speculative: false,
+            took: started.elapsed().as_secs_f64() * 1000.0,
         })
     }
 }
@@ -340,12 +493,12 @@ mod tests {
     fn another_choice_of_formats_is_another_entry() {
         let mut cache = BuildCache::default();
         let spectre = Formats::from([("/a.sp".to_string(), "spectre".to_string())]);
-        assert!(!cache.build("/a.sp", &files(), &none(), false).unwrap().hit);
-        let chosen = cache.build("/a.sp", &files(), &spectre, false).unwrap();
+        assert!(!cache.build("/a.sp", None, &files(), &none(), false).unwrap().hit);
+        let chosen = cache.build("/a.sp", None, &files(), &spectre, false).unwrap();
         assert!(!chosen.hit);
         assert!(chosen.json.contains(r#""format":"spectre""#));
-        assert!(cache.build("/a.sp", &files(), &none(), false).unwrap().hit);
-        assert!(cache.build("/a.sp", &files(), &spectre, false).unwrap().hit);
+        assert!(cache.build("/a.sp", None, &files(), &none(), false).unwrap().hit);
+        assert!(cache.build("/a.sp", None, &files(), &spectre, false).unwrap().hit);
         assert!(cache.contains("/a.sp", false, &spectre));
         assert!(!cache.contains("/a.sp", false, &Formats::from([("/a.sp".to_string(), "spice".to_string())])));
     }
@@ -373,7 +526,7 @@ mod tests {
         let held = MemoryProvider::new();
         let layered = Layered { layers: vec![&held, &disk] };
         let mut cache = BuildCache::default();
-        let built = cache.build("/W/Top.sp", &layered, &formats, false).unwrap();
+        let built = cache.build("/W/Top.sp", None, &layered, &formats, false).unwrap();
         let doc: serde_json::Value = serde_json::from_str(&built.json).unwrap();
         let included =
             doc["files"].as_array().unwrap().iter().find(|f| f["path"].as_str().unwrap().ends_with("odels.SCS"));
@@ -390,12 +543,12 @@ mod tests {
     #[test]
     fn background_result_moves_threads_without_replacing_active_drawings() {
         let mut cache = BuildCache::default();
-        cache.build("/a.sp", &files(), &none(), false).unwrap();
+        cache.build("/a.sp", None, &files(), &none(), false).unwrap();
         let prepared = std::thread::spawn(|| Prepared::build("/b.sp", &files(), &none()).unwrap()).join().unwrap();
         assert!(cache.offer(prepared));
         assert_eq!(cache.stats().prefetched, 1);
         assert!(cache.unplaced(0, &[0], &["R1".into()]).unwrap()[0].svg.is_some());
-        assert!(cache.build("/b.sp", &files(), &none(), false).unwrap().hit);
+        assert!(cache.build("/b.sp", None, &files(), &none(), false).unwrap().hit);
         assert_eq!(cache.stats().prefetched, 0);
         assert!(cache.unplaced(0, &[0], &["R2".into()]).unwrap()[0].svg.is_some());
     }
@@ -403,13 +556,13 @@ mod tests {
     #[test]
     fn speculative_results_cannot_evict_visited_and_are_evicted_first() {
         let mut cache = BuildCache::default();
-        cache.build("/a.sp", &files(), &none(), false).unwrap();
+        cache.build("/a.sp", None, &files(), &none(), false).unwrap();
         let b = Prepared::build("/b.sp", &files(), &none()).unwrap();
         cache.set_limit(cache.used + b.bytes);
         assert!(cache.offer(b));
         assert!(!cache.offer(Prepared::build("/c.sp", &files(), &none()).unwrap()));
         assert_eq!(cache.stats().entries, 2);
-        cache.build("/c.sp", &files(), &none(), false).unwrap();
+        cache.build("/c.sp", None, &files(), &none(), false).unwrap();
         assert!(cache.contains("/a.sp", false, &none()));
         assert!(!cache.contains("/b.sp", false, &none()));
         assert!(cache.used <= cache.limit);
@@ -420,11 +573,11 @@ mod tests {
         let mut cache = BuildCache::default();
         assert!(cache.offer(Prepared::build("/a.sp", &files(), &none()).unwrap()));
         let changed = files().with("/a.sp", "* a\nR9 a 0 1k\n.end\n");
-        assert!(!cache.build("/a.sp", &changed, &none(), false).unwrap().hit);
+        assert!(!cache.build("/a.sp", None, &changed, &none(), false).unwrap().hit);
         assert!(cache.unplaced(0, &[0], &["R9".into()]).unwrap()[0].svg.is_some());
         cache.clear();
         assert!(cache.offer(Prepared::build("/a.sp", &files(), &none()).unwrap()));
-        assert!(!cache.build("/a.sp", &files(), &none(), true).unwrap().hit);
+        assert!(!cache.build("/a.sp", None, &files(), &none(), true).unwrap().hit);
     }
 
     #[test]
@@ -432,14 +585,14 @@ mod tests {
         let mut cache = BuildCache::default();
         let files =
             MemoryProvider::new().with("/p.sp", "* p\n.subckt amp a b w=1u\nR1 a b 1k\n.ends\nX1 a b amp\n.end\n");
-        let own = cache.build("/p.sp", &files, &none(), false).unwrap();
+        let own = cache.build("/p.sp", None, &files, &none(), false).unwrap();
         assert!(own.json.contains(r#""value":"1u""#));
         let bind = Bind { subckt: "amp".into(), params: BTreeMap::from([("w".to_string(), "2u".to_string())]) };
-        let bound = cache.build_unkept("/p.sp", &files, &none(), Some(&bind), false).unwrap();
+        let bound = cache.build_unkept("/p.sp", None, &files, &none(), Some(&bind), false).unwrap();
         assert!(!bound.hit);
         assert!(bound.json.contains(r#""value":"2u""#) && bound.json.contains(r#""from":"bound""#));
         // the entry is the file's own: opening it again is a hit, with its own parameters
-        let again = cache.build("/p.sp", &files, &none(), false).unwrap();
+        let again = cache.build("/p.sp", None, &files, &none(), false).unwrap();
         assert!(again.hit);
         assert_eq!(again.json, own.json);
         assert_eq!(cache.stats().entries, 1);
@@ -456,13 +609,13 @@ R2 b c 1k
 .end
 ",
         );
-        let own = cache.build("/p.sp", &files, &none(), false).unwrap();
+        let own = cache.build("/p.sp", None, &files, &none(), false).unwrap();
         assert!(!own.json.contains(r#""constraints""#));
-        let constrained = cache.build_unkept("/p.sp", &files, &none(), None, true).unwrap();
+        let constrained = cache.build_unkept("/p.sp", None, &files, &none(), None, true).unwrap();
         assert!(!constrained.hit);
         assert!(constrained.json.contains(r#""constraints""#) && constrained.json.contains(r#""facts""#));
         // the entry is the file's own: opening it again is a hit, without them
-        let again = cache.build("/p.sp", &files, &none(), false).unwrap();
+        let again = cache.build("/p.sp", None, &files, &none(), false).unwrap();
         assert!(again.hit);
         assert_eq!(again.json, own.json);
         assert_eq!(cache.stats().entries, 1);
@@ -472,11 +625,11 @@ R2 b c 1k
     fn switching_back_reuses_document_and_reactivates_its_lazy_drawings() {
         let mut cache = BuildCache::default();
         let files = files();
-        let a = cache.build("/a.sp", &files, &none(), false).unwrap();
+        let a = cache.build("/a.sp", None, &files, &none(), false).unwrap();
         assert!(!a.hit);
-        cache.build("/b.sp", &files, &none(), false).unwrap();
+        cache.build("/b.sp", None, &files, &none(), false).unwrap();
         assert!(cache.unplaced(0, &[0], &["R1".into()]).is_err());
-        let again = cache.build("/a.sp", &files, &none(), false).unwrap();
+        let again = cache.build("/a.sp", None, &files, &none(), false).unwrap();
         assert!(again.hit);
         assert_eq!(again.json, a.json);
         assert!(cache.unplaced(0, &[0], &["R1".into()]).unwrap()[0].svg.is_some());
@@ -488,30 +641,30 @@ R2 b c 1k
     fn same_size_edits_deleted_files_and_applied_overlays_cannot_reuse_stale_results() {
         let mut cache = BuildCache::default();
         let mut files = files();
-        cache.build("/a.sp", &files, &none(), false).unwrap();
+        cache.build("/a.sp", None, &files, &none(), false).unwrap();
         files.insert("/a.sp", "* a\nR1 a 0 9k\n.end\n");
-        let changed = cache.build("/a.sp", &files, &none(), false).unwrap();
+        let changed = cache.build("/a.sp", None, &files, &none(), false).unwrap();
         assert!(!changed.hit && changed.json.contains("9k"));
         let edits = MemoryProvider::new().with("/a.sp", "* edited\nRedit a 0 8k\n");
         let overlay = Layered { layers: vec![&edits, &files] };
-        let edited = cache.build("/a.sp", &overlay, &none(), false).unwrap();
+        let edited = cache.build("/a.sp", None, &overlay, &none(), false).unwrap();
         assert!(!edited.hit && edited.json.contains("Redit"));
-        assert!(cache.build("/a.sp", &overlay, &none(), false).unwrap().hit);
-        assert!(!cache.build("/a.sp", &files, &none(), false).unwrap().hit);
+        assert!(cache.build("/a.sp", None, &overlay, &none(), false).unwrap().hit);
+        assert!(!cache.build("/a.sp", None, &files, &none(), false).unwrap().hit);
         files.files.remove("/a.sp");
-        assert!(cache.build("/a.sp", &files, &none(), false).is_err());
+        assert!(cache.build("/a.sp", None, &files, &none(), false).is_err());
     }
 
     #[test]
     fn missing_includes_appearing_and_dependency_edits_invalidate_the_root() {
         let mut cache = BuildCache::default();
         let mut files = MemoryProvider::new().with("/a.sp", "* a\n.include part.inc\n");
-        cache.build("/a.sp", &files, &none(), false).unwrap();
-        assert!(cache.build("/a.sp", &files, &none(), false).unwrap().hit);
+        cache.build("/a.sp", None, &files, &none(), false).unwrap();
+        assert!(cache.build("/a.sp", None, &files, &none(), false).unwrap().hit);
         files.insert("/part.inc", "R1 a 0 1k\n");
-        assert!(!cache.build("/a.sp", &files, &none(), false).unwrap().hit);
+        assert!(!cache.build("/a.sp", None, &files, &none(), false).unwrap().hit);
         files.insert("/part.inc", "R1 a 0 2k\n");
-        let changed = cache.build("/a.sp", &files, &none(), false).unwrap();
+        let changed = cache.build("/a.sp", None, &files, &none(), false).unwrap();
         assert!(!changed.hit && changed.json.contains("2k"));
     }
 
@@ -524,16 +677,16 @@ R2 b c 1k
             .with("/duplicate.inc", ".subckt cell p n\n.ends\n");
         let mut index = LibraryIndex::default();
         index.update(&["/cell.inc".into()], &files, false);
-        cache.build("/top.sp", &files, &none(), false).unwrap();
+        cache.build("/top.sp", None, &files, &none(), false).unwrap();
         let enabled = LibraryProvider { files: &files, index: &index, enabled: true };
-        let imported = cache.build("/top.sp", &enabled, &none(), false).unwrap();
+        let imported = cache.build("/top.sp", None, &enabled, &none(), false).unwrap();
         assert!(!imported.hit && imported.json.contains("subcircuit cell was added from /cell.inc by Auto Include"));
-        assert!(cache.build("/top.sp", &enabled, &none(), false).unwrap().hit);
+        assert!(cache.build("/top.sp", None, &enabled, &none(), false).unwrap().hit);
         index.update(&["/cell.inc".into(), "/duplicate.inc".into()], &files, false);
         let collision = LibraryProvider { files: &files, index: &index, enabled: true };
-        let changed = cache.build("/top.sp", &collision, &none(), false).unwrap();
+        let changed = cache.build("/top.sp", None, &collision, &none(), false).unwrap();
         assert!(!changed.hit && changed.json.contains("times in the Library"));
-        assert!(cache.build("/top.sp", &files, &none(), false).unwrap().hit);
+        assert!(cache.build("/top.sp", None, &files, &none(), false).unwrap().hit);
     }
 
     #[test]
@@ -563,23 +716,23 @@ R2 b c 1k
     fn lru_evicts_the_least_recently_used_result_and_respects_lowered_limits() {
         let mut cache = BuildCache::default();
         let files = files();
-        cache.build("/a.sp", &files, &none(), false).unwrap();
-        cache.build("/b.sp", &files, &none(), false).unwrap();
+        cache.build("/a.sp", None, &files, &none(), false).unwrap();
+        cache.build("/b.sp", None, &files, &none(), false).unwrap();
         let budget = cache.stats().used;
         cache.set_limit(budget);
-        assert!(cache.build("/a.sp", &files, &none(), false).unwrap().hit);
-        cache.build("/c.sp", &files, &none(), false).unwrap();
+        assert!(cache.build("/a.sp", None, &files, &none(), false).unwrap().hit);
+        cache.build("/c.sp", None, &files, &none(), false).unwrap();
         assert!(cache.stats().used <= budget);
-        assert!(cache.entries.iter().all(|e| e.path != "/b.sp"));
-        assert!(cache.build("/a.sp", &files, &none(), false).unwrap().hit);
-        assert!(!cache.build("/b.sp", &files, &none(), false).unwrap().hit);
+        assert!(cache.entries.iter().all(|e| e.entry != "/b.sp"));
+        assert!(cache.build("/a.sp", None, &files, &none(), false).unwrap().hit);
+        assert!(!cache.build("/b.sp", None, &files, &none(), false).unwrap().hit);
         cache.set_limit(0);
         assert_eq!((cache.stats().used, cache.stats().entries), (0, 0));
         assert!(cache.unplaced(0, &[0], &["R2".into()]).is_ok());
-        assert!(!cache.build("/b.sp", &files, &none(), false).unwrap().hit);
+        assert!(!cache.build("/b.sp", None, &files, &none(), false).unwrap().hit);
         assert_eq!(cache.stats().entries, 0);
         cache.set_limit(1);
-        assert!(!cache.build("/a.sp", &files, &none(), false).unwrap().hit);
+        assert!(!cache.build("/a.sp", None, &files, &none(), false).unwrap().hit);
         assert_eq!(cache.stats().used, 0); // oversized documents still open but are not cached
     }
 
@@ -587,12 +740,115 @@ R2 b c 1k
     fn force_reload_and_clear_rebuild_while_preserving_the_current_thumbnails() {
         let mut cache = BuildCache::default();
         let files = files();
-        cache.build("/a.sp", &files, &none(), false).unwrap();
-        assert!(!cache.build("/a.sp", &files, &none(), true).unwrap().hit);
-        assert!(cache.build("/a.sp", &files, &none(), false).unwrap().hit);
+        cache.build("/a.sp", None, &files, &none(), false).unwrap();
+        assert!(!cache.build("/a.sp", None, &files, &none(), true).unwrap().hit);
+        assert!(cache.build("/a.sp", None, &files, &none(), false).unwrap().hit);
         cache.clear();
         assert_eq!(cache.stats().entries, 0);
         assert!(cache.unplaced(0, &[0], &["R1".into()]).is_ok());
-        assert!(!cache.build("/a.sp", &files, &none(), false).unwrap().hit);
+        assert!(!cache.build("/a.sp", None, &files, &none(), false).unwrap().hit);
+    }
+
+    /// A document of two files: the entry, which instantiates a subcircuit, and the file that defines it.
+    fn two_files() -> MemoryProvider {
+        MemoryProvider::new()
+            .with("/w/top.sp", "* top\n.include \"cells.inc\"\nX1 a 0 cell\n.end\n")
+            .with("/w/cells.inc", ".subckt cell p n\nR1 p n 1k\n.ends\n")
+    }
+
+    #[test]
+    fn a_file_of_the_document_is_read_alone_in_the_context_of_its_entry_with_the_outline() {
+        let mut cache = BuildCache::default();
+        let files = two_files();
+        let built = cache.build("/w/top.sp", Some("cells.inc"), &files, &none(), false).unwrap();
+        assert!(!built.hit);
+        let doc: serde_json::Value = serde_json::from_str(&built.json).unwrap();
+        assert_eq!(doc["file"], "cells.inc");
+        assert_eq!(doc["path"], "/w/top.sp");
+        let titles: Vec<&str> =
+            doc["levels"].as_array().unwrap().iter().map(|l| l["title"].as_str().unwrap()).collect();
+        assert_eq!(titles, ["cell"]);
+        // the outline of the whole document, and the other file's text for the netlist pane
+        let outline: Vec<&str> =
+            doc["outline"]["files"].as_array().unwrap().iter().map(|f| f["path"].as_str().unwrap()).collect();
+        assert_eq!(outline, ["top.sp", "cells.inc"]);
+        let top = doc["files"].as_array().unwrap().iter().find(|f| f["path"] == "top.sp").unwrap();
+        assert!(top["text"].as_str().unwrap().contains("X1 a 0 cell"), "{top:#}");
+        // the entry's own file is another reading
+        let own = cache.build("/w/top.sp", None, &files, &none(), false).unwrap();
+        assert!(!own.hit && own.json.contains(r#""file":"top.sp""#));
+        let again = cache.build("/w/top.sp", Some("cells.inc"), &files, &none(), false).unwrap();
+        assert!(again.hit);
+        assert_eq!(again.json, built.json);
+        assert_eq!(cache.stats().entries, 2);
+    }
+
+    #[test]
+    fn a_reading_kept_does_not_hold_once_a_file_it_read_changes() {
+        let mut cache = BuildCache::default();
+        let mut files = two_files();
+        cache.build("/w/top.sp", Some("cells.inc"), &files, &none(), false).unwrap();
+        files.insert("/w/cells.inc", ".subckt cell p n\nR1 p n 2k\n.ends\n");
+        let changed = cache.build("/w/top.sp", Some("cells.inc"), &files, &none(), false).unwrap();
+        assert!(!changed.hit && changed.json.contains("2k"));
+        // the entry is read in the context of the reading too
+        files.insert("/w/top.sp", "* top\n.include \"cells.inc\"\nX1 a 0 cell\nX2 b 0 cell\n.end\n");
+        assert!(!cache.build("/w/top.sp", Some("cells.inc"), &files, &none(), false).unwrap().hit);
+        // another entry that includes the file is another document
+        files.insert("/w/other.sp", "* other\n.include \"cells.inc\"\n.end\n");
+        assert!(!cache.build("/w/other.sp", Some("cells.inc"), &files, &none(), false).unwrap().hit);
+        assert!(cache.build("/w/top.sp", Some("cells.inc"), &files, &none(), false).unwrap().hit);
+    }
+
+    #[test]
+    fn a_file_that_is_not_one_of_the_document_is_refused() {
+        let mut cache = BuildCache::default();
+        let err = cache.build("/w/top.sp", Some("nowhere.inc"), &two_files(), &none(), false).err().unwrap();
+        assert!(err.contains("is not a file of"), "{err}");
+    }
+
+    #[test]
+    fn checking_a_file_keeps_its_reading_without_changing_the_drawings_shown() {
+        let mut cache = BuildCache::default();
+        let files = two_files();
+        cache.build("/w/top.sp", None, &files, &none(), false).unwrap();
+        let checked = cache.check("/w/top.sp", "cells.inc", &files, &none()).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&checked).unwrap();
+        assert!(value["file"] == "cells.inc" && value.get("outline").is_none());
+        assert_eq!(cache.stats().prefetched, 1);
+        assert!(cache.build("/w/top.sp", Some("cells.inc"), &files, &none(), false).unwrap().hit);
+        assert_eq!(cache.check("/w/top.sp", "cells.inc", &files, &none()).unwrap(), checked);
+    }
+
+    #[test]
+    fn a_summary_tells_the_symbols_and_whether_a_reading_is_kept_without_using_it() {
+        let mut cache = BuildCache::default();
+        let mut files = two_files();
+        let wanted = ["cells.inc".to_string()];
+        let before = cache.summaries("/w/top.sp", &wanted, &files, &none());
+        let first = &before["cells.inc"];
+        let titles = first.subckts.as_ref().map(|s| s.iter().map(|s| s.title.clone()).collect::<Vec<_>>());
+        assert_eq!(titles, Some(vec!["cell".to_string()]));
+        assert!(!first.kept && first.took.is_none());
+        cache.build("/w/top.sp", Some("cells.inc"), &files, &none(), false).unwrap();
+        let (hits, misses) = (cache.stats().hits, cache.stats().misses);
+        let summaries = cache.summaries("/w/top.sp", &wanted, &files, &none());
+        let kept = &summaries["cells.inc"];
+        assert!(kept.kept && kept.took.is_some_and(|t| t >= 0.0));
+        assert_eq!((cache.stats().hits, cache.stats().misses), (hits, misses));
+        files.insert("/w/cells.inc", ".subckt cell p n\nR1 p n 2k\n.ends\n");
+        let summaries = cache.summaries("/w/top.sp", &wanted, &files, &none());
+        let stale = &summaries["cells.inc"];
+        assert!(!stale.kept && stale.took.is_some());
+    }
+
+    #[test]
+    fn the_outline_is_added_to_a_reading_as_its_last_field() {
+        let outline = rnl_view::outline("/w/top.sp", &two_files(), &BuildOptions::default()).unwrap();
+        let json = with_outline(r#"{"file":"top.sp"}"#, &outline).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(value["file"], "top.sp");
+        assert_eq!(value["outline"]["path"], "/w/top.sp");
+        assert!(serde_json::from_str::<serde_json::Value>(&with_outline("{}", &outline).unwrap()).is_ok());
     }
 }
