@@ -1,0 +1,265 @@
+* Line styles: every style on every shape kind, in a symbol and on a wire
+*! Each line style drawn on each graphic: rectangle, circle, ellipse, polyline, closed polyline, arc, Bezier curve; first thin lines (line width 0), then double, dashed and dotted lines with a line width,
+*! with butt, miter, square and bevel ends and joins; line style none fills without a stroke. Double lines on rectangles, circles and ellipses are also drawn as two lines with the fill between them (before, only paths were);
+*! a double-line box in a symbol, a double line given by an instance's style (the zigzag of the standard resistor), and a double-line wire.
+R1 a c 1k
+R2 a b 1k
+* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-basic", version="0.4"); @VERSION("0.4")}
+* @RNL {
+*   #R2 @SET-SYMBOL $RESISTOR;
+*   (-3, 0) @TEXT("solid", halign="end", valign="middle");
+*   (0, 0) @RECTANGLE(width=5, height=3); (8, 0) @CIRCLE(radius=1.5); (16, 0) @ELLIPSE(width=5, height=3);
+*   @LINE {(21.5, -1.5) (24, 1.5) (26.5, -1.5)}; @LINE {(29.5, -1.5) (34.5, -1.5) (32, 1.5) (29.5, -1.5)};
+*   @ARC {(37.5, -1) (40, 1.5) (42.5, -1)}; @BEZIER {(45.5, 0) (47, 3) (49, -3) (50.5, 0)};
+*
+*   (-3, -5) @TEXT("dashed", halign="end", valign="middle");
+*   (0, -5) @RECTANGLE(width=5, height=3, linestyle="dashed"); (8, -5) @CIRCLE(radius=1.5, linestyle="dashed");
+*   (16, -5) @ELLIPSE(width=5, height=3, linestyle="dashed"); @LINE(linestyle="dashed") {(21.5, -6.5) (24, -3.5) (26.5, -6.5)};
+*   @LINE(linestyle="dashed") {(29.5, -6.5) (34.5, -6.5) (32, -3.5) (29.5, -6.5)};
+*   @ARC(linestyle="dashed") {(37.5, -6) (40, -3.5) (42.5, -6)}; @BEZIER(linestyle="dashed") {(45.5, -5) (47, -2) (49, -8) (50.5, -5)};
+*
+*   (-3, -10) @TEXT("dotted", halign="end", valign="middle");
+*   (0, -10) @RECTANGLE(width=5, height=3, linestyle="dotted"); (8, -10) @CIRCLE(radius=1.5, linestyle="dotted");
+*   (16, -10) @ELLIPSE(width=5, height=3, linestyle="dotted"); @LINE(linestyle="dotted") {(21.5, -11.5) (24, -8.5) (26.5, -11.5)};
+*   @LINE(linestyle="dotted") {(29.5, -11.5) (34.5, -11.5) (32, -8.5) (29.5, -11.5)};
+*   @ARC(linestyle="dotted") {(37.5, -11) (40, -8.5) (42.5, -11)}; @BEZIER(linestyle="dotted") {(45.5, -10) (47, -7) (49, -13) (50.5, -10)};
+*
+*   (-3, -15) @TEXT("dash-dot", halign="end", valign="middle");
+*   (0, -15) @RECTANGLE(width=5, height=3, linestyle="dash-dot"); (8, -15) @CIRCLE(radius=1.5, linestyle="dash-dot");
+*   (16, -15) @ELLIPSE(width=5, height=3, linestyle="dash-dot"); @LINE(linestyle="dash-dot") {(21.5, -16.5) (24, -13.5) (26.5, -16.5)};
+*   @LINE(linestyle="dash-dot") {(29.5, -16.5) (34.5, -16.5) (32, -13.5) (29.5, -16.5)};
+*   @ARC(linestyle="dash-dot") {(37.5, -16) (40, -13.5) (42.5, -16)}; @BEZIER(linestyle="dash-dot") {(45.5, -15) (47, -12) (49, -18) (50.5, -15)};
+*
+*   (-3, -20) @TEXT("bold", halign="end", valign="middle");
+*   (0, -20) @RECTANGLE(width=5, height=3, linestyle="bold"); (8, -20) @CIRCLE(radius=1.5, linestyle="bold");
+*   (16, -20) @ELLIPSE(width=5, height=3, linestyle="bold"); @LINE(linestyle="bold") {(21.5, -21.5) (24, -18.5) (26.5, -21.5)};
+*   @LINE(linestyle="bold") {(29.5, -21.5) (34.5, -21.5) (32, -18.5) (29.5, -21.5)};
+*   @ARC(linestyle="bold") {(37.5, -21) (40, -18.5) (42.5, -21)}; @BEZIER(linestyle="bold") {(45.5, -20) (47, -17) (49, -23) (50.5, -20)};
+*
+*   (-3, -25) @TEXT("double", halign="end", valign="middle");
+*   (0, -25) @RECTANGLE(width=5, height=3, linestyle="double"); (8, -25) @CIRCLE(radius=1.5, linestyle="double");
+*   (16, -25) @ELLIPSE(width=5, height=3, linestyle="double"); @LINE(linestyle="double") {(21.5, -26.5) (24, -23.5) (26.5, -26.5)};
+*   @LINE(linestyle="double") {(29.5, -26.5) (34.5, -26.5) (32, -23.5) (29.5, -26.5)};
+*   @ARC(linestyle="double") {(37.5, -26) (40, -23.5) (42.5, -26)}; @BEZIER(linestyle="double") {(45.5, -25) (47, -22) (49, -28) (50.5, -25)};
+*
+*   $wide = @DEFINE-STYLE(linestyle="double", linewidth=0.25, linecolor="#1f4fd8", fillcolor="#ffe0b2") {};
+*   (-3, -30) @TEXT("double 0.25", halign="end", valign="middle");
+*   {(0, -30) @RECTANGLE(width=5, height=3, fill="fillcolor"); (8, -30) @CIRCLE(radius=1.5, fill="fillcolor");
+*    (16, -30) @ELLIPSE(width=5, height=3, fill="fillcolor"); @LINE {(21.5, -31.5) (24, -28.5) (26.5, -31.5)};
+*    @LINE(fill="fillcolor") {(29.5, -31.5) (34.5, -31.5) (32, -28.5) (29.5, -31.5)};
+*    @ARC {(37.5, -31) (40, -28.5) (42.5, -31)}; @BEZIER {(45.5, -30) (47, -27) (49, -33) (50.5, -30)}} @SET-STYLE $wide;
+*
+*   $butt = @DEFINE-STYLE(linestyle="dashed", linewidth=0.15, cap="butt", join="miter") {};
+*   (-3, -35) @TEXT("dashed 0.15", halign="end", valign="middle");
+*   {(0, -35) @RECTANGLE(width=5, height=3); (8, -35) @CIRCLE(radius=1.5); (16, -35) @ELLIPSE(width=5, height=3);
+*    @LINE {(21.5, -36.5) (24, -33.5) (26.5, -36.5)}; @LINE {(29.5, -36.5) (34.5, -36.5) (32, -33.5) (29.5, -36.5)};
+*    @ARC {(37.5, -36) (40, -33.5) (42.5, -36)}; @BEZIER {(45.5, -35) (47, -32) (49, -38) (50.5, -35)}} @SET-STYLE $butt;
+*
+*   $square = @DEFINE-STYLE(linestyle="dotted", linewidth=0.05, cap="square", join="bevel", linecolor="#c62828") {};
+*   (-3, -40) @TEXT("dotted 0.05", halign="end", valign="middle");
+*   {(0, -40) @RECTANGLE(width=5, height=3); (8, -40) @CIRCLE(radius=1.5); (16, -40) @ELLIPSE(width=5, height=3);
+*    @LINE {(21.5, -41.5) (24, -38.5) (26.5, -41.5)}; @LINE {(29.5, -41.5) (34.5, -41.5) (32, -38.5) (29.5, -41.5)};
+*    @ARC {(37.5, -41) (40, -38.5) (42.5, -41)}; @BEZIER {(45.5, -40) (47, -37) (49, -43) (50.5, -40)}} @SET-STYLE $square;
+*
+*   (-3, -45) @TEXT("none", halign="end", valign="middle");
+*   (0, -45) @RECTANGLE(width=5, height=3, linestyle="none", fill="fillcolor", fillcolor="#c8e6c9");
+*   (8, -45) @CIRCLE(radius=1.5, linestyle="none", fill="fillcolor", fillcolor="#c8e6c9");
+*   (16, -45) @ELLIPSE(width=5, height=3, linestyle="none", fill="fillcolor", fillcolor="#c8e6c9");
+*   @LINE(linestyle="none", fill="fillcolor", fillcolor="#c8e6c9") {(29.5, -46.5) (34.5, -46.5) (32, -43.5) (29.5, -46.5)};
+*
+*   $TWIN = @DEFINE-SYMBOL {
+*     (-3, 0) @PIN(terminal=1, label="a", direction="left"); (3, 0) @PIN(terminal=2, label="b", direction="right");
+*     @RECTANGLE(linestyle="double") {(-1.5, -0.6) (1.5, 0.6)}; @LINE {(-3, 0) (-1.5, 0)}; @LINE {(1.5, 0) (3, 0)}
+*   };
+*   #R1 @SET-SYMBOL $TWIN;
+*   $twin = @DEFINE-STYLE(linestyle="double") {};
+*   #R2 @SET-STYLE $twin;
+*   &a @WIRE(mode="auto", linestyle="double", linewidth=0.15) {#R1:1 #R2:1};
+*   #R1 @PLACE(62, 0); #R2 @PLACE(56, -10)
+* }
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:a166222a1db6ac73.128af4af3f3e79d6", numbering="6535c365c5f35c7d") {
+*   #R1 @PLACE(62, 0) => @ORIENT("R0");
+*   #R2 @PLACE(56, -10) => @ORIENT("R0");
+*   %#1 @PLACE(-3, 0);
+*   %#3 @PLACE(0, 0);
+*   %#5 @PLACE(8, 0);
+*   %#7 @PLACE(16, 0);
+*   %#10 @PLACE(21.5, -1.5);
+*   %#11 @PLACE(24, 1.5);
+*   %#12 @PLACE(26.5, -1.5);
+*   %#14 @PLACE(29.5, -1.5);
+*   %#15 @PLACE(34.5, -1.5);
+*   %#16 @PLACE(32, 1.5);
+*   %#17 @PLACE(29.5, -1.5);
+*   %#19 @PLACE(37.5, -1);
+*   %#20 @PLACE(40, 1.5);
+*   %#21 @PLACE(42.5, -1);
+*   %#23 @PLACE(45.5, 0);
+*   %#24 @PLACE(47, 3);
+*   %#25 @PLACE(49, -3);
+*   %#26 @PLACE(50.5, 0);
+*   %#27 @PLACE(-3, -5);
+*   %#29 @PLACE(0, -5);
+*   %#31 @PLACE(8, -5);
+*   %#33 @PLACE(16, -5);
+*   %#36 @PLACE(21.5, -6.5);
+*   %#37 @PLACE(24, -3.5);
+*   %#38 @PLACE(26.5, -6.5);
+*   %#40 @PLACE(29.5, -6.5);
+*   %#41 @PLACE(34.5, -6.5);
+*   %#42 @PLACE(32, -3.5);
+*   %#43 @PLACE(29.5, -6.5);
+*   %#45 @PLACE(37.5, -6);
+*   %#46 @PLACE(40, -3.5);
+*   %#47 @PLACE(42.5, -6);
+*   %#49 @PLACE(45.5, -5);
+*   %#50 @PLACE(47, -2);
+*   %#51 @PLACE(49, -8);
+*   %#52 @PLACE(50.5, -5);
+*   %#53 @PLACE(-3, -10);
+*   %#55 @PLACE(0, -10);
+*   %#57 @PLACE(8, -10);
+*   %#59 @PLACE(16, -10);
+*   %#62 @PLACE(21.5, -11.5);
+*   %#63 @PLACE(24, -8.5);
+*   %#64 @PLACE(26.5, -11.5);
+*   %#66 @PLACE(29.5, -11.5);
+*   %#67 @PLACE(34.5, -11.5);
+*   %#68 @PLACE(32, -8.5);
+*   %#69 @PLACE(29.5, -11.5);
+*   %#71 @PLACE(37.5, -11);
+*   %#72 @PLACE(40, -8.5);
+*   %#73 @PLACE(42.5, -11);
+*   %#75 @PLACE(45.5, -10);
+*   %#76 @PLACE(47, -7);
+*   %#77 @PLACE(49, -13);
+*   %#78 @PLACE(50.5, -10);
+*   %#79 @PLACE(-3, -15);
+*   %#81 @PLACE(0, -15);
+*   %#83 @PLACE(8, -15);
+*   %#85 @PLACE(16, -15);
+*   %#88 @PLACE(21.5, -16.5);
+*   %#89 @PLACE(24, -13.5);
+*   %#90 @PLACE(26.5, -16.5);
+*   %#92 @PLACE(29.5, -16.5);
+*   %#93 @PLACE(34.5, -16.5);
+*   %#94 @PLACE(32, -13.5);
+*   %#95 @PLACE(29.5, -16.5);
+*   %#97 @PLACE(37.5, -16);
+*   %#98 @PLACE(40, -13.5);
+*   %#99 @PLACE(42.5, -16);
+*   %#101 @PLACE(45.5, -15);
+*   %#102 @PLACE(47, -12);
+*   %#103 @PLACE(49, -18);
+*   %#104 @PLACE(50.5, -15);
+*   %#105 @PLACE(-3, -20);
+*   %#107 @PLACE(0, -20);
+*   %#109 @PLACE(8, -20);
+*   %#111 @PLACE(16, -20);
+*   %#114 @PLACE(21.5, -21.5);
+*   %#115 @PLACE(24, -18.5);
+*   %#116 @PLACE(26.5, -21.5);
+*   %#118 @PLACE(29.5, -21.5);
+*   %#119 @PLACE(34.5, -21.5);
+*   %#120 @PLACE(32, -18.5);
+*   %#121 @PLACE(29.5, -21.5);
+*   %#123 @PLACE(37.5, -21);
+*   %#124 @PLACE(40, -18.5);
+*   %#125 @PLACE(42.5, -21);
+*   %#127 @PLACE(45.5, -20);
+*   %#128 @PLACE(47, -17);
+*   %#129 @PLACE(49, -23);
+*   %#130 @PLACE(50.5, -20);
+*   %#131 @PLACE(-3, -25);
+*   %#133 @PLACE(0, -25);
+*   %#135 @PLACE(8, -25);
+*   %#137 @PLACE(16, -25);
+*   %#140 @PLACE(21.5, -26.5);
+*   %#141 @PLACE(24, -23.5);
+*   %#142 @PLACE(26.5, -26.5);
+*   %#144 @PLACE(29.5, -26.5);
+*   %#145 @PLACE(34.5, -26.5);
+*   %#146 @PLACE(32, -23.5);
+*   %#147 @PLACE(29.5, -26.5);
+*   %#149 @PLACE(37.5, -26);
+*   %#150 @PLACE(40, -23.5);
+*   %#151 @PLACE(42.5, -26);
+*   %#153 @PLACE(45.5, -25);
+*   %#154 @PLACE(47, -22);
+*   %#155 @PLACE(49, -28);
+*   %#156 @PLACE(50.5, -25);
+*   %#157 @PLACE(-3, -30);
+*   %#159 @PLACE(0, -30);
+*   %#161 @PLACE(8, -30);
+*   %#163 @PLACE(16, -30);
+*   %#166 @PLACE(21.5, -31.5);
+*   %#167 @PLACE(24, -28.5);
+*   %#168 @PLACE(26.5, -31.5);
+*   %#170 @PLACE(29.5, -31.5);
+*   %#171 @PLACE(34.5, -31.5);
+*   %#172 @PLACE(32, -28.5);
+*   %#173 @PLACE(29.5, -31.5);
+*   %#175 @PLACE(37.5, -31);
+*   %#176 @PLACE(40, -28.5);
+*   %#177 @PLACE(42.5, -31);
+*   %#179 @PLACE(45.5, -30);
+*   %#180 @PLACE(47, -27);
+*   %#181 @PLACE(49, -33);
+*   %#182 @PLACE(50.5, -30);
+*   %#183 @PLACE(-3, -35);
+*   %#185 @PLACE(0, -35);
+*   %#187 @PLACE(8, -35);
+*   %#189 @PLACE(16, -35);
+*   %#192 @PLACE(21.5, -36.5);
+*   %#193 @PLACE(24, -33.5);
+*   %#194 @PLACE(26.5, -36.5);
+*   %#196 @PLACE(29.5, -36.5);
+*   %#197 @PLACE(34.5, -36.5);
+*   %#198 @PLACE(32, -33.5);
+*   %#199 @PLACE(29.5, -36.5);
+*   %#201 @PLACE(37.5, -36);
+*   %#202 @PLACE(40, -33.5);
+*   %#203 @PLACE(42.5, -36);
+*   %#205 @PLACE(45.5, -35);
+*   %#206 @PLACE(47, -32);
+*   %#207 @PLACE(49, -38);
+*   %#208 @PLACE(50.5, -35);
+*   %#209 @PLACE(-3, -40);
+*   %#211 @PLACE(0, -40);
+*   %#213 @PLACE(8, -40);
+*   %#215 @PLACE(16, -40);
+*   %#218 @PLACE(21.5, -41.5);
+*   %#219 @PLACE(24, -38.5);
+*   %#220 @PLACE(26.5, -41.5);
+*   %#222 @PLACE(29.5, -41.5);
+*   %#223 @PLACE(34.5, -41.5);
+*   %#224 @PLACE(32, -38.5);
+*   %#225 @PLACE(29.5, -41.5);
+*   %#227 @PLACE(37.5, -41);
+*   %#228 @PLACE(40, -38.5);
+*   %#229 @PLACE(42.5, -41);
+*   %#231 @PLACE(45.5, -40);
+*   %#232 @PLACE(47, -37);
+*   %#233 @PLACE(49, -43);
+*   %#234 @PLACE(50.5, -40);
+*   %#235 @PLACE(-3, -45);
+*   %#237 @PLACE(0, -45);
+*   %#239 @PLACE(8, -45);
+*   %#241 @PLACE(16, -45);
+*   %#244 @PLACE(29.5, -46.5);
+*   %#245 @PLACE(34.5, -46.5);
+*   %#246 @PLACE(32, -43.5);
+*   %#247 @PLACE(29.5, -46.5);
+*   %#2 @PLACE(-3, 0);
+*   %#28 @PLACE(-3, -5);
+*   %#54 @PLACE(-3, -10);
+*   %#80 @PLACE(-3, -15);
+*   %#106 @PLACE(-3, -20);
+*   %#132 @PLACE(-3, -25);
+*   %#158 @PLACE(-3, -30);
+*   %#184 @PLACE(-3, -35);
+*   %#210 @PLACE(-3, -40);
+*   %#236 @PLACE(-3, -45);
+*   %#248 @WIRE(mode="straight") {#R1:p (56, 0) #R2:p}
+* }
+.end

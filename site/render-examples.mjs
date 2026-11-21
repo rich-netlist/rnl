@@ -1,6 +1,10 @@
-// Draws the five-transistor OTA of the introduction page with the RNL core, as an RNL viewer draws it from the file: the
-// two looks of the example (the standard packages, and the same file with the packages eda-symbol and eda-style) that
-// the page's style switch shows.
+// Draws the five-transistor OTA of the pages with the RNL core, as an RNL viewer draws it from the solved files of
+// site/examples: the two looks of the introduction's example (the standard packages, and the same file with the packages
+// eda-symbol and eda-style) that the page's style switch shows; the plain look, the netlist with no RNL of its own, as a
+// solver lays it out from the connections alone; and the edits look, the file of the language page's fifth example, whose
+// editor's record came after the solve. With them go the records of the solver of the four files of the introduction's
+// example (the notation, the English sentences, the Chinese ones, and the file with the two packages), as the code
+// panel shows them.
 //
 //   node site/render-examples.mjs [--core DIR] [--packages DIR] [--only LOOK]
 //
@@ -57,7 +61,9 @@ if (only) {
   const old = JSON.parse(/window\.RNLOtaLooks = (.*);\s*$/s.exec(readFileSync(outFile, "utf8"))[1]);
   for (const [k, v] of Object.entries(old.looks)) if (k !== only) looks[k] = v;
 }
-for (const [look, name, withPackages] of [["standard", "ota5t-review.sp", false], ["eda", "ota5t-review-eda.sp", true]]) {
+const LOOKS = [["standard", "ota5t-review.sp", false], ["eda", "ota5t-review-eda.sp", true], ["plain", "ota5t-plain.sp", false],
+  ["edits", "ota5t-edits.sp", false]];
+for (const [look, name, withPackages] of LOOKS) {
   if (only && look !== only) continue;
   const text = example(name);
   const doc = await core.build({
@@ -65,7 +71,11 @@ for (const [look, name, withPackages] of [["standard", "ota5t-review.sp", false]
     files: withPackages ? { "/top.sp": text, ...library } : { "/top.sp": text },
     package_dirs: withPackages ? ["/lib/eda-symbol", "/lib/eda-style"] : [],
   });
-  const bad = doc.diagnostics.filter((d) => d.severity === "error" || d.severity === "warning");
+  // example 5 shows two statements in error on purpose, the ALIGN of the missing M9 and the PLACE of "2O": their errors
+  // are expected, any other is not
+  const lines = text.split(/\r?\n/);
+  const meant = (d) => look === "edits" && d.severity === "error" && /#M9|\b2O\b/.test(lines[d.line - 1] || "");
+  const bad = doc.diagnostics.filter((d) => (d.severity === "error" || d.severity === "warning") && !meant(d));
   if (bad.length) throw new Error(`${name}: ${bad.map((d) => `${d.severity} ${d.line}: ${d.message}`).join("; ")}`);
   const level = doc.levels.find((l) => l.kind === "subckt");
   const attrs = new Map();
@@ -85,13 +95,23 @@ for (const [look, name, withPackages] of [["standard", "ota5t-review.sp", false]
   console.log(`${look}: ${name} sha256:${looks[look].sha256}, ${attrs.size} parts`);
 }
 
-/* the same view box for both looks, so that the placements stay where they are when the look changes */
-const boxes = Object.values(looks).map((l) => /viewBox="([^"]*)"/.exec(l.svg)[1].split(" ").map(Number));
+/* the same view box for the two looks of the introduction, so that the placements stay where they are when the look changes */
+const pair = [looks.standard, looks.eda].filter(Boolean);
+const boxes = pair.map((l) => /viewBox="([^"]*)"/.exec(l.svg)[1].split(" ").map(Number));
 const x0 = Math.min(...boxes.map((b) => b[0])), y0 = Math.min(...boxes.map((b) => b[1]));
 const x1 = Math.max(...boxes.map((b) => b[0] + b[2])), y1 = Math.max(...boxes.map((b) => b[1] + b[3]));
 const viewBox = [x0, y0, x1 - x0, y1 - y0].map((v) => Math.round(v * 100) / 100).join(" ");
-for (const l of Object.values(looks)) l.svg = l.svg.replace(/viewBox="[^"]*"/, `viewBox="${viewBox}"`);
+for (const l of pair) l.svg = l.svg.replace(/viewBox="[^"]*"/, `viewBox="${viewBox}"`);
+
+/* the records of the solver (type="generated") of the four files of the introduction's example, block by block, as
+   the code panel shows them: the solver writes them, so the page takes them from the files rather than repeating them */
+const records = {};
+for (const name of ["ota5t-review-bare.sp", "ota5t-review.sp", "ota5t-review-zh.sp", "ota5t-review-eda.sp"]) {
+  const text = example(name);
+  const blocks = [...text.matchAll(/^\* @RNL\(type="generated"[^\n]*(?:\{\}$|\{\n[\s\S]*?\n\* \}$)/gm)].map((m) => m[0].split("\n"));
+  records[name] = { sha256: createHash("sha256").update(text).digest("hex").slice(0, 12), blocks };
+}
 
 const head = `/* Drawn by the RNL core ${version} from the example files of site/examples with site/render-examples.mjs; do not edit.
-   site/build.py checks that each look is drawn from the current text of its file (the sha256 below). */\n`;
-writeFileSync(outFile, `${head}window.RNLOtaLooks = ${JSON.stringify({ core: version, looks }, null, 1)};\n`);
+   site/build.py checks that each look and each file's records are those of the current text of its file (the sha256 below). */\n`;
+writeFileSync(outFile, `${head}window.RNLOtaLooks = ${JSON.stringify({ core: version, looks, records }, null, 1)};\n`);

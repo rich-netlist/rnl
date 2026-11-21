@@ -227,7 +227,7 @@ for (const language of registry.languages.filter(entry => entry.code === registr
     }
 
     await page.goto(`/${language}/tools.html`);
-    await expect(page.locator('a[href*="samples/cases/15-chinese.sp"]')).toHaveCount(examples ? 1 : 0);
+    await expect(page.locator('a[href*="samples/site/cases/15-chinese.sp"]')).toHaveCount(examples ? 1 : 0);
     expect(errors).toEqual([]);
   });
 }
