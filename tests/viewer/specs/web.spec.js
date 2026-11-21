@@ -1871,6 +1871,40 @@ test("the web viewer solves in the browser: its Worker starts at the first Solve
   await expect(page.locator("#preview-badge")).toBeHidden();
 });
 
+test("Save Solved Copy downloads the solve shown: the netlist alone under its name with -solved, else a ZIP of the files in their places", async ({ page }) => {
+  test.setTimeout(180000);
+  const solve = async (url) => {
+    await page.goto(`${process.env.RNL_WEB_URL}/?url=${url}`);
+    await page.waitForFunction(() => window.viewer.doc && !document.body.classList.contains("busy"));
+    await page.keyboard.press("F9");
+    await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"), null, { timeout: 90000 });
+  };
+  const saved = async () => {
+    const download = page.waitForEvent("download");
+    await page.evaluate(() => window.viewer.command("solve-save"));
+    const file = await download;
+    const dialog = page.locator("dialog.dialog");
+    await expect(dialog.locator(".dialog-title")).toHaveText("Save Solved Copy");
+    const said = await dialog.innerText();
+    await dialog.getByRole("button").first().click();
+    return { name: file.suggestedFilename(), text: fs.readFileSync(await file.path(), "latin1"), said };
+  };
+  // the netlist alone: one file, the solver's records in it
+  await solve("samples/cases/01-rc-lowpass.sp");
+  const one = await saved();
+  expect(one.name).toBe("01-rc-lowpass-solved.sp");
+  expect(one.text).toContain("@RNL");
+  expect(one.said).toContain("Downloaded the solved copy as 01-rc-lowpass-solved.sp.");
+  expect(one.said).toContain("The files that were opened are unchanged.");
+  // a netlist that reads another file: a ZIP of both
+  await solve("samples/cases/04-hierarchy.sp");
+  const zip = await saved();
+  expect(zip.name).toBe("04-hierarchy-solved.zip");
+  expect(zip.text.startsWith("PK")).toBe(true);
+  expect(zip.text).toContain("04-hierarchy.sp");
+  expect(zip.said).toContain("Downloaded 04-hierarchy-solved.zip");
+});
+
 test("a solve in the browser is cancelled by stopping its Worker, and the next Solve starts another", async ({ page, browserName }) => {
   test.skip(browserName !== "chromium", "only Chromium routes the requests of a Worker, which holds the solver's module back here");
   test.setTimeout(120000);

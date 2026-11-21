@@ -189,6 +189,26 @@ export function endPreview() {
   status("", false);
 }
 
+/**
+ * What Save Solved Copy says the shell saved, the same sentences in every shell, from what the shell gives: where it
+ * wrote the copy, `{ to, written, copied }` (the desktop), or the file it downloaded, `{ downloaded, written, copied }`
+ * (the web); `written` files the solve wrote and `copied` files it only read, put beside them. A netlist that reads no
+ * other file is one file (`written` 1, `copied` 0); else a folder, or a ZIP.
+ */
+function savedSentence(said) {
+  const one = said.written === 1 && said.copied === 0;
+  if (said.downloaded !== undefined) {
+    return one
+      ? m("Downloaded the solved copy as {0}.", said.downloaded)
+      : m("Downloaded {0}: the solved files and the files they read, in their places.", said.downloaded);
+  }
+  if (one) return m("Saved the solved copy as {0}.", said.to);
+  const files = said.written === 1 ? m("Saved 1 solved file into {0}", said.to) : m("Saved {0} solved files into {1}", said.written, said.to);
+  if (said.copied === 0) return m`${files}.`;
+  return said.copied === 1 ? m("{0}, along with 1 other file copied alongside them.", files)
+    : m("{0}, along with {1} other files copied alongside them.", files, said.copied);
+}
+
 /** Solve > Save Solved Copy As: a copy of the solve shown, where the user says. */
 export async function saveSolved(encoding = "preserve") {
   if (!shell || !shell.saveSolved || modal()) return;
@@ -199,7 +219,7 @@ export async function saveSolved(encoding = "preserve") {
   }
   try {
     const said = await shell.saveSolved(encoding);
-    if (said) await inform({ title, paragraphs: [said, m("The files that were opened are unchanged.")] });
+    if (said) await inform({ title, paragraphs: [savedSentence(said), m("The files that were opened are unchanged.")] });
   } catch (e) {
     await inform({ title, paragraphs: [m`The copy was not saved: ${e instanceof Error ? e.message : String(e)}`] });
   }
