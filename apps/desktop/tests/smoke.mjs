@@ -1060,10 +1060,13 @@ async function independentNavigationSmoke(page) {
     await openSource({path:${JSON.stringify(top)},name:'visit-top.sp'},false);
     await descend(window.viewer.doc.objects.findIndex(o => o.name === 'Xcell'));
     const v=window.viewer;
-    const isolated={entry:v.doc.path, file:v.doc.file, files:v.doc.files.length, opens:v.doc.objects.find(o => o.name === 'Xleaf').opens,
+    // (the reading of one file has the levels of that file alone: a subcircuit another file defines is a child of it,
+    // with that file and the host level that draws it)
+    const leaf=()=>v.doc.children.find(c=>c.master.toLowerCase()==='visit_leaf');
+    const isolated={entry:v.doc.path, file:v.doc.file, files:v.doc.files.length, leaf:leaf(),
       path:namedPath().map(s=>s.title), listed:poolSnapshot().some(i=>i.path.endsWith('/visit-cell.inc'))};
     await toggleAutoInclude(true);
-    const resolved=v.doc.objects.find(o=>o.name==='Xleaf').opens !== null;
+    const resolved=leaf()?.file==='visit-leaf.inc' && leaf()?.host !== null;
     await descend(v.doc.objects.findIndex(o=>o.name==='Xleaf'));
     const deep=namedPath().map(s=>s.title);
     await backTo(0);
@@ -1075,7 +1078,8 @@ async function independentNavigationSmoke(page) {
   same(result.isolated.file,'visit-cell.inc','the file of the subcircuit is the file read');
   check(result.isolated.entry.replaceAll('\\','/').endsWith('/visit-top.sp'),'the file was not read in the context of its entry');
   same(result.isolated.files,3,'the reading lists every file of the document');
-  check(result.isolated.opens !== null,'the definitions the entry includes do not reach the file read in its context');
+  check(result.isolated.leaf?.file==='visit-leaf.inc' && result.isolated.leaf?.host !== null,
+    `the definitions the entry includes do not reach the file read in its context: ${JSON.stringify(result.isolated.leaf)}`);
   same(result.isolated.listed,false,'a file of the document shown joined Files');
   same(result.isolated.path,['visit-top.sp','visit_cell'],'cross-file descent history');
   same(result.resolved,true,'the leaf opens with Auto Include on too');
