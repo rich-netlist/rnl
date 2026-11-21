@@ -2,7 +2,7 @@
 * @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-PACKAGE(name="rnl-std-basic", version="0.4"); @USE-PACKAGE(name="rnl-std-semiconductors", version="0.4"); @VERSION("0.4")}
 *! Levels: one drawing per subcircuit; a block symbol (`# @SET-SYMBOL` in a subcircuit) as the look of the instances above it, with pins by port name; an .include'd file is a level of its own;
 *! scope= writes into a subcircuit from outside; the rules above apply to the levels below, recursive=false only to its own; USE-PACKAGE of an embedded package in a subcircuit changes how resistors are drawn;
-*! ports filled in ($PORT_FILL_SET) and taken first; a port that the fill makes is named in the record of the solver, which places and wires it.
+*! ports written with $IO_PORT, the fill of port tags ($PORT_FILL_SET) turned off on every level.
 .include 04-hierarchy-lib.inc
 .model nch nmos level=1
 .subckt amp in out vdd vss
@@ -31,33 +31,33 @@ R1 vdd out 10k
 *   # @SET-SYMBOL %amp_block;
 *   #M1 @SET-SYMBOL $NMOS;
 *   &vdd @ADD-TO $SUPPLY_NET_SET; &vss @ADD-TO $GROUND_NET_SET;
-*   {&in &vdd &vss} @REMOVE-FROM $PORT_FILL_SET;
+*   # @SELECT-NET(port=true) => @REMOVE-FROM $PORT_FILL_SET;
 *   %pin = $IO_PORT @ATTACH &in;
 *   &in @WIRE(mode="auto") {%pin:p #M1:2};
+*   %pout = $IO_PORT @ATTACH &out;
 *   %branch = {#R1 #M1} @AS $BRANCH;
 *   &out @ROUTE-NET
 * }
 * 
 
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:c9a37d5b364797b9.2e02c1e4aefd5467", numbering="2b95cd6ab6bfb99c") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:6c57d7a69ffd2016.110230454409f3e6", numbering="b0637405273e991e") {
 *   %ground_stub_M1_s = $GROUND_STUB @ATTACH(gap=3) #M1::s;
 *   %supply_stub_R1_p = $SUPPLY_STUB @ATTACH(gap=3) #R1:p;
-*   %io_port_out = $IO_PORT @ATTACH &out;
-*   %rt1 = (6, 4);
-*   #M1 @PLACE(6, 0) => @ORIENT("R0");
-*   #R1 @PLACE(6, 8) => @ORIENT("R0");
-*   %pin @PLACE(0, 0) => @ORIENT("R0");
-*   %branch @PLACE(6, 0);
+*   %rt1 = (5, -6);
+*   #M1 @PLACE(5, -12) => @ORIENT("R0");
+*   #R1 @PLACE(5, 0) => @ORIENT("R0");
+*   %pin @PLACE(0, -12) => @ORIENT("R0");
+*   %pout @PLACE(6, -6) => @ORIENT("R180");
+*   %branch @PLACE(5, 0);
 *   %#2 @PLACE(0, 0);
 *   %ground_stub_M1_s @PLACE(0, 0);
-*   %ground_stub_M1_s::g @PLACE(6, -4) => @ORIENT("R0");
+*   %ground_stub_M1_s::g @PLACE(5, -16) => @ORIENT("R0");
 *   %supply_stub_R1_p @PLACE(0, 0);
-*   %supply_stub_R1_p::s @PLACE(6, 13) => @ORIENT("R0");
-*   %io_port_out @PLACE(0, 4) => @ORIENT("R0");
+*   %supply_stub_R1_p::s @PLACE(5, 5) => @ORIENT("R0");
+*   &out @WIRE(mode="straight") {#R1:n %rt1};
+*   &out @WIRE(mode="straight") {%rt1 %pout::pin};
 *   &out @WIRE(mode="straight") {#M1::d %rt1};
-*   &out @WIRE(mode="straight") {%rt1 #R1:n};
-*   &out @WIRE(mode="straight") {%io_port_out::pin %rt1};
-*   $JUNCTION @ATTACH %rt1 => @PLACE(6, 4)
+*   $JUNCTION @ATTACH %rt1 => @PLACE(5, -6)
 * }
 .ends
 X1 a b vdd 0 amp
@@ -71,7 +71,14 @@ Vin a 0 0.9
 *   # @SELECT-INSTANCE(name="V*", recursive=false) => @SET-STYLE $signal;
 *   &a @WIRE(mode="auto") {#Vin:1 #X1:in};
 *   &b @WIRE(mode="auto") {#X1:out #X2:in};
-*   &c @WIRE(mode="auto") {#X2:out #X3:top}
+*   &c @WIRE(mode="auto") {#X2:out #X3:top};
+*   /* the sources stand upright, the + pin above the - pin; the supply source left of the signal chain */
+*   {#Vin:2 #Vin:1} @ORDER("bottom-to-top"); {#Vdd:2 #Vdd:1} @ORDER("bottom-to-top");
+*   /* the signal goes from left to right: the source, the two stages and the divider */
+*   {#Vin #X1 #X2 #X3} @ORDER("left-to-right");
+*   /* the divider stands as its symbol is drawn: top and mid in one column on the left, bot on the right */
+*   {#X3:top #X3:mid} @ALIGN("x"); {#X3:top #X3:bot} @ORDER("left-to-right");
+*   #Vdd {#Vin #X1 #X2 #X3} @DISTANCE("left-to-right", min=4)
 * }
 * @RNL(scope="amp") {
 *   #R1 @TEXT("R_{L}", key="name");
@@ -79,7 +86,7 @@ Vin a 0 0.9
 * }
 * 
 
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:fadac595f316fc79.c8fb7aa80b2c7852", numbering="611c1274b5dae8ee") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:774776a67141d0f1.c75d5869532e5c6a", numbering="c141945bba507de5") {
 *   %ground_stub_X1_vss = $GROUND_STUB @ATTACH(gap=3) #X1:vss;
 *   %ground_stub_X2_vss = $GROUND_STUB @ATTACH(gap=3) #X2:vss;
 *   %ground_stub_X3_bot = $GROUND_STUB @ATTACH(gap=3) #X3:bot;
@@ -89,30 +96,30 @@ Vin a 0 0.9
 *   %supply_stub_X2_vdd = $SUPPLY_STUB @ATTACH(gap=3) #X2:vdd;
 *   %supply_stub_Vdd_p = $SUPPLY_STUB @ATTACH(gap=3) #Vdd::p;
 *   %net_label_stub_X3_mid = $NET_LABEL_STUB @ATTACH #X3:mid;
-*   #X1 @PLACE(0, -3) => @ORIENT("R0");
-*   #X2 @PLACE(10, -3) => @ORIENT("R0");
-*   #X3 @PLACE(19, -4) => @ORIENT("R0");
-*   #Vdd @PLACE(19, 9) => @ORIENT("R0");
-*   #Vin @PLACE(-8, -3) => @ORIENT("R270");
+*   #X1 @PLACE(-18, -3) => @ORIENT("R0");
+*   #X2 @PLACE(-8, -3) => @ORIENT("R0");
+*   #X3 @PLACE(0, -3) => @ORIENT("R0");
+*   #Vdd @PLACE(-31, 6) => @ORIENT("MY");
+*   #Vin @PLACE(-27, -5) => @ORIENT("MY");
 *   %ground_stub_X1_vss @PLACE(0, 0);
-*   %ground_stub_X1_vss::g @PLACE(0, -8) => @ORIENT("R0");
+*   %ground_stub_X1_vss::g @PLACE(-18, -8) => @ORIENT("R0");
 *   %ground_stub_X2_vss @PLACE(0, 0);
-*   %ground_stub_X2_vss::g @PLACE(10, -8) => @ORIENT("R0");
+*   %ground_stub_X2_vss::g @PLACE(-8, -8) => @ORIENT("R0");
 *   %ground_stub_X3_bot @PLACE(0, 0);
-*   %ground_stub_X3_bot::g @PLACE(23, -6) => @ORIENT("R0");
+*   %ground_stub_X3_bot::g @PLACE(4, -5) => @ORIENT("R0");
 *   %ground_stub_Vdd_n @PLACE(0, 0);
-*   %ground_stub_Vdd_n::g @PLACE(19, 5) => @ORIENT("R0");
+*   %ground_stub_Vdd_n::g @PLACE(-31, 2) => @ORIENT("R0");
 *   %ground_stub_Vin_n @PLACE(0, 0);
-*   %ground_stub_Vin_n::g @PLACE(-12, -5) => @ORIENT("R0");
+*   %ground_stub_Vin_n::g @PLACE(-27, -9) => @ORIENT("R0");
 *   %supply_stub_X1_vdd @PLACE(0, 0);
-*   %supply_stub_X1_vdd::s @PLACE(0, 2) => @ORIENT("R0");
+*   %supply_stub_X1_vdd::s @PLACE(-18, 2) => @ORIENT("R0");
 *   %supply_stub_X2_vdd @PLACE(0, 0);
-*   %supply_stub_X2_vdd::s @PLACE(10, 2) => @ORIENT("R0");
+*   %supply_stub_X2_vdd::s @PLACE(-8, 2) => @ORIENT("R0");
 *   %supply_stub_Vdd_p @PLACE(0, 0);
-*   %supply_stub_Vdd_p::s @PLACE(19, 13) => @ORIENT("R0");
+*   %supply_stub_Vdd_p::s @PLACE(-31, 10) => @ORIENT("R0");
 *   %net_label_stub_X3_mid @PLACE(0, 0);
-*   %net_label_stub_X3_mid::l @PLACE(17, -5) => @ORIENT("R0");
-*   %#6 @WIRE(mode="straight") {#X3:bot (23, -4) %ground_stub_X3_bot::g::pin};
-*   %#8 @WIRE(mode="straight") {#Vin::n (-12, -3) %ground_stub_Vin_n::g::pin}
+*   %net_label_stub_X3_mid::l @PLACE(-2, -4) => @ORIENT("R0");
+*   %#3 @WIRE(mode="straight") {#X2:out (-3, -3) (-3, -2) #X3:top};
+*   %#6 @WIRE(mode="straight") {#X3:bot (4, -3) %ground_stub_X3_bot::g::pin}
 * }
 .end

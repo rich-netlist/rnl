@@ -59,10 +59,14 @@
     u6: ['&vdd @ADD-TO $SUPPLY_NET_SET;', '&vdd @ADD-TO $SUPPLY_NET_SET;'],
     u7: ['&vss @ADD-TO $GROUND_NET_SET;', '&vss @ADD-TO $GROUND_NET_SET;'],
     u14: ['#M5:d @CURRENT("in");', '#M5:d has @CURRENT("in");'],
+    u16: ['# @SELECT-NET(port=true) => @REMOVE-FROM $PORT_FILL_SET;', '# @SELECT-NET(port=true) => @REMOVE-FROM $PORT_FILL_SET;'],
+    u17: ['%p_inp = $IO_PORT @ATTACH &inp;', '%p_inp = $IO_PORT @ATTACH &inp;'],
+    u18: ['%p_inn = $IO_PORT @ATTACH &inn;', '%p_inn = $IO_PORT @ATTACH &inn;'],
+    u19: ['%p_out = $IO_PORT @ATTACH &out;', '%p_out = $IO_PORT @ATTACH &out;'],
+    u21: ['%p_bias = $IO_PORT @ATTACH &vbias;', '%p_bias = $IO_PORT @ATTACH &vbias;'],
     u20: ['# @SELECT-NET => @ROUTE-NET;', '# @SELECT-NET => @ROUTE-NET;'],
-    u21: ['$IO_PORT_STUB @ATTACH {#M1:g #M2:g #M5:g};', '$IO_PORT_STUB @ATTACH {#M1:g #M2:g #M5:g};'],
-    u22: ['%po = $IO_PORT @ATTACH &out;', '%po = $IO_PORT @ATTACH &out;'],
-    u23: ['{%amp %po::pin} @ORDER("left-to-right")', '{%amp %po::pin} @ORDER("left-to-right")']
+    u22: ['%amp_group = {%amp %p_inp %p_inn %p_out %p_bias} @GROUP;', '%amp_group = {%amp %p_inp %p_inn %p_out %p_bias} @GROUP;'],
+    u23: ['{%amp %p_out} @ORDER("left-to-right")', '{%amp %p_out} @ORDER("left-to-right")']
   };
   /* zh: the Chinese standard sentences, written with the alias package alias-zh; only the Chinese pages have them */
   var UZ = {};
@@ -76,10 +80,14 @@
     u6: '&vdd @加入 $"电源网络集";',
     u7: '&vss @加入 $"地网络集";',
     u14: '#M5:d 有 @电流("流入");',
+    u16: '# @选出网络(端口=是) => @移出 $"端口补位集";',
+    u17: '%p_inp = $"端口" @附着 &inp;',
+    u18: '%p_inn = $"端口" @附着 &inn;',
+    u19: '%p_out = $"端口" @附着 &out;',
+    u21: '%p_bias = $"端口" @附着 &vbias;',
     u20: '# @选出网络 => @布线网络;',
-    u21: '$"端口桩" @附着 {#M1:g #M2:g #M5:g};',
-    u22: '%po = $"端口" @附着 &out;',
-    u23: '{%amp %po::pin} @顺序("从左到右")'
+    u22: '%amp_group = {%amp %p_inp %p_inn %p_out %p_bias} 视作一个 @分组;',
+    u23: '{%amp %p_out} @顺序("从左到右")'
   };
   /*/zh-CN*/
   var STYLES = ['bare', 'en', 'zh'];
@@ -101,7 +109,7 @@
     add('m4', 'M4 out  x     vdd  vdd pch W=4u L=0.5u');
     add('m5', 'M5 tail vbias vss  vss nch W=4u L=1u');
     add('u0', '* @RNL {');
-    ['u1', 'u2', 'u3', 'u4', 'u5', 'u6', 'u7', 'u14', 'u20', 'u21', 'u22', 'u23'].forEach(function (id) {
+    ['u1', 'u2', 'u3', 'u4', 'u5', 'u6', 'u7', 'u14', 'u16', 'u17', 'u18', 'u19', 'u21', 'u20', 'u22', 'u23'].forEach(function (id) {
       add(id, '*   ' + (k === 2 ? UZ[id] : U[id][k]));
     });
     add('u15', '* }');
@@ -124,16 +132,16 @@
     { t: '*   %dp1 = #M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N;', r: 'M1 M2 M5', d: 'conflict' },
     { t: '*   {#M1 #M2 #M9} @ALIGN("y")', cls: 'is-err', d: 'm9' },
     { t: '* }' },
-    { t: '* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:13bd9770c3063bbd.c9d4c659d9406c2d", numbering="09e867fdaf53775a") {', d: 'fp' },
-    { t: '*   #M1 @PLACE(10, 16) => @ORIENT("R0");', r: 'M1' },
-    { t: '*   #M2 @PLACE(20, 16) => @ORIENT("MY");', r: 'M2' },
-    { t: '*   #M3 @PLACE(10, 26) => @ORIENT("MY");', r: 'M3' },
-    { t: '*   #M4 @PLACE(20, 26) => @ORIENT("R0");', r: 'M4', d: 'bad' },
-    { t: '*   #M5 @PLACE(15, 9) => @ORIENT("MY");', r: 'M5' },
+    { t: '* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:edea2dac05e41f41.a52325ef217ada41", numbering="d4bd4a77786955a8") {', d: 'fp' },
+    { t: '*   #M1 @PLACE(4, 16) => @ORIENT("R0");', r: 'M1' },
+    { t: '*   #M2 @PLACE(16, 16) => @ORIENT("MY");', r: 'M2' },
+    { t: '*   #M3 @PLACE(4, 26) => @ORIENT("MY");', r: 'M3' },
+    { t: '*   #M4 @PLACE(16, 26) => @ORIENT("R0");', r: 'M4', d: 'bad' },
+    { t: '*   #M5 @PLACE(10, 9) => @ORIENT("R0");', r: 'M5' },
     { t: '*   /* <en>more wires, junctions, ports, supplies and the ground follow; left out here</en> */', fold: true },
     { t: '* }' },
     { t: '* @RNL(author="rnl-editor") {', d: 'fp' },
-    { t: '*   #M2 @PLACE(x=22, priority="high");', r: 'M2', d: 'conflict' },
+    { t: '*   #M2 @PLACE(x=18, priority="high");', r: 'M2', d: 'conflict' },
     { t: '*   #M4 @PLACE(2O, 26, priority="high")', r: 'M4', cls: 'is-err', d: 'bad' },
     { t: '* }' },
     { t: '.ends ota5t' }
@@ -143,8 +151,8 @@
      taken out of their comments) */
   var E5_DIAG = [
     { k: 'err', id: 'm9', icon: 'cross', html: '<en><code>{#M1 #M2 #M9} @ALIGN("y")</code>: this level has no instance M9. ALIGN is strict about its members, so the whole statement fails; it does not fall back to “align only M1 and M2”.</en>', refs: [] },
-    { k: 'err', id: 'bad', icon: 'cross', html: '<en><code>#M4 @PLACE(2O, 26, …)</code>: a number cannot be followed by a letter, and “2O” contains the letter O. Only this statement fails; M4 keeps the solver’s (20, 26).</en>', refs: ['M4'] },
-    { k: 'warn', id: 'conflict', icon: 'warn', html: '<en>The editor’s <code>#M2 @PLACE(x=22, …)</code> is high and written later, so it overrides the solver’s x = 20, which is discarded. M1 stays at x = 10, M4 above M2 at x = 20 and M5 at x = 15, so the pair is no longer even about its tail: four low facts of the structures conflict with these high coordinates and give way, the tail centered under the pair, the pair’s own center, the axis of its mirror image and the column of M4 and M2 that <code>%right</code> makes. A low fact giving way is expected and noted no further.</en>', refs: ['M1', 'M2', 'M4', 'M5'] },
+    { k: 'err', id: 'bad', icon: 'cross', html: '<en><code>#M4 @PLACE(2O, 26, …)</code>: a number cannot be followed by a letter, and “2O” contains the letter O. Only this statement fails; M4 keeps the solver’s (16, 26).</en>', refs: ['M4'] },
+    { k: 'warn', id: 'conflict', icon: 'warn', html: '<en>The editor’s <code>#M2 @PLACE(x=18, …)</code> is high and written later, so it overrides the solver’s x = 16, which is discarded. M1 stays at x = 4, M4 above M2 at x = 16 and M5 at x = 10, so the pair is no longer even about its tail: four low facts of the structures conflict with these high coordinates and give way, the tail centered under the pair, the pair’s own center, the axis of its mirror image and the column of M4 and M2 that <code>%right</code> makes. A low fact giving way is expected and noted no further.</en>', refs: ['M1', 'M2', 'M4', 'M5'] },
     { k: 'info', id: 'fp', icon: 'info', html: '<en>The solver record’s <code>hash</code> no longer matches the current input: the editor added a record after solving. The viewer suggests solving again; the old result still displays.</en>', refs: [] },
     { k: 'ok', id: 'ok', icon: 'check', html: '<en>Everything else takes effect: the differential pair and its tail, the current mirror, the orientations and the other coordinates.</en>', refs: ['M1', 'M2', 'M5'] }
   ];

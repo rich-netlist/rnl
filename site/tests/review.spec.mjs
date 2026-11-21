@@ -77,7 +77,7 @@ test('review: the look switch redraws the same circuit with the packages, the fi
   const devices = async () => [...new Set(await page.locator('#rv-stage svg [data-dev]').evaluateAll(els => els.map(el => el.getAttribute('data-dev'))))].sort();
   const standard = await stage.innerHTML();
   const names = await devices();
-  expect(names).toEqual(expect.arrayContaining(['INN', 'INP', 'M1', 'M2', 'M3', 'M4', 'M5', 'PO', 'VBIAS', 'VDD', 'VSS']));
+  expect(names).toEqual(expect.arrayContaining(['M1', 'M2', 'M3', 'M4', 'M5', 'P_BIAS', 'P_INN', 'P_INP', 'P_OUT', 'VDD', 'VSS']));
   await expect(page.locator('#rv-code')).not.toContainText('eda-symbol');
   await expect(page.locator('#rv-open')).toHaveAttribute('href', /ota5t-review\.sp/);
 

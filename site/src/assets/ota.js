@@ -29,11 +29,16 @@
     n1: ['&vdd @ADD-TO $SUPPLY_NET_SET;', '&vdd @ADD-TO $SUPPLY_NET_SET;'],
     n2: ['&vss @ADD-TO $GROUND_NET_SET;', '&vss @ADD-TO $GROUND_NET_SET;'],
     cur: ['#M5:d @CURRENT("in");', '#M5:d has @CURRENT("in");'],
-    /* how to draw it: every net as wires, the inputs and the bias as port stubs, the output port to the right of the stage */
+    /* how to draw it, as the gallery's examples do: no port tags from the fill, a port of its own for each signal and the
+       bias, every net as wires, the stage and its ports one block, the output port to the right of the stage */
+    fill: ['# @SELECT-NET(port=true) => @REMOVE-FROM $PORT_FILL_SET;', '# @SELECT-NET(port=true) => @REMOVE-FROM $PORT_FILL_SET;'],
+    pin: ['%p_inp = $IO_PORT @ATTACH &inp;', '%p_inp = $IO_PORT @ATTACH &inp;'],
+    pinn: ['%p_inn = $IO_PORT @ATTACH &inn;', '%p_inn = $IO_PORT @ATTACH &inn;'],
+    pout: ['%p_out = $IO_PORT @ATTACH &out;', '%p_out = $IO_PORT @ATTACH &out;'],
+    pbias: ['%p_bias = $IO_PORT @ATTACH &vbias;', '%p_bias = $IO_PORT @ATTACH &vbias;'],
     rt: ['# @SELECT-NET => @ROUTE-NET;', '# @SELECT-NET => @ROUTE-NET;'],
-    stub: ['$IO_PORT_STUB @ATTACH {#M1:g #M2:g #M5:g};', '$IO_PORT_STUB @ATTACH {#M1:g #M2:g #M5:g};'],
-    po: ['%po = $IO_PORT @ATTACH &out;', '%po = $IO_PORT @ATTACH &out;'],
-    ord: ['{%amp %po::pin} @ORDER("left-to-right")', '{%amp %po::pin} @ORDER("left-to-right")']
+    grp: ['%amp_group = {%amp %p_inp %p_inn %p_out %p_bias} @GROUP;', '%amp_group = {%amp %p_inp %p_inn %p_out %p_bias} @GROUP;'],
+    ord: ['{%amp %p_out} @ORDER("left-to-right")', '{%amp %p_out} @ORDER("left-to-right")']
   };
   var TZ = {};
   /*zh-CN*/
@@ -46,10 +51,14 @@
     n1: '&vdd @加入 $"电源网络集";',
     n2: '&vss @加入 $"地网络集";',
     cur: '#M5:d 有 @电流("流入");',
+    fill: '# @选出网络(端口=是) => @移出 $"端口补位集";',
+    pin: '%p_inp = $"端口" @附着 &inp;',
+    pinn: '%p_inn = $"端口" @附着 &inn;',
+    pout: '%p_out = $"端口" @附着 &out;',
+    pbias: '%p_bias = $"端口" @附着 &vbias;',
     rt: '# @选出网络 => @布线网络;',
-    stub: '$"端口桩" @附着 {#M1:g #M2:g #M5:g};',
-    po: '%po = $"端口" @附着 &out;',
-    ord: '{%amp %po::pin} @顺序("从左到右")'
+    grp: '%amp_group = {%amp %p_inp %p_inn %p_out %p_bias} 视作一个 @分组;',
+    ord: '{%amp %p_out} @顺序("从左到右")'
   };
   /*/zh-CN*/
   var STYLES = ['bare', 'en', 'zh'];
@@ -72,7 +81,7 @@
     function record(n, block) {
       (block || []).forEach(function (t, i) {
         var about = (t.match(/#M\d\b/g) || []).map(function (d) { return d.slice(1); });
-        if (/%po\b/.test(t)) about.push('PO');
+        (t.match(/%p_(inp|inn|out|bias)\b/g) || []).forEach(function (p) { about.push(p.slice(1).toUpperCase()); });
         add('g' + n + '-' + i, t, about.join(' '));
       });
     }
@@ -82,7 +91,7 @@
     add('h1', '.model nch nmos level=1 vto=0.5 kp=100u lambda=0.05');
     add('h2', '.model pch pmos level=1 vto=-0.5 kp=100u lambda=0.05');
     add('h3', '* @RNL(type="header") { ' + (k === 2 ? '@VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-ALIASES(name="alias-zh", version="0.4")' : '@VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")') + (look === 'eda' ? PACKAGES : '') + '}', '', look === 'eda' ? { cls: 'is-diff' } : null);
-    add('h4', '.subckt ota5t inp inn out vdd vss vbias', 'PO');
+    add('h4', '.subckt ota5t inp inn out vdd vss vbias', 'P_INP P_INN P_OUT P_BIAS');
     dev('M1', 'M1 x    inp   tail vss nch W=2u L=0.5u');
     dev('M2', 'M2 out  inn   tail vss nch W=2u L=0.5u');
     dev('M3', 'M3 x    x     vdd  vdd pch W=4u L=0.5u');
@@ -97,10 +106,14 @@
     st('n1', 'VDD');
     st('n2', 'VSS');
     st('cur', 'M5 ov:cur');
+    st('fill');
+    st('pin', 'P_INP');
+    st('pinn', 'P_INN');
+    st('pout', 'P_OUT');
+    st('pbias', 'P_BIAS');
     st('rt');
-    st('stub', 'M1 M2 M5');
-    st('po', 'PO');
-    st('ord', 'PO');
+    st('grp', 'M1 M2 M3 M4 M5 P_INP P_INN P_OUT P_BIAS');
+    st('ord', 'M1 M2 M3 M4 M5 P_OUT');
     add('r1', '* }');
     record(0, blocks[0]);
     add('e0', '.ends ota5t');

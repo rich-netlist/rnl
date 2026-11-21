@@ -17,65 +17,65 @@ M5 tail vbias vss  vss nch W=4u L=1u
 *   &vdd @ADD-TO $SUPPLY_NET_SET;
 *   &vss @ADD-TO $GROUND_NET_SET;
 *   #M5:d @CURRENT("in");
+*   # @SELECT-NET(port=true) => @REMOVE-FROM $PORT_FILL_SET;
+*   %p_inp = $IO_PORT @ATTACH &inp;
+*   %p_inn = $IO_PORT @ATTACH &inn;
+*   %p_out = $IO_PORT @ATTACH &out;
+*   %p_bias = $IO_PORT @ATTACH &vbias;
 *   # @SELECT-NET => @ROUTE-NET;
-*   $IO_PORT_STUB @ATTACH {#M1:g #M2:g #M5:g};
-*   %po = $IO_PORT @ATTACH &out;
-*   {%amp %po::pin} @ORDER("left-to-right")
+*   %amp_group = {%amp %p_inp %p_inn %p_out %p_bias} @GROUP;
+*   {%amp %p_out} @ORDER("left-to-right")
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:13bd9770c3063bbd.c9d4c659d9406c2d", numbering="09e867fdaf53775a") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:edea2dac05e41f41.efd247ad24a049ce", numbering="d4bd4a77786955a8") {
 *   %ground_stub_M5_s = $GROUND_STUB @ATTACH(gap=3) #M5::s;
 *   %supply_stub_M3_s = $SUPPLY_STUB @ATTACH(gap=3) #M3::s;
 *   %supply_stub_M4_s = $SUPPLY_STUB @ATTACH(gap=3) #M4::s;
-*   %io_port_vdd = $IO_PORT @ATTACH &vdd;
-*   %io_port_vss = $IO_PORT @ATTACH &vss;
-*   %rt1 = (15, 13);
-*   %rt2 = (20, 21);
-*   %rt3 = (10, 21);
-*   %rt4 = (15, 26);
-*   #M1 @PLACE(10, 16) => @ORIENT("R0");
-*   #M2 @PLACE(20, 16) => @ORIENT("MY");
-*   #M3 @PLACE(10, 26) => @ORIENT("MY");
-*   #M4 @PLACE(20, 26) => @ORIENT("R0");
-*   #M5 @PLACE(15, 9) => @ORIENT("MY");
-*   %dp1 @PLACE(15, 16);
-*   %#1 @PLACE(10, 16);
-*   %#2 @PLACE(15, 16);
-*   %cm1 @PLACE(5.95, 26);
-*   %amp @PLACE(10, 16);
-*   %left @PLACE(10, -0.95);
-*   %#3 @PLACE(10, 16);
-*   %right @PLACE(20, -0.95);
-*   %#4 @PLACE(10, 16);
-*   %#5 @PLACE(10, 16);
-*   %#5::p @PLACE(7, 16) => @ORIENT("R0");
-*   %#6 @PLACE(10, 16);
-*   %#6::p @PLACE(23, 16) => @ORIENT("R180");
-*   %#7 @PLACE(10, 16);
-*   %#7::p @PLACE(18, 9) => @ORIENT("MY");
-*   %po @PLACE(23, 21) => @ORIENT("MY");
-*   %ground_stub_M5_s @PLACE(10, 16);
-*   %ground_stub_M5_s::g @PLACE(15, 5) => @ORIENT("R0");
-*   %supply_stub_M3_s @PLACE(10, 16);
-*   %supply_stub_M3_s::s @PLACE(10, 30) => @ORIENT("R0");
-*   %supply_stub_M4_s @PLACE(10, 16);
-*   %supply_stub_M4_s::s @PLACE(20, 30) => @ORIENT("R0");
-*   %io_port_vdd @PLACE(4, 5) => @ORIENT("R0");
-*   %io_port_vss @PLACE(4, 1) => @ORIENT("R0");
-*   &tail @WIRE(mode="straight") {#M1::s (10, 13) %rt1};
-*   &tail @WIRE(mode="straight") {#M5::d %rt1};
-*   &tail @WIRE(mode="straight") {%rt1 (20, 13) #M2::s};
+*   %rt1 = (10, 12);
+*   %rt2 = (16, 21);
+*   %rt3 = (4, 21);
+*   %rt4 = (10, 26);
+*   #M1 @PLACE(4, 16) => @ORIENT("R0");
+*   #M2 @PLACE(16, 16) => @ORIENT("MY");
+*   #M3 @PLACE(4, 26) => @ORIENT("MY");
+*   #M4 @PLACE(16, 26) => @ORIENT("R0");
+*   #M5 @PLACE(10, 9) => @ORIENT("R0");
+*   %dp1 @PLACE(10, 16);
+*   %#1 @PLACE(4, 16);
+*   %#2 @PLACE(10, 16);
+*   %cm1 @PLACE(-1, 26);
+*   %amp @PLACE(4, 16);
+*   %left @PLACE(4, -0.95);
+*   %#3 @PLACE(4, 16);
+*   %right @PLACE(16, -0.95);
+*   %#4 @PLACE(4, 16);
+*   %p_inp @PLACE(-1, 16) => @ORIENT("R0");
+*   %p_inn @PLACE(21, 16) => @ORIENT("MY");
+*   %p_out @PLACE(19, 21) => @ORIENT("MY");
+*   %p_bias @PLACE(-1, 9) => @ORIENT("R0");
+*   %ground_stub_M5_s @PLACE(4, 16);
+*   %ground_stub_M5_s::g @PLACE(10, 5) => @ORIENT("R0");
+*   %supply_stub_M3_s @PLACE(4, 16);
+*   %supply_stub_M3_s::s @PLACE(4, 30) => @ORIENT("R0");
+*   %supply_stub_M4_s @PLACE(4, 16);
+*   %supply_stub_M4_s::s @PLACE(16, 30) => @ORIENT("R0");
+*   &tail @WIRE(mode="straight") {%rt1 #M5::d};
+*   &tail @WIRE(mode="straight") {%rt1 (4, 12) #M1::s};
+*   &tail @WIRE(mode="straight") {%rt1 (16, 12) #M2::s};
 *   &out @WIRE(mode="straight") {#M2::d %rt2};
 *   &out @WIRE(mode="straight") {%rt2 #M4::d};
-*   &out @WIRE(mode="straight") {%rt2 %po::pin};
+*   &out @WIRE(mode="straight") {%rt2 %p_out::pin};
 *   &x @WIRE(mode="straight") {#M1::d %rt3};
 *   &x @WIRE(mode="straight") {%rt3 #M3::d};
-*   &x @WIRE(mode="straight") {%rt3 (15, 21) %rt4};
+*   &x @WIRE(mode="straight") {%rt3 (10, 21) %rt4};
 *   &x @WIRE(mode="straight") {#M3::g %rt4};
 *   &x @WIRE(mode="straight") {%rt4 #M4::g};
-*   $JUNCTION @ATTACH %rt1 => @PLACE(15, 13);
-*   $JUNCTION @ATTACH %rt2 => @PLACE(20, 21);
-*   $JUNCTION @ATTACH %rt3 => @PLACE(10, 21);
-*   $JUNCTION @ATTACH %rt4 => @PLACE(15, 26)
+*   &inp @WIRE(mode="straight") {%p_inp::pin #M1::g};
+*   &inn @WIRE(mode="straight") {#M2::g %p_inn::pin};
+*   &vbias @WIRE(mode="straight") {%p_bias::pin #M5::g};
+*   $JUNCTION @ATTACH %rt1 => @PLACE(10, 12);
+*   $JUNCTION @ATTACH %rt2 => @PLACE(16, 21);
+*   $JUNCTION @ATTACH %rt3 => @PLACE(4, 21);
+*   $JUNCTION @ATTACH %rt4 => @PLACE(10, 26)
 * }
 .ends ota5t
 * @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:94c0bd39bc2b69dc.53706929d5b144cf") {}
