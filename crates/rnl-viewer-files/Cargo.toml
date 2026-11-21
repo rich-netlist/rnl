@@ -3,11 +3,14 @@ name = "rnl-viewer-files"
 description = "Writing the user's files for the RNL viewers: Save, Save As and the files they make, whole or not at all"
 version.workspace = true
 edition.workspace = true
-rust-version.workspace = true
+# (File::lock, for the settings file)
+rust-version = "1.89"
 license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
 [dependencies]
 rnl-cli = { path = "../rnl-cli" }
+rnl-runtime = { path = "../rnl-runtime" }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"

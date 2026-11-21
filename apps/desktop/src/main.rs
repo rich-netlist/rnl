@@ -35,6 +35,7 @@ use std::sync::Mutex;
 use core_thread::Core;
 use files::{Saved, SavedFile};
 use rnl_view::UnplacedDrawing;
+use rnl_viewer_files::watch::Watcher;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 
@@ -122,6 +123,7 @@ async fn unplaced_drawings(
 /// others; the names of those files are given back.
 #[tauri::command]
 async fn save_files(
+    app: AppHandle,
     entry: String,
     files: Vec<SavedFile>,
     overwrite: Option<bool>,
@@ -129,15 +131,35 @@ async fn save_files(
 ) -> Result<Saved, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let entry = std::path::absolute(&entry).map_err(|e| format!("{entry}: {e}"))?;
-        files::save_all_with_encoding(
-            &entry.to_string_lossy(),
-            &files,
-            overwrite.unwrap_or(false),
-            encoding.unwrap_or_default(),
-        )
+        let entry = entry.to_string_lossy();
+        let saved =
+            files::save_all_with_encoding(&entry, &files, overwrite.unwrap_or(false), encoding.unwrap_or_default())?;
+        // the app's own writes are not changes on disk to tell of (rnl_viewer_files::watch)
+        let watcher = app.state::<Watcher>();
+        for f in &files {
+            watcher.wrote(std::path::Path::new(&files::located(&entry, &f.path)));
+        }
+        Ok(saved)
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// The files of the document shown, which the page gives, are looked at for a change on disk once a second.
+#[tauri::command]
+fn watch_files(watcher: State<'_, Watcher>, paths: Vec<String>) {
+    for path in paths.iter().map(std::path::Path::new).filter(|p| p.is_absolute()) {
+        watcher.watch(path);
+    }
+}
+
+/// What changed on disk since `since`, which the page tells the user of: the version now, and the files, as the page
+/// gave them.
+#[tauri::command]
+fn file_changes(watcher: State<'_, Watcher>, since: u64) -> serde_json::Value {
+    let (version, changed) = watcher.since(since);
+    let changed: Vec<String> = changed.iter().map(|p| p.to_string_lossy().into_owned()).collect();
+    serde_json::json!({ "version": version, "changed": changed })
 }
 
 /// Ask where to save the text of the netlist, write it there, and give its path; None when the
@@ -170,6 +192,7 @@ async fn save_file_as(
     let Some(chosen) = chosen else { return Ok(None) };
     let to = chosen.into_path().map_err(|e| e.to_string())?;
     files::save_as(entry.as_deref().map(std::path::Path::new), &to, &text, encoding.unwrap_or_default())?;
+    window.state::<Watcher>().wrote(&to);
     Ok(Some(to.to_string_lossy().into_owned()))
 }
 
@@ -280,10 +303,17 @@ fn main() {
         .manage(Core::new())
         .manage(library::Library::default())
         .manage(project::Choices::default())
+        .manage(Watcher::default())
         .manage(menu::Drawn::default())
         .manage(startup)
         .setup(|app| {
             public_packages::init(app.handle());
+            // the files of the document shown, looked at once a second (rnl_viewer_files::watch)
+            let handle = app.handle().clone();
+            std::thread::spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                handle.state::<Watcher>().poll();
+            });
             Ok(())
         })
         .menu(menu::menu)
@@ -314,6 +344,8 @@ fn main() {
             unplaced_drawings,
             save_files,
             save_file_as,
+            watch_files,
+            file_changes,
             set_dirty,
             quit,
             finish_startup,

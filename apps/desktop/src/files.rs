@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use rnl_cli::codec::OutputEncoding;
-use rnl_runtime::source::{dirname, join, normalize, Layered, MemoryProvider, Provider};
+use rnl_runtime::source::{Layered, MemoryProvider, Provider};
 
 /// The texts to build over the files of a netlist, by the path the Document names each file by: a
 /// path relative to the directory of the netlist, unless it is rooted.
@@ -16,10 +16,7 @@ pub type Edits = HashMap<String, String>;
 
 pub use rnl_viewer_files::save::{Saved, SavedFile};
 
-/// The file at `path`, as the Document names it, of the netlist `entry`: where it is on disk.
-pub fn located(entry: &str, path: &str) -> String {
-    join(&dirname(&normalize(entry)), path)
-}
+pub use rnl_viewer_files::save::located;
 
 /// The edits as files in memory, each where the core looks for it when it builds the netlist `entry`.
 pub fn held(entry: &str, edits: &Edits) -> MemoryProvider {

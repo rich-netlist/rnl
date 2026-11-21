@@ -7,6 +7,15 @@ use std::path::{Path, PathBuf};
 use rnl_cli::codec::{self, OutputEncoding};
 use serde::{Deserialize, Serialize};
 
+/// The file at `path`, as the Document names it, of the netlist `entry`: where it is, `/`-separated. A path relative to the
+/// folder of the netlist is joined to it, and a rooted one stands alone; `.` and `..` are taken away, as the core takes them
+/// away when it reads the files. The shell names the netlist as it names it to the core (the local program's page names
+/// `C:` as `/C:/a`, and turns the path back into one of the machine).
+pub fn located(entry: &str, path: &str) -> String {
+    use rnl_runtime::source::{dirname, join, normalize};
+    join(&dirname(&normalize(entry)), path)
+}
+
 /// The largest file that is taken to be one the page read: a file larger than it has changed since.
 pub const MAX_FILE: u64 = 256 * 1024 * 1024;
 

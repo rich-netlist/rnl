@@ -39,9 +39,11 @@
  * @property {() => Promise<Array<{name: string, version: string, path: string, description: string, builtin: boolean}>>} [publicPackages] Published package metadata for lookup hints.
  * @property {(pkg: {name: string, version: string}, signal?: AbortSignal) => Promise<object[]>} [includePackage] Include an exact published package.
  * @property {(kind: string) => Promise<object[]>} [include] Include files, a folder or a library package.
- * @property {(items: object[], reload?: boolean, refresh?: string[]) => Promise<string[]> | void} [setPool] Replace and index the search pool; reload rereads all files, refresh replaces named entries. Returns read errors.
+ * @property {(items: object[], reload?: boolean, refresh?: string[], searched?: string[]) => Promise<string[]> | void} [setPool] Replace and index the search pool; reload rereads all files, refresh replaces named entries. Returns read errors.
+ *   The items of PATH have `searchPath`, and `searched` is the folders PATH searches, in order (the `dirs` of each
+ *   `pathPackages` answer): a shell whose core does not read the disk gives them to it as folders, not in the pool.
  * @property {() => Promise<string | null>} [pickPath] Pick a desktop search directory.
- * @property {(dir: string, subfolders?: boolean) => Promise<string[] | { files: string[], truncated?: boolean }>} [pathPackages] Package and netlist paths in a PATH directory (desktop, and the local program's page), with those of its sub-folders when asked.
+ * @property {(dir: string, subfolders?: boolean) => Promise<string[] | { files: string[], dirs?: string[], truncated?: boolean }>} [pathPackages] Package and netlist paths in a PATH directory (desktop, and the local program's page), with those of its sub-folders when asked, and the folders lookup searches for it, in order (`dirs`, rnl_cli::walk).
  * @property {(path: string) => { source: Source, read?: () => Promise<File> }} [pathItem] A file of a PATH directory as the Library searches and opens it, for a shell that reads it itself; without it, the shell builds from the path.
  * @property {(source: Source) => object} [poolItem] A web source's entry as a searchable file.
  * @property {() => Promise<Array<{name: string, title: string, extensions: string[], fallback: boolean}>>} [formats] The core's parse formats, in its order, for the Library's format menus before a Document lists them.
@@ -141,7 +143,7 @@
  *   the user to say. On the web, which cannot write files, download them. Rejects with a message when
  *   it cannot. A shell that offers neither does not save.
  * @property {(name: string, build: () => Promise<Blob>) => Promise<string | false>} [saveProject]
- *   Save Project (desktop) or Download Project (web), project.js: ask where (the web where the browser
+ *   Save Project (desktop, and the local program's page) or Download Project (web), project.js: ask where (the web where the browser
  *   lets it), then write the archive `build` gives, named `name`; what was written, or false on cancel.
  * @property {() => Promise<{ name: string, path?: string, bytes: Uint8Array } | null>} [pickProject]
  *   Open Project: the archive the user chooses, or null.
@@ -161,7 +163,7 @@
  *   shown, with `overlays` (rnl_view::OverlayOptions), built again from what `doc` was built from; when `preview`
  *   is true, `doc` is a solve's preview, built from the files the solve wrote, which the shell that solved holds.
  * @property {(name: string, blob: Blob, kind: "svg" | "png") => Promise<string | null>} [saveImage]
- *   Save the image: the web downloads it, the desktop asks where; what was written, or null on cancel.
+ *   Save the image: the web downloads it, the desktop (and the local program's page) asks where; what was written, or null on cancel.
  * @property {(source: Source, file: SavedFile, encoding?: "preserve" | "utf8") => Promise<Source | null>} [saveAs] Ask where to save the
  *   text of the netlist that was opened, write it there, and give the source of the file written; null
  *   when the user cancels. Rejects with a message when it cannot. Only the desktop offers it.
@@ -169,6 +171,13 @@
  *   where the page's own title does not name it: the desktop's. Without it the page's title is set.
  * @property {(dirty: boolean) => void} [setDirty] Tell the platform that files have changes that are not
  *   saved, or have none, for the window's title and for closing it.
+ * @property {(paths: string[]) => void} [watchFiles] Look at the files of the Document shown, by the paths the page names
+ *   them by (source-path.js), for a change on disk (disk-changes.js). The desktop; the local program looks at the files
+ *   the page reads itself.
+ * @property {(since: number) => Promise<{ version: number, changed: string[] }>} [fileChanges] The files looked at that
+ *   changed on disk, went or came back since the version `since`, each once, and the version now; the shell's own
+ *   writes are not changes. The page asks once a second and tells the user (disk-changes.js). The desktop and the local
+ *   program (rnl-viewer-files watch.rs); the web reads no file of a disk.
  * @property {(handler: () => void) => void} [onCloseRequested] Call `handler` when the user asks to
  *   close the window while `setDirty(true)` was the last word: the window stays until `quit`.
  * @property {() => void} [quit] Close the window, as `onCloseRequested` asked.

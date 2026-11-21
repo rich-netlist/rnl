@@ -50,9 +50,11 @@ async function syncPool(reload = false) {
       seen.add(path);
     }
   }
+  // the folders PATH searches, in its order: those its listings name (the folders lookup searches for each)
+  const searched = [...scanned].flatMap(([dir, found]) => (found.error ? [] : found.dirs ?? [dir]));
   const refresh = [...refreshPaths];
   refreshPaths.clear();
-  try { libraryErrors = await shell.setPool?.(all, reload, refresh) || []; }
+  try { libraryErrors = await shell.setPool?.(all, reload, refresh, searched) || []; }
   catch (e) { for (const path of refresh) refreshPaths.add(path); throw e; }
 }
 
@@ -251,7 +253,7 @@ async function scanPaths(reload = false) {
     try {
       // an array from a shell that lists a directory alone, or { files, truncated }
       const found = await shell.pathPackages(dir, deep.has(dir));
-      return [dir, Array.isArray(found) ? { files: found } : { files: found.files, truncated: found.truncated }];
+      return [dir, Array.isArray(found) ? { files: found } : { files: found.files, dirs: found.dirs, truncated: found.truncated }];
     }
     catch (e) { return [dir, { files: [], error: String(e) }]; }
   }));
@@ -474,8 +476,9 @@ function render() {
   });
   // the public packages this build bundles, read only, searched after the PATH directories above
   if (bundledPackages.length) {
+    // (read as a file of PATH is, by a shell that reads it itself: the local program's page)
     const files = bundledPackages.map((p) => ({ path: p.path, name: `${p.name} ${p.version}`,
-      source: { path: p.path, name: p.path, library: true, readonly: true } }));
+      source: { ...(shell.pathItem?.(p.path)?.source ?? { path: p.path, name: p.path }), library: true, readonly: true } }));
     append(groups, group("public", m("Public packages (bundled)"), files, "public"));
   }
   if (external && shell.externalFile) {
@@ -495,7 +498,7 @@ export async function startPool() {
   const listing = shell.formats?.().then(setFormatList, () => {});
   if (shell.pathPackages) await listing;
   $("auto-include").addEventListener("change", (e) => toggleAutoInclude(e.target.checked));
-  // the desktop's bundled public packages, in a group of their own; none in the build without them
+  // the public packages a desktop bundles (the local program's too), in a group of their own; none in the build without them
   if (shell.bundledPackages) bundledPackages = await shell.bundledPackages().then((info) => info.packages || [], () => []);
   if (shell.bundledFiles) {
     const bundled = await shell.bundledFiles();

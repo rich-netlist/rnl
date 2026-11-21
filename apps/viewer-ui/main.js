@@ -12,6 +12,7 @@ import { startNetlistColors } from "./netlist-colors.js";
 import { setBackground } from "./background.js";
 import { command, isChecked, runStartupShortcuts, setCheck, startCommands } from "./commands.js";
 import { closeRequested, note } from "./editor.js";
+import { watchDisk } from "./disk-changes.js";
 import { dirtyPaths, unappliedPaths } from "./edits.js";
 import { gridState, setGrid } from "./grid.js";
 import { setHoverNames, setHoverRoles } from "./hover.js";
@@ -86,6 +87,8 @@ async function start() {
   if (!shell.nativeMenu) showMenuBar(true);
   if (shell.onOpen) await shell.onOpen((source) => openSource(source, false));
   if (shell.onCloseRequested) shell.onCloseRequested(closeRequested);
+  // a file of the document shown that changes on disk is told of, where the shell looks at files
+  watchDisk();
   if (shell.platform === "web" && new URLSearchParams(location.search).get("api") === "1") {
     const { startFullViewerApi } = await import("./full-viewer-api.js");
     await startFullViewerApi();

@@ -209,6 +209,7 @@ async function prepare(source, edits, suppliedPackages, progress, { bind, constr
   const reading = source.prefetch && source.text === undefined ? source.open(again, progress) : null;
   reading?.catch(() => {});
   await poolReady;
+  await bundledReady;
   const library = librarySnapshot;
   progress?.("reading");
   const held = source.text !== undefined;
@@ -224,8 +225,12 @@ async function prepare(source, edits, suppliedPackages, progress, { bind, constr
   files[entry.path] = entry.text;
   Object.assign(files, source.snapshot || {});
   for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
-  // a manifest's pool first, in its order, then the Library's files
-  const pool = [...(source.pool || []), ...[...library.texts.keys()].map(poolPath)];
+  // a manifest's pool first, in its order, then the Library's files; PATH's are searched folder by folder after the pool,
+  // as the desktop and the CLI search them: given as the folders, their files read but not in the pool
+  const pool = [...(source.pool || []), ...[...library.texts.keys()].filter((path) => !library.path?.files.has(path)).map(poolPath)];
+  const searched = (library.path?.dirs || []).map(poolPath);
+  // the public packages bundled, for packages only: read, but not in the pool, and searched after PATH
+  for (const [path, text] of Object.entries(bundled.files)) files[path] ??= text;
   // the files of a manifest are indexed as the Library's are, for Auto Include, from the build
   // that opens it on: the Library has them only after it (pool.js)
   for (const [path, text] of Object.entries(source.external?.files || {})) {
@@ -234,7 +239,7 @@ async function prepare(source, edits, suppliedPackages, progress, { bind, constr
     pool.push(poolPath(path));
   }
   // flylines and the layout hints are asked for, not left to the core's default: View > Show Flylines hides the flylines (flylines.js), and the problems list has the hints (problems.js)
-  const request = { entry: entry.path, files, pool, svg: true, primitives: false, flylines: true, hints: true, lazy_unplaced: true,
+  const request = { entry: entry.path, files, pool, package_dirs: [...searched, ...bundled.dirs], search_paths: searched, svg: true, primitives: false, flylines: true, hints: true, lazy_unplaced: true,
     auto_include: load("auto-include", true) === true, library_prefix: source.fromPool ? "" : "/<pool>",
     formats: requestFormats(source.url ? new URL(source.url).origin : null, poolPath),
     library_edits: Object.fromEntries(Object.entries(edits || {}).map(([path, text]) => {
@@ -278,6 +283,16 @@ function solveFiles(request, edits) {
     auto_include: request.auto_include === true, library_prefix: request.library_prefix ?? "", library_edits: libraryEdits,
     formats: request.formats ?? {},
   };
+}
+
+// The public packages a shell of the page has bundled (the local program's): their files, and their directories, which
+// are searched for packages only, after PATH, as the desktop searches its own (apps/desktop/src/public_packages.rs)
+let bundled = { files: {}, dirs: [] };
+let bundledReady = Promise.resolve();
+
+/** The public packages bundled, once `loading` gives them: `{ files, dirs }`; none when it fails. */
+export function useBundledPackages(loading) {
+  bundledReady = loading.then((given) => { bundled = given; }, () => {});
 }
 
 /** A core to ask what needs no document: the one shown, or the warm spare. */
@@ -965,7 +980,7 @@ export default {
     if (kind === "library") return includeLibrary();
     return chooseFiles(kind === "folder" ? folderInput : includeInput).then((files) => poolItems(files, kind === "folder"));
   },
-  setPool(items, reload = false, refresh = []) {
+  setPool(items, reload = false, refresh = [], searched = []) {
     const next = new Map(items.filter((item) => !item.builtin).map((item) => [item.path, item.read]));
     poolSources = new Map(items.filter(item => !item.builtin).map(item => [item.path, item.source]));
     poolReady = poolReady.catch(() => {}).then(async () => {
@@ -981,7 +996,9 @@ export default {
       poolFiles = next;
       poolTexts = texts;
       // (the files that joined the Library by being opened, which its stamps tell apart)
-      librarySnapshot = { texts, epoch: librarySnapshot.epoch + (reload ? 1 : 0), opened: new Set(items.filter((item) => item.opened).map((item) => item.path)) };
+      librarySnapshot = { texts, epoch: librarySnapshot.epoch + (reload ? 1 : 0), opened: new Set(items.filter((item) => item.opened).map((item) => item.path)),
+        // PATH (the local program's page): its files, and the folders it searches in order (prepare)
+        path: { files: new Set(items.filter((item) => item.searchPath).map((item) => item.path)), dirs: searched } };
       if (!spare && !core) spare = warmCore();
       const indexed = await indexLibrary(spare?.worker ?? core, librarySnapshot);
       return [...errors, ...indexed];
