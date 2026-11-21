@@ -569,8 +569,6 @@ export default {
     // the names of the files written, as the desktop gives them: the page says it
     return { written: files.map((f) => f.name) };
   },
-  // `overwrites=1`: a web page whose shell writes the files where they were read from, as the local shell does
-  ...(platform === "web" && params.get("overwrites") === "1" ? { overwrites: true, saveAs } : {}),
   ...(platform === "desktop"
     ? {
         saveAs,

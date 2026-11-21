@@ -16,15 +16,15 @@
         { "id": "reload", "label": "&Reload", "keys": ["F5"] },
         { "id": "reload-library", "label": "Reload Li&brary" },
         { "id": "toggle-auto-include", "label": "Auto Includ&e", "check": true },
-        { "id": "memory-cache", "label": "Memory Cac&he...", "platforms": ["desktop"], "with": "reader" },
+        { "id": "memory-cache", "label": "Memory Cac&he...", "with": "reader" },
         "-",
-        { "id": "save", "label": "&Save", "keys": ["Ctrl+S"], "platforms": ["desktop"], "with": "overwrites" },
-        { "id": "save", "label": "&Download File", "keys": ["Ctrl+S"], "platforms": ["web"], "unless": "overwrites" },
+        { "id": "save", "label": "&Save", "keys": ["Ctrl+S"], "platforms": ["desktop"] },
+        { "id": "save", "label": "&Download File", "keys": ["Ctrl+S"], "platforms": ["web"] },
         { "id": "save-project", "label": "Download Pro&ject...", "platforms": ["web"] },
         { "id": "download-manifest", "label": "Do&wnload Manifest...", "platforms": ["web"] },
-        { "id": "save-as", "label": "Save &As...", "platforms": ["desktop"], "with": "overwrites" },
-        { "id": "save-utf8", "label": "Save Changes Using UTF-8", "platforms": ["desktop"], "with": "overwrites" },
-        { "id": "save-as-utf8", "label": "Save As UTF-8...", "platforms": ["desktop"], "with": "overwrites" },
+        { "id": "save-as", "label": "Save &As...", "platforms": ["desktop"] },
+        { "id": "save-utf8", "label": "Save Changes Using UTF-8", "platforms": ["desktop"] },
+        { "id": "save-as-utf8", "label": "Save As UTF-8...", "platforms": ["desktop"] },
         { "id": "save-project", "label": "Save Pro&ject...", "platforms": ["desktop"] },
         {
           "label": "Export Ima&ge",
@@ -34,8 +34,8 @@
           ]
         },
         "-",
-        { "id": "file-associations", "label": "Fi&le Associations...", "platforms": ["desktop"], "windowsOnly": true },
-        { "id": "exit", "label": "E&xit", "platforms": ["desktop"] }
+        { "id": "file-associations", "label": "Fi&le Associations...", "platforms": ["desktop"], "with": "fileAssociations", "windowsOnly": true },
+        { "id": "exit", "label": "E&xit", "platforms": ["desktop"], "with": "quit" }
       ]
     },
     {
@@ -118,21 +118,21 @@
     {
       "label": "&Solve",
       "items": [
-        { "id": "solve", "label": "&Solve", "keys": ["F9"], "platforms": ["desktop"], "with": "solve" },
-        { "id": "solve-all", "label": "Solve &All Circuits", "platforms": ["desktop"], "with": "solve" },
-        { "id": "solve-respace", "label": "&Respace", "platforms": ["desktop"], "with": "solve" },
-        { "id": "solve-respace-all", "label": "Respace All Circuits", "platforms": ["desktop"], "with": "solve" },
-        { "id": "solve-close", "label": "&Close Preview", "platforms": ["desktop"], "with": "solve" },
-        { "id": "toggle-solve-on-open", "label": "As&k to Solve on Open", "check": true, "platforms": ["desktop"], "with": "solve" },
+        { "id": "solve", "label": "&Solve", "keys": ["F9"], "with": "solve" },
+        { "id": "solve-all", "label": "Solve &All Circuits", "with": "solve" },
+        { "id": "solve-respace", "label": "&Respace", "with": "solve" },
+        { "id": "solve-respace-all", "label": "Respace All Circuits", "with": "solve" },
+        { "id": "solve-close", "label": "&Close Preview", "with": "solve" },
+        { "id": "toggle-solve-on-open", "label": "As&k to Solve on Open", "check": true, "with": "solve" },
         "-",
-        { "id": "solve-save", "label": "Save Solved Cop&y As...", "keys": ["Ctrl+Shift+S"], "platforms": ["desktop"], "with": "saveSolved" },
-        { "id": "solve-save-utf8", "label": "Save Solved Copy As UTF-8...", "platforms": ["desktop"] },
+        { "id": "solve-save", "label": "Save Solved Cop&y As...", "keys": ["Ctrl+Shift+S"], "with": "saveSolved" },
+        { "id": "solve-save-utf8", "label": "Save Solved Copy As UTF-8...", "platforms": ["desktop"], "with": "saveSolved" },
         "-",
         { "id": "toggle-layout", "label": "Show &Layout Table", "check": true, "page": true },
         { "id": "toggle-skeleton-symbols", "label": "Show Component and &Pin Skeleton Lines", "check": true, "page": true },
         { "id": "toggle-skeleton-wires", "label": "Show &Wire Skeleton Lines", "check": true, "page": true },
         "-",
-        { "id": "solve-settings", "label": "S&ettings...", "platforms": ["desktop"], "with": "solverTable" }
+        { "id": "solve-settings", "label": "S&ettings...", "with": "solverTable" }
       ]
     },
     {
@@ -140,8 +140,8 @@
       "items": [
         { "id": "shortcuts", "label": "&Keyboard Shortcuts..." },
         { "id": "desktop-viewer", "label": "&Desktop Viewer...", "platforms": ["web"] },
-        { "id": "public-packages", "label": "Public &Packages...", "platforms": ["desktop"] },
-        { "id": "check-updates", "label": "Check for &Updates...", "platforms": ["desktop"], "with": "version" },
+        { "id": "public-packages", "label": "Public &Packages...", "platforms": ["desktop"], "with": "bundledPackages" },
+        { "id": "check-updates", "label": "Check for &Updates...", "with": "version" },
         "-",
         { "id": "about", "label": "&About RNL Viewer" }
       ]

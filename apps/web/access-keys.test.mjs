@@ -2,9 +2,10 @@
 // on a platform have one letter each, after the `&` of their labels, which no other item there has. The
 // same holds in each language of i18n/: the labels there have their own letters, or keep the English
 // one as `(&C)`; a label the catalog does not translate shows in English. An item is shown where its platforms say, and
-// where the shell has the capability it names `with` (and not the one it names `unless`): the page of the local program
-// is the web viewer with the files of a machine behind it (`overwrites`, `pathPackages`), and they and the desktop read
-// the files of a document one by one, and keep what they read (`reader`: Check All Files, File › Memory Cache).
+// only where the shell has the capability it names `with` (and not the one it names `unless`): the page of the local
+// program is a desktop, without what a browser cannot do (`quit`, `fileAssociations`) and, for now, the bundled packages
+// (`bundledPackages`); all of them read the files of a document one by one, and keep what they read (`reader`: Check All
+// Files, File › Memory Cache).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -15,14 +16,14 @@ const languages = readdirSync(i18n).filter((lang) => existsSync(new URL(`${lang}
 
 /** The shells whose menus are checked: the platform their items name, and the capabilities of the shell (shell.js). */
 const SHELLS = {
-  desktop: { platform: 'desktop', has: ['solve', 'solverTable', 'reader', 'overwrites', 'pathPackages'] },
-  web: { platform: 'web', has: ['solve', 'solverTable', 'reader'] },
-  local: { platform: 'web', has: ['solve', 'solverTable', 'reader', 'overwrites', 'pathPackages'] },
+  desktop: { platform: 'desktop', has: ['solve', 'solverTable', 'reader', 'pathPackages', 'saveSolved', 'version', 'quit', 'fileAssociations', 'bundledPackages'] },
+  web: { platform: 'web', has: ['solve', 'solverTable', 'reader', 'saveSolved', 'version'] },
+  local: { platform: 'desktop', has: ['solve', 'solverTable', 'reader', 'pathPackages', 'saveSolved', 'version'] },
 };
 
 /** Whether `shell` shows `item`, as commands.js offers it. */
 function shown(item, { platform, has }) {
-  const here = !item.platforms || item.platforms.includes(platform) || (item.with !== undefined && has.includes(item.with));
+  const here = (!item.platforms || item.platforms.includes(platform)) && (item.with === undefined || has.includes(item.with));
   return here && !(item.unless !== undefined && has.includes(item.unless));
 }
 

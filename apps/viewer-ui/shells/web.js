@@ -887,6 +887,8 @@ function sourceAt(source, full, f) {
 /** @type {import("../shell.js").Shell} */
 export default {
   platform: "web",
+  // the core runs in this page, as WebAssembly (the local program's page too): it is given the texts of built-in files
+  coreInPage: true,
   // the page's opens read the file shown alone, in the context of its entry (per-file loading); an embed reads its document whole
   perFile: !embed,
   // the core's parse formats, the one it detects for a Library file the document shown does not read,

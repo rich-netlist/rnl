@@ -1,8 +1,11 @@
 import { m, tr } from "../i18n.js";
 // The local shell: the page served by the local program (apps/local) to a browser, on the machine the program runs on, or,
-// over `ssh -L`, to a browser on another. It is the web shell, with the core as WebAssembly in the browser, and with the files
-// of the machine of the program behind it: the program lists them for the chooser, reads them for the page, and writes the
-// ones the user saves where they were read from, in the encoding they had (Save is Save, not Download File: `overwrites`).
+// over `ssh -L`, to a browser on another. It is the desktop viewer, for a machine where the desktop app cannot run: the same
+// interface and the same rules (platform "desktop"), with the files of the machine of the program behind it: the program
+// lists them for the chooser, reads them for the page, and writes the ones the user saves where they were read from, in the
+// encoding they had. What differs is only what a browser cannot do: the menus and dialogs are the page's own, not native;
+// the core runs in the page as WebAssembly (the web shell's); and a file dropped on the page, which a browser gives without
+// its path, is not opened. None of the web's own is here: no URL, no manifest, no public packages online.
 // Solve is the web shell's, which finds the program's solver service. The settings are kept by the program, in a file of the
 // user's own, not in the browser: its storage is of one address, and the program's address changes with every run.
 //
@@ -13,7 +16,7 @@ import { m, tr } from "../i18n.js";
 import web from "./web.js";
 import { decodeText } from "../core/client.js";
 import { chooseOnServer } from "../server-files.js";
-import { offer } from "../dialog.js";
+import { inform, offer } from "../dialog.js";
 import { note } from "../editor.js";
 import { sourcePath } from "../source-path.js";
 import { doc } from "../state.js";
@@ -139,37 +142,67 @@ async function watchChanges() {
 }
 watchChanges();
 
+// A browser gives a file dropped on the page without its path, which the desktop's rules need (Save writes a file where it
+// is): the page says so, and opens nothing.
+document.addEventListener("drop", (e) => {
+  if (![...(e.dataTransfer?.types || [])].includes("Files")) return;
+  void inform({ title: m("Open"), paragraphs: [m("A browser does not tell the page where a dropped file is. Open it with File › Open.")] });
+});
+
+// what the web shell has that is the web's own: none of it here (a URL, a manifest, public packages online, the Viewer API)
+const {
+  includeLibrary: _library, publicPackages: _published, includePackage: _include, externalFile: _external,
+  pickManifest: _pickManifest, sourceFromManifestJson: _manifestJson, saveManifest: _saveManifest, ...shared
+} = web;
+
 /** @type {import("../shell.js").Shell} */
 export default {
-  ...web,
-  overwrites: true,
-  /** The files named on the command line, the first of them; else what the web shell opens (a ?url= address). */
+  ...shared,
+  platform: "desktop",
+  /** The file named on the command line, the first of them; else none. */
   initial() {
-    if (session.initial.length > 0) return Promise.resolve(serverSource(session.initial[0]));
-    return web.initial();
+    return Promise.resolve(session.initial.length > 0 ? serverSource(session.initial[0]) : null);
   },
-  /** The chooser of the machine's files, whose last entry is the browser's own: the files of the computer the browser is on. */
+  /** The page opens nothing it is given otherwise: a file comes by File › Open or the command line (and see the drop above). */
+  onOpen() {},
+  /**
+   * The session of a new window (New Window, in a new tab of the browser): its files of the machine are read from the
+   * machine again, as the desktop's new window reads them from disk, with the texts applied and not saved over them
+   * (`edits`, navigation.js); the web shell's handoff carries the rest.
+   */
+  async initialSession() {
+    const session = await web.initialSession();
+    if (!session) return null;
+    const machine = (source) => {
+      if (!source || source.temporary || !onMachine(source.path)) return source;
+      const read = serverSource(source.path);
+      return source.view ? { ...read, entrySource: read, view: source.view } : read;
+    };
+    session.entry = machine(session.entry);
+    session.path = session.path.map((step) => ({ ...step, entry: machine(step.entry) }));
+    session.pool = session.pool.map((item) => (onMachine(item.path) ? { ...item, ...web.poolItem(serverSource(item.path)) } : item));
+    return session;
+  },
+  /** The chooser of the machine's files. */
   async pick(kind) {
-    if (kind !== "file") return web.pick(kind);
-    const chosen = await chooseOnServer(api, { kind: "file", start: lastDir, browser: () => web.pick("file"), remember });
+    if (kind !== "file") return null;
+    const chosen = await chooseOnServer(api, { kind: "file", start: lastDir, browser: null, remember });
     if (!chosen) return null;
-    if (chosen.browser !== undefined) return chosen.browser;
     await api("api/open", { method: "POST", body: { path: chosen.path } });
     return serverSource(chosen.path);
   },
-  /** Include File, and Include Folder: from the machine of the program, or, last in the list, from the browser's computer. */
+  /** Include File, and Include Folder: from the machine of the program. */
   async include(kind) {
-    if (kind !== "file" && kind !== "folder") return web.include(kind);
+    if (kind !== "file" && kind !== "folder") return [];
     const chosen = await chooseOnServer(api, {
       kind: kind === "folder" ? "folder" : "file",
       start: lastDir,
       title: kind === "folder" ? m("Choose Folder") : undefined,
-      browser: kind === "file" ? () => web.include(kind) : null,
+      browser: null,
       action: kind === "folder" ? tr("Choose") : undefined,
       remember,
     });
     if (!chosen) return [];
-    if (chosen.browser !== undefined) return chosen.browser;
     if (kind === "file") {
       await api("api/open", { method: "POST", body: { path: chosen.path } });
       return [web.poolItem(serverSource(chosen.path))];
@@ -233,8 +266,8 @@ export default {
   pathPackages: (dir, subfolders = false) => api(`api/path?${new URLSearchParams({ dir, ...(subfolders ? { subfolders: "1" } : {}) })}`),
   /** The bytes of a file of the machine, such as a PATH file that Download Project holds (project.js). */
   readFile: fileBytes,
-  /** A format chosen for a file of the machine is kept for the next start, as the desktop keeps it; else as the web does. */
-  keepsFormat: (path) => machineFiles.has(path) || web.keepsFormat(path),
+  /** A format chosen for a file of the machine is kept for the next start, as the desktop keeps it. */
+  keepsFormat: (path) => machineFiles.has(path),
   /** A file of a PATH folder, read from the machine as a file opened is. */
   pathItem(path) {
     const source = { ...serverSource(path), library: true };

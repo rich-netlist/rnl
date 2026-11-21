@@ -28,6 +28,12 @@ async function webMenus(page) {
       add(i.items);
     });
     for (const m of table.menus) add(m.items);
+    // what the page's shell has of what the items name in `with`, which they are offered only with
+    const { shell } = await import("./shell.js");
+    const names = [];
+    const withs = (items) => items.forEach((i) => (i.items ? withs(i.items) : i.with && names.push(i.with)));
+    for (const m of table.menus) withs(m.items);
+    table.has = Object.fromEntries(names.map((n) => [n, !!shell[n]]));
     return table;
   });
   const plain = (label) => label.replace("&", "");
@@ -40,7 +46,7 @@ async function webMenus(page) {
         continue;
       }
       const inner = item.items ? entries(item.items) : null;
-      if (inner ? inner.length === 0 : item.platforms && !item.platforms.includes("web")) continue;
+      if (inner ? inner.length === 0 : (item.platforms && !item.platforms.includes("web")) || (item.with && !table.has[item.with])) continue;
       if (gap) shown.push("");
       shown.push(plain(item.label) + (item.shown || (item.keys ? item.keys[0] : "")), ...(inner || []));
       gap = false;

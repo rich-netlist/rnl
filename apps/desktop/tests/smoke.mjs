@@ -358,7 +358,7 @@ const commands = (items) => items.flatMap((item) => (item === "-" ? [] : item.it
 /**
  * The native menus the command table gives the desktop on Windows, the keys shown after a tab, and
  * the check marks the page has set: `marks` by command id. A command is offered where it names no
- * platforms or names the desktop, or where the shell has what it names in `with`, and not where the
+ * platforms or names the desktop, and the shell has what it names in `with`, and not where the
  * shell has what it names in `unless`: `caps`, by name, as the page's shell has them.
  */
 function tableMenus(marks, caps) {
@@ -376,7 +376,7 @@ function tableMenus(marks, caps) {
         if (inner.length === 0) continue;
         next = { text: item.label, separator: false, checked: false, items: inner };
       } else {
-        const here = !item.platforms || item.platforms.includes("desktop") || (item.with !== undefined && caps[item.with]);
+        const here = (!item.platforms || item.platforms.includes("desktop")) && (item.with === undefined || caps[item.with]);
         if (!here || (item.unless !== undefined && caps[item.unless])) continue;
         const keys = item.shown || (item.keys ? item.keys[0] : null);
         next = { text: keys ? `${item.label}\t${keys}` : item.label, separator: false, checked: !!item.check && marks[item.id] };
