@@ -1,20 +1,19 @@
 import { expect, test } from '../viewer.js';
 
-test('preload order follows descendants breadth first, deduplicates cycles and appends PATH', async ({page, viewer}) => {
+test('the files to preload are those below the file shown, breadth first, each once, from the outline', async ({page, viewer}) => {
   await viewer.open('04-hierarchy');
-  const candidates = await page.evaluate(async () => {
-    const {preloadSources} = await import('./preload-queue.js');
-    const doc = {path:'C:/top.sp', levels:[
-      {lines:[0], children:[{level:1},{level:2},{level:1},{level:null}]},
-      {lines:[1], children:[{level:3},{level:0}]},
-      {lines:[2], children:[]}, {lines:[3], children:[]},
-    ]};
-    const paths = ['C:/top.sp', 'C:/a.sp', 'C:/b.sp', 'C:/deep.sp'];
-    const shell = {platform:'desktop', sourceForFile: (_s,_d,i) => ({path:paths[i]}),
-      preloadCandidates: () => ['C:\\A.sp', 'C:/other.sp', 'C:/pkg.rnl'].map(path=>({path}))};
-    return preloadSources(doc,0,{path:paths[0]},shell).map(s=>s.path);
+  const files = await page.evaluate(async () => {
+    const {preloadFiles} = await import('./preload-queue.js');
+    // top.sp calls a cell of a.inc and one of b.inc; a's cell calls one of deep.inc, and top again (a cycle); a
+    // device no file defines; b.inc's own other cell is not called
+    const level = (file, calls) => ({file, calls: calls.map(level => ({master: 'x', level}))});
+    const doc = {file: 'top.sp', outline: {
+      files: [{path: 'top.sp', levels: [0]}, {path: 'a.inc', levels: [1]}, {path: 'b.inc', levels: [2, 4]}, {path: 'deep.inc', levels: [3]}],
+      levels: [level(0, [1, 2, null]), level(1, [3, 0]), level(2, []), level(3, []), level(2, [])],
+    }};
+    return {below: preloadFiles(doc), fromA: preloadFiles({...doc, file: 'a.inc'}), none: preloadFiles({file: 'top.sp'})};
   });
-  expect(candidates).toEqual(['C:/a.sp','C:/b.sp','C:/deep.sp','C:/other.sp']);
+  expect(files).toEqual({below: ['a.inc', 'b.inc', 'deep.inc'], fromA: ['deep.inc', 'top.sp', 'b.inc'], none: []});
 });
 
 test('preloader yields to interaction, serializes builds and discards superseded queues', async ({page, viewer}) => {

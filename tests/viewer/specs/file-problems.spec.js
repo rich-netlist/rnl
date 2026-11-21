@@ -27,6 +27,8 @@ R1 a b 1k
 
 async function open(page) {
   await page.route('https://rich-netlist.github.io/rnl-packages/**', route => route.abort());
+  // no preloading, which reads files while the page is idle: what is kept is what the test reads
+  await page.addInitScript(() => localStorage.setItem('file-preload', 'false'));
   await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
   await expect(page.locator('#menubar')).toBeVisible();
   await page.locator('#file-input').setInputFiles([

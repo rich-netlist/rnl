@@ -37,6 +37,31 @@ test('the cache limit validates, persists, can keep none, and Clear Cache leaves
   await dialog(page).getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(dialog(page)).toHaveCount(0);
   expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('fake-settings'))['file-cache-memory-mib'])).toBe(0);
+  // the switches: no readings kept, which leaves the limit and preloading with nothing to do; preloading off
+  await openCache(page);
+  const keep = dialog(page).getByLabel('Keep the readings in memory');
+  const preload = dialog(page).getByLabel('Preload the files below the file shown while idle');
+  await expect(keep).toBeChecked();
+  await expect(preload).toBeChecked();
+  await limit.fill('64');
+  await preload.uncheck();
+  await keep.uncheck();
+  await expect(limit).toBeDisabled();
+  await expect(preload).toBeDisabled();
+  await dialog(page).getByRole('button', { name: 'Apply', exact: true }).click();
+  await expect(dialog(page)).toHaveCount(0);
+  const saved = await page.evaluate(() => JSON.parse(sessionStorage.getItem('fake-settings')));
+  expect([saved['file-cache-enabled'], saved['file-cache-memory-mib'], saved['file-preload']]).toEqual([false, 0, false]);
+  expect(await page.evaluate(async () => (await import('./file-reading.js')).readingStats().limit)).toBe(0);
+  expect(await page.evaluate(async () => (await import('./file-reading.js')).preloadAllowed())).toBe(false);
+  await openCache(page);
+  await expect(keep).not.toBeChecked();
+  await expect(limit).toBeDisabled();
+  await keep.check();
+  await preload.check();
+  await dialog(page).getByRole('button', { name: 'Apply', exact: true }).click();
+  await expect(dialog(page)).toHaveCount(0);
+  expect(await page.evaluate(async () => (await import('./file-reading.js')).preloadAllowed())).toBe(false);
 });
 
 test('reload requests a fresh build rather than reusing a cached result', async ({ page, viewer }) => {

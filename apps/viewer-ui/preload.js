@@ -1,29 +1,32 @@
 import { modal } from './dialog.js';
 import { dirtyPaths, unappliedPaths } from './edits.js';
 import { editing } from './editor.js';
+import { preloadAllowed, preloadFile, stopPreload } from './file-reading.js';
 import { currentSource, isLoading } from './open.js';
-import { preloadSources, PreloadQueue } from './preload-queue.js';
+import { preloadFiles, PreloadQueue } from './preload-queue.js';
 import { shell } from './shell.js';
 import { previewing } from './solve.js';
-import { current, doc } from './state.js';
-import { load } from './util.js';
+import { doc } from './state.js';
 
-/** Native PATH preloading. Shells without an isolated compiler simply omit this capability. */
+/**
+ * Preloading, the same in every shell that reads by file: while the viewer is idle, the files of the subcircuits below
+ * the file shown are read, one at a time, into the room the cache has free (file-reading.js). Nothing is shown, and
+ * nothing joins the Library. An embedded viewer does not preload.
+ */
 export function startPreload() {
-  if (!shell.preload || shell.embed) return;
+  if (!shell.reader || shell.embed) return;
   const queue = new PreloadQueue({
-    candidates: () => preloadSources(doc, current, currentSource(), shell),
-    prepare: source => shell.preload(source),
-    cancel: () => shell.cancelPreload(),
-    allowed: () => load('background-preload', true) === true && load('render-cache-mib', 256) > 0 &&
-      !document.hidden && !isLoading() && !modal() && !editing && !previewing() &&
+    candidates: () => preloadFiles(doc),
+    prepare: file => preloadFile(currentSource(), doc, file),
+    cancel: () => stopPreload(),
+    allowed: () => preloadAllowed() && !document.hidden && !isLoading() && !modal() && !editing && !previewing() &&
       !document.body.classList.contains('solving') && !dirtyPaths().length && !unappliedPaths().length,
   });
   for (const event of ['pointermove', 'pointerdown', 'wheel', 'keydown'])
     window.addEventListener(event, () => queue.activity(), { capture: true, passive: true });
-  for (const event of ['viewer-level', 'preload-reset']) window.addEventListener(event, () => queue.reset());
+  for (const event of ['viewer-level', 'preload-reset', 'open-finished']) window.addEventListener(event, () => queue.reset());
   document.addEventListener('visibilitychange', () => queue.reset());
-  // A navigation/solve cancels before its async build; no compiler is queued behind speculation.
+  // a reading of the page's own, or a solve, stops the preloading before it starts
   const observer = new MutationObserver(() => {
     if (document.body.matches('.busy, .solving') || editing) queue.reset();
   });

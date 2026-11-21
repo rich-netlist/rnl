@@ -2,34 +2,34 @@
 export const IDLE_MS = 1500;
 export const MAX_CANDIDATES = 128;
 
-/** Breadth-first descendants first, then the shell's library/search-path files. */
-export function preloadSources(doc, current, source, shell) {
-  if (!doc || !source || source.readonly || source.temporary || source.text !== undefined) return [];
-  const key = path => shell.platform === 'desktop' ? path.replaceAll('\\', '/').toLowerCase() : path;
-  const paths = new Set([key(source.path || doc.path)]), levels = new Set([current]), queue = [current], out = [];
-  const add = candidate => {
-    const path = candidate?.path;
-    if (!path || candidate.readonly || paths.has(key(path)) || !/\.(sp|spi|spice|cir|ckt|net|netlist|scs|inc|lib)$/i.test(path)) return;
-    paths.add(key(path)); out.push(candidate);
-  };
-  for (let at = 0; at < queue.length && out.length < MAX_CANDIDATES; at++) {
-    const id = queue[at];
-    const level = doc.levels[id];
+/**
+ * The files to read while the viewer is idle (file-reading.js `preloadFile`): those of the subcircuits below the file
+ * the Document `doc` shows, breadth first, by the levels each level calls, from the outline of the whole document; the
+ * file shown aside, and each file once. The Library and PATH are not among them.
+ */
+export function preloadFiles(doc) {
+  const outline = doc?.outline;
+  if (!outline) return [];
+  const at = outline.files.findIndex((f) => f.path === doc.file);
+  if (at < 0) return [];
+  const files = new Set([at]), levels = new Set(outline.files[at].levels), queue = [...outline.files[at].levels], out = [];
+  for (let k = 0; k < queue.length && out.length < MAX_CANDIDATES; k++) {
+    const level = outline.levels[queue[k]];
     if (!level) continue;
-    const file = level.lines?.[0];
-    if (file !== undefined) add(shell.sourceForFile(source, doc, file));
-    for (const child of level.children) if (child.level != null && !levels.has(child.level)) {
-      levels.add(child.level); queue.push(child.level);
+    if (level.file !== null && !files.has(level.file)) {
+      files.add(level.file);
+      out.push(outline.files[level.file].path);
     }
-  }
-  for (const candidate of shell.preloadCandidates?.() || []) {
-    if (out.length >= MAX_CANDIDATES) break;
-    add(candidate);
+    for (const call of level.calls) {
+      if (call.level === null || levels.has(call.level)) continue;
+      levels.add(call.level);
+      queue.push(call.level);
+    }
   }
   return out;
 }
 
-/** One build at a time; rest for 3x its duration (~25% of one core over repeated jobs).
+/** One reading at a time; rest for 3x its duration (~25% of one core over repeated jobs).
  * This is a duty-cycle target, not a hard CPU cap during an individual compilation.
  */
 export class PreloadQueue {
