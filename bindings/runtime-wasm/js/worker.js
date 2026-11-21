@@ -3,7 +3,8 @@
 // { id, outline } for an outline request, { id, file } for the reading of one file, { id, symbols }
 // for the symbols of a file, { id, written } for a write, { id, replaced } for a
 // replace-records request, { id, catalog } for a catalog request, { id, drawings } for the drawings
-// of objects the last build kept, { id, formats } for a formats request, or { id, error },
+// of objects the last build kept, { id, formats } for a formats request, { id, bundled } for the
+// bundled packages a frontend lists, or { id, error },
 // in the order they came. The request is an object or, as client.js sends it, its JSON text. Every request gets
 // the packages this build brings (packages.js): their files under the request's own, their
 // directories after the request's; an outline, which loads no package, gets none. It runs in browsers and, for the tests, as a Node worker thread.

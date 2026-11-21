@@ -312,7 +312,7 @@ pub struct FormatList {
 
 /// The answer to a request: `{"document": ...}`, `{"outline": ...}`, `{"file": ...}`, `{"symbols": ...}`,
 /// `{"snapshot": ...}`, `{"written": ...}`,
-/// `{"replaced": ...}`, `{"catalog": ...}`, `{"drawings": ...}`, `{"formats": ...}` or
+/// `{"replaced": ...}`, `{"catalog": ...}`, `{"drawings": ...}`, `{"formats": ...}`, `{"bundled": ...}` or
 /// `{"error": "..."}`.
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
@@ -338,6 +338,9 @@ pub enum Response {
     Drawings(Vec<UnplacedDrawing>),
     /// The formats a [`FormatsRequest`] asks for.
     Formats(Box<FormatList>),
+    /// The bundled packages a frontend lists among its built-in ones, by path with their texts, when the
+    /// request has a `bundled` field ([`rnl_view::bundled_listed`]): all but those of a draft series.
+    Bundled(BTreeMap<String, String>),
     /// Why there is none: the request is not a [`Request`], a [`WriteRequest`], a
     /// [`ReplaceRequest`], a [`CatalogRequest`] or a [`DrawingsRequest`], the entry cannot be read,
     /// an op cannot be written, the records cannot be replaced (the message begins with the kind of
@@ -440,6 +443,9 @@ pub fn respond(request: &[u8]) -> Response {
             Ok(d) => drawings(d.drawings),
             Err(e) => invalid(e),
         };
+    }
+    if value.get("bundled").is_some() && value.get("entry").is_none() {
+        return Response::Bundled(rnl_view::bundled_listed());
     }
     // a build sets formats too: a request for the list has no entry
     if value.get("formats").is_some() && value.get("entry").is_none() {
@@ -1144,6 +1150,13 @@ C1 a 0 1p
         assert_eq!(v["formats"]["list"], serde_json::to_value(rnl_view::formats()).unwrap());
         assert_eq!(v["formats"]["detected"], json!({ "/w/a.inc": "spice", "/w/b.lib": "spectre" }));
         assert_eq!(answer(json!({ "formats": {} }))["formats"]["detected"], json!({}));
+        // the suffixes a frontend lists come with the list
+        assert_eq!(v["formats"]["list"][0]["entries"][0], "sp");
+        // the bundled packages a frontend lists
+        assert_eq!(
+            answer(json!({ "bundled": true }))["bundled"],
+            serde_json::to_value(rnl_view::bundled_listed()).unwrap()
+        );
         // the library index reads with them: a `.scs` file written in SPICE defines its subcircuit
         let lib = json!({ "/lib/cells.scs": ".subckt cell p n\nR1 p n 1k\n.ends\n" });
         let update = |formats: Value| {

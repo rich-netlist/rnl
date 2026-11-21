@@ -32,19 +32,61 @@ pub struct FormatInfo {
     pub extensions: Vec<String>,
     /// The format of a file that no other format claims: exactly one has it.
     pub fallback: bool,
+    /// The suffixes of the files of this format that a frontend lists, lower case and without the dot, in the
+    /// order it lists them: in its file dialogs, for files dropped on it, in a folder it includes and in a
+    /// PATH folder. They are not how a file's format is found ([`detect_format`]): SPICE reads a file of any
+    /// suffix. [`listed_suffixes`] gives those of all formats.
+    pub listed: Vec<String>,
+    /// Those of `listed` whose files are netlists opened on their own, which a frontend offers first as the
+    /// file to open; the others, such as `inc` and `rnl`, are mostly included or used by a netlist.
+    pub entries: Vec<String>,
+}
+
+/// The suffixes a frontend lists for each format, by its name, and how many of them, from the first, are
+/// those of netlists opened on their own. Verilog-A files (`va`, `vams`) are listed, as a netlist includes
+/// them, though they are read as text; the other suffixes of text are not.
+fn listed(name: &str) -> (&'static [&'static str], usize) {
+    match name {
+        "spice" => (&["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "inc", "lib"], 7),
+        "spectre" => (&["scs"], 1),
+        "rnl" => (&["rnl"], 0),
+        "text" => (&["va", "vams"], 0),
+        _ => (&[], 0),
+    }
 }
 
 /// The formats a file can be read with.
 pub fn formats() -> Vec<FormatInfo> {
     FORMATS
         .iter()
-        .map(|f| FormatInfo {
-            name: f.name().to_string(),
-            title: f.title().to_string(),
-            extensions: f.extensions().iter().map(|e| e.to_string()).collect(),
-            fallback: f.name() == "spice",
+        .map(|f| {
+            let (suffixes, entries) = listed(f.name());
+            FormatInfo {
+                name: f.name().to_string(),
+                title: f.title().to_string(),
+                extensions: f.extensions().iter().map(|e| e.to_string()).collect(),
+                fallback: f.name() == "spice",
+                listed: suffixes.iter().map(|s| s.to_string()).collect(),
+                entries: suffixes[..entries].iter().map(|s| s.to_string()).collect(),
+            }
         })
         .collect()
+}
+
+/// The suffixes of the files a frontend lists, of every format: the netlists opened on their own first, then
+/// the files they include or use, each group in the order of the formats. Lower case, without the dot.
+pub fn listed_suffixes() -> Vec<&'static str> {
+    let all: Vec<_> = FORMATS.iter().map(|f| listed(f.name())).collect();
+    let entries = all.iter().flat_map(|(s, n)| s[..*n].iter().copied());
+    let parts = all.iter().flat_map(|(s, n)| s[*n..].iter().copied());
+    entries.chain(parts).collect()
+}
+
+/// Whether a frontend lists the file at `path`: its suffix, in any case, is among [`listed_suffixes`].
+pub fn is_listed(path: &str) -> bool {
+    let name = path.rsplit(['/', '\\']).next().unwrap_or(path);
+    name.rsplit_once('.')
+        .is_some_and(|(stem, ext)| !stem.is_empty() && listed_suffixes().iter().any(|s| s.eq_ignore_ascii_case(ext)))
 }
 
 /// The name of the format of index `k`.

@@ -11,9 +11,7 @@ pub async fn dropped_files(paths: Vec<String>) -> Result<Vec<String>, String> {
             .into_iter()
             .filter_map(|name| {
                 let path = Path::new(&name);
-                (path.is_file()
-                    && path.extension().is_some_and(|e| super::NETLISTS.iter().any(|x| e.eq_ignore_ascii_case(x))))
-                .then_some(name)
+                (path.is_file() && rnl_view::is_listed(&name)).then_some(name)
             })
             .collect()
     })
@@ -29,9 +27,7 @@ pub fn folder_files(dir: &Path, out: &mut Vec<String>) -> Result<(), String> {
         let path = entry.path();
         if kind.is_dir() {
             folder_files(&path, out)?;
-        } else if kind.is_file()
-            && path.extension().is_some_and(|e| super::NETLISTS.iter().any(|x| e.eq_ignore_ascii_case(x)))
-        {
+        } else if kind.is_file() && rnl_view::is_listed(&path.to_string_lossy()) {
             out.push(rnl_cli::path_str(&path));
         }
     }
@@ -56,7 +52,7 @@ pub async fn pick_pool(window: WebviewWindow, kind: String) -> Result<Vec<String
             Ok(paths)
         } else {
             dialog
-                .add_filter(filter, &super::NETLISTS)
+                .add_filter(filter, &rnl_view::listed_suffixes())
                 .add_filter(all, &["*"])
                 .blocking_pick_files()
                 .unwrap_or_default()
@@ -69,12 +65,11 @@ pub async fn pick_pool(window: WebviewWindow, kind: String) -> Result<Vec<String
     .map_err(|e| e.to_string())?
 }
 
-/// The bundled packages the Library lists as built in: all but those of a draft series, such as 0.4
-/// before its standard is released (`rnl_view::bundled_drafts`), which the core reads all the same.
+/// The bundled packages the Library lists as built in, as the core lists them for every viewer
+/// ([`rnl_view::bundled_listed`]): all but those of a draft series, which the core reads all the same.
 #[tauri::command]
 pub fn bundled_files() -> std::collections::BTreeMap<String, String> {
-    let drafts = rnl_view::bundled_drafts();
-    rnl_view::bundled().files.into_iter().filter(|(path, _)| !drafts.contains(path)).collect()
+    rnl_view::bundled_listed()
 }
 
 /// What a PATH directory lists in the Library: its packages and netlists, and whether it was added
@@ -120,14 +115,12 @@ fn directory_files(path: &Path) -> Result<Vec<String>, String> {
     for entry in std::fs::read_dir(path).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         let p = entry.path();
-        if p.is_file() && p.extension().is_some_and(|e| super::NETLISTS.iter().any(|x| e.eq_ignore_ascii_case(x))) {
+        if p.is_file() && rnl_view::is_listed(&p.to_string_lossy()) {
             files.push(rnl_cli::path_str(&p));
         } else if p.is_dir() && rnl_runtime::source::version_directory(&entry.file_name().to_string_lossy()) {
             for file in std::fs::read_dir(&p).map_err(|e| e.to_string())? {
                 let file = file.map_err(|e| e.to_string())?.path();
-                if file.is_file()
-                    && file.extension().is_some_and(|e| super::NETLISTS.iter().any(|x| e.eq_ignore_ascii_case(x)))
-                {
+                if file.is_file() && rnl_view::is_listed(&file.to_string_lossy()) {
                     files.push(rnl_cli::path_str(&file));
                 }
             }

@@ -97,6 +97,8 @@ export interface CoreWorker {
   library(request: LibraryRequest): Promise<string[]>;
   /** The formats a file can be read with, and the format each file of `detect` has when none is set. */
   formats(request: FormatsRequest): Promise<FormatList>;
+  /** The bundled packages a frontend lists among its built-in ones, by path with their texts: all but those of a draft series. */
+  bundled(): Promise<Record<string, string>>;
   /** Stop the Worker; calls still waiting, and later ones, reject. */
   terminate(): void;
 }

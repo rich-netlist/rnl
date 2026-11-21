@@ -1,15 +1,23 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { publishLibrary } from "./library.mjs";
 
+/** The package files of a series folder by their `<bundled>/` paths, as the core lists a series it bundles. */
+function series(libraries, name) {
+  const dir = join(libraries, "standard", name);
+  return Object.fromEntries(readdirSync(dir).filter((f) => f.endsWith(".rnl"))
+    .map((f) => [`<bundled>/${name}/${f}`, readFileSync(join(dir, f), "utf8").replace(/\r\n/g, "\n")]));
+}
+
 test("the published library describes every package and separates built-ins from optional packages", () => {
   const out = mkdtempSync(join(tmpdir(), "rnl-library-"));
   try {
-    const index = publishLibrary(fileURLToPath(new URL("../../libraries", import.meta.url)), out);
+    const libraries = fileURLToPath(new URL("../../libraries", import.meta.url));
+    const index = publishLibrary(libraries, out, series(libraries, "0.4"));
     const optional = index.filter((p) => !p.builtin);
     assert.deepEqual(optional, []);
     assert.ok(index.every((p) => p.path.endsWith(".rnl")));
@@ -23,20 +31,21 @@ test("the published library describes every package and separates built-ins from
   } finally { rmSync(out, { recursive: true, force: true }); }
 });
 
-test("every series under libraries/standard is published, whether its standard is released or not", () => {
+test("every series under libraries/standard is published, and the built-in ones are those the core lists", () => {
   const root = mkdtempSync(join(tmpdir(), "rnl-library-"));
   try {
-    for (const series of ["0.4", "0.5"]) {
-      mkdirSync(join(root, "libraries", "standard", series), { recursive: true });
-      writeFileSync(join(root, "libraries", "standard", series, "rnl-std-all.rnl"),
-        `@RNL(type="header") { @VERSION("${series}"); @PACKAGE(name="rnl-std-all", version="${series}")}\n`);
+    for (const name of ["0.4", "0.5"]) {
+      mkdirSync(join(root, "libraries", "standard", name), { recursive: true });
+      writeFileSync(join(root, "libraries", "standard", name, "rnl-std-all.rnl"),
+        `@RNL(type="header") { @VERSION("${name}"); @PACKAGE(name="rnl-std-all", version="${name}")}\n`);
     }
-    // a released standard of 0.4 and a draft of 0.5: both series are bundled by the core, and both published
-    mkdirSync(join(root, "spec", "0.4"), { recursive: true });
-    writeFileSync(join(root, "spec", "0.4", "RELEASED"), "released\n");
+    // a draft series 0.5, which the core bundles and reads but does not list: published, not built in
     const out = mkdtempSync(join(root, "out-"));
-    publishLibrary(join(root, "libraries"), out);
-    assert.deepEqual(Object.keys(JSON.parse(readFileSync(join(out, "bundled.json"), "utf8"))),
-      ["<bundled>/0.4/rnl-std-all.rnl", "<bundled>/0.5/rnl-std-all.rnl"]);
+    const index = publishLibrary(join(root, "libraries"), out, series(join(root, "libraries"), "0.4"));
+    assert.deepEqual(index.map((p) => [p.path, p.builtin]), [["standard/0.4/rnl-std-all.rnl", true], ["standard/0.5/rnl-std-all.rnl", false]]);
+    assert.ok(readFileSync(join(out, "standard", "0.5", "rnl-std-all.rnl"), "utf8").includes('version="0.5"'));
+    assert.deepEqual(Object.keys(JSON.parse(readFileSync(join(out, "bundled.json"), "utf8"))), ["<bundled>/0.4/rnl-std-all.rnl"]);
+    // a package the core lists must be among the files
+    assert.throws(() => publishLibrary(join(root, "libraries"), out, { "<bundled>/0.6/rnl-std-all.rnl": "" }), /does not have: <bundled>\/0\.6/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

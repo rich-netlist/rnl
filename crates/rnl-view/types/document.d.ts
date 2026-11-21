@@ -859,6 +859,18 @@ export type FormatInfo = {
    * The format of a file that no other format claims: exactly one has it.
    */
   fallback: boolean,
+  /**
+   * The suffixes of the files of this format that a frontend lists, lower case and without the dot, in the
+   * order it lists them: in its file dialogs, for files dropped on it, in a folder it includes and in a
+   * PATH folder. They are not how a file's format is found ([`detect_format`]): SPICE reads a file of any
+   * suffix. [`listed_suffixes`] gives those of all formats.
+   */
+  listed: Array<string>,
+  /**
+   * Those of `listed` whose files are netlists opened on their own, which a frontend offers first as the
+   * file to open; the others, such as `inc` and `rnl`, are mostly included or used by a netlist.
+   */
+  entries: Array<string>,
 };
 
 export type Object = {

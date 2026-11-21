@@ -181,9 +181,6 @@ impl Roots {
     }
 }
 
-/// The files the Library reads in a PATH folder: netlists and packages, by their names.
-const NETLISTS: [&str; 11] = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "inc", "lib", "scs", "rnl"];
-
 /// The most sub-folders of a PATH folder added with its sub-folders that are searched, as on the desktop.
 pub const SUBFOLDER_LIMIT: usize = 500;
 
@@ -254,7 +251,8 @@ fn path_folder(dir: &Path, root: &Path, out: &mut Vec<PathBuf>) {
 
 /// A netlist or package, when it is a file in `root` as the file system resolves it, with nothing hidden on the way.
 fn path_file(path: PathBuf, root: &Path, out: &mut Vec<PathBuf>) {
-    let named = path.extension().is_some_and(|e| NETLISTS.iter().any(|x| e.eq_ignore_ascii_case(x)));
+    // the files a viewer lists, by the suffixes the core gives
+    let named = rnl_view::is_listed(&path.to_string_lossy());
     let inside = || {
         canonical(&path).is_some_and(|real| real.is_file() && real.strip_prefix(root).is_ok_and(|below| !hidden(below)))
     };
