@@ -28,8 +28,10 @@ R1 a b 1k
 .ends
 `;
 
-async function open(page) {
+async function open(page, { preload = false } = {}) {
   await page.route('https://rich-netlist.github.io/rnl-packages/**', route => route.abort());
+  // preloading reads files while the page is idle: off, but in its own test, so that what is kept is what the test reads
+  await page.addInitScript((on) => localStorage.setItem('file-preload', String(on)), preload);
   await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
   await expect(page.locator('#menubar')).toBeVisible();
   await page.locator('#file-input').setInputFiles([
@@ -127,6 +129,20 @@ test('a file read before is shown again from the readings kept, until a file it 
   await idle(page);
   await expect.poll(() => kept(page)).toMatchObject({ hits: 2, misses: 3 });
   expect(await shown(page)).toMatchObject({ file: 'cells.inc', levels: ['cell'] });
+});
+
+test('while the page is idle, the files below the file shown are read into the cache, and shown from it', async ({ page }) => {
+  await open(page, { preload: true });
+  // the entry was read; cells.inc and leaf.inc, below it, are preloaded, which counts as no hit or miss
+  await expect.poll(async () => (await kept(page)).entries, { timeout: 20000 }).toBe(3);
+  expect(await kept(page)).toMatchObject({ hits: 0, misses: 1 });
+  expect(await shown(page)).toMatchObject({ file: 'top.sp', level: 'top.sp' });
+  await descendNamed(page, 'X1');
+  expect(await shown(page)).toMatchObject({ file: 'cells.inc', levels: ['cell'], path: ['top.sp', 'cell'] });
+  expect(await kept(page)).toMatchObject({ hits: 1, misses: 1 });
+  // the Library has only the file opened
+  await page.locator('#tab-files').click();
+  await expect(page.locator('.lib-group[data-group="files"] .pool-row .pool-open')).toHaveText(['top.sp']);
 });
 
 test('the readings are kept in memory alone: another visit of the page reads the file again', async ({ page }) => {

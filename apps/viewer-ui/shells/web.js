@@ -1130,9 +1130,10 @@ export default {
      * What the page reads a document file by file with (file-reading.js, shell.js `Reader`): the files the source reads,
      * with the Library and `edits` over them, read and hashed as the core reads them, and a core, which starts only when
      * the outline or a reading is asked for. A reading with `keep` holds the drawings of what has no position: the
-     * reader's core does, and becomes the core shown when the page shows the Document.
+     * reader's core does, and becomes the core shown when the page shows the Document. A `background` reader has a core
+     * of its own, and leaves the warm spare to the page.
      */
-    async reader(source, edits, { progress, signal, bind, constraints } = {}) {
+    async reader(source, edits, { progress, signal, bind, constraints, background = false } = {}) {
       const prepared = await prepare(source, edits, [], progress, { bind, constraints });
       const { entry, request, read, library } = prepared;
       // the texts known, by the paths of the request, and those read, once each
@@ -1151,10 +1152,11 @@ export default {
       const stopped = () => { if (signal?.aborted) throw new Error("superseded"); };
       const useCore = () => (starting ??= (async () => {
         stopped();
-        const warm = spare ?? warmCore();
-        spare = null;
+        // (a background reading, preloading, takes a core of its own: the warm spare stays for the page's next open)
+        const warm = background ? warmCore() : spare ?? warmCore();
+        if (!background) spare = null;
         worker = warm.worker;
-        pendingCores.add(worker);
+        if (!background) pendingCores.add(worker);
         signal?.addEventListener("abort", abort, { once: true });
         await warm.ready;
         await indexLibrary(worker, library);

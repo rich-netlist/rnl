@@ -2,7 +2,9 @@
 //! outline of the whole document, the reading of one file alone in the context of its entry, the hashes and texts of
 //! its files as the core reads them, and the symbols of a file's subcircuits. The page keeps the readings, in memory,
 //! by the rules every shell keeps them by; the app keeps nothing of them but the drawings of what the reading shown
-//! has with no position, which the page asks for as it scrolls (`unplaced_drawings`).
+//! has with no position, which the page asks for as it scrolls (`unplaced_drawings`). Only a reading that keeps them
+//! runs on the core thread; the others, the page's preloading and Check All Files among them, run beside it, so that
+//! they never hold up the reading the page is to show.
 
 use rnl_runtime::numbering::{hex, sha256};
 use rnl_runtime::source::Provider;
@@ -33,22 +35,23 @@ fn options(formats: formats::Formats, bind: Option<Bind>, constraints: bool) -> 
     BuildOptions { formats, bind, constraints, flylines: true, hints: true, ..BuildOptions::default() }
 }
 
-/// Run `job` on the core thread, with its drawings, the entry as the core names it, and the files of `source` as a
+/// Run `job` with the drawings of the reading shown, the entry as the core names it, and the files of `source` as a
 /// reading reads them: its edits over the disk, the file pool, the public packages, PATH and the Library, Auto Include
-/// when it is on. With `progress`, the window is told when the first file is read (`load-stage`).
+/// when it is on. With `drawn`, it runs on the core thread, which holds the drawings; otherwise on a thread of its own,
+/// with none. With `progress`, the window is told when the first file is read (`load-stage`).
 async fn with_files<T: Send + 'static>(
     core: &Core,
     settings: &settings::Settings,
     library: &library::Library,
     source: Source,
-    progress: Option<(WebviewWindow, String)>,
+    (drawn, progress): (bool, Option<(WebviewWindow, String)>),
     job: impl FnOnce(&mut Drawn, &str, &dyn Provider, &formats::Formats) -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
     let core = core.clone();
     let paths = settings.paths()?;
     let library = library.snapshot()?;
     tauri::async_runtime::spawn_blocking(move || {
-        core.run(move |drawn| {
+        let read = move |drawn: &mut Drawn| {
             let Source { path, name, text, edits, pool, auto_include, formats } = source;
             let (entry, held) = files::entry_held(path, name, text, &edits.unwrap_or_default())?;
             let pool = pool.unwrap_or_default();
@@ -66,10 +69,15 @@ async fn with_files<T: Send + 'static>(
                 }
                 None => job(drawn, &entry, &files, &formats),
             }
-        })
+        };
+        if drawn {
+            core.run(read)?
+        } else {
+            read(&mut Drawn::default())
+        }
     })
     .await
-    .map_err(|e| e.to_string())??
+    .map_err(|e| e.to_string())?
 }
 
 /// The version of the core and of the shape of its readings, which the key of a reading kept has.
@@ -89,7 +97,7 @@ pub async fn read_outline(
     request_id: Option<String>,
 ) -> Result<tauri::ipc::Response, String> {
     let progress = request_id.map(|id| (window, id));
-    let json = with_files(&core, &settings, &library, source, progress, |_, entry, files, formats| {
+    let json = with_files(&core, &settings, &library, source, (false, progress), |_, entry, files, formats| {
         let outline = rnl_view::outline(entry, files, &options(formats.clone(), None, false))?;
         serde_json::to_string(&outline).map_err(|e| e.to_string())
     })
@@ -117,18 +125,20 @@ pub async fn read_file(
     request_id: Option<String>,
 ) -> Result<tauri::ipc::Response, String> {
     let progress = request_id.map(|id| (window, id));
-    let json = with_files(&core, &settings, &library, source, progress, move |drawn, entry, files, formats| {
-        let options = options(formats.clone(), bind, constraints.unwrap_or(false));
-        let result = if keep.unwrap_or(false) {
-            let (result, drawings) = rnl_view::build_file_drawn(entry, &file, files, &options)?;
-            drawn.keep(drawings);
-            result
-        } else {
-            rnl_view::build_file(entry, &file, files, &options)?
-        };
-        serde_json::to_string(&result).map_err(|e| e.to_string())
-    })
-    .await?;
+    let drawn = keep.unwrap_or(false);
+    let json =
+        with_files(&core, &settings, &library, source, (drawn, progress), move |drawn, entry, files, formats| {
+            let options = options(formats.clone(), bind, constraints.unwrap_or(false));
+            let result = if keep.unwrap_or(false) {
+                let (result, drawings) = rnl_view::build_file_drawn(entry, &file, files, &options)?;
+                drawn.keep(drawings);
+                result
+            } else {
+                rnl_view::build_file(entry, &file, files, &options)?
+            };
+            serde_json::to_string(&result).map_err(|e| e.to_string())
+        })
+        .await?;
     Ok(tauri::ipc::Response::new(json))
 }
 
@@ -152,7 +162,7 @@ pub async fn file_hashes(
     source: Source,
     paths: Vec<String>,
 ) -> Result<Vec<Option<String>>, String> {
-    with_files(&core, &settings, &library, source, None, move |_, entry, files, _| {
+    with_files(&core, &settings, &library, source, (false, None), move |_, entry, files, _| {
         Ok(paths
             .iter()
             .map(|p| read_named(entry, p, files).map(|text| hex(&sha256(text.as_bytes()))[..16].to_string()))
@@ -171,7 +181,7 @@ pub async fn file_texts(
     source: Source,
     paths: Vec<String>,
 ) -> Result<Vec<Option<String>>, String> {
-    with_files(&core, &settings, &library, source, None, move |_, entry, files, _| {
+    with_files(&core, &settings, &library, source, (false, None), move |_, entry, files, _| {
         Ok(paths.iter().map(|p| read_named(entry, p, files)).collect())
     })
     .await
@@ -187,7 +197,7 @@ pub async fn file_symbols(
     source: Source,
     file: String,
 ) -> Result<tauri::ipc::Response, String> {
-    let json = with_files(&core, &settings, &library, source, None, move |_, entry, files, formats| {
+    let json = with_files(&core, &settings, &library, source, (false, None), move |_, entry, files, formats| {
         let symbols = rnl_view::symbols(entry, &file, files, &options(formats.clone(), None, false))?;
         serde_json::to_string(&symbols).map_err(|e| e.to_string())
     })

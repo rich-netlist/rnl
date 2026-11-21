@@ -77,14 +77,24 @@ export class ResultCache {
     return entry && (await valid(entry.inputs)) ? entry.value : null;
   }
 
-  /** Keep `value`, made from `inputs`, under `key`. */
-  async put(key, value, inputs = [], { counted = true } = {}) {
+  /**
+   * Keep `value`, made from `inputs`, under `key`; with `evict` false, only into the room that is free, nothing else
+   * going for it (a reading preloaded). Whether it was kept.
+   */
+  async put(key, value, inputs = [], { counted = true, evict = true } = {}) {
     const size = JSON.stringify(value).length * 2;
-    if (this.fits(size)) {
+    const free = this.memoryLimit - this.memoryUsed + (this.memory.get(key)?.size ?? 0);
+    if (this.fits(size) && (evict || size <= free)) {
       this.remember(key, { value, inputs, size, counted });
       this.trimMemory();
-    } else this.forget(key);
+      return true;
+    }
+    if (evict) this.forget(key);
+    return false;
   }
+
+  /** Whether the memory has no room left. */
+  full() { return this.memoryUsed >= this.memoryLimit; }
 
   async delete(key) {
     this.forget(key);

@@ -90,8 +90,9 @@ document, then the reading of that one file ([`reading.rs`](src/reading.rs)), wh
 ([Reading the file shown alone](../viewer-ui/README.md#reading-the-file-shown-alone)). Entering a subcircuit another
 file defines reads that file in the context of the same entry; **Edit > Check All Files** reads the others, for the
 problems of every file. The readings are kept in memory for the window alone, by the same rules as on the web, and
-nothing of them is written to disk: **File > Memory Cache…** sets the limit (256 MiB by default, 0 keeps none), tells
-how many readings it holds and their hits and misses, and clears it. The app keeps nothing of a reading but the
+nothing of them is written to disk: **File > Memory Cache…** turns keeping them on and off, sets the limit (256 MiB by
+default, 0 keeps none), turns preloading on and off (while idle, the files of the subcircuits below the file shown
+are read into the room that is free), tells how many readings it holds and their hits and misses, and clears it. The app keeps nothing of a reading but the
 drawings of the objects the reading shown lists without a position, for the Not drawn pane. Explicit Solve operations
 read the whole document, run the solver and are not kept.
 

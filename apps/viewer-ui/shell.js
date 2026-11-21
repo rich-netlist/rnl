@@ -49,9 +49,6 @@
  * @property {(path: string) => boolean} [keepsFormat] Whether a format chosen for the file is kept in the settings; otherwise only while the page is open. True when absent.
  * @property {(source: Source, document: object, file: number) => Source} sourceForFile Re-root at a document file, retaining read capabilities but no compiled include scope.
  * @property {(source: Source, path: string) => Source} [sourceForPath] The same for a Library file that the document does not read, by its canonical path, such as one of several definitions of a subcircuit.
- * @property {() => Source[]} [preloadCandidates] Library/PATH sources eligible for background compilation.
- * @property {(source: Source) => Promise<string>} [preload] Prepare an independent file without activating its document. Returns ready/cached/full/paused/busy/cancelled/skipped/disabled.
- * @property {() => Promise<void>} [cancelPreload] Discard in-flight speculative results; never waits for their compiler.
  * @property {(legacy: object) => Promise<{ path: string, values: object }>} [loadSettings] Native settings and migration.
  * @property {(key: string, value: unknown) => Promise<void>} [saveSetting] Persist a native setting.
  * @property {(session: object, doc?: object) => Promise<unknown>} [newWindow] Open an independent viewer with a session.
@@ -63,9 +60,10 @@
  * @property {boolean} [perFile] Whether the page reads the file of a source alone, in the context of its entry, with
  *   `reader` (file-reading.js; see the README's Reading the file shown alone); the page then names the file by the
  *   source's `view` (visit-source.js).
- * @property {(source: Source, edits: Edits | undefined, options?: { progress?: (stage: string) => void, signal?: AbortSignal, bind?: { subckt: string, params: Record<string, string> }, constraints?: boolean }) => Promise<Reader>} [reader]
+ * @property {(source: Source, edits: Edits | undefined, options?: { progress?: (stage: string) => void, signal?: AbortSignal, bind?: { subckt: string, params: Record<string, string> }, constraints?: boolean, background?: boolean }) => Promise<Reader>} [reader]
  *   With `perFile`, what the page reads the document `source` (an entry's own source) file by file with, `edits` over
  *   its files: the shell reads the files and starts the core; what is kept, and when, is the page's (file-reading.js).
+ *   A `background` reader, preloading's, reads beside the page's own readings, which it does not hold up.
  * @property {() => Promise<{ user: string, all: string }>} [libraryStamps] With `reader`, the stamps of the Library as it
  *   is now, once what it was given is read (file-results.js `libraryStamps`).
  * @property {boolean} nativeMenu Whether the platform shows the menu bar itself; if not, the page shows

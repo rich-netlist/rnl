@@ -163,10 +163,22 @@ view of it: the entry's source with `view`, the file as the document names it (`
   of the Solve view, is not kept, nor a solve's preview; Reload reads the file again and keeps the new reading; a
   reading of a document that misses a file is not kept. The core holds no drawings of a kept reading's objects without
   a position: the Not drawn list has it read the file again first.
-- **File › Memory Cache** (`memory-cache.js`, `file-reading.js` `memoryCache`) is the same dialog in every shell: the
-  limit of the readings kept in memory (256 MiB by default, `file-cache-memory-mib` in the settings; 0 keeps none), how
-  many readings it holds and their size, with the hits and misses, and Clear Cache, which empties it, the document
-  shown staying as it is. An embedded viewer has no menu, and keeps its readings with the default limit.
+- **File › Memory Cache** (`memory-cache.js`, `file-reading.js` `memoryCache`) is the same dialog in every shell:
+  whether the readings are kept (`file-cache-enabled`, on by default), their limit in memory (256 MiB by default,
+  `file-cache-memory-mib`; 0 keeps none), whether preloading is on (`file-preload`, on by default), how many readings
+  it holds and their size, with the hits and misses, and Clear Cache, which empties it, the document shown staying as
+  it is. With no readings kept, the limit and preloading have nothing to do, and are greyed. An embedded viewer has no
+  menu, keeps its readings with the default limit, and does not preload.
+- **Preloading** (`preload.js`, `preload-queue.js`, `file-reading.js` `preloadFile`), the same in every shell: after
+  1.5 seconds with no pointer, wheel or key input, the files of the subcircuits below the file shown are read one at
+  a time, breadth first by the levels each level calls, from the outline (`preloadFiles`), each into the room the cache
+  has free: nothing kept goes for them, and a file with no room stops it. The packages they use are read with them, as
+  the core asks for them. The Library and PATH are not read so. Preloading shows nothing, adds nothing to the Library,
+  and counts as no hit or miss. It waits while the viewer is busy, hidden, edited with changes not applied or not
+  saved, solving or showing a dialog or a preview; a reading of the page's own, a level shown, or input stops it, and
+  between two files it rests for at least 1.5 seconds and three times the time the last one took. It reads beside the
+  page's own readings: on the web in a core of its own, and on the desktop on a thread apart from the one that holds
+  the drawings of the reading shown (reading.rs).
 - **The problems** (`file-checks.js`, `problems.js`) are those of the file shown: the reading of a file has the
   problems of the files above it too, which it reads in its context, and of the packages it uses; the list has those
   of its own file, of no file and of a package. **All Files**, a switch at the right of the problems' heading, adds
