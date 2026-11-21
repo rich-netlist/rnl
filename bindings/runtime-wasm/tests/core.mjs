@@ -532,6 +532,25 @@ test("a formats request lists the formats and detects files, through the core an
   }
 });
 
+test("the formats give the suffixes a frontend lists, and a bundled request the packages it lists as built in", async () => {
+  const list = core.formats({ formats: {} }).list;
+  const by = Object.fromEntries(list.map((f) => [f.name, f]));
+  assert.deepEqual(by.spice.entries, ["sp", "spi", "spice", "cir", "ckt", "net", "netlist"]);
+  assert.deepEqual(by.spice.listed, [...by.spice.entries, "inc", "lib"]);
+  assert.deepEqual([by.spectre.listed, by.spectre.entries], [["scs"], ["scs"]]);
+  assert.deepEqual([by.rnl.listed, by.text.listed, by.text.entries], [["rnl"], ["va", "vams"], []]);
+  const bundled = core.bundled();
+  const paths = Object.keys(bundled);
+  assert.ok(paths.length > 0 && paths.every((p) => p.startsWith("<bundled>/") && p.endsWith(".rnl")), paths.join(", "));
+  assert.ok(paths.every((p) => /@PACKAGE\(/.test(bundled[p])));
+  const worker = startCore();
+  try {
+    assert.deepEqual(await worker.bundled(), bundled);
+  } finally {
+    worker.terminate();
+  }
+});
+
 test("decodeText reads bytes as rnl reads a file", () => {
   const encoded = (text) => new TextEncoder().encode(text);
   // UTF-8, without a byte order mark at the start

@@ -55,7 +55,7 @@ pub use file_result::{
     core_version, FileCall, FileChild, FileInput, FileInputs, FileOutline, FileResult, FileSymbols, SubcktSymbol,
     FILE_RESULT_FORMAT,
 };
-pub use formats::{detect_format, formats, validate_format, FormatInfo};
+pub use formats::{detect_format, formats, is_listed, listed_suffixes, validate_format, FormatInfo};
 pub use library::{LibraryIndex, LibraryProvider};
 pub use outline::{Outline, OutlineCall, OutlineFile, OutlineLevel};
 pub use params::{Bind, ParamValue, SubcktParam};
@@ -101,6 +101,13 @@ pub fn bundled_drafts() -> BTreeSet<String> {
         language.is_some_and(|l| key(&l) > key(rnl_runtime::interp::unit::DEFAULT_VERSION))
     };
     bundled().files.into_iter().filter(|(_, text)| draft(text)).map(|(path, _)| path).collect()
+}
+
+/// The bundled package files a frontend lists among its built-in packages, by their paths in [`bundled`] with
+/// their texts: all but those of a draft series ([`bundled_drafts`]). Every viewer lists these and only these.
+pub fn bundled_listed() -> BTreeMap<String, String> {
+    let drafts = bundled_drafts();
+    bundled().files.into_iter().filter(|(path, _)| !drafts.contains(path)).collect()
 }
 
 /// How to build a Document, and what to give of each level's drawing.
@@ -1038,6 +1045,34 @@ R1 p q 1k
         assert!(is_spectre("a.sp", "", Some("spectre")));
         assert!(is_spectre("a.net", "// t\nsimulator lang=spectre\n", None));
         assert!(!is_spectre("dir.scs/a.sp", "* t\n", None));
+    }
+
+    #[test]
+    fn the_listed_suffixes_are_the_netlists_first_then_what_they_include() {
+        assert_eq!(
+            listed_suffixes(),
+            ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "scs", "inc", "lib", "rnl", "va", "vams"]
+        );
+        let spice = formats().into_iter().find(|f| f.name == "spice").unwrap();
+        assert_eq!(spice.entries.len(), 7);
+        assert!(spice.listed.starts_with(&spice.entries));
+        let text = formats().into_iter().find(|f| f.name == "text").unwrap();
+        assert_eq!(text.listed, ["va", "vams"]);
+        assert!(text.entries.is_empty());
+        for f in formats() {
+            assert!(f.entries.iter().all(|e| f.listed.contains(e)), "{}", f.name);
+        }
+        assert!(is_listed("a/b.SP") && is_listed(r"c:\x\m.VAMS") && is_listed("lib/0.4/p.rnl"));
+        assert!(!is_listed("a/b.v") && !is_listed("a/.sp") && !is_listed("a.sp/readme") && !is_listed("noext"));
+    }
+
+    #[test]
+    fn the_listed_bundled_packages_are_all_but_a_draft_series() {
+        let listed = bundled_listed();
+        let drafts = bundled_drafts();
+        assert!(!listed.is_empty());
+        assert_eq!(listed.len() + drafts.len(), bundled().files.len());
+        assert!(listed.keys().all(|p| p.starts_with(&format!("{BUNDLED_DIR}/")) && !drafts.contains(p)));
     }
 
     #[test]

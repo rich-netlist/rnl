@@ -542,6 +542,8 @@ export interface Core {
   library(request: LibraryRequest | string): string[];
   /** The formats a file can be read with, and the format each file of `detect` has when none is set. */
   formats(request: FormatsRequest | string): FormatList;
+  /** The bundled packages a frontend lists among its built-in ones, by path with their texts: all but those of a draft series. */
+  bundled(): Record<string, string>;
   /** The core's answer as it gives it; throws only when the core stops. */
   respond(
     request:
@@ -552,6 +554,7 @@ export interface Core {
       | DrawingsRequest
       | LibraryRequest
       | FormatsRequest
+      | { bundled: true }
       | string,
   ):
     | { document: Document }
@@ -565,6 +568,7 @@ export interface Core {
     | { drawings: UnplacedDrawing[] }
     | { library: string[] }
     | { formats: FormatList }
+    | { bundled: Record<string, string> }
     | { error: string };
 }
 

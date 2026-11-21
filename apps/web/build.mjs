@@ -17,7 +17,7 @@ import { addPreloadHints } from "./preload-hints.mjs";
 import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { gzipSync } from "node:zlib";
 import { API_FEATURES, MAX_OPEN_BYTES } from "../viewer-ui/viewer-api-contract.js";
 import { writeLocales } from "../../scripts/i18n/viewer-locales.mjs";
@@ -117,7 +117,11 @@ function files(dir, base = dir) {
   );
 }
 
-publishLibrary(join(root, "libraries"), join(out, "libraries"));
+// The built-in packages are those the core lists, from the core this build copies (core.js `bundled()`);
+// read from the binding's folder, whose package.json makes Node read its scripts as modules.
+const { loadCore } = await import(pathToFileURL(join(core, "core.js")).href);
+const builtCore = await loadCore(readFileSync(join(core, "rnl_runtime_wasm.wasm")));
+publishLibrary(join(root, "libraries"), join(out, "libraries"), builtCore.bundled());
 // Tests use a verified offline fixture, never the public service.
 const fixture = process.env.RNL_PACKAGE_FIXTURE;
 if (fixture) cpSync(fixture, join(out, "public-packages"), { recursive: true });

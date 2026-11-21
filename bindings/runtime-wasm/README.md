@@ -184,6 +184,12 @@ A netlist whose objects have no position yet lists every one of them in `Level.u
 
 `items` are places in `levels[level].unplaced`, and `names`, which may be left out, the objects' names as the Document lists them: the core refuses a request whose names are not those of the build it kept, so that one about a Document that was built since is not answered with the drawings of other objects. The answer is `{"drawings": [{"svg": "..."}, ...]}`, one for each item in the order asked, each holding the `svg` and `primitives` that the Document carries when the build is not lazy and the request's `svg` and `primitives` ask for them (`UnplacedDrawing` of `document.d.ts`), or an error: no build kept drawings, the level or an object is not there, or the names are not those of the build. The web viewer asks for the rows its Not drawn list adds, when they are added.
 
+### Formats and the built-in packages
+
+A request with a `formats` field and no `entry`, `{"formats": {"detect": {"/w/a.inc": "* a\n"}}}`, gives `{"formats": {"list": [...], "detected": {...}}}`: the formats a file can be read with, as [`rnl_view::formats`](../../crates/rnl-view/README.md) lists them, and the format each file of `detect` has by its path and text when none is set. Each format gives its `extensions`, how a file is read in it, and `listed` and `entries`, the suffixes of its files a frontend lists and those of them that are netlists opened on their own. Every viewer lists files by them.
+
+A request with a `bundled` field and no `entry`, `{"bundled": true}`, gives `{"bundled": {"<bundled>/0.4/rnl-std-all.rnl": "...", ...}}`: the bundled packages a frontend lists among its built-in ones, by path with their texts, all but those of a draft series ([`rnl_view::bundled_listed`](../../crates/rnl-view/README.md)). The web viewer's build writes them into its `libraries/bundled.json`. `core.js` and `client.js` give them as `bundled()`.
+
 ## JavaScript modules
 
 ES modules in [`js/`](js/), with no dependencies. They keep to the browser baseline of decision 0008, Chromium 109 and Safari 16, and run in module Workers and in Node 18 or later.

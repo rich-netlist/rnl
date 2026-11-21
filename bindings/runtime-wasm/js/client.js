@@ -45,6 +45,8 @@ export { coreVersion, fileResultFormat } from "./version.js";
  * @property {(request: {library: {reload?: boolean, refresh?: string[]}, pool: string[], files: Record<string, string>, formats?: Record<string, string>}) => Promise<string[]>} library Update the viewer library index, reading its files with the formats set for them; returns read errors.
  * @property {(request: import("./core.js").FormatsRequest) => Promise<{ list: object[], detected: Record<string, string> }>} formats
  *   The formats a file can be read with, and the format each file of `detect` has when none is set.
+ * @property {() => Promise<Record<string, string>>} bundled The bundled packages a frontend lists among
+ *   its built-in ones, by path with their texts: all the core has but those of a draft series.
  * @property {() => void} terminate Stop the Worker; calls still waiting, and later ones, reject.
  */
 
@@ -123,6 +125,7 @@ export function startCore(options = {}) {
     drawings: (request) => send(request, "drawings"),
     library: (request) => send(request, "library"),
     formats: (request) => send(request, "formats"),
+    bundled: () => send({ bundled: true }, "bundled"),
     terminate() {
       stop(new Error("The core was stopped."));
       worker.then((w) => w.terminate(), () => {});

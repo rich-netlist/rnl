@@ -168,6 +168,8 @@
  * @property {(request: {library: {reload?: boolean, refresh?: string[]}, pool: string[], files: Record<string, string>, formats?: Record<string, string>} | string) => string[]} library Update the viewer library index, reading its files with the formats set for them; returns read errors.
  * @property {(request: FormatsRequest | string) => { list: object[], detected: Record<string, string> }} formats
  *   The formats a file can be read with, and the format each file of `detect` has when none is set.
+ * @property {() => Record<string, string>} bundled The bundled packages a frontend lists among its
+ *   built-in ones, by path with their texts: all the core has but those of a draft series.
  * @property {(request: Request | WriteRequest | ReplaceRecordsRequest | CatalogRequest | DrawingsRequest | string) => object} respond
  *   The core's answer as it gives it: `{ document }`, `{ outline }`, `{ file }`, `{ symbols }`, `{ snapshot }`, `{ written }`, `{ replaced }`,
  *   `{ catalog }`, `{ drawings }` or `{ error }`. Throws only when the core stops.
@@ -188,6 +190,7 @@ const ASKS = {
   drawings: "a drawings request",
   library: "a library update",
   formats: "a formats request",
+  bundled: "a bundled request",
 };
 const REPLACEMENT = String.fromCharCode(0xfffd);
 
@@ -277,6 +280,7 @@ export async function loadCore(wasm) {
     drawings: (request) => part(request, "drawings"),
     library: (request) => part(request, "library"),
     formats: (request) => part(request, "formats"),
+    bundled: () => part({ bundled: true }, "bundled"),
   };
 }
 
