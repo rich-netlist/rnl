@@ -36,12 +36,12 @@ CL out vss 1p
 *   /* 标注：输出的网络标签、M1 的 W/L、标题和底层的框；框以 M1 为中心，标题在框上方、与框左右对齐 */
 *   $"网络标签" @附着 在 &out 上 => @朝向("右");
 *   #M1 上有 @文本("W/L = ${w}/${l}", 引用名="wl", dx=-9, dy=-4);
-*   在 (_,_) 有 @文本("五管 OTA：偏置由 R1、R2、R3 分压给出", 字号=1.1) => 记作 %title;
+*   在 (_,_) 有 @文本("五管 OTA：偏置由 R1、R2、R3 分压给出", 字号=1.1, 横向对齐="中") => 记作 %title;
 *   以 #M1::position 为中心的 @矩形(宽度=50, 高度=46, 填充="填充色", 填充色="#1f4fd80d", 线型="点线") => 其处于 @图层("底") => 记作 %box;
 *   %title 和 %box @对齐("x");
 *   %title 到 %box 的 @距离("从上到下", 最小值=25)
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:c35f527fa112d40d.7f63946c6804f1b8", numbering="d7c764b7cf3c6e58") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:4f3a6c9c20562f46.6f545a8f6337a726", numbering="0ebfb596d73fe6e7") {
 *   %ground_stub_M5_s = $GROUND_STUB @ATTACH(gap=3) #M5::s;
 *   %ground_stub_R3_n = $GROUND_STUB @ATTACH(gap=3) #R3::n;
 *   %ground_stub_CL_n = $GROUND_STUB @ATTACH(gap=3) #CL::n;
