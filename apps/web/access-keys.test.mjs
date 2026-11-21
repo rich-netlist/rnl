@@ -57,3 +57,18 @@ for (const [name, shell] of Object.entries(SHELLS)) {
     }
   });
 }
+
+/** The ids of the items `shell` shows, down the submenus. */
+function ids(items, shell) {
+  return items.flatMap((item) => (typeof item === 'string' || !shown(item, shell) ? [] : [item.id, ...ids(item.items ?? [], shell)]));
+}
+
+test('what every shell can do is in every menu bar: the files read one by one, the solver and its copy, the version', () => {
+  // (a command of a capability that all three shells have names no platform: it is shown wherever the shell has it)
+  for (const [name, shell] of Object.entries(SHELLS)) {
+    const shownHere = ids(table.menus, shell);
+    for (const id of ['check-all-files', 'memory-cache', 'solve', 'solve-save', 'solve-settings', 'check-updates']) {
+      assert.ok(shownHere.includes(id), `${id} on the ${name}`);
+    }
+  }
+});

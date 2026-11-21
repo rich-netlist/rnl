@@ -193,11 +193,11 @@ test("the chooser lists the machine's files, goes up and in, and opens the one c
   const dialog = page.locator("dialog.dialog");
   await expect(dialog.locator(".dialog-title")).toHaveText("Open Netlist");
   await expect(dialog).toContainText("sim");
-  // the folder shown, its files, the way up, and last the browser's own chooser
+  // the folder shown, its files and the way up; not the browser's own chooser, as on the desktop: the files are the machine's
   const options = dialog.locator(".dialog-option");
   await expect(options.filter({ hasText: "other.sp" })).toHaveCount(1);
   await expect(options.filter({ hasText: "Parent folder" })).toHaveCount(1);
-  expect(await options.last().innerText()).toContain("From the computer of the browser");
+  await expect(options.filter({ hasText: "From the computer of the browser" })).toHaveCount(0);
   // up, and down into models
   await options.filter({ hasText: "Parent folder" }).click();
   await dialog.getByRole("button", { name: "Open" }).click();
