@@ -391,12 +391,14 @@ export async function save(overwrite = false, encoding = "preserve") {
   }
   try {
     const result = await shell.save(opened, files, overwrite, encoding);
-    if (result !== null && typeof result === "object") return changedOnDisk(result.changed, encoding);
+    if (result?.changed?.length) return changedOnDisk(result.changed, encoding);
     edits.markSaved(files, !downloads());
     refreshEditing();
+    // the shell gives the names of the files it wrote; the page says it, in the user's language
+    const written = result?.written ?? [];
     note(downloads()
       ? files.length === 1 ? m`Downloaded ${files[0].name.split("/").pop()}.` : m`Downloaded ${files.length} files.`
-      : result || m("Saved."));
+      : written.length ? m`Saved ${written.join(", ")}.` : m("Saved."));
     return true;
   } catch (e) {
     await inform({ title: downloads() ? m("Download File") : m("Save"), paragraphs: [m`The changes were not saved: ${e instanceof Error ? e.message : String(e)}`] });

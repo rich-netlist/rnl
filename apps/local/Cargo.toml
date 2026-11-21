@@ -16,6 +16,7 @@ rnl-cli = { path = "../../crates/rnl-cli" }
 rnl-runtime = { path = "../../crates/rnl-runtime" }
 rnl-solver = { path = "../../crates/rnl-solver" }
 rnl-view = { path = "../../crates/rnl-view" }
+rnl-viewer-files = { path = "../../crates/rnl-viewer-files" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
