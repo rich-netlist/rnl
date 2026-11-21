@@ -1042,7 +1042,10 @@ async function filePoolSmoke(page) {
   console.log("The native core bundles only standard packages and offers the public-package website on missing USE-PACKAGE");
 }
 
-/** File transitions exercise the real disk reader and build cache, not a fixture shell. */
+/**
+ * Entering a subcircuit another file defines, with the real disk reader, not a fixture shell: the file is read alone in
+ * the context of the same entry, whose includes reach it, and nothing joins Files; the path leads back.
+ */
 async function independentNavigationSmoke(page) {
   const work = path.dirname(netlist);
   const top = path.join(work, 'visit-top.sp'), cell = path.join(work, 'visit-cell.inc'), leaf = path.join(work, 'visit-leaf.inc');
@@ -1057,7 +1060,7 @@ async function independentNavigationSmoke(page) {
     await openSource({path:${JSON.stringify(top)},name:'visit-top.sp'},false);
     await descend(window.viewer.doc.objects.findIndex(o => o.name === 'Xcell'));
     const v=window.viewer;
-    const isolated={entry:v.doc.path, files:v.doc.files.length, opens:v.doc.objects.find(o => o.name === 'Xleaf').opens,
+    const isolated={entry:v.doc.path, file:v.doc.file, files:v.doc.files.length, opens:v.doc.objects.find(o => o.name === 'Xleaf').opens,
       path:namedPath().map(s=>s.title), listed:poolSnapshot().some(i=>i.path.endsWith('/visit-cell.inc'))};
     await toggleAutoInclude(true);
     const resolved=v.doc.objects.find(o=>o.name==='Xleaf').opens !== null;
@@ -1069,16 +1072,17 @@ async function independentNavigationSmoke(page) {
     await ascend();
     return {isolated,resolved,deep,back,entry:v.doc.path};
   })()`);
-  same(result.isolated.files,1,'child independently reads one disk file');
-  same(result.isolated.opens,null,'parent include definitions are absent with Auto Include off');
-  check(result.isolated.entry.replaceAll('\\','/').endsWith('/visit-cell.inc'),'child did not become the entry');
-  same(result.isolated.listed,true,'visited disk file joins Files');
+  same(result.isolated.file,'visit-cell.inc','the file of the subcircuit is the file read');
+  check(result.isolated.entry.replaceAll('\\','/').endsWith('/visit-top.sp'),'the file was not read in the context of its entry');
+  same(result.isolated.files,3,'the reading lists every file of the document');
+  check(result.isolated.opens !== null,'the definitions the entry includes do not reach the file read in its context');
+  same(result.isolated.listed,false,'a file of the document shown joined Files');
   same(result.isolated.path,['visit-top.sp','visit_cell'],'cross-file descent history');
-  same(result.resolved,true,'Auto Include resolves the leaf using the Library index');
+  same(result.resolved,true,'the leaf opens with Auto Include on too');
   same(result.deep,['visit-top.sp','visit_cell','visit_leaf'],'deep cross-file history');
   same(result.back,{path:['visit-top.sp'],selected:'Xcell'},'cross-level breadcrumb jump restores prefix and selection');
   check(result.entry.replaceAll('\\','/').endsWith('/visit-top.sp'),'ascend did not reopen the top entry');
-  console.log('Cross-file disk navigation isolates includes, adds Library files, and restores visit history');
+  console.log('Cross-file disk navigation reads the file in the context of its entry, adds nothing to Files, and restores visit history');
 }
 
 /**
