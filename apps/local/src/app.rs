@@ -9,6 +9,12 @@
 //!   POST /api/allow              {dir}: a folder the user chose to include, allowed
 //!   POST /api/save               {entry, files, overwrite, encoding}: the desktop's Save
 //!   POST /api/save-as            {source, to, text, encoding, overwrite}: the desktop's Save As; a file that is there is not replaced unless told
+//!   POST /api/write?to=&overwrite=  the bytes of the body, as a file the user chose (a project's archive, an image), as Save As writes
+//!   POST /api/project-folder     {dir}: the folder the user chose to open a project in, allowed; its files are written there alone
+//!   POST /api/project-existing   {paths}: which of those files, by their names in that folder, are there already
+//!   POST /api/project-file?path= the bytes of the body, as the project's file of that name in that folder
+//!   POST /api/save-solved        {to, encoding, overwrite}: the desktop's Save Solved Copy As, of the last solve shown
+//!   POST /api/encode-like        {path, text}: the bytes of the text in the encoding of that file, as Save writes it
 //!   GET  /api/changes?since=N    the files read that changed on disk since version N
 //!   GET  /f/ABSOLUTE/PATH        a file, below the folders allowed
 //!   GET  /rnl-solver             what the solver service is;  GET /rnl-solver/table  the table of its settings;
@@ -60,6 +66,10 @@ pub struct App {
     pub run_dirs: Mutex<Vec<PathBuf>>,
     /// The bytes of the bodies being read now.
     pub bodies: AtomicUsize,
+    /// The last solve shown, for Save Solved Copy As (service.rs).
+    pub last_solve: crate::service::LastSolve,
+    /// The folder the user chose to open a project in: the only place a project's files are written.
+    pub project_root: Mutex<Option<PathBuf>>,
 }
 
 impl App {
@@ -120,11 +130,21 @@ pub fn admit(app: &App, request: &Request) -> Result<usize, Response> {
     if matches!(method, "POST" | "PUT") && !security::from_the_page(request) {
         return Err(Response::error(403, "only the page of this program may change anything"));
     }
-    Ok(if matches!(request.path.as_str(), "/rnl-solver/solve" | "/api/save" | "/api/save-as") {
-        MAX_BODY
-    } else {
-        MAX_SMALL_BODY
-    })
+    Ok(
+        if matches!(
+            request.path.as_str(),
+            "/rnl-solver/solve"
+                | "/api/save"
+                | "/api/save-as"
+                | "/api/write"
+                | "/api/project-file"
+                | "/api/encode-like"
+        ) {
+            MAX_BODY
+        } else {
+            MAX_SMALL_BODY
+        },
+    )
 }
 
 /// Whether a path is of what reads or writes the user's files, or solves.
@@ -286,11 +306,12 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
             if solve.stream {
                 // (a request that is wrong is answered as such, before a head that says it is not: what fails later is a line)
                 let prepared = crate::service::prepare(&solve).map_err(bad)?;
+                let last = app.last_solve.clone();
                 return Ok(Response::streamed("application/x-ndjson; charset=utf-8", move |out| {
-                    crate::service::stream(prepared, out)
+                    crate::service::stream(prepared, out, &last)
                 }));
             }
-            let answer = crate::service::solve(&solve, stream).map_err(bad)?;
+            let answer = crate::service::solve(&solve, stream, &app.last_solve).map_err(bad)?;
             Ok(Response::new(200, "application/json; charset=utf-8", answer.into_bytes()))
         }
         "/api/session" if get => Ok(Response::json(
@@ -460,6 +481,88 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
                 SavedAs::Exists(to) => Ok(Response::json(200, &json!({ "exists": files::page_path(&to) }))),
             }
         }
+        "/api/write" if method == "POST" => {
+            let to = files::machine_path(&request.param("to").ok_or_else(|| bad("where to?"))?);
+            let overwrite = request.param("overwrite").is_some_and(|o| o == "1");
+            match files::write_chosen(&app.roots, &to, &request.body, overwrite).map_err(|e| Failure(500, e))? {
+                SavedAs::Written(to) => Ok(Response::json(200, &json!({ "path": files::page_path(&to) }))),
+                // a file of that name is there: the page asks the user, and asks again with `overwrite`
+                SavedAs::Exists(to) => Ok(Response::json(200, &json!({ "exists": files::page_path(&to) }))),
+            }
+        }
+        "/api/project-folder" if method == "POST" => {
+            #[derive(Deserialize)]
+            struct Folder {
+                dir: String,
+            }
+            let folder: Folder = json_body(request)?;
+            let dir = files::machine_path(&folder.dir);
+            if !dir.is_absolute() {
+                return Err(bad("the path is not absolute"));
+            }
+            // (allowed as a folder included is: the page reads the project's files from it once they are written)
+            app.roots.allow_chosen(&dir).map_err(forbidden)?;
+            let real = files::canonical(&dir).ok_or_else(|| bad("the folder is not there"))?;
+            *app.project_root.lock().unwrap_or_else(|e| e.into_inner()) = Some(real.clone());
+            Ok(Response::json(200, &json!({ "dir": files::page_path(&real) })))
+        }
+        "/api/project-existing" if method == "POST" => {
+            #[derive(Deserialize)]
+            struct Existing {
+                paths: Vec<String>,
+            }
+            let asked: Existing = json_body(request)?;
+            let root = app.project_root.lock().unwrap_or_else(|e| e.into_inner()).clone();
+            let there = match root {
+                Some(root) => rnl_viewer_files::project::existing(&root, asked.paths),
+                None => asked.paths,
+            };
+            Ok(Response::json(200, &json!({ "existing": there })))
+        }
+        "/api/project-file" if method == "POST" => {
+            let relative = request.param("path").ok_or_else(|| bad("which file?"))?;
+            let root = app.project_root.lock().unwrap_or_else(|e| e.into_inner()).clone();
+            let root = root.ok_or_else(|| bad("no folder was chosen to open the project in"))?;
+            let at =
+                rnl_viewer_files::project::write_file(&root, &relative, &request.body).map_err(|e| Failure(500, e))?;
+            Ok(Response::json(200, &json!({ "path": files::page_path(&at) })))
+        }
+        "/api/encode-like" if method == "POST" => {
+            // an edited file that Save Project holds, in the encoding Save would write it in (apps/viewer-ui/project.js)
+            #[derive(Deserialize)]
+            struct EncodeLike {
+                path: String,
+                text: String,
+            }
+            let asked: EncodeLike = json_body(request)?;
+            let path = app.roots.check(&files::machine_path(&asked.path), true).map_err(forbidden)?;
+            let bytes = rnl_cli::codec::encode_file(Some(&path), &asked.text, OutputEncoding::Preserve)
+                .map_err(|e| Failure(500, format!("{}: {e}", path.display())))?;
+            Ok(Response::new(200, "application/octet-stream", bytes))
+        }
+        "/api/save-solved" if method == "POST" => {
+            #[derive(Deserialize)]
+            struct SaveSolved {
+                to: String,
+                #[serde(default)]
+                encoding: Option<String>,
+                #[serde(default)]
+                overwrite: bool,
+            }
+            let save: SaveSolved = json_body(request)?;
+            let copy = app.last_solve.lock().unwrap_or_else(|e| e.into_inner()).clone();
+            let copy = copy.ok_or_else(|| bad("solve the netlist first: there is no solve to save"))?;
+            let to = files::machine_path(&save.to);
+            match files::save_solved(&app.roots, &copy, &to, encoding(&save.encoding)?, save.overwrite)
+                .map_err(|e| Failure(500, e))?
+            {
+                files::SavedSolve::Saved { to, written, copied } => Ok(Response::json(
+                    200,
+                    &json!({ "to": files::page_path(&to), "written": written, "copied": copied }),
+                )),
+                files::SavedSolve::Exists(to) => Ok(Response::json(200, &json!({ "exists": files::page_path(&to) }))),
+            }
+        }
         "/api/changes" if get => {
             if let Ok(mut heartbeat) = app.heartbeat.lock() {
                 *heartbeat = Some(Instant::now());
@@ -525,6 +628,8 @@ mod tests {
             address_file: Mutex::new(None),
             run_dirs: Mutex::new(Vec::new()),
             bodies: AtomicUsize::new(0),
+            last_solve: Default::default(),
+            project_root: Mutex::new(None),
         };
         app.roots.allow_file(&top).unwrap();
         (app, token, dir)
@@ -916,5 +1021,120 @@ mod tests {
                 assert_eq!(std::fs::read_to_string(&target).unwrap(), "precious\n");
             }
         }
+    }
+
+    /// A POST of raw bytes, as the page sends an archive, an image or a project's file.
+    fn post_bytes(path: &str, cookie: &str, body: &[u8]) -> String {
+        format!(
+            "POST {path} HTTP/1.1\nHost: 127.0.0.1:1\nX-RNL-Key: {cookie}\nX-RNL: 1\nContent-Type: application/octet-stream\nContent-Length: {}\n",
+            body.len()
+        )
+    }
+
+    #[test]
+    fn bytes_the_page_made_are_written_as_the_file_the_user_chose_and_not_over_one_there_unless_told() {
+        let (app, token, dir) = app(Site::Embedded);
+        let key = sign_in(&app, &token);
+        let write = |to: &Path, overwrite: bool, bytes: &[u8]| {
+            let query =
+                format!("to={}{}", encode_path(&files::page_path(to)), if overwrite { "&overwrite=1" } else { "" });
+            let (status, _, answer) = ask(&app, &post_bytes(&format!("/api/write?{query}"), &key, bytes), bytes);
+            (status, serde_json::from_slice::<serde_json::Value>(&answer).unwrap_or_default())
+        };
+        let zip = dir.join("project.zip");
+        assert_eq!(write(&zip, false, b"PK first").1["path"].as_str(), Some(files::page_path(&zip).as_str()));
+        assert_eq!(std::fs::read(&zip).unwrap(), b"PK first");
+        let (status, said) = write(&zip, false, b"PK second");
+        assert_eq!((status, said["exists"].is_string()), (200, true));
+        assert_eq!(std::fs::read(&zip).unwrap(), b"PK first");
+        assert_eq!(write(&zip, true, b"PK second").0, 200);
+        assert_eq!(std::fs::read(&zip).unwrap(), b"PK second");
+        // a folder the program was not told of is not written to
+        let elsewhere = std::env::temp_dir().join(format!("rnl-local-elsewhere-{}.png", std::process::id()));
+        assert_eq!(write(&elsewhere, true, b"png").0, 500);
+        assert!(!elsewhere.exists());
+        let _ = std::fs::remove_dir_all(dir.parent().unwrap());
+    }
+
+    #[test]
+    fn a_project_is_opened_into_the_folder_the_user_chose_and_its_files_are_written_there_alone() {
+        let (app, token, dir) = app(Site::Embedded);
+        let key = sign_in(&app, &token);
+        let root = dir.join("opened");
+        std::fs::create_dir_all(root.join("lib")).unwrap();
+        std::fs::write(root.join("lib/a.inc"), "* a\n").unwrap();
+        // no folder chosen yet: nothing is written
+        let file = |relative: &str, bytes: &[u8]| {
+            let path = format!("/api/project-file?path={}", encode_path(relative));
+            ask(&app, &post_bytes(&path, &key, bytes), bytes).0
+        };
+        assert_eq!(file("top.sp", b"* top\n"), 400);
+        let (head, body) = post("/api/project-folder", &key, &json!({ "dir": files::page_path(&root) }));
+        assert_eq!(ask(&app, &head, &body).0, 200);
+        let (head, body) =
+            post("/api/project-existing", &key, &json!({ "paths": ["lib/a.inc", "top.sp", "../out.sp"] }));
+        let (status, _, answer) = ask(&app, &head, &body);
+        assert_eq!(status, 200);
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&answer).unwrap()["existing"],
+            json!(["lib/a.inc", "../out.sp"])
+        );
+        assert_eq!(file("cells/top.sp", b"* top\n"), 200);
+        assert_eq!(std::fs::read_to_string(root.join("cells/top.sp")).unwrap(), "* top\n");
+        assert_eq!(file("../out.sp", b"x"), 500);
+        assert!(!dir.join("out.sp").exists());
+        let _ = std::fs::remove_dir_all(dir.parent().unwrap());
+    }
+
+    #[test]
+    fn a_text_is_given_in_the_encoding_of_its_file_as_save_writes_it() {
+        let (app, token, dir) = app(Site::Embedded);
+        let key = sign_in(&app, &token);
+        let marked = dir.join("marked.sp");
+        std::fs::write(&marked, b"\xEF\xBB\xBFR1 a b 1k\n").unwrap();
+        let (head, body) =
+            post("/api/encode-like", &key, &json!({ "path": files::page_path(&marked), "text": "R1 a b 2k\n" }));
+        let (status, _, bytes) = ask(&app, &head, &body);
+        assert_eq!(status, 200);
+        assert_eq!(bytes, b"\xEF\xBB\xBFR1 a b 2k\n");
+        // a file the page may not read is not looked at
+        let elsewhere = std::env::temp_dir().join(format!("rnl-local-encode-{}.sp", std::process::id()));
+        std::fs::write(&elsewhere, "x").unwrap();
+        let (head, body) =
+            post("/api/encode-like", &key, &json!({ "path": files::page_path(&elsewhere), "text": "y" }));
+        assert_eq!(ask(&app, &head, &body).0, 403);
+        let _ = std::fs::remove_file(&elsewhere);
+        let _ = std::fs::remove_dir_all(dir.parent().unwrap());
+    }
+
+    #[test]
+    fn save_solved_copy_saves_the_last_solve_as_the_desktop_does() {
+        let (app, token, dir) = app(Site::Embedded);
+        let key = sign_in(&app, &token);
+        let call = |to: &Path, overwrite: bool| {
+            let (head, body) =
+                post("/api/save-solved", &key, &json!({ "to": files::page_path(to), "overwrite": overwrite }));
+            let (status, _, answer) = ask(&app, &head, &body);
+            (status, serde_json::from_slice::<serde_json::Value>(&answer).unwrap())
+        };
+        let copy = dir.join("top-solved.sp");
+        // no solve yet: nothing to save
+        assert_eq!(call(&copy, false).0, 400);
+        let entry = files::page_path(&dir.join("top.sp"));
+        *app.last_solve.lock().unwrap() = Some(rnl_cli::preview::Copy {
+            entry: entry.clone(),
+            files: vec![rnl_cli::solve::SolvedFile { path: entry.clone(), text: "R1 a b 1k\n* solved\n.end\n".into() }],
+            read: vec![entry],
+        });
+        let (status, said) = call(&copy, false);
+        assert_eq!(status, 200);
+        assert_eq!((said["written"].as_u64(), said["copied"].as_u64()), (Some(1), Some(0)));
+        assert_eq!(said["to"].as_str(), Some(files::page_path(&copy).as_str()));
+        assert!(std::fs::read_to_string(&copy).unwrap().contains("* solved"));
+        // the name is taken: the user is asked; and never over the file solved
+        assert_eq!(call(&copy, false).1["exists"].as_str(), Some(files::page_path(&copy).as_str()));
+        assert_eq!(call(&dir.join("top.sp"), true).0, 500);
+        assert_eq!(std::fs::read_to_string(dir.join("top.sp")).unwrap(), "R1 a b 1k\n.end\n");
+        let _ = std::fs::remove_dir_all(dir.parent().unwrap());
     }
 }

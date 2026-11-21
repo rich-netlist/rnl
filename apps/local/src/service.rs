@@ -26,9 +26,9 @@ use std::collections::BTreeMap;
 use std::io::{self, Write};
 use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-use rnl_cli::preview::{preview, preview_progress, respace, StoppableClock};
+use rnl_cli::preview::{preview, preview_progress, respace, Copy, StoppableClock};
 use rnl_cli::progress::Event;
 use rnl_cli::solve::{check_settings, Progress, SolveOptions, ToolSettings};
 use rnl_runtime::source::MemoryProvider;
@@ -189,7 +189,7 @@ fn solved_json(shown: &rnl_cli::preview::Preview) -> Result<String, String> {
 
 /// Solve a request: the JSON text of `{document, report}`. `peer` is the connection of the page, which is watched for the
 /// page going away, as a cancel is: the solve stops at its next level.
-pub fn solve(request: &Request, peer: &TcpStream) -> Result<String, String> {
+pub fn solve(request: &Request, peer: &TcpStream, last: &LastSolve) -> Result<String, String> {
     let Prepared { entry, files, options, respace: spaced } = prepare(request)?;
     let stop = Arc::new(AtomicBool::new(false));
     let clock = StoppableClock::new(stop.clone());
@@ -211,13 +211,22 @@ pub fn solve(request: &Request, peer: &TcpStream) -> Result<String, String> {
     } else {
         preview(&entry, &files, &options, &clock, &watch)?
     };
+    keep(last, &shown.copy);
     solved_json(&shown)
+}
+
+/// The last solve shown, as the desktop keeps it for Solve › Save Solved Copy As: the file solved, the texts the solve
+/// wrote and the files it read, by the paths the page gave them.
+pub type LastSolve = Arc<Mutex<Option<Copy>>>;
+
+fn keep(last: &LastSolve, copy: &Copy) {
+    *last.lock().unwrap_or_else(|e| e.into_inner()) = Some(copy.clone());
 }
 
 /// Solve a prepared request and tell the page, on its connection, a line of JSON for each event of the solve as it
 /// happens, then the result, or the error. A line that cannot be written is the page gone, as its closing the connection
 /// is: the solve stops at its next step.
-pub fn stream(prepared: Prepared, out: &mut TcpStream) -> io::Result<()> {
+pub fn stream(prepared: Prepared, out: &mut TcpStream, last: &LastSolve) -> io::Result<()> {
     let Prepared { entry, files, options, respace: spaced } = prepared;
     let stop = Arc::new(AtomicBool::new(false));
     let clock = StoppableClock::new(stop.clone());
@@ -243,7 +252,10 @@ pub fn stream(prepared: Prepared, out: &mut TcpStream) -> io::Result<()> {
     } else {
         preview_progress(&entry, &files, &options, &clock, &sink)
     };
-    let end = match shown.and_then(|shown| solved_json(&shown)) {
+    let end = match shown.and_then(|shown| {
+        keep(last, &shown.copy);
+        solved_json(&shown)
+    }) {
         // (the document is already JSON: it is put in the line as it is)
         Ok(result) => format!("{{\"result\":{result}}}"),
         Err(message) => serde_json::json!({ "error": message }).to_string(),
@@ -288,7 +300,8 @@ mod tests {
         // Spectre written in a .sp file: read as SPICE, its nets would be `(a` and `0)`
         let text = "r1 (a 0) resistor r=1k\n";
         let nets = |r: &Request| {
-            let json: serde_json::Value = serde_json::from_str(&solve(r, &server).unwrap()).unwrap();
+            let json: serde_json::Value =
+                serde_json::from_str(&solve(r, &server, &LastSolve::default()).unwrap()).unwrap();
             let mut nets: Vec<String> = json["document"]["objects"]
                 .as_array()
                 .unwrap()
@@ -311,10 +324,13 @@ mod tests {
     fn a_netlist_is_solved_in_memory_and_the_document_and_the_report_come_back() {
         let (_client, server) = pair();
         let text = "R1 a b 1k\nR2 b 0 1k\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n* @RNL { {#R1 #R2} @ALIGN(\"y\") }\n.end\n";
-        let answer = solve(&request("/top.sp", text), &server).unwrap();
+        let last = LastSolve::default();
+        let answer = solve(&request("/top.sp", text), &server, &last).unwrap();
         let json: serde_json::Value = serde_json::from_str(&answer).unwrap();
         assert!(json["document"]["levels"].as_array().is_some_and(|l| !l.is_empty()));
         assert!(json["report"]["levels"].as_array().is_some());
+        // kept for Save Solved Copy As, as the desktop keeps it
+        assert_eq!(last.lock().unwrap().as_ref().map(|c| c.entry.as_str()), Some("/top.sp"));
     }
 
     #[test]
@@ -350,7 +366,8 @@ R1 a b 1k
         r.library_prefix = "/<pool>".into();
         r.search_paths = vec!["/P".into()];
         let read = |r: &Request| {
-            let json: serde_json::Value = serde_json::from_str(&solve(r, &server).unwrap()).unwrap();
+            let json: serde_json::Value =
+                serde_json::from_str(&solve(r, &server, &LastSolve::default()).unwrap()).unwrap();
             let files = json["document"]["files"].as_array().unwrap().clone();
             let has = |name: &str| files.iter().any(|f| f["path"].as_str().unwrap().ends_with(name));
             (has("cell.inc"), has("part.inc"))
@@ -366,11 +383,11 @@ R1 a b 1k
         let (_client, server) = pair();
         let mut r = request("/top.sp", "R1 a b 1k\n.end\n");
         r.entry = "/other.sp".into();
-        assert!(solve(&r, &server).is_err());
+        assert!(solve(&r, &server, &LastSolve::default()).is_err());
         let mut r = request("/a/../top.sp", "R1 a b 1k\n.end\n");
-        assert!(solve(&r, &server).is_err());
+        assert!(solve(&r, &server, &LastSolve::default()).is_err());
         r.entry = "top.sp".into();
-        assert!(solve(&r, &server).is_err());
+        assert!(solve(&r, &server, &LastSolve::default()).is_err());
     }
 
     #[test]
@@ -378,7 +395,7 @@ R1 a b 1k
         let (_client, server) = pair();
         let mut r = request("/top.sp", "R1 a b 1k\n.end\n");
         r.config = "beam=0".into();
-        let error = solve(&r, &server).unwrap_err();
+        let error = solve(&r, &server, &LastSolve::default()).unwrap_err();
         assert!(error.contains("the beam must be at least 1"), "{error}");
     }
 
@@ -403,7 +420,7 @@ R1 a b 1k
         let (mut client, mut server) = pair();
         let prepared = prepare(request).unwrap();
         // (on a thread: the answer is larger than the connection holds until it is read)
-        let writer = std::thread::spawn(move || stream(prepared, &mut server).unwrap());
+        let writer = std::thread::spawn(move || stream(prepared, &mut server, &LastSolve::default()).unwrap());
         let mut text = String::new();
         client.read_to_string(&mut text).unwrap();
         writer.join().unwrap();
@@ -433,10 +450,10 @@ R1 a b 1k
         let (_client, server) = pair();
         let mut r = request("/top.sp", "R1 a b 1k\n.end\n");
         r.timeall = Some(60.0);
-        assert!(solve(&r, &server).is_ok());
+        assert!(solve(&r, &server, &LastSolve::default()).is_ok());
         for bad in [0.0, -3.0, f64::INFINITY] {
             r.timeall = Some(bad);
-            let error = solve(&r, &server).unwrap_err();
+            let error = solve(&r, &server, &LastSolve::default()).unwrap_err();
             assert!(error.contains("timeall must be a positive number"), "{bad}: {error}");
         }
     }
@@ -447,7 +464,8 @@ R1 a b 1k
         let mut r = request("/top.sp", HIERARCHY);
         r.config = "spacing_x=3".into();
         r.respace = true;
-        let json: serde_json::Value = serde_json::from_str(&solve(&r, &server).unwrap()).unwrap();
+        let json: serde_json::Value =
+            serde_json::from_str(&solve(&r, &server, &LastSolve::default()).unwrap()).unwrap();
         assert_eq!(json["report"]["mode"], "respace");
         // (no level of this netlist has a record of the solver to respace from: each is left as it is, with the reason)
         assert!(
@@ -459,7 +477,8 @@ R1 a b 1k
         );
         // and a solve says it is one
         r.respace = false;
-        let json: serde_json::Value = serde_json::from_str(&solve(&r, &server).unwrap()).unwrap();
+        let json: serde_json::Value =
+            serde_json::from_str(&solve(&r, &server, &LastSolve::default()).unwrap()).unwrap();
         assert_eq!(json["report"]["mode"], "solve");
     }
 
@@ -495,7 +514,8 @@ R1 a b 1k
         let (_client, server) = pair();
         let mut r = request("/top.sp", HIERARCHY);
         r.level = Some("amp".into());
-        let json: serde_json::Value = serde_json::from_str(&solve(&r, &server).unwrap()).unwrap();
+        let json: serde_json::Value =
+            serde_json::from_str(&solve(&r, &server, &LastSolve::default()).unwrap()).unwrap();
         assert_eq!(json["report"]["levels"].as_array().unwrap().len(), 1);
     }
 
