@@ -52,7 +52,7 @@
   "The web viewer is a static web page, with the RNL core compiled to WebAssembly running inside it. It opens files or a whole folder from your computer, or a netlist on the web; files dropped on the page open too.": "웹 뷰어는 WebAssembly로 컴파일된 RNL 코어가 내부에서 실행되는 정적 웹 페이지입니다. 컴퓨터의 파일이나 폴더 전체를 열거나 웹상의 넷리스트를 열 수 있으며, 페이지 위에 파일을 끌어다 놓아도 열립니다.",
   "cta|Open the web viewer": "웹 뷰어 열기",
   "Try these samples": "예제 회로 열어보기",
-  "The samples come from RNL’s conformance corpus and are published with the web viewer. Click one and the viewer opens it.": "RNL 적합성 테스트 코퍼스에서 가져와 웹 뷰어와 함께 배포되는 예제들입니다. 항목을 클릭하면 뷰어에서 바로 열립니다.",
+  "The samples come from RNL’s conformance corpus, written for the solver and solved by it, and are published with the web viewer. Click one and the viewer opens it.": "RNL 적합성 테스트 코퍼스에서 가져와, 솔버용으로 작성되고 솔버로 풀린 뒤 웹 뷰어와 함께 배포되는 예제들입니다. 항목을 클릭하면 뷰어에서 바로 열립니다.",
   "sample|Hierarchy": "계층 구조",
   "A two-stage buffer: a drawing for each subcircuit, drawn as a block symbol one level up, and a file it includes.": "2단 버퍼 회로입니다. 각 서브서킷마다 도면이 있고 상위 레벨에서는 블록 심볼로 그려지며, include된 외부 파일 하나를 포함합니다.",
   "Line styles": "선 스타일",

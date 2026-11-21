@@ -108,7 +108,7 @@
   "Today’s workarounds": "目前的权宜做法",
   "Redraw by hand": "手动重画",
   "Slow, and every netlist change means redrawing.": "耗时费力，且每当网表修改就得重新画过。",
-  "Five-transistor OTA placed from connectivity alone: airwires crossing everywhere": "仅按连接关系排出的五管 OTA：飞线四处交叉",
+  "The five-transistor OTA laid out by a solver from its connections alone: every net is wired, but nothing shows which transistors form the pair or the mirror": "求解器仅按连接关系排出的五管 OTA：每个网络都已连线，但看不出哪些晶体管构成差分对或电流镜",
   "Generate automatically": "自动生成原理图",
   "Auto-layout knows the connections but not the structure: you cannot tell which transistors form a pair.": "自动布局只知连接关系、不知电路结构，看不出哪两个晶体管构成一对。",
   "Screenshots and exports": "截图与导出图片",
