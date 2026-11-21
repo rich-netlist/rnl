@@ -206,6 +206,8 @@ fn run(options: Options) -> Result<(), String> {
         address_file: Mutex::new(None),
         run_dirs: Mutex::new(Vec::new()),
         bodies: AtomicUsize::new(0),
+        last_solve: Default::default(),
+        project_root: Mutex::new(None),
     });
     for file in &app.initial {
         app.watcher.watch(file);

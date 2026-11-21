@@ -421,16 +421,57 @@ test("Save Project holds the files of a PATH folder, read from the machine", asy
   await open(page);
   await page.locator("#tab-files").click();
   await expect(page.locator("#library-groups")).not.toHaveAttribute("aria-busy", "true");
-  // (the archive is still saved by the browser here: its own save dialog, where it has one, is not one a test can answer)
-  await page.evaluate(() => { window.showSaveFilePicker = undefined; });
-  const download = page.waitForEvent("download");
   // the command waits for the dialog of what the archive holds, which is answered as the desktop's is
   await page.evaluate(() => { void window.viewer.command("save-project"); });
-  await page.locator("dialog.dialog").getByRole("button", { name: "Save", exact: true }).click();
-  const zip = readFileSync(await (await download).path(), "latin1");
+  const dialog = page.locator("dialog.dialog");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  // then where: the chooser of the machine's files, in the folder of the netlist; the program writes the archive there
+  await dialog.locator(".dialog-option", { hasText: "Save in this folder" }).click();
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await dialog.locator("input").fill("saved.zip");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  const archive = join(work, "proj", "sim", "saved.zip");
+  await expect.poll(() => existsSync(archive)).toBe(true);
+  const zip = readFileSync(archive, "latin1");
   expect(zip.startsWith("PK")).toBe(true);
   expect(zip).toContain("PATH/1-lib/amp.sp");
   expect(zip).toContain("R5 in out 5k");
+});
+
+test("Export Image writes the image where the user says, as the desktop does", async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => { void window.viewer.command("export-svg"); });
+  const dialog = page.locator("dialog.dialog");
+  await expect(dialog.locator(".dialog-title")).toHaveText("Export Image");
+  await dialog.locator(".dialog-option", { hasText: "Save in this folder" }).click();
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await dialog.locator("input").fill("drawn.svg");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  const image = join(work, "proj", "sim", "drawn.svg");
+  await expect.poll(() => existsSync(image)).toBe(true);
+  expect(readFileSync(image, "utf8")).toContain("<svg");
+});
+
+test("Save Solved Copy As saves the solve the program kept into a folder the user chooses, as the desktop does", async ({ page }) => {
+  mkdirSync(join(work, "proj", "out"));
+  await open(page);
+  await page.evaluate(() => window.viewer.command("solve"));
+  await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"), null, { timeout: 120000 });
+  // the netlist reads other files: the copy is a folder, with the files it read beside the one solved
+  await page.evaluate(() => { void window.viewer.command("solve-save"); });
+  const dialog = page.locator("dialog.dialog");
+  const options = dialog.locator(".dialog-option");
+  await expect(dialog.locator(".dialog-title")).toHaveText("Save the Solved Files Into a Folder");
+  await options.filter({ hasText: "Parent folder" }).click();
+  await dialog.getByRole("button", { name: "Choose" }).click();
+  await options.filter({ hasText: "out/" }).dblclick();
+  await options.filter({ hasText: "Choose this folder" }).click();
+  await dialog.getByRole("button", { name: "Choose" }).click();
+  await expect.poll(() => existsSync(join(work, "proj", "out", "top.sp"))).toBe(true);
+  expect(readFileSync(join(work, "proj", "out", "top.sp"), "utf8")).toContain("A top level");
+  expect(existsSync(join(work, "proj", "out", "extra.inc"))).toBe(true);
+  // the files read are as they were
+  expect(readFileSync(join(work, "proj", "sim", "extra.inc"), "utf8")).toBe("* beside\n");
 });
 
 test("the format chosen for a file of the machine is kept for the next start", async ({ page }) => {

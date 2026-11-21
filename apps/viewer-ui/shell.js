@@ -143,7 +143,7 @@
  *   the user to say. On the web, which cannot write files, download them. Rejects with a message when
  *   it cannot. A shell that offers neither does not save.
  * @property {(name: string, build: () => Promise<Blob>) => Promise<string | false>} [saveProject]
- *   Save Project (desktop) or Download Project (web), project.js: ask where (the web where the browser
+ *   Save Project (desktop, and the local program's page) or Download Project (web), project.js: ask where (the web where the browser
  *   lets it), then write the archive `build` gives, named `name`; what was written, or false on cancel.
  * @property {() => Promise<{ name: string, path?: string, bytes: Uint8Array } | null>} [pickProject]
  *   Open Project: the archive the user chooses, or null.
@@ -163,7 +163,7 @@
  *   shown, with `overlays` (rnl_view::OverlayOptions), built again from what `doc` was built from; when `preview`
  *   is true, `doc` is a solve's preview, built from the files the solve wrote, which the shell that solved holds.
  * @property {(name: string, blob: Blob, kind: "svg" | "png") => Promise<string | null>} [saveImage]
- *   Save the image: the web downloads it, the desktop asks where; what was written, or null on cancel.
+ *   Save the image: the web downloads it, the desktop (and the local program's page) asks where; what was written, or null on cancel.
  * @property {(source: Source, file: SavedFile, encoding?: "preserve" | "utf8") => Promise<Source | null>} [saveAs] Ask where to save the
  *   text of the netlist that was opened, write it there, and give the source of the file written; null
  *   when the user cancels. Rejects with a message when it cannot. Only the desktop offers it.
