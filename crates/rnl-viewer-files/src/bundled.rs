@@ -77,7 +77,8 @@ pub fn info(root: &Path, named: impl Fn(&Path) -> String) -> Info {
             packages.push(Package { kind: field(p, "kind"), path: named(&file), name, version });
         }
     }
-    let licenses = lock["licenses"].as_array().into_iter().flatten().map(|l| named(&root.join(field(l, "path")))).collect();
+    let licenses =
+        lock["licenses"].as_array().into_iter().flatten().map(|l| named(&root.join(field(l, "path")))).collect();
     Info {
         bundled: !packages.is_empty(),
         catalog: field(&lock, "catalog"),
