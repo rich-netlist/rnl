@@ -2,7 +2,7 @@
 name = "rnl-viewer-local"
 version = "0.6.1"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.89"
 license = "MIT"
 publish = false
 description = "RNL Viewer for older enterprise Linux: a local server for the web viewer, drawn in a browser"
