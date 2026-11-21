@@ -384,6 +384,27 @@ test("New Window opens the file of the machine in a new tab, with the changes ap
   expect(readFileSync(join(work, "proj", "sim", "top.sp"), "utf8")).not.toContain("* applied here");
 });
 
+test("PATH is searched as the desktop searches it: folder by folder, a bare include in each folder itself, not in its version folders", async ({ page }) => {
+  server.kill();
+  // the first PATH folder has part.inc only in a version folder; the second has it itself
+  mkdirSync(join(work, "pa", "1.0"), { recursive: true });
+  mkdirSync(join(work, "pb"), { recursive: true });
+  writeFileSync(join(work, "pa", "1.0", "part.inc"), "* in a version folder\nR1 a 0 1k\n");
+  writeFileSync(join(work, "pb", "part.inc"), "* in the folder\nR2 a 0 2k\n");
+  writeFileSync(join(work, "proj", "sim", "uses.sp"), "* uses\n.include part.inc\n.end\n");
+  const pagePath = (p) => (process.platform === "win32" ? `/${p.replaceAll("\\", "/")}` : p);
+  writeFileSync(join(work, "settings.json"), JSON.stringify({ "search-paths": [pagePath(join(work, "pa")), pagePath(join(work, "pb"))] }));
+  ({ child: server, base, address } = await start(join(work, "proj", "sim", "uses.sp")));
+  await open(page);
+  // (the netlist is read again once PATH is listed)
+  await page.locator("#tab-files").click();
+  await expect(page.locator("#library-groups")).not.toHaveAttribute("aria-busy", "true");
+  await page.waitForFunction(() => window.viewer.doc?.files.length > 1 && !document.body.classList.contains("busy"));
+  const read = (await document(page)).files.map((f) => f.path);
+  expect(read.some((p) => p.endsWith("pb/part.inc"))).toBe(true);
+  expect(read.some((p) => p.endsWith("1.0/part.inc"))).toBe(false);
+});
+
 test("Save Project holds the files of a PATH folder, read from the machine", async ({ page }) => {
   server.kill();
   mkdirSync(join(work, "lib"), { recursive: true });

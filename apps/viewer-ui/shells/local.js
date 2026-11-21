@@ -107,22 +107,6 @@ const remember = (dir) => {
 /** Keep a setting in the program's file. */
 const save = (key, value) => api("api/settings", { method: "PUT", body: { key, value } });
 
-const NETLISTS = /\.(sp|spi|spice|cir|ckt|net|netlist|scs|inc|lib|rnl)$/i;
-
-/** The netlists and packages in a folder, and in the folders below it, as the Library's Include Folder lists them. */
-async function folderFiles(dir, found = [], depth = 0, seen = { cut: 0 }) {
-  const listing = await api(`api/ls?${new URLSearchParams({ dir })}`);
-  // (a folder with more entries than the program lists is included in part: said, with how many it lists)
-  if (listing.truncated) seen.cut = listing.entries.length;
-  for (const entry of listing.entries) {
-    const path = `${listing.dir.replace(/\/$/, "")}/${entry.name}`;
-    if (entry.dir) {
-      if (depth < 8 && found.length < 2000) await folderFiles(path, found, depth + 1, seen);
-    } else if (NETLISTS.test(entry.name)) found.push(path);
-  }
-  return found;
-}
-
 /** The files of the machine that changed on disk since the page read them: said once each, with the key that reloads them. */
 let version = 0;
 async function watchChanges() {
@@ -207,11 +191,11 @@ export default {
       await api("api/open", { method: "POST", body: { path: chosen.path } });
       return [web.poolItem(serverSource(chosen.path))];
     }
-    await api("api/allow", { method: "POST", body: { dir: chosen.path } });
-    const seen = { cut: 0 };
-    const paths = await folderFiles(chosen.path, [], 0, seen);
-    if (seen.cut) note(m`Only the first ${seen.cut} entries are listed.`);
-    return paths.map((path) => web.poolItem(serverSource(path)));
+    // the program allows the folder and lists it as the desktop's Include Folder does (rnl_cli::walk), by the core's suffixes
+    const { files, truncated } = await api("api/folder", { method: "POST", body: { dir: chosen.path } });
+    // (a folder with more files than are listed is included in part: said, with how many)
+    if (truncated) note(m`Only the first ${files.length} entries are listed.`);
+    return files.map((path) => web.poolItem(serverSource(path)));
   },
   // another file of the document, opened from the Library, a diagnostic or an include: read from the machine too
   sourceForFile(source, document, index) {

@@ -50,9 +50,11 @@ async function syncPool(reload = false) {
       seen.add(path);
     }
   }
+  // the folders PATH searches, in its order: those its listings name (the folders lookup searches for each)
+  const searched = [...scanned].flatMap(([dir, found]) => (found.error ? [] : found.dirs ?? [dir]));
   const refresh = [...refreshPaths];
   refreshPaths.clear();
-  try { libraryErrors = await shell.setPool?.(all, reload, refresh) || []; }
+  try { libraryErrors = await shell.setPool?.(all, reload, refresh, searched) || []; }
   catch (e) { for (const path of refresh) refreshPaths.add(path); throw e; }
 }
 
@@ -251,7 +253,7 @@ async function scanPaths(reload = false) {
     try {
       // an array from a shell that lists a directory alone, or { files, truncated }
       const found = await shell.pathPackages(dir, deep.has(dir));
-      return [dir, Array.isArray(found) ? { files: found } : { files: found.files, truncated: found.truncated }];
+      return [dir, Array.isArray(found) ? { files: found } : { files: found.files, dirs: found.dirs, truncated: found.truncated }];
     }
     catch (e) { return [dir, { files: [], error: String(e) }]; }
   }));
