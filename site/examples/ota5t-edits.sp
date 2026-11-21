@@ -24,12 +24,12 @@ M5 tail vbias vss  vss nch W=4u L=1u
 *   %p_bias = $IO_PORT @ATTACH &vbias;
 *   # @SELECT-NET => @ROUTE-NET;
 *   %amp_group = {%amp %p_inp %p_inn %p_out %p_bias} @GROUP;
-*   {%amp %p_out} @ORDER("left-to-right")
-*   /* {#M1 #M2 #M9} @ALIGN("y") */
+*   {%amp %p_out} @ORDER("left-to-right");
+*   {#M1 #M2 #M9} @ALIGN("y")
 * }
 * @RNL(author="rnl-editor") {
-*   #M2 @PLACE(x=18, priority="high")
-*   /* #M4 @PLACE(2O, 26, priority="high") */
+*   #M2 @PLACE(x=18, priority="high");
+*   #M4 @PLACE(2O, 26, priority="high")
 * }
 * @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:a0c875a9451d0e20.3cb60203afe238d5", numbering="9912cd934557ce94") {
 *   %ground_stub_M5_s = $GROUND_STUB @ATTACH(gap=3) #M5::s;

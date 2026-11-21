@@ -71,7 +71,11 @@ for (const [look, name, withPackages] of LOOKS) {
     files: withPackages ? { "/top.sp": text, ...library } : { "/top.sp": text },
     package_dirs: withPackages ? ["/lib/eda-symbol", "/lib/eda-style"] : [],
   });
-  const bad = doc.diagnostics.filter((d) => d.severity === "error" || d.severity === "warning");
+  // example 5 shows two statements in error on purpose, the ALIGN of the missing M9 and the PLACE of "2O": their errors
+  // are expected, any other is not
+  const lines = text.split(/\r?\n/);
+  const meant = (d) => look === "edits" && d.severity === "error" && /#M9|\b2O\b/.test(lines[d.line - 1] || "");
+  const bad = doc.diagnostics.filter((d) => (d.severity === "error" || d.severity === "warning") && !meant(d));
   if (bad.length) throw new Error(`${name}: ${bad.map((d) => `${d.severity} ${d.line}: ${d.message}`).join("; ")}`);
   const level = doc.levels.find((l) => l.kind === "subckt");
   const attrs = new Map();

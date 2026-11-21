@@ -147,12 +147,13 @@
     { t: '.ends ota5t' }
   ];
 
-  /* What the core says of the file (rnl check site/examples/ota5t-edits.sp, with the two statements shown as errors
-     taken out of their comments): solved again after the editor's move, so nothing conflicts */
+  /* What the core says of the file (rnl check site/examples/ota5t-edits.sp): 3 errors, two of them the missing M9 and
+     the ALIGN it fails; solved again after the editor's move, so nothing conflicts. The two statements in error are
+     left out of what the solver reads, so its record and hash are those of the file without them */
   var E5_DIAG = [
-    { k: 'err', id: 'm9', icon: 'cross', html: '<en><code>{#M1 #M2 #M9} @ALIGN("y")</code>: this level has no instance M9. ALIGN is strict about its members, so the whole statement fails; it does not fall back to “align only M1 and M2”.</en>', refs: [] },
+    { k: 'err', id: 'm9', icon: 'cross', html: '<en><code>{#M1 #M2 #M9} @ALIGN("y")</code>: this level has no instance M9, and ALIGN is strict about its members, so the whole statement fails too: two errors, the second caused by the first. It does not fall back to “align only M1 and M2”.</en>', refs: [] },
     { k: 'err', id: 'bad', icon: 'cross', html: '<en><code>#M4 @PLACE(2O, 26, …)</code>: a number cannot be followed by a letter, and “2O” contains the letter O. Only this statement fails; the solver places M4, at (18, 26) above M2.</en>', refs: ['M4'] },
-    { k: 'ok', id: 'move', icon: 'check', html: '<en>The editor’s <code>#M2 @PLACE(x=18, …)</code> is a record like the author’s, and high. Solved again, M2 stays at x = 18 and the solver lays out the rest around it: M1 moves to x = 6, M4 stays above M2 and the tail M5 stays centered under the pair, at x = 12. To move a device, write where it goes in a record of your own and let the solver arrange the rest.</en>', refs: ['M1', 'M2', 'M4', 'M5'] },
+    { k: 'ok', id: 'move', icon: 'check', html: '<en>The editor’s <code>#M2 @PLACE(x=18, …)</code> is a record like the author’s, and high; it sets only M2’s x, and nothing else is fixed. Solved again, the solver keeps the amplifier’s shape and moves it as a whole 2 to the right, so that M2 is at x = 18: M1 goes from x = 4 to 6 and the tail M5 from 10 to 12, M3 and M4 stay above M1 and M2, and the wires stay straight. To move a device, write where it goes in a record of your own and solve again.</en>', refs: ['M1', 'M2', 'M4', 'M5'] },
     { k: 'info', id: 'solve', icon: 'info', html: '<en>The solver writes its record after the others, with a <code>hash</code> of what it read. Had the editor’s record been added without solving again, the hash would no longer match: the viewer would still show the old drawing and suggest solving again.</en>', refs: [] },
     { k: 'ok', id: 'ok', icon: 'check', html: '<en>Everything else takes effect: the differential pair and its tail, the current mirror, the orientations and the other coordinates.</en>', refs: ['M1', 'M2', 'M5'] }
   ];

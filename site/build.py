@@ -758,9 +758,14 @@ def find_rnl(given):
     raise BuildError("no rnl command: build it with `cargo build -p rnl-cli` or give --rnl PATH")
 
 
+# Example 5 of the language page (glance.js, E5_DIAG in scenes.js) shows two statements in error on purpose: the ALIGN of
+# the missing M9, which fails as a whole (two errors), and the PLACE of "2O". The viewer opens the same file.
+MEANT_ERRORS = {"ota5t-edits.sp": ("RNL1121", "RNL3215", "RNL5000")}
+
+
 def check_examples_rnl(rnl):
     """Check that every file in site/examples/ (*.sp, and cases/*.sp) passes `rnl check` with 0 errors, 0 violations
-    and 0 warnings, renders with `rnl render`, and that the record of the solver of each of its levels is up to date
+    and 0 warnings, but the errors MEANT_ERRORS lists, which it must find exactly; renders with `rnl render`, and that the record of the solver of each of its levels is up to date
     (`rnl view --status`: solved, or fixed for a level that has nothing to solve), so that the viewer shows what it
     shows and solving it again gives the same."""
     errors = []
@@ -783,6 +788,14 @@ def check_examples_rnl(rnl):
                 errors.append("%s: rnl check printed no summary:\n%s%s" % (rel, chk.stdout, chk.stderr))
                 continue
             n_err, n_vio, n_warn = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            meant = MEANT_ERRORS.get(path.name)
+            if meant:
+                # the errors the page shows on purpose: exactly these, so that its count of them stays true
+                codes = sorted(re.findall(r"^error \S+ (RNL\d+)", chk.stdout, re.M))
+                if codes != sorted(meant):
+                    errors.append("%s: rnl check finds the errors %s, but the page shows %s"
+                                  % (rel, ", ".join(codes) or "none", ", ".join(sorted(meant))))
+                n_err = 0
             if n_err or n_vio or n_warn:
                 errors.append("%s: rnl check finds %d errors, %d violations and %d warnings:\n%s"
                               % (rel, n_err, n_vio, n_warn, "\n".join(
