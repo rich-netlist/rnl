@@ -357,9 +357,11 @@ const commands = (items) => items.flatMap((item) => (item === "-" ? [] : item.it
 
 /**
  * The native menus the command table gives the desktop on Windows, the keys shown after a tab, and
- * the check marks the page has set: `marks` by command id.
+ * the check marks the page has set: `marks` by command id. A command is offered where it names no
+ * platforms or names the desktop, or where the shell has what it names in `with`, and not where the
+ * shell has what it names in `unless`: `caps`, by name, as the page's shell has them.
  */
-function tableMenus(marks) {
+function tableMenus(marks, caps) {
   const entries = (items) => {
     const shown = [];
     let gap = false;
@@ -374,7 +376,8 @@ function tableMenus(marks) {
         if (inner.length === 0) continue;
         next = { text: item.label, separator: false, checked: false, items: inner };
       } else {
-        if (item.platforms && !item.platforms.includes("desktop")) continue;
+        const here = !item.platforms || item.platforms.includes("desktop") || (item.with !== undefined && caps[item.with]);
+        if (!here || (item.unless !== undefined && caps[item.unless])) continue;
         const keys = item.shown || (item.keys ? item.keys[0] : null);
         next = { text: keys ? `${item.label}\t${keys}` : item.label, separator: false, checked: !!item.check && marks[item.id] };
       }
@@ -473,7 +476,10 @@ async function drive(app, port, profile, t0, session) {
   const ids = commands(table.menus.flatMap((m) => m.items)).filter((c) => c.check).map((c) => c.id);
   const marks = await page.evaluate(`Object.fromEntries(${JSON.stringify(ids)}.map((id) => [id, window.viewer.checked(id)]))`);
   same(marks["grid-none"] && !marks["grid-dots"] && !marks["grid-lines"], true, "the grid's marks at start: off");
-  const want = tableMenus(marks);
+  // what the page's shell has of what the table's commands name in `with` and `unless`
+  const capNames = [...new Set(commands(table.menus.flatMap((m) => m.items)).flatMap((c) => [c.with, c.unless]).filter(Boolean))];
+  const caps = await page.evaluate(`import('./shell.js').then(({ shell }) => Object.fromEntries(${JSON.stringify(capNames)}.map((k) => [k, !!shell[k]])))`);
+  const want = tableMenus(marks, caps);
   same(nativeMenu(app.pid), want, "the native menu");
   // a key in the page clears a check mark, and an item chosen in the menu reaches the page
   const at = (id) => find(want, id).at;
@@ -491,7 +497,7 @@ async function drive(app, port, profile, t0, session) {
     return { ...item, text: (catalog[label] || label) + (english.has(label) ? ` (${english.get(label)})` : '') + (keys ? '\t' + keys : ''),
       ...(item.items ? {items: translatedMenu(item.items)} : {}) };
   });
-  same(nativeMenu(app.pid), translatedMenu(tableMenus({...marks, "language-en":false, "language-zh":true})), "Chinese native menu");
+  same(nativeMenu(app.pid), translatedMenu(tableMenus({...marks, "language-en":false, "language-zh":true}, caps)), "Chinese native menu");
   same(await page.evaluate(`window.localeDocument === window.viewer.doc && window.localeSvg === document.querySelector('#canvas > svg')`), true, "language change preserves document and drawing");
   chooseItem(app.pid, at("about"));
   await until("Chinese About", () => page.evaluate(`document.querySelector('dialog[open] .dialog-title')?.textContent === '关于 RNL Viewer'`));

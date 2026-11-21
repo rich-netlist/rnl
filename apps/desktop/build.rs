@@ -7,35 +7,44 @@ fn main() {
     tauri_build::build()
 }
 
-/// The languages of the interface besides English, which the menus list and whose catalogs the page
-/// asks for (menu.rs): those of the project's list of languages, `i18n/languages.json`, that are shown
-/// (`published`) and have a catalog of the viewers, `i18n/<code>/viewer.json` (decision 0015). Written
-/// to `ui_languages.rs` in OUT_DIR, as the web viewer's build writes them for the page
-/// (scripts/i18n/viewer-locales.mjs).
+/// The languages of the interface, English first, whose catalogs the page asks for (menu.rs): the one table of them,
+/// `i18n/viewer-languages.json`, which scripts/i18n/viewer-locales.mjs writes from the project's list of languages and
+/// the catalogs of the viewers (decision 0015), as the web viewer's build gives it to the page. Written to
+/// `ui_languages.rs` in OUT_DIR, with each language's catalog, `i18n/<lang>/viewer.json`.
 fn ui_languages() {
     let i18n = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../i18n");
-    println!("cargo:rerun-if-changed={}", i18n.display());
-    let registry = i18n.join("languages.json");
-    let text = std::fs::read_to_string(&registry).unwrap_or_else(|e| panic!("{}: {e}", registry.display()));
-    let config: serde_json::Value = serde_json::from_str(&text).expect("i18n/languages.json is JSON");
+    let table = i18n.join("viewer-languages.json");
+    println!("cargo:rerun-if-changed={}", table.display());
+    let text = std::fs::read_to_string(&table).unwrap_or_else(|e| panic!("{}: {e}", table.display()));
+    let languages: Vec<serde_json::Value> = serde_json::from_str(&text).expect("i18n/viewer-languages.json is a list");
     let mut out = String::from(
-        "/// The languages of the interface besides English: the code of i18n/languages.json, the one the\n\
-         /// page knows it by, its name in itself, the first parts of the system languages that ask for it,\n\
-         /// and its catalog of the viewers. Written by build.rs.\n\
-         pub const UI_LANGUAGES: &[(&str, &str, &str, &[&str], &str)] = &[\n",
+        "/// A language of the interface, as i18n/viewer-languages.json has it, with its catalog of the viewers.\n\
+         pub struct UiLanguageRow {\n\
+         \x20   pub code: &'static str,\n\
+         \x20   pub lang: &'static str,\n\
+         \x20   pub name: &'static str,\n\
+         \x20   pub english: &'static str,\n\
+         \x20   pub matches: &'static [&'static str],\n\
+         \x20   pub catalog: &'static str,\n\
+         }\n\n\
+         /// The languages of the interface, English first, which has no catalog. Written by build.rs.\n\
+         pub const UI_LANGUAGES: &[UiLanguageRow] = &[\n",
     );
-    for entry in config["languages"].as_array().expect("languages") {
-        let code = entry["code"].as_str().expect("code");
-        let catalog = i18n.join(code).join("viewer.json");
-        if code == config["default"] || entry["status"] != "published" || !catalog.is_file() {
-            continue;
-        }
-        let viewer = entry["codes"]["viewer"].as_str().unwrap_or(code);
-        let name = entry["names"]["viewer"].as_str().or(entry["name"].as_str()).expect("name");
-        let matches: Vec<&str> = entry["matches"]
-            .as_array()
-            .map_or_else(|| vec![code], |m| m.iter().filter_map(serde_json::Value::as_str).collect());
-        out += &format!("    ({code:?}, {viewer:?}, {name:?}, &{matches:?}, include_str!({:?})),\n", catalog.display());
+    for (n, language) in languages.iter().enumerate() {
+        let field = |key: &str| language[key].as_str().unwrap_or_else(|| panic!("{key} of a language")).to_string();
+        let (code, lang, name, english) = (field("code"), field("lang"), field("name"), field("english"));
+        let matches: Vec<&str> =
+            language["matches"].as_array().expect("matches").iter().filter_map(|m| m.as_str()).collect();
+        let catalog = if n == 0 {
+            "\"{}\"".to_string()
+        } else {
+            let file = i18n.join(&lang).join("viewer.json");
+            println!("cargo:rerun-if-changed={}", file.display());
+            format!("include_str!({:?})", file.display().to_string())
+        };
+        out += &format!(
+            "    UiLanguageRow {{ code: {code:?}, lang: {lang:?}, name: {name:?}, english: {english:?}, matches: &{matches:?}, catalog: {catalog} }},\n"
+        );
     }
     out += "];\n";
     let file = Path::new(&std::env::var("OUT_DIR").expect("OUT_DIR")).join("ui_languages.rs");

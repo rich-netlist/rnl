@@ -39,9 +39,12 @@ import { netlistColors } from "./netlist-colors.js";
 import { downloadManifest, openManifest, openProject, saveProject } from "./project.js";
 import { exportImage } from "./export-image.js";
 import { $ } from "./util.js";
+import { nativeMenus, nativeOs } from "./native-menu.js";
 
 let table = null; // commands.json, once loaded
 const checks = new Map(); // the id of a check-mark command -> whether it is checked
+const enabled = new Map(); // the id of a command the page enables and disables -> whether it is enabled
+let drawing = Promise.resolve(); // the native menu being drawn, which the next one waits for
 
 /** Load the command table, and pass the shell the check marks and the commands of its menu. */
 export async function startCommands() {
@@ -49,6 +52,7 @@ export async function startCommands() {
   if (!response.ok) throw new Error(`The page could not load its command table (${response.status}).`);
   table = await response.json();
   for (const menu of table.menus) addLanguages(menu.items);
+  await drawNativeMenu();
   for (const [id, checked] of checks) shell.setCheck(id, checked);
   shell.onCommand(command);
   setEnabled("descend-new-window", false);
@@ -56,6 +60,22 @@ export async function startCommands() {
   setEnabled("find-text", false);
   languageChecks();
 }
+
+/**
+ * Give a shell that draws a native menu bar (`setMenu`, the desktop's) the menus as this page plans them
+ * (native-menu.js), in the language shown, with the check marks and the commands disabled as they are: at start, and
+ * again in another language.
+ */
+function drawNativeMenu() {
+  if (!shell?.setMenu || !table) return Promise.resolve();
+  drawing = drawing.catch(() => {}).then(async () => {
+    await shell.setMenu(nativeMenus(menus(), nativeOs()));
+    for (const [id, checked] of checks) shell.setCheck(id, checked);
+    for (const [id, on] of enabled) shell.setEnabled?.(id, on);
+  });
+  return drawing;
+}
+window.addEventListener("language-changed", () => void drawNativeMenu().catch(() => {}));
 
 /**
  * The submenu that the table marks with "languages" lists English, and after it each language that
@@ -235,8 +255,9 @@ export function isChecked(id) {
 }
 
 export const isEnabled = (id) => id === "check-all-files" ? canCheckAll() : id === "panel-hide" ? !$("app").classList.contains("sidebar-hidden") : id === "find-text" ? !!doc && !editing : id === "edit-params" ? canEditParams() : id !== "descend-new-window" || canOpen(selected);
-export function setEnabled(id, enabled) {
-  shell?.setEnabled?.(id, enabled);
+export function setEnabled(id, on) {
+  enabled.set(id, on);
+  shell?.setEnabled?.(id, on);
 }
 
 /**
@@ -281,9 +302,9 @@ function entries(items) {
   return shown;
 }
 
-/** The menus with the entries this platform shows, and no menu left without any. */
+/** The menus with the entries this platform shows, and no menu left without any; `source` is the table's label. */
 export function menus() {
-  return table.menus.map((m) => ({ label: named(m), items: entries(m.items) })).filter((m) => m.items.length > 0);
+  return table.menus.map((m) => ({ label: named(m), source: m.label, items: entries(m.items) })).filter((m) => m.items.length > 0);
 }
 
 /** The commands among a menu's items, those of its submenus too. */

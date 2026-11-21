@@ -7,6 +7,7 @@ English is the project's only core language ([decision 0015](../docs/decisions/0
 | File | Content |
 | --- | --- |
 | [`languages.json`](languages.json) | The one list of languages: code, native name, HTML language, how browsers' languages match it, fonts, the English of the site's shared messages, and `status`, `published` or `incubating` |
+| [`viewer-languages.json`](viewer-languages.json) | The languages of the viewers' interface, written from `languages.json` and the catalogs by `node scripts/i18n/viewer-locales.mjs`: those `published` with a catalog of the viewers, English first. Run it after a language is published or gains `viewer.json`; a test says when it is not current. |
 | [`surfaces.json`](surfaces.json) | Every kind of text there is to translate, a *surface*: where its English is, where each language's translation goes, and the texts that are not translated, with the reason |
 | [`../scripts/i18n/status.py`](../scripts/i18n/status.py) | The report: how far each language is in each surface, what is missing, what is stale |
 | `<lang>/` | The catalogs of one language (from the later steps below) |

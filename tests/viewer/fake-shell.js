@@ -442,6 +442,8 @@ export default {
   } : {}),
   platform,
   nativeMenu: platform === "desktop",
+  // the desktop draws the menu bar the page plans (native-menu.js)
+  ...(platform === "desktop" ? { setMenu: async (plan) => { fake.calls.push(["setMenu", plan]); } } : {}),
   formats: async () => { fake.calls.push(["formats"]); return FORMATS; },
   // the desktop's bundled public packages (public_packages.rs): `bundled=1` in the address is a build that has them
   ...(platform === "desktop" ? { bundledPackages: async () => (params.has("bundled") ? BUNDLED_PACKAGES : NO_PACKAGES) } : {}),

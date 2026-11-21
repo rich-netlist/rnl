@@ -56,7 +56,8 @@ export default {
     return path.startsWith('<') ? { path, name: f.name, text: f.text, readonly: true } : file(path);
   },
   sourceForPath: (source, path) => file(path),
-  setLanguage: language => invoke("set_ui_language", { language }),
+  // the menu bar as the page plans it, in the language shown (native-menu.js): the app only draws it
+  setMenu: (plan) => invoke("set_menu", { plan }),
   // the languages the app was built with, from i18n/ (apps/desktop/build.rs)
   uiLanguages: () => invoke("ui_languages"),
   uiCatalog: language => invoke("ui_catalog", { language }),

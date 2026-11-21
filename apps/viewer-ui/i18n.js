@@ -182,19 +182,17 @@ export async function startI18n(shell, saved, save) {
   }
   if (!languages.length || languages[0].code !== english.code) languages = [english, ...languages.filter((l) => l.code !== english.code)];
   language = languages.some((l) => l.code === saved) ? saved : preferredLanguage();
-  await host.setLanguage?.(language);
   bindStatic();
   refresh();
   return unavailable;
 }
 
-/** Serialize native-menu updates and settings writes when users switch quickly. */
+/** Serialize language changes (and the native menu drawn again, commands.js) and settings writes when users switch quickly. */
 export function setLanguage(next) {
   if (!languages.some((l) => l.code === next)) return Promise.reject(new Error("Unsupported UI language"));
   const change = async () => {
     // the catalog of a language is read when it is first chosen
     if (next !== languages[0].code) await catalogOf(next);
-    await host?.setLanguage?.(next);
     language = next;
     refresh();
     await persist?.(next);

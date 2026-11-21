@@ -1,330 +1,103 @@
-//! The menu bar, built from the command table that the page shares with the web viewer
-//! (`apps/viewer-ui/commands.json`), so that the menus and the page's keys cannot drift apart.
+//! The menu bar, drawn as the page plans it (apps/viewer-ui/native-menu.js): from the command table it shares with the
+//! web viewer (`apps/viewer-ui/commands.json`), with the commands this app offers, translated, with their keys. The page
+//! sends the plan at start and again in another language; this module only draws it, and keeps the items whose check
+//! marks and enabled state the page sets. It also keeps the texts of the file dialogs the app shows, as the page
+//! translated them.
 
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
 use serde::Deserialize;
-use tauri::menu::{
-    CheckMenuItem, CheckMenuItemBuilder, IsMenuItem, Menu, MenuItemBuilder, MenuItemKind, Submenu, SubmenuBuilder,
-};
+use tauri::menu::{CheckMenuItem, CheckMenuItemBuilder, Menu, MenuItemBuilder, MenuItemKind, Submenu, SubmenuBuilder};
 use tauri::{AppHandle, Manager, State, Wry};
-
-/// The command table: the menus, their items, and the keys of the items.
-const COMMANDS: &str = include_str!("../../viewer-ui/commands.json");
 
 // UI_LANGUAGES, the languages of the interface besides English, from i18n/ (build.rs, decision 0015)
 include!(concat!(env!("OUT_DIR"), "/ui_languages.rs"));
 
-/// This platform, as the command table names it: an item that names its platforms is only shown
-/// when they include this one.
-const PLATFORM: &str = "desktop";
-
-#[derive(Deserialize)]
-struct Table {
-    menus: Vec<TableMenu>,
-}
-
-/// A menu, or a submenu: its label and its entries.
-#[derive(Deserialize)]
-struct TableMenu {
-    label: String,
-    items: Vec<Entry>,
-    /// Whether it lists the languages: its items, English, and then each of [`UI_LANGUAGES`].
-    #[serde(default)]
-    languages: bool,
-    /// An English word that follows its translated label, in parentheses, when the interface is not
-    /// in English: on the View menu and its Language submenu, so that a user who reads none of the
-    /// interface finds the way back. The table's `icon` is the page's alone: a submenu has none here.
-    #[serde(default)]
-    english: Option<String>,
-}
-
-/// A menu entry: a submenu, which has entries of its own, a command, or `"-"` for a separator.
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum Entry {
-    Submenu(TableMenu),
-    Command(Command),
-    Separator(Rule),
-}
-
-/// The separator, the only string a menu's items may hold.
-#[derive(Deserialize)]
-enum Rule {
-    #[serde(rename = "-")]
-    Rule,
-}
-
-/// A command of the table.
-#[derive(Deserialize)]
-struct Command {
-    /// What the page's `command` takes; "exit" and "about" are the app's own.
-    id: String,
-    /// The text, with `&` before the mnemonic letter.
-    label: String,
-    /// The keys that run it, written like "Ctrl+Shift+M", where Ctrl is Cmd on macOS. The first is
-    /// the menu's accelerator.
-    #[serde(default)]
-    keys: Vec<String>,
-    /// How the menu shows the keys, when not as the first of them.
-    shown: Option<String>,
-    /// Whether it has a check mark. An item of a group of which one is checked, which the table
-    /// marks as `radio` for the page's own menu bar, is a check item here: the page sets the marks.
-    #[serde(default)]
-    check: bool,
-    /// Whether the page always handles its key, such as Enter or Backspace: a menu accelerator
-    /// would take the key from the search box too.
-    #[serde(default)]
-    page: bool,
-    /// The platforms that offer it; all when not given.
-    platforms: Option<Vec<String>>,
-    #[serde(default, rename = "windowsOnly")]
-    windows_only: bool,
-}
-
-/// An entry of the menu bar as this platform shows it.
-#[derive(Debug, PartialEq)]
-enum Shown {
-    /// A command: its id, its text with the keys shown, the accelerator that runs it, and whether it
-    /// has a check mark.
+/// An entry of the menu bar, as the page plans it.
+#[derive(Deserialize, Debug, PartialEq)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum Entry {
+    /// A command: its id, its text (with the keys shown after a tab, on Windows), the accelerator that runs it, and
+    /// whether it has a check mark.
     Item {
         id: String,
         text: String,
         accelerator: Option<String>,
         check: bool,
     },
-    /// A submenu: its text, and its entries as this platform shows them.
-    Submenu(String, Vec<Shown>),
-    /// The predefined About item, with its text.
-    About(String),
+    /// A submenu, or a menu of the bar: its text and its entries; `edit` marks the Edit menu, which on macOS begins
+    /// with the system's editing commands.
+    Submenu {
+        text: String,
+        items: Vec<Entry>,
+        #[serde(default)]
+        edit: bool,
+    },
+    /// The About item, which the page answers.
+    About {
+        text: String,
+    },
     Separator,
 }
 
-/// The menus as this platform shows them, with a separator only between two entries. On Windows the
-/// page handles the shortcut keys, which reach the WebView before any menu accelerator, so the
-/// shortcut is only shown, after a tab; elsewhere the menu handles it, and the page never sees the
-/// key. The keys the page always handles have no accelerator and are only shown on Windows.
-fn plan(table: &Table, windows: bool) -> Vec<(String, Vec<Shown>)> {
-    table
-        .menus
-        .iter()
-        .map(|menu| (menu.label.clone(), entries(&menu.items, windows)))
-        .filter(|(_, shown)| !shown.is_empty())
-        .collect()
+/// The menu bar as the page plans it, and the texts of the file dialogs, by their English.
+#[derive(Deserialize)]
+pub struct Plan {
+    menus: Vec<Entry>,
+    texts: HashMap<String, String>,
 }
 
-/// macOS reserves the first menu for the application. Quit still uses our unsaved-edit flow.
-#[cfg(any(target_os = "macos", test))]
-fn macos_plan(table: &Table) -> Vec<(String, Vec<Shown>)> {
-    let mut menus = plan(table, false);
-    for (_, entries) in &mut menus {
-        entries.retain(|entry| {
-            !matches!(entry, Shown::About(_)) && !matches!(entry, Shown::Item { id, .. } if id == "exit")
-        });
-        while matches!(entries.last(), Some(Shown::Separator)) {
-            entries.pop();
-        }
-    }
-    menus.insert(
-        0,
-        (
-            "RNL Viewer".into(),
-            vec![
-                Shown::About("About RNL Viewer".into()),
-                Shown::Separator,
-                Shown::Item {
-                    id: "exit".into(),
-                    text: "Quit RNL Viewer".into(),
-                    accelerator: Some("CmdOrCtrl+Q".into()),
-                    check: false,
-                },
-            ],
-        ),
-    );
-    menus
+/// The items drawn last, whose check marks and enabled state the page sets, and the texts of the file dialogs.
+#[derive(Default)]
+pub struct Drawn(Mutex<DrawnItems>);
+
+#[derive(Default)]
+struct DrawnItems {
+    checks: HashMap<String, CheckMenuItem<Wry>>,
+    items: Vec<MenuItemKind<Wry>>,
+    texts: HashMap<String, String>,
 }
 
-/// The entries of a menu or a submenu as this platform shows them, as [`plan`] says; a submenu with
-/// nothing to show is left out.
-fn entries(items: &[Entry], windows: bool) -> Vec<Shown> {
-    let mut shown = Vec::new();
-    let mut gap = false;
-    for entry in items {
-        let next = match entry {
-            Entry::Separator(Rule::Rule) => {
-                gap = !shown.is_empty();
-                continue;
-            }
-            Entry::Submenu(menu) => match entries(&menu.items, windows) {
-                inner if inner.is_empty() => continue,
-                mut inner => {
-                    if menu.languages {
-                        inner.extend(UI_LANGUAGES.iter().map(|(code, _, name, _, _)| Shown::Item {
-                            id: format!("language-{code}"),
-                            text: (*name).into(),
-                            accelerator: None,
-                            check: true,
-                        }));
-                    }
-                    Shown::Submenu(menu.label.clone(), inner)
-                }
-            },
-            Entry::Command(c) if c.platforms.as_ref().is_some_and(|p| !p.iter().any(|p| p == PLATFORM)) => continue,
-            Entry::Command(c) if c.windows_only && !windows => continue,
-            Entry::Command(c) if c.id == "about" => Shown::About(c.label.clone()),
-            Entry::Command(c) => {
-                let (text, accelerator) = match (c.shown.as_ref().or(c.keys.first()), c.keys.first()) {
-                    (Some(shown), _) if windows => (format!("{}\t{shown}", c.label), None),
-                    (_, Some(key)) if !c.page => {
-                        (c.label.clone(), Some(key.replacen("Ctrl+", "CmdOrCtrl+", 1).replacen("Control+", "Ctrl+", 1)))
-                    }
-                    _ => (c.label.clone(), None),
-                };
-                Shown::Item { id: c.id.clone(), text, accelerator, check: c.check }
-            }
-        };
-        if gap {
-            shown.push(Shown::Separator);
-            gap = false;
-        }
-        shown.push(next);
-    }
-    shown
-}
-
-/// The menu bar: the menus of the command table with the items the desktop offers. Every item but
-/// Exit and About is passed to the page as a `menu` event carrying the item's id.
+/// The menu bar at start, before the page has planned it: none.
 pub fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
-    let table: Table = serde_json::from_str(COMMANDS).expect("commands.json is a command table");
-    let mut checks = HashMap::new();
-    let mut menus = Vec::new();
-    let mut labels = Vec::new();
-    #[cfg(target_os = "macos")]
-    let planned = macos_plan(&table);
-    #[cfg(not(target_os = "macos"))]
-    let planned = plan(&table, cfg!(windows));
-    for (label, entries) in planned {
-        menus.push(submenu(app, &label, entries, &mut checks, &mut labels)?);
-    }
-    app.manage(Checks(checks));
-    let items: Vec<&dyn IsMenuItem<Wry>> = menus.iter().map(|s| s as &dyn IsMenuItem<Wry>).collect();
-    let menu = Menu::with_items(app, &items)?;
-
-    app.manage(Labels(Mutex::new(("en".into(), labels))));
-    Ok(menu)
+    Menu::new(app)
 }
 
-type LabelList = Vec<(MenuItemKind<Wry>, String)>;
-pub struct Labels(Mutex<(String, LabelList)>);
-/// The catalog of each language of the interface, by the code the page knows it by, without the
-/// entries that have no translation yet (null).
-static CATALOGS: LazyLock<HashMap<&str, HashMap<String, String>>> = LazyLock::new(|| {
-    UI_LANGUAGES
-        .iter()
-        .map(|(_, code, _, _, json)| {
-            let catalog: HashMap<String, Option<String>> = serde_json::from_str(json).expect("a UI catalog");
-            (*code, catalog.into_iter().filter_map(|(key, text)| Some((key, text?))).collect())
-        })
-        .collect()
-});
-
-/// The English word that follows the translated label of a menu or a submenu, by its label in the
-/// table (`english` of commands.json): the same in every language, and no text of the catalogs.
-static ENGLISH_WORDS: LazyLock<HashMap<String, String>> = LazyLock::new(|| {
-    fn collect(menu: &TableMenu, words: &mut HashMap<String, String>) {
-        if let Some(word) = &menu.english {
-            words.insert(menu.label.clone(), word.clone());
-        }
-        for entry in &menu.items {
-            if let Entry::Submenu(inner) = entry {
-                collect(inner, words);
-            }
-        }
-    }
-    let table: Table = serde_json::from_str(COMMANDS).expect("commands.json is a command table");
-    let mut words = HashMap::new();
-    for menu in &table.menus {
-        collect(menu, &mut words);
-    }
-    words
-});
-
-fn translated(language: &str, source: &str) -> String {
-    let (label, keys) = source.split_once('\t').map_or((source, None), |(a, b)| (a, Some(b)));
-    let mut text =
-        CATALOGS.get(language).and_then(|catalog| catalog.get(label)).map_or(label, String::as_str).to_string();
-    if language != "en" {
-        if let Some(word) = ENGLISH_WORDS.get(label) {
-            text = format!("{text} ({word})");
-        }
-    }
-    keys.map_or_else(|| text.clone(), |keys| format!("{text}\t{keys}"))
-}
-
-/// Change labels in place: command IDs, accelerators, enabled state and check marks stay intact.
+/// Draw the menu bar the page planned, in place of the one drawn before.
 #[tauri::command]
-pub fn set_ui_language(labels: State<'_, Labels>, language: String) -> Result<(), String> {
-    if language != "en" && !CATALOGS.contains_key(language.as_str()) {
-        return Err("Unsupported UI language".into());
-    }
-    let mut state = labels.0.lock().map_err(|e| e.to_string())?;
-    for (item, source) in &state.1 {
-        let text = translated(&language, source);
-        match item {
-            MenuItemKind::MenuItem(i) => i.set_text(&text),
-            MenuItemKind::Check(i) => i.set_text(&text),
-            MenuItemKind::Submenu(i) => i.set_text(&text),
-            _ => continue,
+pub fn set_menu(app: AppHandle, drawn: State<'_, Drawn>, plan: Plan) -> Result<(), String> {
+    let mut items = DrawnItems { texts: plan.texts, ..Default::default() };
+    let menu = Menu::new(&app).map_err(|e| e.to_string())?;
+    for entry in plan.menus {
+        if let Entry::Submenu { text, items: inner, edit } = entry {
+            let submenu = submenu(&app, &text, inner, edit, &mut items).map_err(|e| e.to_string())?;
+            menu.append(&submenu).map_err(|e| e.to_string())?;
         }
-        .map_err(|e| e.to_string())?;
     }
-    state.0 = language;
+    app.set_menu(menu).map_err(|e| e.to_string())?;
+    *drawn.0.lock().map_err(|e| e.to_string())? = items;
     Ok(())
 }
 
-/// A language of the interface, as the page takes it (i18n.js): the code it knows it by, the code of
-/// i18n/languages.json, its name in itself, and the first parts of the system languages that ask for it.
-#[derive(serde::Serialize)]
-pub struct UiLanguage {
-    code: &'static str,
-    lang: &'static str,
-    name: &'static str,
-    matches: &'static [&'static str],
-}
-
-/// The languages of the interface, English first.
-#[tauri::command]
-pub fn ui_languages() -> Vec<UiLanguage> {
-    let english = UiLanguage { code: "en", lang: "en", name: "English", matches: &["en"] };
-    std::iter::once(english)
-        .chain(UI_LANGUAGES.iter().map(|&(lang, code, name, matches, _)| UiLanguage { code, lang, name, matches }))
-        .collect()
-}
-
-/// The catalog of a language of the interface, {English: translation}.
-#[tauri::command]
-pub fn ui_catalog(language: String) -> Result<HashMap<String, String>, String> {
-    CATALOGS.get(language.as_str()).cloned().ok_or_else(|| format!("No UI catalog for {language}"))
-}
-
+/// A text of the file dialogs, by its English, as the page translated it; the English before the page sent them.
 pub fn text(app: &AppHandle, source: &str) -> String {
-    let labels = app.state::<Labels>();
-    let state = labels.0.lock().unwrap_or_else(|e| e.into_inner());
-    translated(&state.0, source)
+    let drawn = app.state::<Drawn>();
+    let items = drawn.0.lock().unwrap_or_else(|e| e.into_inner());
+    items.texts.get(source).cloned().unwrap_or_else(|| source.to_string())
 }
 
-/// A menu of the menu bar, or a submenu, with its entries; its check items go into `checks`.
+/// A menu of the menu bar, or a submenu, with its entries; its items go into `drawn`.
 fn submenu(
     app: &AppHandle,
     label: &str,
-    entries: Vec<Shown>,
-    checks: &mut HashMap<String, CheckMenuItem<Wry>>,
-    labels: &mut LabelList,
+    entries: Vec<Entry>,
+    edit: bool,
+    drawn: &mut DrawnItems,
 ) -> tauri::Result<Submenu<Wry>> {
     let mut menu = SubmenuBuilder::new(app, label);
     #[cfg(target_os = "macos")]
-    if label == "&Edit" {
+    if edit {
         // WKWebView's responder actions need native Edit items for standard Cmd+C/V/X/A.
         use tauri::menu::PredefinedMenuItem;
         for item in [
@@ -339,86 +112,55 @@ fn submenu(
         }
         menu = menu.separator();
     }
+    #[cfg(not(target_os = "macos"))]
+    let _ = edit;
     for entry in entries {
         menu = match entry {
-            Shown::Separator => menu.separator(),
-            Shown::About(text) => {
+            Entry::Separator => menu.separator(),
+            Entry::About { text } => {
                 let item = MenuItemBuilder::with_id("about", &text).build(app)?;
-                labels.push((MenuItemKind::MenuItem(item.clone()), text));
+                drawn.items.push(MenuItemKind::MenuItem(item.clone()));
                 menu.item(&item)
             }
-            Shown::Submenu(text, inner) => menu.item(&submenu(app, &text, inner, checks, labels)?),
-            Shown::Item { id, text, accelerator, check: true } => {
-                let mut b = CheckMenuItemBuilder::with_id(&id, &text).checked(true);
+            Entry::Submenu { text, items, edit } => menu.item(&submenu(app, &text, items, edit, drawn)?),
+            Entry::Item { id, text, accelerator, check: true } => {
+                let mut b = CheckMenuItemBuilder::with_id(&id, &text);
                 if let Some(a) = accelerator {
                     b = b.accelerator(a);
                 }
                 let item = b.build(app)?;
-                labels.push((MenuItemKind::Check(item.clone()), text));
+                drawn.items.push(MenuItemKind::Check(item.clone()));
                 let menu = menu.item(&item);
-                checks.insert(id, item);
+                drawn.checks.insert(id, item);
                 menu
             }
-            Shown::Item { id, text, accelerator, check: false } => {
+            Entry::Item { id, text, accelerator, check: false } => {
                 let mut b = MenuItemBuilder::with_id(id, &text);
                 if let Some(a) = accelerator {
                     b = b.accelerator(a);
                 }
                 let item = b.build(app)?;
-                labels.push((MenuItemKind::MenuItem(item.clone()), text));
+                drawn.items.push(MenuItemKind::MenuItem(item.clone()));
                 menu.item(&item)
             }
         };
     }
-    let menu = menu.build()?;
-    labels.push((MenuItemKind::Submenu(menu.clone()), label.to_string()));
-    Ok(menu)
+    menu.build()
 }
-
-/// The About box. Its copyright, which every platform shows, is the notice of the fonts the drawing
-/// is in, which the app embeds with the page (decision 0009, OFL 2).
-#[cfg(test)]
-fn about() -> tauri::menu::AboutMetadata<'static> {
-    tauri::menu::AboutMetadata {
-        name: Some("RNL Viewer".into()),
-        version: Some(env!("CARGO_PKG_VERSION").into()),
-        comments: Some(
-            "Draws netlists with Rich Netlist (RNL) records. It can edit a netlist, solve it as a preview and save \
-             a solved copy; it writes a file only when you have edited it and choose Save."
-                .into(),
-        ),
-        copyright: Some(
-            "Texts are drawn in Noto Sans SC, copyright 2014-2021 Adobe (http://www.adobe.com/), under the SIL Open \
-             Font License 1.1 (https://openfontlicense.org)."
-                .into(),
-        ),
-        ..Default::default()
-    }
-}
-
-/// The menu's check marks by command id, which follow the panels however they are shown or hidden.
-pub struct Checks(HashMap<String, CheckMenuItem<Wry>>);
 
 /// Set the check mark of a command, such as "toggle-netlist".
 #[tauri::command]
-pub fn set_view_check(checks: State<'_, Checks>, id: String, checked: bool) {
-    if let Some(item) = checks.0.get(&id) {
+pub fn set_view_check(drawn: State<'_, Drawn>, id: String, checked: bool) {
+    if let Some(item) = drawn.0.lock().unwrap_or_else(|e| e.into_inner()).checks.get(&id) {
         let _ = item.set_checked(checked);
     }
 }
 
+/// Enable or disable a command, at whatever depth of submenus it is.
 #[tauri::command]
-pub fn set_command_enabled(labels: State<'_, Labels>, id: String, enabled: bool) {
-    // Menu::get only searches direct children; Labels retains handles at every submenu depth.
-    let item = labels
-        .0
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .1
-        .iter()
-        .find(|(item, _)| item.id().as_ref() == id.as_str())
-        .map(|(item, _)| item.clone());
-    match item {
+pub fn set_command_enabled(drawn: State<'_, Drawn>, id: String, enabled: bool) {
+    let drawn = drawn.0.lock().unwrap_or_else(|e| e.into_inner());
+    match drawn.items.iter().find(|item| item.id().as_ref() == id.as_str()) {
         Some(MenuItemKind::MenuItem(item)) => {
             let _ = item.set_enabled(enabled);
         }
@@ -429,409 +171,91 @@ pub fn set_command_enabled(labels: State<'_, Labels>, id: String, enabled: bool)
     }
 }
 
+/// The catalog of each language of the interface, by the code the page knows it by, without the
+/// entries that have no translation yet (null).
+static CATALOGS: LazyLock<HashMap<&str, HashMap<String, String>>> = LazyLock::new(|| {
+    UI_LANGUAGES
+        .iter()
+        .map(|language| {
+            let catalog: HashMap<String, Option<String>> =
+                serde_json::from_str(language.catalog).expect("a UI catalog");
+            (language.code, catalog.into_iter().filter_map(|(key, text)| Some((key, text?))).collect())
+        })
+        .collect()
+});
+
+/// A language of the interface, as the page takes it (i18n.js) and scripts/i18n/viewer-locales.mjs gives it: the
+/// code it knows it by, the code of i18n/languages.json, its name in itself, its name in English, and the first parts
+/// of the system languages that ask for it.
+#[derive(serde::Serialize)]
+pub struct UiLanguage {
+    code: &'static str,
+    lang: &'static str,
+    name: &'static str,
+    english: &'static str,
+    matches: &'static [&'static str],
+}
+
+/// The languages of the interface, English first.
+#[tauri::command]
+pub fn ui_languages() -> Vec<UiLanguage> {
+    UI_LANGUAGES
+        .iter()
+        .map(|l| UiLanguage { code: l.code, lang: l.lang, name: l.name, english: l.english, matches: l.matches })
+        .collect()
+}
+
+/// The catalog of a language of the interface, {English: translation}.
+#[tauri::command]
+pub fn ui_catalog(language: String) -> Result<HashMap<String, String>, String> {
+    CATALOGS.get(language.as_str()).cloned().ok_or_else(|| format!("No UI catalog for {language}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn item(id: &str, text: &str, accelerator: Option<&str>) -> Shown {
-        Shown::Item { id: id.into(), text: text.into(), accelerator: accelerator.map(Into::into), check: false }
-    }
-
-    fn check(id: &str, text: &str, accelerator: Option<&str>) -> Shown {
-        Shown::Item { id: id.into(), text: text.into(), accelerator: accelerator.map(Into::into), check: true }
-    }
-
-    fn table() -> Table {
-        serde_json::from_str(COMMANDS).expect("commands.json is a command table")
-    }
-
     #[test]
-    fn translations_keep_shortcuts_and_fall_back_to_english() {
-        assert_eq!(translated("zh-CN", "&Open File...\tCtrl+O"), "打开文件(&O)...\tCtrl+O");
-        assert_eq!(translated("en", "&Open File...\tCtrl+O"), "&Open File...\tCtrl+O");
-        assert_eq!(translated("zh-CN", "untranslated"), "untranslated");
-    }
-
-    #[test]
-    fn the_view_and_language_menus_have_their_english_word_in_every_other_language() {
-        // the word is the table's, the translation the catalog's; English has the label as it is
-        assert_eq!(translated("en", "&Language"), "&Language");
-        assert_eq!(translated("en", "&View"), "&View");
-        assert!(!UI_LANGUAGES.is_empty());
-        for (_, code, _, _, _) in UI_LANGUAGES {
-            let catalog = &CATALOGS[code];
-            for (label, word) in [("&Language", "Language"), ("&View", "View")] {
-                let own = catalog.get(label).map_or(label, String::as_str);
-                assert_eq!(translated(code, label), format!("{own} ({word})"), "{code} {label}");
-            }
-            // another menu, and a command's keys, are as they were
-            assert_eq!(translated(code, "&Edit"), catalog.get("&Edit").map_or("&Edit", String::as_str));
-            let own = catalog.get("&Open File...").map_or("&Open File...", String::as_str);
-            assert_eq!(translated(code, "&Open File...\tCtrl+O"), format!("{own}\tCtrl+O"));
-        }
-    }
-
-    #[test]
-    fn macos_has_one_application_about_and_quit_and_keeps_control_q_for_editing() {
-        let menus = macos_plan(&table());
-        assert_eq!(menus[0].0, "RNL Viewer");
+    fn the_plan_the_page_sends_is_read() {
+        let plan: Plan = serde_json::from_str(
+            r#"{"menus":[{"kind":"submenu","text":"&File","items":[
+                {"kind":"item","id":"open","text":"&Open...","accelerator":"CmdOrCtrl+O","check":false},
+                {"kind":"separator"},
+                {"kind":"submenu","text":"&Grid","items":[{"kind":"item","id":"grid-dots","text":"&Dots","accelerator":null,"check":true}]},
+                {"kind":"about","text":"&About RNL Viewer"}]},
+              {"kind":"submenu","text":"&Edit","edit":true,"items":[]}],
+              "texts":{"Save As":"另存为"}}"#,
+        )
+        .unwrap();
+        assert_eq!(plan.texts["Save As"], "另存为");
+        let Entry::Submenu { text, items, edit } = &plan.menus[0] else { panic!("a menu") };
+        assert_eq!((text.as_str(), *edit), ("&File", false));
         assert_eq!(
-            menus[0].1,
-            vec![
-                Shown::About("About RNL Viewer".into()),
-                Shown::Separator,
-                item("exit", "Quit RNL Viewer", Some("CmdOrCtrl+Q"))
-            ]
-        );
-        assert!(menus[1..].iter().all(|(_, items)| items
-            .iter()
-            .all(|entry| !matches!(entry, Shown::About(_)) && !matches!(entry, Shown::Item {id,..} if id == "exit"))));
-        assert!(menus.iter().any(|(_, items)| items.contains(&check("toggle-edit", "&Edit Text", Some("Ctrl+Q")))));
-    }
-
-    /// View › Grid: the grid shown or not, by G, which the page always handles; its style, one of
-    /// three; the axes; and the dialog of its settings.
-    fn grid(show: &str) -> Shown {
-        Shown::Submenu(
-            "&Grid".into(),
-            vec![
-                check("toggle-grid", show, None),
-                Shown::Separator,
-                check("grid-none", "&None", None),
-                check("grid-dots", "&Dots", None),
-                check("grid-lines", "&Lines", None),
-                Shown::Separator,
-                check("grid-axes", "&Axes", None),
-                Shown::Separator,
-                item("grid-settings", "Grid &Settings...", None),
-            ],
-        )
-    }
-
-    /// Panel digits are page-handled, so native accelerators cannot intercept text input.
-    fn panels(tabbed: bool) -> Shown {
-        let mut entries: Vec<_> = [
-            ("files", "&Library"),
-            ("netlist", "&Netlist"),
-            ("hierarchy", "&Hierarchy"),
-            ("symbol", "&Symbol"),
-            ("usages", "&Usage"),
-            ("unplaced", "Not &Drawn"),
-            ("solve", "S&olve"),
-        ]
-        .iter()
-        .enumerate()
-        .map(|(i, (id, label))| {
-            let text = if tabbed { format!("{label}\t{}", i + 1) } else { label.to_string() };
-            check(&format!("panel-{id}"), &text, None)
-        })
-        .collect();
-        entries.extend([Shown::Separator, item("panel-hide", "H&ide", None)]);
-        Shown::Submenu("Side P&anels".into(), entries)
-    }
-
-    /// English, and each language the registry publishes, by its name in itself (build.rs)
-    fn languages() -> Shown {
-        let mut items = vec![check("language-en", "English", None)];
-        items.extend(UI_LANGUAGES.iter().map(|(lang, _, name, _, _)| check(&format!("language-{lang}"), name, None)));
-        Shown::Submenu("&Language".into(), items)
-    }
-
-    /// The Edit menu (decision 0011): switching the text to edit, a check item, and applying its
-    /// changes, with their keys shown after a tab on Windows (`tabbed`) and as accelerators elsewhere.
-    fn edit(tabbed: bool) -> (String, Vec<Shown>) {
-        let (switch, apply) = if tabbed {
-            (
-                check("toggle-edit", "&Edit Text\tCtrl+Q", None),
-                item("apply-edits", "&Apply and Exit Editing\tCtrl+Enter", None),
-            )
-        } else {
-            (
-                check("toggle-edit", "&Edit Text", Some("Ctrl+Q")),
-                item("apply-edits", "&Apply and Exit Editing", Some("CmdOrCtrl+Enter")),
-            )
-        };
-        (
-            "&Edit".to_string(),
-            vec![
-                switch,
-                apply,
-                item("discard-edits", "&Discard Changes", None),
-                item("find-text", if tabbed { "&Find in Netlist...\tCtrl+F" } else { "&Find in Netlist..." }, None),
-                item("check-all-files", "&Check All Files", None),
-                Shown::Separator,
-                item("descend", if tabbed { "Open &Subcircuit\tE" } else { "Open &Subcircuit" }, None),
-                item(
-                    "descend-new-window",
-                    if tabbed { "Open Subcircuit in New &Window\tShift+E" } else { "Open Subcircuit in New &Window" },
-                    None,
-                ),
-                item("ascend", if tabbed { "&Up to Parent Level\tCtrl+E" } else { "&Up to Parent Level" }, None),
-                item("edit-params", "Subcircuit &Parameters...", None),
-            ],
-        )
-    }
-
-    /// The Solve menu, which only the desktop offers (decision 0010): Solve, with its key shown after
-    /// a tab on Windows (`tabbed`) and as the accelerator elsewhere, Solve All Circuits, Respace and Respace All Circuits, Close Preview,
-    /// Save Solved Copy As and Settings.
-    fn solve(tabbed: bool) -> (String, Vec<Shown>) {
-        let keyed = |id: &str, text: &str, shown: &str, accelerator: &str| {
-            if tabbed {
-                item(id, &format!("{text}\t{shown}"), None)
-            } else {
-                item(id, text, Some(accelerator))
+            items[0],
+            Entry::Item {
+                id: "open".into(),
+                text: "&Open...".into(),
+                accelerator: Some("CmdOrCtrl+O".into()),
+                check: false
             }
-        };
-        (
-            "&Solve".to_string(),
-            vec![
-                keyed("solve", "&Solve", "F9", "F9"),
-                item("solve-all", "Solve &All Circuits", None),
-                item("solve-respace", "&Respace", None),
-                item("solve-respace-all", "Respace All Circuits", None),
-                item("solve-close", "&Close Preview", None),
-                check("toggle-solve-on-open", "As&k to Solve on Open", None),
-                Shown::Separator,
-                keyed("solve-save", "Save Solved Cop&y As...", "Ctrl+Shift+S", "CmdOrCtrl+Shift+S"),
-                item("solve-save-utf8", "Save Solved Copy As UTF-8...", None),
-                Shown::Separator,
-                check("toggle-layout", "Show &Layout Table", None),
-                check("toggle-skeleton-symbols", "Show Component and &Pin Skeleton Lines", None),
-                check("toggle-skeleton-wires", "Show &Wire Skeleton Lines", None),
-                Shown::Separator,
-                item("solve-settings", "S&ettings...", None),
-            ],
-        )
+        );
+        assert_eq!(items[1], Entry::Separator);
+        assert!(
+            matches!(&items[2], Entry::Submenu { items, .. } if matches!(&items[0], Entry::Item { check: true, .. }))
+        );
+        assert_eq!(items[3], Entry::About { text: "&About RNL Viewer".into() });
+        assert!(matches!(&plan.menus[1], Entry::Submenu { edit: true, .. }));
     }
 
-    /// The Help menu, alike on every platform: Check for Updates, which only the desktop offers and
-    /// which has no keys, then About.
-    fn help() -> (String, Vec<Shown>) {
-        let updates = item("check-updates", "Check for &Updates...", None);
-        (
-            "&Help".to_string(),
-            vec![
-                item("shortcuts", "&Keyboard Shortcuts...", None),
-                item("public-packages", "Public &Packages...", None),
-                updates,
-                Shown::Separator,
-                Shown::About("&About RNL Viewer".into()),
-            ],
-        )
-    }
-
-    /// The menu bar as it was written by hand before the table, on Windows, and the grid's submenu.
     #[test]
-    fn windows_shows_the_keys_after_a_tab() {
-        let menus = plan(&table(), true);
-        let expected = vec![
-            (
-                "&File".to_string(),
-                vec![
-                    item("new-window", "&New Window", None),
-                    item("open", "&Open File...\tCtrl+O", None),
-                    item("include-file", "&Include File...", None),
-                    item("include-folder", "Include &Folder (with Sub-folders)...", None),
-                    item("add-path-subfolders", "Add Folder to &PATH (with Sub-folders)...", None),
-                    item("open-project", "Open Projec&t...", None),
-                    item("load-clipboard", "Load from &Clipboard...\tCtrl+Shift+V", None),
-                    item("reload", "&Reload\tF5", None),
-                    item("reload-library", "Reload Li&brary", None),
-                    check("toggle-auto-include", "Auto Includ&e", None),
-                    item("memory-cache", "Memory Cac&he...", None),
-                    Shown::Separator,
-                    item("save", "&Save\tCtrl+S", None),
-                    item("save-as", "Save &As...", None),
-                    item("save-utf8", "Save Changes Using UTF-8", None),
-                    item("save-as-utf8", "Save As UTF-8...", None),
-                    item("save-project", "Save Pro&ject...", None),
-                    Shown::Submenu(
-                        "Export Ima&ge".into(),
-                        vec![item("export-svg", "Export &SVG...", None), item("export-png", "Export &PNG...", None)],
-                    ),
-                    Shown::Separator,
-                    item("file-associations", "Fi&le Associations...", None),
-                    item("exit", "E&xit", None),
-                ],
-            ),
-            edit(true),
-            (
-                "&View".to_string(),
-                vec![
-                    item("fit", "&Fit to Window\tF", None),
-                    item("zoom-in", "Zoom &In\tCtrl++", None),
-                    item("zoom-out", "Zoom &Out\tCtrl+-", None),
-                    item("netlist-colors", "&Color Scheme...", None),
-                    Shown::Submenu(
-                        "&Background".into(),
-                        vec![check("background-light", "&Light", None), check("background-dark", "&Dark", None)],
-                    ),
-                    grid("Show &Grid\tG"),
-                    check("toggle-hover-names", "Show &Names on Hover", None),
-                    check("toggle-hover-roles", "Show &Roles on Hover", None),
-                    check("toggle-usages", "Show &Usages\tCtrl+R", None),
-                    check("toggle-currents", "Show Current &Directions\tShift+R", None),
-                    check("toggle-origins", "Show Registration &Points", None),
-                    check("toggle-flylines", "Show Fl&ylines\tL", None),
-                    check("toggle-net-labels", "Show Net Na&mes\tN", None),
-                    languages(),
-                    Shown::Separator,
-                    panels(true),
-                ],
-            ),
-            solve(true),
-            help(),
-        ];
-        assert_eq!(menus, expected);
-    }
-
-    /// The menu bar as it was written by hand before the table, on macOS and Linux, and the grid's
-    /// submenu.
-    #[test]
-    fn elsewhere_the_menu_has_the_accelerators() {
-        let menus = plan(&table(), false);
-        let expected = vec![
-            (
-                "&File".to_string(),
-                vec![
-                    item("new-window", "&New Window", None),
-                    item("open", "&Open File...", Some("CmdOrCtrl+O")),
-                    item("include-file", "&Include File...", None),
-                    item("include-folder", "Include &Folder (with Sub-folders)...", None),
-                    item("add-path-subfolders", "Add Folder to &PATH (with Sub-folders)...", None),
-                    item("open-project", "Open Projec&t...", None),
-                    item("load-clipboard", "Load from &Clipboard...", Some("CmdOrCtrl+Shift+V")),
-                    item("reload", "&Reload", Some("F5")),
-                    item("reload-library", "Reload Li&brary", None),
-                    check("toggle-auto-include", "Auto Includ&e", None),
-                    item("memory-cache", "Memory Cac&he...", None),
-                    Shown::Separator,
-                    item("save", "&Save", Some("CmdOrCtrl+S")),
-                    item("save-as", "Save &As...", None),
-                    item("save-utf8", "Save Changes Using UTF-8", None),
-                    item("save-as-utf8", "Save As UTF-8...", None),
-                    item("save-project", "Save Pro&ject...", None),
-                    Shown::Submenu(
-                        "Export Ima&ge".into(),
-                        vec![item("export-svg", "Export &SVG...", None), item("export-png", "Export &PNG...", None)],
-                    ),
-                    Shown::Separator,
-                    item("exit", "E&xit", None),
-                ],
-            ),
-            edit(false),
-            (
-                "&View".to_string(),
-                vec![
-                    item("fit", "&Fit to Window", Some("F")),
-                    item("zoom-in", "Zoom &In", Some("CmdOrCtrl+=")),
-                    item("zoom-out", "Zoom &Out", Some("CmdOrCtrl+-")),
-                    item("netlist-colors", "&Color Scheme...", None),
-                    Shown::Submenu(
-                        "&Background".into(),
-                        vec![check("background-light", "&Light", None), check("background-dark", "&Dark", None)],
-                    ),
-                    grid("Show &Grid"),
-                    check("toggle-hover-names", "Show &Names on Hover", None),
-                    check("toggle-hover-roles", "Show &Roles on Hover", None),
-                    check("toggle-usages", "Show &Usages", Some("CmdOrCtrl+R")),
-                    check("toggle-currents", "Show Current &Directions", None),
-                    check("toggle-origins", "Show Registration &Points", None),
-                    check("toggle-flylines", "Show Fl&ylines", None),
-                    check("toggle-net-labels", "Show Net Na&mes", None),
-                    languages(),
-                    Shown::Separator,
-                    panels(false),
-                ],
-            ),
-            solve(false),
-            help(),
-        ];
-        assert_eq!(menus, expected);
-    }
-
-    /// The About box names the fonts the app embeds, their copyright and their licence.
-    #[test]
-    fn the_about_box_names_the_fonts_and_their_licence() {
-        let notice = about().copyright.unwrap_or_default();
-        for part in ["Noto Sans SC", "copyright 2014-2021 Adobe", "SIL Open Font License 1.1"] {
-            assert!(notice.contains(part), "{notice}");
+    fn the_languages_are_those_of_the_one_table_english_first() {
+        let languages = ui_languages();
+        assert_eq!(languages[0].code, "en");
+        assert_eq!(languages[0].english, "English");
+        assert!(languages.len() > 1);
+        for language in &languages[1..] {
+            assert!(!language.english.is_empty(), "{}", language.code);
+            assert!(CATALOGS.contains_key(language.code), "{}", language.code);
         }
-    }
-
-    /// Separators stand only between two items, whichever items a platform leaves out.
-    #[test]
-    fn separators_only_between_items() {
-        let table: Table = serde_json::from_str(
-            r#"{ "menus": [
-                { "label": "A", "items": ["-", { "id": "a", "label": "a", "platforms": ["web"] }, "-",
-                    { "id": "b", "label": "b" }, "-", "-", { "id": "c", "label": "c" }, "-",
-                    { "id": "d", "label": "d", "platforms": ["web"] }] },
-                { "label": "B", "items": [{ "id": "e", "label": "e", "platforms": ["web"] }] }
-            ] }"#,
-        )
-        .unwrap();
-        let menus = plan(&table, false);
-        assert_eq!(menus, vec![("A".to_string(), vec![item("b", "b", None), Shown::Separator, item("c", "c", None)])]);
-    }
-
-    /// A string in a menu's items is a separator, "-", and nothing else.
-    #[test]
-    fn only_a_dash_is_a_separator() {
-        let table = serde_json::from_str::<Table>(r#"{ "menus": [{ "label": "A", "items": ["--"] }] }"#);
-        assert!(table.is_err());
-    }
-
-    /// A submenu's entries are planned as a menu's, at any depth: the items the platform offers, a
-    /// separator only between two entries, and the keys as the platform shows them. A submenu with
-    /// nothing to show is left out, and so is a menu that has nothing else.
-    #[test]
-    fn submenus_are_planned_as_menus() {
-        let table: Table = serde_json::from_str(
-            r#"{ "menus": [
-                { "label": "A", "items": [
-                    { "id": "a", "label": "a", "keys": ["Ctrl+A"] }, "-",
-                    { "label": "B", "items": ["-", { "id": "b", "label": "b", "keys": ["G"], "check": true, "radio": true },
-                        "-", { "label": "C", "items": [{ "id": "c", "label": "c", "keys": ["Enter"], "page": true }] }, "-"] },
-                    "-", { "label": "D", "items": [{ "id": "d", "label": "d", "platforms": ["web"] }, "-"] },
-                    "-", { "id": "e", "label": "e" }
-                ] },
-                { "label": "F", "items": [{ "label": "G", "items": [{ "id": "g", "label": "g", "platforms": ["web"] }] }] }
-            ] }"#,
-        )
-        .unwrap();
-        let sub = |text: &str, entries: Vec<Shown>| Shown::Submenu(text.into(), entries);
-        let windows = vec![(
-            "A".to_string(),
-            vec![
-                item("a", "a\tCtrl+A", None),
-                Shown::Separator,
-                sub("B", vec![check("b", "b\tG", None), Shown::Separator, sub("C", vec![item("c", "c\tEnter", None)])]),
-                Shown::Separator,
-                item("e", "e", None),
-            ],
-        )];
-        assert_eq!(plan(&table, true), windows);
-        let elsewhere = vec![(
-            "A".to_string(),
-            vec![
-                item("a", "a", Some("CmdOrCtrl+A")),
-                Shown::Separator,
-                sub("B", vec![check("b", "b", Some("G")), Shown::Separator, sub("C", vec![item("c", "c", None)])]),
-                Shown::Separator,
-                item("e", "e", None),
-            ],
-        )];
-        assert_eq!(plan(&table, false), elsewhere);
-    }
-
-    /// An entry with items is a submenu and one with an id a command; one with neither is no entry.
-    #[test]
-    fn a_submenu_has_items_and_a_command_an_id() {
-        let entry = |json: &str| serde_json::from_str::<Entry>(json);
-        assert!(matches!(entry(r#"{ "label": "A", "items": [] }"#), Ok(Entry::Submenu(_))));
-        assert!(matches!(entry(r#"{ "id": "a", "label": "A" }"#), Ok(Entry::Command(_))));
-        assert!(entry(r#"{ "label": "A" }"#).is_err());
     }
 }
