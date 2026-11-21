@@ -38,14 +38,15 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard, Once, PoisonError};
 
 use rnl_cli::solve::{SolveOptions, CANCELLED};
-use rnl_runtime::source::{normalize, MemoryProvider};
+use rnl_runtime::source::normalize;
 use rnl_solver::{Clock, SolverOptions};
 use serde::{Deserialize, Serialize};
 
 /// What to solve: the texts of the workspace and the settings. Every field the solve reads is
-/// here. Fields it does not know are ignored, those of a build request of the core's module that
-/// are not here among them (`pool`, `auto_include`, `library_prefix`, `library_edits`,
-/// `std_version`).
+/// here. The files are those of a build request of the core's module, read as it reads them
+/// ([`rnl_view::RequestFiles`]), so that a solve finds what the build it follows found: the pool, the
+/// package directories and search paths, and Auto Include. Fields it does not know are ignored,
+/// those of a build request that are not here among them (`std_version`).
 #[derive(Deserialize, Debug)]
 pub struct SolveRequest {
     /// The path of the file to solve, as the frontend names it. A solve needs it; a [`check`] may
@@ -65,6 +66,19 @@ pub struct SolveRequest {
     /// is not beside the file that includes it: `DIR/NAME` in each.
     #[serde(default)]
     pub search_paths: Vec<String>,
+    /// The paths, among those of `files`, of the Library's files: searched first, for packages by
+    /// name and for bare includes, and indexed for Auto Include.
+    #[serde(default)]
+    pub pool: Vec<String>,
+    /// A subcircuit that no file read defines is taken from the pool's files that define it.
+    #[serde(default)]
+    pub auto_include: bool,
+    /// The start of the pool's paths that the index leaves out, as in a build request.
+    #[serde(default)]
+    pub library_prefix: String,
+    /// Texts applied over the pool's files that the index reads, as in a build request.
+    #[serde(default)]
+    pub library_edits: BTreeMap<String, String>,
     /// "spice" or "spectre", instead of guessing from the entry.
     pub dialect: Option<String>,
     /// The format set for files, by path as in `files`.
@@ -144,21 +158,26 @@ impl Clock for Now<'_> {
     }
 }
 
-/// The files of a request by their normal paths, as the solve reads them, and each normal path
-/// with the path of the request; an error when two paths of the request are one file.
-fn workspace(request: &mut SolveRequest) -> Result<(MemoryProvider, BTreeMap<String, String>), String> {
+/// The files of a request by their normal paths, as the solve reads them ([`rnl_view::RequestFiles`]),
+/// and each normal path with the path of the request; an error when two paths of the request are
+/// one file.
+fn workspace(request: &mut SolveRequest) -> Result<(rnl_view::Opened, BTreeMap<String, String>), String> {
     let mut asked: BTreeMap<String, String> = BTreeMap::new();
     for path in request.files.keys() {
         if let Some(other) = asked.insert(normalize(path), path.clone()) {
             return Err(format!("files: {other} and {path} are one file"));
         }
     }
-    let files = MemoryProvider {
-        files: std::mem::take(&mut request.files).into_iter().map(|(p, t)| (normalize(&p), t)).collect(),
-        package_dirs: request.package_dirs.iter().map(|p| normalize(p)).collect(),
-        search_paths: request.search_paths.iter().map(|p| normalize(p)).collect(),
+    let workspace = rnl_view::RequestFiles {
+        files: std::mem::take(&mut request.files),
+        pool: std::mem::take(&mut request.pool),
+        package_dirs: std::mem::take(&mut request.package_dirs),
+        search_paths: std::mem::take(&mut request.search_paths),
+        auto_include: request.auto_include,
+        library_prefix: std::mem::take(&mut request.library_prefix),
+        library_edits: std::mem::take(&mut request.library_edits),
     };
-    Ok((files, asked))
+    Ok((workspace.open(&request.formats), asked))
 }
 
 /// How the files of a request are read, its settings aside.
@@ -400,6 +419,7 @@ fn keep_panic_messages() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rnl_runtime::source::MemoryProvider;
     use std::cell::RefCell;
     use std::path::Path;
 
@@ -426,6 +446,34 @@ R2 a 0 1k
         });
         r.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
         serde_json::to_vec(&r).unwrap()
+    }
+
+    #[test]
+    fn a_solve_reads_the_pool_and_auto_include_as_the_build_it_follows() {
+        // a subcircuit no file includes, defined by a file of the Library, under the page's prefix
+        let top = "* top
+* @RNL(type=\"header\") { @VERSION(\"0.4\") }
+X1 a 0 cell
+.end
+";
+        let cell = "* cell
+.subckt cell a b
+R1 a b 1k
+.ends
+";
+        let solved = |auto_include: bool| {
+            let r = request(serde_json::json!({
+                "entry": "/w/top.sp",
+                "files": { "/w/top.sp": top, "/<pool>/lib/cell.inc": cell },
+                "pool": ["/<pool>/lib/cell.inc"],
+                "library_prefix": "/<pool>",
+                "auto_include": auto_include,
+            }));
+            let Answer::Solved { document, .. } = solve(&r, &|| 0., &|_| true) else { panic!("not solved") };
+            document["files"].as_array().unwrap().iter().any(|f| f["path"].as_str().unwrap().ends_with("cell.inc"))
+        };
+        assert!(solved(true), "Auto Include takes the definition from the Library");
+        assert!(!solved(false));
     }
 
     #[test]

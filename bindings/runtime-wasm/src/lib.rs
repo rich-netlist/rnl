@@ -30,7 +30,7 @@ use std::fmt::Write;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard, Once, PoisonError};
 
-use rnl_runtime::source::{normalize, LibraryDefinition, LibraryLookup, MemoryProvider, Provider};
+use rnl_runtime::source::{normalize, MemoryProvider};
 use rnl_runtime::Options;
 use rnl_view::{
     BuildOptions, Catalog, CatalogOptions, Document, Drawings, FileResult, FileSymbols, Outline, Parts, Snapshot,
@@ -491,30 +491,17 @@ pub fn respond(request: &[u8]) -> Response {
             kept.push(Vec::with_capacity(1 << 30));
         }
     }
-    let files = request.files.into_iter().map(|(path, text)| (normalize(&path), text)).collect();
-    let files = MemoryProvider { files, package_dirs: request.package_dirs, search_paths: request.search_paths };
-    let paths: Vec<String> = request.pool.iter().map(|p| normalize(p)).collect();
-    let files = rnl_runtime::source::FilePool { files: &files, paths: &paths };
-    let canonical: Vec<_> =
-        paths.iter().map(|p| p.strip_prefix(&request.library_prefix).unwrap_or(p).to_string()).collect();
-    let namespace = PoolNamespace { files: &files, prefix: &request.library_prefix };
-    let pool = rnl_runtime::source::FilePool { files: &namespace, paths: &canonical };
-    let edits = MemoryProvider {
-        files: request.library_edits.into_iter().map(|(p, t)| (normalize(&p), t)).collect(),
-        ..MemoryProvider::default()
+    // the files as every build and solve of a frontend reads them, with the index of the Library kept between builds
+    let workspace = rnl_view::RequestFiles {
+        files: request.files,
+        pool: request.pool,
+        package_dirs: request.package_dirs,
+        search_paths: request.search_paths,
+        auto_include: request.auto_include,
+        library_prefix: request.library_prefix,
+        library_edits: request.library_edits,
     };
-    // the index reads the canonical paths, as the formats set for them name them
-    let prefix = request.library_prefix.as_str();
-    let set = request.formats.iter().map(|(p, f)| (p.strip_prefix(prefix).unwrap_or(p).to_string(), f.clone()));
-    let index_formats: BTreeMap<String, String> = set.collect();
-    let index = LIBRARY.with(|index| {
-        let mut index = index.borrow_mut();
-        index.set_formats(index_formats);
-        index.update(&canonical, &pool, false);
-        index.with_edits(&edits, &pool)
-    });
-    let lookup = NamespacedIndex { index: &index, prefix: &request.library_prefix };
-    let files = AutoLibrary { files: &files, index: &lookup, enabled: request.auto_include };
+    let files = LIBRARY.with(|index| workspace.open_kept(&request.formats, &mut index.borrow_mut()));
     let options = BuildOptions {
         dialect: request.dialect,
         formats: request.formats,
@@ -603,68 +590,6 @@ pub fn respond(request: &[u8]) -> Response {
             Response::Document(Box::new(d))
         }
         Err(e) => Response::Error(e),
-    }
-}
-
-/// Index in canonical pool paths; resolve the same entries in the browser's source namespace.
-struct PoolNamespace<'a> {
-    files: &'a dyn Provider,
-    prefix: &'a str,
-}
-impl Provider for PoolNamespace<'_> {
-    fn read(&self, path: &str) -> Option<String> {
-        self.files.read(&format!("{}{path}", self.prefix))
-    }
-    fn path_key(&self, path: &str) -> String {
-        self.files.path_key(path)
-    }
-}
-struct NamespacedIndex<'a> {
-    index: &'a rnl_view::LibraryIndex,
-    prefix: &'a str,
-}
-impl NamespacedIndex<'_> {
-    fn map(&self, mut d: LibraryDefinition) -> LibraryDefinition {
-        d.path = format!("{}{}", self.prefix, d.path);
-        d.file = format!("{}{}", self.prefix, d.file);
-        d
-    }
-}
-impl LibraryLookup for NamespacedIndex<'_> {
-    fn candidates(&self, name: &str, sensitive: bool) -> Vec<LibraryDefinition> {
-        self.index.candidates(name, sensitive).into_iter().map(|d| self.map(d)).collect()
-    }
-    fn definitions(&self, path: &str) -> Vec<LibraryDefinition> {
-        self.index
-            .definitions(path.strip_prefix(self.prefix).unwrap_or(path))
-            .into_iter()
-            .map(|d| self.map(d))
-            .collect()
-    }
-}
-struct AutoLibrary<'a> {
-    files: &'a dyn Provider,
-    index: &'a dyn LibraryLookup,
-    enabled: bool,
-}
-impl Provider for AutoLibrary<'_> {
-    fn read(&self, path: &str) -> Option<String> {
-        self.files.read(path)
-    }
-    fn package_files(&self) -> Vec<String> {
-        self.files.package_files()
-    }
-    fn package_candidates(&self, name: &str) -> Vec<String> {
-        self.files.package_candidates(name)
-    }
-    fn include_candidates(&self, name: &str) -> Vec<String> {
-        self.files.include_candidates(name)
-    }
-    fn auto_include(&self) -> Option<&dyn LibraryLookup> {
-        self.enabled.then_some(self.index)
-    }
-    fn path_key(&self, path: &str) -> String {
-        self.files.path_key(path)
     }
 }
 

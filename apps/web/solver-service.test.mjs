@@ -20,8 +20,9 @@ if (args[0] === "solve" && args.includes("--check")) {
   console.log(JSON.stringify({ ok: errors.length === 0, levels: [{ title: null, settings: {}, warnings: [], errors }], args }));
   process.exit(errors.length ? 1 : 0);
 }
-const entry = args[1] || args[0];
-const text = fs.existsSync(entry) ? fs.readFileSync(entry, "utf8") : null;
+const request = args.includes("--request") ? JSON.parse(fs.readFileSync(args[1], "utf8")) : null;
+const entry = request ? request.entry : args[1] || args[0];
+const text = request ? request.files[request.entry] ?? null : fs.existsSync(entry) ? fs.readFileSync(entry, "utf8") : null;
 if (/old-fail/.test(text || "")) { console.error("the solver is a preview, whose layouts may be poor\\nnote: a note\\nerror: the netlist fails"); process.exit(1); }
 if (/fail/.test(text || "")) { console.error("hint: RNL8111 solve-preview-notice: the solver is a preview, and its layouts may be poor\\nerror: the netlist fails"); process.exit(1); }
 const events = args.includes("--progress=json");
@@ -31,7 +32,7 @@ if (events) {
   if (/stops-late/.test(text || "")) { console.error(JSON.stringify({ event: "error", message: "late" })); console.error("error: the solver stops"); process.exit(1); }
 }
 if (/slow/.test(text || "")) { fs.writeFileSync(process.env.FAKE_STARTED, "1"); setTimeout(() => {}, 60000); return; }
-const seen = { args: args.slice(1), cwd: process.cwd(), files: fs.readdirSync(".").sort(), text };
+const seen = { args: args.slice(1), cwd: process.cwd(), files: fs.readdirSync(".").sort(), text, request };
 console.log(JSON.stringify({ document: { path: entry, seen }, report: { levels: [] } }));
 `;
 
@@ -99,20 +100,23 @@ test("the service says what it runs", async () => {
   } finally { await s.close(); }
 });
 
-test("a solve writes the files where the page has them, runs preview on the entry there, and gives its document and report", async () => {
+test("a solve gives preview the page's build request, files and how they are searched, and gives its document and report", async () => {
   const s = await serve("seconds=120");
   try {
-    const files = { "/top.sp": "* top\n.include cell.inc\n", "/cell.inc": "* cell\n", "/<pool>/packages/p.rnl": "pkg", "/<pool>/lib/x.inc": "inc" };
-    const { status, json } = await call(s.port, "POST", SOLVE, { entry: "/top.sp", files, pool: ["/<pool>/packages/p.rnl", "/<pool>/lib/x.inc"], config: "beam=8" });
+    const files = { "/top.sp": "* top\n.include cell.inc\n", "/cell.inc": "* cell\n", "/<pool>/packages/p.rnl": "pkg", "/<pool>/lib/x.inc": "inc", "/P/a.rnl": "pkg" };
+    const pool = ["/<pool>/packages/p.rnl", "/<pool>/lib/x.inc"];
+    const { status, json } = await call(s.port, "POST", SOLVE, { entry: "/top.sp", files, pool, package_dirs: ["/P"], search_paths: ["/P"],
+      auto_include: true, library_prefix: "/<pool>", config: "beam=8" });
     assert.equal(status, 200);
     const seen = json.document.seen;
-    // the entry is named relative to where it runs, with the other files beside it
-    assert.equal(json.document.path, "top.sp");
-    assert.deepEqual(seen.files, ["_pool_", "cell.inc", "top.sp"]);
+    // preview reads the request alone, the files in it by the page's paths, written where it runs and nothing else
+    assert.equal(json.document.path, "/top.sp");
+    assert.deepEqual(seen.files, ["request.json"]);
+    assert.deepEqual(seen.args.slice(0, 2), ["request.json", "--request"]);
     assert.equal(seen.text, files["/top.sp"]);
-    // the pool's directories are searched, the packages' as packages; the settings are the server's then the page's, named parameters
-    assert.ok(seen.args.some((a, i) => a === "--package-dir" && /packages$/.test(seen.args[i + 1])));
-    assert.ok(seen.args.some((a, i) => a === "--path" && /lib$/.test(seen.args[i + 1])));
+    assert.deepEqual(seen.request, { entry: "/top.sp", files, pool, package_dirs: ["/P"], search_paths: ["/P"], auto_include: true,
+      library_prefix: "/<pool>", library_edits: {}, formats: {} });
+    // the settings are the server's then the page's, named parameters
     assert.equal(seen.args[seen.args.indexOf("--solver-config") + 1], "seconds=120,beam=8");
     assert.deepEqual(json.report, { levels: [] });
     // nothing is left behind
@@ -140,19 +144,18 @@ test("a respace asks preview for --respace; a solve does not", async () => {
   } finally { await s.close(); }
 });
 
-test("the formats the page set reach preview as --format, by the paths from the entry's folder; preview reads only the solve's directory", async () => {
+test("the formats the page set reach preview in its request, by their paths; a value of the wrong kind is left out", async () => {
   const s = await serve();
   try {
-    const files = { "/work/top.sp": "* x", "/work/sub/a.inc": "* a", "/lib/m.inc": "* m" };
+    const files = { "/work/top.sp": "* x", "/work/sub/a.inc": "* a", "/lib/m.inc": "* m", "/up/../x.inc": "* x", "/n.inc": 3 };
     const formats = { "/work/top.sp": "spectre", "/lib/m.inc": "spice", "/work/sub/a.inc": "bad name;", "/missing.inc": "spectre" };
-    const args = (await call(s.port, "POST", SOLVE, { entry: "/work/top.sp", files, formats })).json.document.seen.args;
-    const given = args.flatMap((a, i) => (a === "--format" ? [args[i + 1]] : []));
+    const request = (await call(s.port, "POST", SOLVE, { entry: "/work/top.sp", files, formats, pool: ["/lib/m.inc", 5], auto_include: "yes" })).json.document.seen.request;
     // a name that is not a format's and a file not sent are left out
-    assert.deepEqual(given.sort(), ["../lib/m.inc=spice", "top.sp=spectre"]);
-    // the directory the files are written in, and nothing outside it
-    const confine = args[args.indexOf("--confine") + 1];
-    assert.ok(confine && /solve-[^\\/]*$/.test(confine), confine);
-    assert.ok(!(await call(s.port, "POST", SOLVE, { entry: "/work/top.sp", files })).json.document.seen.args.includes("--format"));
+    assert.deepEqual(request.formats, { "/work/top.sp": "spectre", "/lib/m.inc": "spice" });
+    // a path that climbs, a text that is not one, a pool path that is not one, an Auto Include that is not true
+    assert.deepEqual(Object.keys(request.files).sort(), ["/lib/m.inc", "/work/sub/a.inc", "/work/top.sp"]);
+    assert.deepEqual(request.pool, ["/lib/m.inc"]);
+    assert.equal(request.auto_include, false);
   } finally { await s.close(); }
 });
 
