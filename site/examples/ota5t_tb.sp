@@ -29,15 +29,16 @@ M5 tail vbias vss  vss nch W=4u L=1u
 *     (-5, 2) @PIN(terminal="inp", direction="left");
 *     (-5, -2) @PIN(terminal="inn", direction="left");
 *     (5, 0) @PIN(terminal="out", direction="right");
-*     (-1, 3) @PIN(terminal="vdd", direction="up");
-*     (1, -2) @PIN(terminal="vss", direction="down");
-*     (-3, -4) @PIN(terminal="vbias", direction="down");
+*     (-1, 5) @PIN(terminal="vdd", direction="up");
+*     (1, -5) @PIN(terminal="vss", direction="down");
+*     (-3, -5) @PIN(terminal="vbias", direction="down");
 *     @LINE {(-5, 5) (5, 0) (-5, -5) (-5, 5)};
+*     @LINE {(-1, 3) (-1, 5)}; @LINE {(1, -2) (1, -5)}; @LINE {(-3, -4) (-3, -5)};
 *     ? @TEXT("${name}", key="name") => @PLACE(-2, 0)
 *   };
 *   this subcircuit # @SET-SYMBOL to $OTA_SYM
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:edea2dac05e41f41.7853daec65a52d57", numbering="d4bd4a77786955a8") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:edea2dac05e41f41.14af0bb5f0665e12", numbering="d4bd4a77786955a8") {
 *   %ground_stub_M5_s = $GROUND_STUB @ATTACH(gap=3) #M5::s;
 *   %supply_stub_M3_s = $SUPPLY_STUB @ATTACH(gap=3) #M3::s;
 *   %supply_stub_M4_s = $SUPPLY_STUB @ATTACH(gap=3) #M4::s;
@@ -103,12 +104,13 @@ CL  out 0 1p
 *   {#VIP #VIN #XU1 #CL} are in @ORDER("left-to-right");
 *   {#VB #XU1} @ORDER("bottom-to-top");
 *   #VDD {#VIP #VIN #XU1 #CL} @DISTANCE("left-to-right", min=4);
+*   #XU1 #CL @DISTANCE("left-to-right", min=10);
 *   /* each source and the load stand upright: the + pin above the - pin */
 *   {#VDD:n #VDD:p} @ORDER("bottom-to-top"); {#VB:n #VB:p} @ORDER("bottom-to-top");
 *   {#VIP:n #VIP:p} @ORDER("bottom-to-top"); {#VIN:n #VIN:p} @ORDER("bottom-to-top"); {#CL:n #CL:p} @ORDER("bottom-to-top");
 *   at (-0.5, 24) there is a @TEXT("5T OTA testbench") => it @SET-STYLE to $note
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:74e01853fd16c474.5b382edd3e662eff", numbering="3ff6b02e1bed8dda") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:1019f082cbfead76.49101b3cb2c99489", numbering="827cc78bc7705a03") {
 *   %ground_stub_XU1_vss = $GROUND_STUB @ATTACH(gap=3) #XU1:vss;
 *   %ground_stub_VDD_n = $GROUND_STUB @ATTACH(gap=3) #VDD::n;
 *   %ground_stub_VB_n = $GROUND_STUB @ATTACH(gap=3) #VB::n;
@@ -116,30 +118,30 @@ CL  out 0 1p
 *   %ground_stub_VIN_n = $GROUND_STUB @ATTACH(gap=3) #VIN::n;
 *   %ground_stub_CL_n = $GROUND_STUB @ATTACH(gap=3) #CL::n;
 *   #XU1 @PLACE(20, 14) => @ORIENT("R0");
-*   #VDD @PLACE(-19, 3) => @ORIENT("MY");
-*   #VB @PLACE(17, 3) => @ORIENT("R0");
-*   #VIP @PLACE(-6, 3) => @ORIENT("MY");
-*   #VIN @PLACE(9, 3) => @ORIENT("MY");
-*   #CL @PLACE(26, 3) => @ORIENT("R0");
+*   #VDD @PLACE(-19, 0) => @ORIENT("MY");
+*   #VB @PLACE(17, 0) => @ORIENT("R0");
+*   #VIP @PLACE(-6, 0) => @ORIENT("MY");
+*   #VIN @PLACE(9, 0) => @ORIENT("MY");
+*   #CL @PLACE(30, 0) => @ORIENT("R0");
 *   %flow @PLACE(0, 0);
 *   %ground_stub_XU1_vss @PLACE(0, 0);
-*   %ground_stub_XU1_vss::g @PLACE(21, 10) => @ORIENT("R0");
+*   %ground_stub_XU1_vss::g @PLACE(21, 7) => @ORIENT("R0");
 *   %ground_stub_VDD_n @PLACE(0, 0);
-*   %ground_stub_VDD_n::g @PLACE(-19, -1) => @ORIENT("R0");
+*   %ground_stub_VDD_n::g @PLACE(-19, -4) => @ORIENT("R0");
 *   %ground_stub_VB_n @PLACE(0, 0);
-*   %ground_stub_VB_n::g @PLACE(17, -1) => @ORIENT("R0");
+*   %ground_stub_VB_n::g @PLACE(17, -4) => @ORIENT("R0");
 *   %ground_stub_VIP_n @PLACE(0, 0);
-*   %ground_stub_VIP_n::g @PLACE(-6, -1) => @ORIENT("R0");
+*   %ground_stub_VIP_n::g @PLACE(-6, -4) => @ORIENT("R0");
 *   %ground_stub_VIN_n @PLACE(0, 0);
-*   %ground_stub_VIN_n::g @PLACE(9, -1) => @ORIENT("R0");
+*   %ground_stub_VIN_n::g @PLACE(9, -4) => @ORIENT("R0");
 *   %ground_stub_CL_n @PLACE(0, 0);
-*   %ground_stub_CL_n::g @PLACE(26, -1) => @ORIENT("R0");
+*   %ground_stub_CL_n::g @PLACE(30, -4) => @ORIENT("R0");
 *   %#5 @PLACE(-0.5, 24);
 *   %#6 @PLACE(-0.5, 24);
 *   &inp @WIRE(mode="straight") {#VIP::p (-6, 16) #XU1:inp};
 *   &inn @WIRE(mode="straight") {#VIN::p (9, 12) #XU1:inn};
-*   &out @WIRE(mode="straight") {#XU1:out (26, 14) #CL::p};
-*   &vdd @WIRE(mode="straight") {#VDD::p (-19, 17) #XU1:vdd};
+*   &out @WIRE(mode="straight") {#XU1:out (30, 14) #CL::p};
+*   &vdd @WIRE(mode="straight") {#VDD::p (-19, 20) (19, 20) #XU1:vdd};
 *   &vb @WIRE(mode="straight") {#VB::p #XU1:vbias}
 * }
 .end

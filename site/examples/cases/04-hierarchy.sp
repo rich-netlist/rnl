@@ -78,7 +78,8 @@ Vin a 0 0.9
 *   {#Vin #X1 #X2 #X3} @ORDER("left-to-right");
 *   /* the divider stands as its symbol is drawn: top and mid in one column on the left, bot on the right */
 *   {#X3:top #X3:mid} @ALIGN("x"); {#X3:top #X3:bot} @ORDER("left-to-right");
-*   #Vdd {#Vin #X1 #X2 #X3} @DISTANCE("left-to-right", min=4)
+*   #Vdd {#Vin #X1 #X2 #X3} @DISTANCE("left-to-right", min=4);
+*   {#Vdd #Vin} @ALIGN("y")
 * }
 * @RNL(scope="amp") {
 *   #R1 @TEXT("R_{L}", key="name");
@@ -86,7 +87,7 @@ Vin a 0 0.9
 * }
 * 
 
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:774776a67141d0f1.c75d5869532e5c6a", numbering="c141945bba507de5") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:9a8b3345b2a07fc1.78427116c9c55b0b", numbering="7ca6fcb1e5481b70") {
 *   %ground_stub_X1_vss = $GROUND_STUB @ATTACH(gap=3) #X1:vss;
 *   %ground_stub_X2_vss = $GROUND_STUB @ATTACH(gap=3) #X2:vss;
 *   %ground_stub_X3_bot = $GROUND_STUB @ATTACH(gap=3) #X3:bot;
@@ -96,30 +97,31 @@ Vin a 0 0.9
 *   %supply_stub_X2_vdd = $SUPPLY_STUB @ATTACH(gap=3) #X2:vdd;
 *   %supply_stub_Vdd_p = $SUPPLY_STUB @ATTACH(gap=3) #Vdd::p;
 *   %net_label_stub_X3_mid = $NET_LABEL_STUB @ATTACH #X3:mid;
-*   #X1 @PLACE(-18, -3) => @ORIENT("R0");
-*   #X2 @PLACE(-8, -3) => @ORIENT("R0");
-*   #X3 @PLACE(0, -3) => @ORIENT("R0");
-*   #Vdd @PLACE(-31, 6) => @ORIENT("MY");
-*   #Vin @PLACE(-27, -5) => @ORIENT("MY");
+*   #X1 @PLACE(-18, -2) => @ORIENT("R0");
+*   #X2 @PLACE(-8, -2) => @ORIENT("R0");
+*   #X3 @PLACE(0, -2) => @ORIENT("R0");
+*   #Vdd @PLACE(-36, -2) => @ORIENT("MY");
+*   #Vin @PLACE(-27, -2) => @ORIENT("MY");
 *   %ground_stub_X1_vss @PLACE(0, 0);
-*   %ground_stub_X1_vss::g @PLACE(-18, -8) => @ORIENT("R0");
+*   %ground_stub_X1_vss::g @PLACE(-18, -7) => @ORIENT("R0");
 *   %ground_stub_X2_vss @PLACE(0, 0);
-*   %ground_stub_X2_vss::g @PLACE(-8, -8) => @ORIENT("R0");
+*   %ground_stub_X2_vss::g @PLACE(-8, -7) => @ORIENT("R0");
 *   %ground_stub_X3_bot @PLACE(0, 0);
-*   %ground_stub_X3_bot::g @PLACE(4, -5) => @ORIENT("R0");
+*   %ground_stub_X3_bot::g @PLACE(4, -4) => @ORIENT("R0");
 *   %ground_stub_Vdd_n @PLACE(0, 0);
-*   %ground_stub_Vdd_n::g @PLACE(-31, 2) => @ORIENT("R0");
+*   %ground_stub_Vdd_n::g @PLACE(-36, -6) => @ORIENT("R0");
 *   %ground_stub_Vin_n @PLACE(0, 0);
-*   %ground_stub_Vin_n::g @PLACE(-27, -9) => @ORIENT("R0");
+*   %ground_stub_Vin_n::g @PLACE(-27, -6) => @ORIENT("R0");
 *   %supply_stub_X1_vdd @PLACE(0, 0);
-*   %supply_stub_X1_vdd::s @PLACE(-18, 2) => @ORIENT("R0");
+*   %supply_stub_X1_vdd::s @PLACE(-18, 3) => @ORIENT("R0");
 *   %supply_stub_X2_vdd @PLACE(0, 0);
-*   %supply_stub_X2_vdd::s @PLACE(-8, 2) => @ORIENT("R0");
+*   %supply_stub_X2_vdd::s @PLACE(-8, 3) => @ORIENT("R0");
 *   %supply_stub_Vdd_p @PLACE(0, 0);
-*   %supply_stub_Vdd_p::s @PLACE(-31, 10) => @ORIENT("R0");
+*   %supply_stub_Vdd_p::s @PLACE(-36, 2) => @ORIENT("R0");
 *   %net_label_stub_X3_mid @PLACE(0, 0);
-*   %net_label_stub_X3_mid::l @PLACE(-2, -4) => @ORIENT("R0");
-*   %#3 @WIRE(mode="straight") {#X2:out (-3, -3) (-3, -2) #X3:top};
-*   %#6 @WIRE(mode="straight") {#X3:bot (4, -3) %ground_stub_X3_bot::g::pin}
+*   %net_label_stub_X3_mid::l @PLACE(-2, -3) => @ORIENT("R0");
+*   %#1 @WIRE(mode="straight") {#Vin:p (-24.5, 0) (-24.5, -2) #X1:in};
+*   %#3 @WIRE(mode="straight") {#X2:out (-3, -2) (-3, -1) #X3:top};
+*   %#6 @WIRE(mode="straight") {#X3:bot (4, -2) %ground_stub_X3_bot::g::pin}
 * }
 .end

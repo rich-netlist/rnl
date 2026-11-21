@@ -78,7 +78,8 @@
   /* ================= 01 Thumbnails for the workarounds ================= */
 
   function initFixes() {
-    /* the netlist with no RNL of its own, as a solver lays it out from the connections alone (examples/ota5t-plain.sp) */
+    /* the netlist as a solver lays it out from the connections alone: its only RNL turns the port tags off and routes every net
+       (examples/ota5t-plain.sp) */
     SC.coreView($('#fix-air'), 'plain');
   }
 
