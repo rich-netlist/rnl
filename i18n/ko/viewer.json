@@ -159,13 +159,8 @@
   "Source: {0}@{1}": "출처: {0}@{1}",
   "{0} at commit {1}": "{0} (커밋 {1})",
   "The netlist has no level {0}; the level shown is the default one.": "넷리스트에 {0} 레벨이 없어 기본 레벨을 표시합니다.",
-  "{0} preloaded documents. Uses the same cache budget; starts new jobs only while idle.": "사전 로드된 문서 {0}개. 동일한 캐시 한도를 공유하며 유휴 상태일 때만 새 작업을 시작합니다.",
-  "{0} cached document{1} · {2} MiB retained · {3} cache hits": "캐시된 문서 {0}개 · {2} MiB 사용 중 · 캐시 적중 {3}회",
-  "Cache limit (MiB)": "캐시 상한 (MiB)",
-  "Preload nearby netlists while idle": "유휴 시 인접 넷리스트 사전 로드",
   "Clear Cache": "캐시 비우기",
   "Memory Cache": "메모리 캐시",
-  "Reuse compiled netlists and drawings. Least recently used results are removed first. Set 0 to disable caching. This budget excludes the current view and temporary build memory.": "컴파일된 넷리스트와 도면을 재사용합니다. 가장 오래 사용하지 않은 결과부터 제거되며, 0으로 설정하면 캐시를 끕니다. 현재 보고 있는 화면과 임시 빌드 메모리는 이 한도에서 제외됩니다.",
   "Apply": "적용",
   "Enter a whole number from 0 to 4096.": "0에서 4096 사이의 정수를 입력하세요.",
   "New Window": "새 창",
@@ -824,11 +819,8 @@
   "Kept: opens at once": "캐시됨: 바로 열립니다",
   "Read in {0} s the last time": "지난번 읽기에 {0}초 걸림",
   "Limit in memory (MiB)": "메모리 상한 (MiB)",
-  "Limit in this browser's storage (MiB)": "이 브라우저 저장소 상한 (MiB)",
   "Readings in memory: {0} ({1} MiB) · {2} hits, {3} misses": "메모리의 읽기 결과: {0}개 ({1} MiB) · 적중 {2}회, 실패 {3}회",
-  "Readings in this browser's storage: {0} ({1} MiB)": "이 브라우저 저장소의 읽기 결과: {0}개 ({1} MiB)",
-  "This browser keeps nothing for the site, as in a private window: the readings are kept in memory alone.": "이 브라우저는 개인 정보 보호 창처럼 이 사이트를 위해 아무것도 저장하지 않습니다. 읽기 결과는 메모리에만 보관됩니다.",
-  "Keep the reading of each file, so that a file shown again, also in a later visit, is not read again: in memory for this page, and in this browser's storage for this site. The least recently used go first. Set 0 to keep none there.": "각 파일의 읽기 결과를 보관하여, 다시 표시하는 파일은 나중에 다시 방문할 때도 다시 읽지 않습니다. 이 페이지용으로는 메모리에, 이 사이트용으로는 이 브라우저 저장소에 보관합니다. 가장 오래 사용하지 않은 것부터 제거됩니다. 0으로 설정하면 그곳에는 보관하지 않습니다.",
-  "Enter a whole number from 0 to 65536.": "0에서 65536 사이의 정수를 입력하세요.",
-  "This build of the core keeps no readings: it does not say its version.": "이 코어 빌드는 읽기 결과를 보관하지 않습니다. 자체 버전을 알려 주지 않기 때문입니다."
+  "Keep the readings in memory": "읽기 결과를 메모리에 보관",
+  "Preload the files below the file shown while idle": "유휴 상태일 때 표시 중인 파일 아래 단계의 파일을 미리 읽기",
+  "Keep the reading of each file in memory while the viewer is open, so that a file shown again is not read again. The least recently used go first. Preloading reads the files of the subcircuits below the file shown while the viewer is idle, into the room that is free.": "뷰어가 열려 있는 동안 각 파일의 읽기 결과를 메모리에 보관하여, 다시 표시하는 파일은 다시 읽지 않습니다. 가장 오래 사용하지 않은 것부터 제거됩니다. 미리 읽기는 뷰어가 유휴 상태일 때 표시 중인 파일 아래에 있는 서브서킷의 파일을 남은 공간만큼 읽어 둡니다."
 }

@@ -159,13 +159,8 @@
   "Source: {0}@{1}": "來源：{0}@{1}",
   "{0} at commit {1}": "{0}，提交 {1}",
   "The netlist has no level {0}; the level shown is the default one.": "網表中沒有 {0} 層級；目前顯示的是預設層級。",
-  "{0} preloaded documents. Uses the same cache budget; starts new jobs only while idle.": "已預先載入 {0} 份文件。共用相同的快取預算；僅在閒置時啟動新工作。",
-  "{0} cached document{1} · {2} MiB retained · {3} cache hits": "已快取 {0} 份文件 · 佔用 {2} MiB · 快取命中 {3} 次",
-  "Cache limit (MiB)": "快取上限（MiB）",
-  "Preload nearby netlists while idle": "閒置時預先載入鄰近的網表",
   "Clear Cache": "清除快取",
   "Memory Cache": "記憶體快取",
-  "Reuse compiled netlists and drawings. Least recently used results are removed first. Set 0 to disable caching. This budget excludes the current view and temporary build memory.": "重複使用已編譯的網表與圖面，優先移除最久未使用的結果。設為 0 可停用快取。此預算不包含目前檢視與暫存建置記憶體。",
   "Apply": "應用",
   "Enter a whole number from 0 to 4096.": "請輸入 0 到 4096 之間的整數。",
   "New Window": "新視窗",
@@ -824,11 +819,8 @@
   "Kept: opens at once": "已快取：可立即開啟",
   "Read in {0} s the last time": "上次讀取耗時 {0} 秒",
   "Limit in memory (MiB)": "記憶體上限（MiB）",
-  "Limit in this browser's storage (MiB)": "此瀏覽器儲存空間上限（MiB）",
   "Readings in memory: {0} ({1} MiB) · {2} hits, {3} misses": "記憶體中的讀取結果：{0} 個（{1} MiB）· 命中 {2} 次，未命中 {3} 次",
-  "Readings in this browser's storage: {0} ({1} MiB)": "此瀏覽器儲存空間中的讀取結果：{0} 個（{1} MiB）",
-  "This browser keeps nothing for the site, as in a private window: the readings are kept in memory alone.": "此瀏覽器不為本網站保存任何內容，如同在私密視窗中：讀取結果只保存在記憶體中。",
-  "Keep the reading of each file, so that a file shown again, also in a later visit, is not read again: in memory for this page, and in this browser's storage for this site. The least recently used go first. Set 0 to keep none there.": "保存每個檔案的讀取結果，再次顯示某個檔案時（包括之後再造訪時）不必重新讀取：在記憶體中為此頁面保存，在此瀏覽器的儲存空間中為本網站保存。優先移除最久未使用的結果。設為 0 則該處不保存。",
-  "Enter a whole number from 0 to 65536.": "請輸入 0 到 65536 之間的整數。",
-  "This build of the core keeps no readings: it does not say its version.": "此核心建置不保存讀取結果：它沒有提供自己的版本。"
+  "Keep the readings in memory": "在記憶體中保存讀取結果",
+  "Preload the files below the file shown while idle": "閒置時預先載入目前顯示檔案下層的檔案",
+  "Keep the reading of each file in memory while the viewer is open, so that a file shown again is not read again. The least recently used go first. Preloading reads the files of the subcircuits below the file shown while the viewer is idle, into the room that is free.": "在檢視器開啟期間，將每個檔案的讀取結果保存在記憶體中，再次顯示某個檔案時不必重新讀取。優先移除最久未使用的結果。預先載入會在檢視器閒置時，把目前顯示檔案下層各子電路所在的檔案讀入尚有餘量的空間。"
 }

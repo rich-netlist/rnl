@@ -159,13 +159,8 @@
   "Source: {0}@{1}": "Quelle: {0}@{1}",
   "{0} at commit {1}": "{0} bei Commit {1}",
   "The netlist has no level {0}; the level shown is the default one.": "Die Netzliste hat keine Ebene {0}; angezeigt wird die Standardebene.",
-  "{0} preloaded documents. Uses the same cache budget; starts new jobs only while idle.": "{0} vorgeladene Dokumente. Nutzt dasselbe Cache-Kontingent; startet neue Aufgaben nur im Leerlauf.",
-  "{0} cached document{1} · {2} MiB retained · {3} cache hits": "{0} Dokumente im Cache · {2} MiB belegt · {3} Cache-Treffer",
-  "Cache limit (MiB)": "Cache-Limit (MiB)",
-  "Preload nearby netlists while idle": "Benachbarte Netzlisten im Leerlauf vorladen",
   "Clear Cache": "Cache leeren",
   "Memory Cache": "Speicher-Cache",
-  "Reuse compiled netlists and drawings. Least recently used results are removed first. Set 0 to disable caching. This budget excludes the current view and temporary build memory.": "Kompilierte Netzlisten und Zeichnungen wiederverwenden. Am längsten nicht genutzte Ergebnisse werden zuerst entfernt. 0 deaktiviert den Cache. Dieses Kontingent zählt weder die aktuelle Ansicht noch temporären Arbeitsspeicher beim Erstellen.",
   "Apply": "Übernehmen",
   "Enter a whole number from 0 to 4096.": "Geben Sie eine ganze Zahl zwischen 0 und 4096 ein.",
   "New Window": "Neues Fenster",
@@ -824,11 +819,8 @@
   "Kept: opens at once": "Im Cache: öffnet sofort",
   "Read in {0} s the last time": "Beim letzten Mal in {0} s gelesen",
   "Limit in memory (MiB)": "Limit im Speicher (MiB)",
-  "Limit in this browser's storage (MiB)": "Limit im Speicherplatz dieses Browsers (MiB)",
   "Readings in memory: {0} ({1} MiB) · {2} hits, {3} misses": "Leseergebnisse im Speicher: {0} ({1} MiB) · {2} Treffer, {3} Fehlschläge",
-  "Readings in this browser's storage: {0} ({1} MiB)": "Leseergebnisse im Speicherplatz dieses Browsers: {0} ({1} MiB)",
-  "This browser keeps nothing for the site, as in a private window: the readings are kept in memory alone.": "Dieser Browser speichert nichts für die Website, wie in einem privaten Fenster: Die Leseergebnisse werden nur im Speicher gehalten.",
-  "Keep the reading of each file, so that a file shown again, also in a later visit, is not read again: in memory for this page, and in this browser's storage for this site. The least recently used go first. Set 0 to keep none there.": "Das Leseergebnis jeder Datei behalten, damit eine wieder gezeigte Datei, auch bei einem späteren Besuch, nicht erneut gelesen wird: im Speicher für diese Seite und im Speicherplatz dieses Browsers für diese Website. Die am längsten nicht genutzten gehen zuerst. 0 behält dort keine.",
-  "Enter a whole number from 0 to 65536.": "Geben Sie eine ganze Zahl zwischen 0 und 65536 ein.",
-  "This build of the core keeps no readings: it does not say its version.": "Dieser Build des Kerns behält keine Leseergebnisse: Er nennt seine Version nicht."
+  "Keep the readings in memory": "Leseergebnisse im Speicher behalten",
+  "Preload the files below the file shown while idle": "Im Leerlauf die Dateien unterhalb der angezeigten vorladen",
+  "Keep the reading of each file in memory while the viewer is open, so that a file shown again is not read again. The least recently used go first. Preloading reads the files of the subcircuits below the file shown while the viewer is idle, into the room that is free.": "Das Leseergebnis jeder Datei im Speicher behalten, solange der Viewer geöffnet ist, damit eine wieder gezeigte Datei nicht erneut gelesen wird. Die am längsten nicht genutzten gehen zuerst. Das Vorladen liest im Leerlauf des Viewers die Dateien der Teilschaltungen unterhalb der angezeigten Datei, in den Platz, der frei ist."
 }
