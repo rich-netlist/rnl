@@ -1,4 +1,5 @@
-//! Independent viewer processes exchange a one-use JSON session, never editor buffers for disk files.
+//! Independent viewer processes exchange a one-use JSON session: the level shown, the Library and the texts applied
+//! and not saved (`edits`), which the new window applies and shows as not saved; never text not applied yet.
 use serde_json::Value;
 use std::ffi::OsString;
 use std::io::Write;
