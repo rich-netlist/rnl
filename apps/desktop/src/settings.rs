@@ -77,7 +77,7 @@ pub fn save_setting(state: State<'_, Settings>, key: String, value: Value) -> Re
 
 impl Settings {
     /// The PATH directories in order, each followed by its sub-folders when it was added with them
-    /// (`search-paths-subfolders`), as package and include lookup searches them. The public packages that
+    /// (`search-paths-subfolders`, [`rnl_cli::walk::subfolders`]), as package and include lookup searches them. The public packages that
     /// this build bundles are searched for packages only, after these (`public_packages::provider`).
     pub fn paths(&self) -> Result<Vec<PathBuf>, String> {
         let state = self.0.lock().map_err(|e| e.to_string())?;
@@ -92,7 +92,7 @@ impl Settings {
         drop(state);
         let mut out = Vec::new();
         for dir in dirs {
-            let sub = deep.contains(&dir).then(|| subfolders(&dir).0);
+            let sub = deep.contains(&dir).then(|| rnl_cli::walk::subfolders(&dir, rnl_cli::walk::PATH_SUBFOLDERS).0);
             out.push(dir);
             out.extend(sub.into_iter().flatten());
         }
@@ -100,66 +100,24 @@ impl Settings {
     }
 }
 
-/// The most sub-folders one PATH directory added with them brings in; past it, the rest are not
-/// searched, and the Library says so.
-pub const SUBFOLDER_LIMIT: usize = 500;
-
-/// The sub-folders of `dir`, depth first and by name, and whether there were more than
-/// [`SUBFOLDER_LIMIT`]. Hidden folders (a name starting with `.`), links and the numeric version
-/// folders of packages, which their parent's lookup reads already, are left out, with what is in them.
-pub fn subfolders(dir: &Path) -> (Vec<PathBuf>, bool) {
-    fn walk(dir: &Path, out: &mut Vec<PathBuf>) -> bool {
-        let Ok(entries) = std::fs::read_dir(dir) else { return false };
-        let mut children: Vec<PathBuf> = entries
-            .filter_map(Result::ok)
-            .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
-            .filter(|e| {
-                let name = e.file_name().to_string_lossy().into_owned();
-                !name.starts_with('.') && !rnl_runtime::source::version_directory(&name)
-            })
-            .map(|e| e.path())
-            .collect();
-        children.sort();
-        for child in children {
-            if out.len() == SUBFOLDER_LIMIT {
-                return true;
-            }
-            out.push(child.clone());
-            if walk(&child, out) {
-                return true;
-            }
-        }
-        false
-    }
-    let mut out = Vec::new();
-    let more = walk(dir, &mut out);
-    (out, more)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn a_path_added_with_subfolders_brings_them_in_depth_first_up_to_the_limit() {
+    fn a_path_added_with_subfolders_is_followed_by_them() {
         let dir = std::env::temp_dir().join(format!("rnl-subfolders-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         for sub in ["b/x", "a", ".git/objects", "c/0.3", "c/d"] {
             std::fs::create_dir_all(dir.join(sub)).unwrap();
         }
-        let (found, more) = subfolders(&dir);
-        let names: Vec<String> =
-            found.iter().map(|p| p.strip_prefix(&dir).unwrap().to_string_lossy().replace('\\', "/")).collect();
-        assert_eq!(names, ["a", "b", "b/x", "c", "c/d"]);
-        assert!(!more);
-        // a directory added without its sub-folders stays alone; one added with them is followed by them
+        // a directory added without its sub-folders stays alone; one added with them is followed by them, as the
+        // core walks them (rnl_cli::walk::subfolders)
         let flat = std::env::temp_dir().join(format!("rnl-subfolders-flat-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&flat);
-        for i in 0..SUBFOLDER_LIMIT + 3 {
+        for i in 0..3 {
             std::fs::create_dir_all(flat.join(format!("d{i:04}"))).unwrap();
         }
-        let (found, more) = subfolders(&flat);
-        assert_eq!((found.len(), more), (SUBFOLDER_LIMIT, true));
         let settings = Settings(Mutex::new(Some((
             dir.join("settings.json"),
             serde_json::from_value(serde_json::json!({

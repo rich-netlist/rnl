@@ -134,11 +134,18 @@ pub fn resolve_include(
     relative
 }
 
-/// Files held in memory: for tests, WASM and bundled packages.
+/// Files held in memory: for tests, WASM and bundled packages. Its directories are searched as
+/// those of the file system are (`FsProvider` in `rnl-cli`), so that a frontend that holds the files
+/// of PATH finds what the desktop viewer and the CLI find.
 #[derive(Default, Clone, Debug)]
 pub struct MemoryProvider {
     pub files: BTreeMap<String, String>,
+    /// The package directories, in order: in each, `NAME.rnl` first, then its other packages by
+    /// path, those of its version folders among them (16.2).
     pub package_dirs: Vec<String>,
+    /// The directories searched, in order, for a bare include name that is not beside the file that
+    /// includes it: `DIR/NAME` in each, not in its sub-folders.
+    pub search_paths: Vec<String>,
 }
 
 impl MemoryProvider {
@@ -191,6 +198,10 @@ impl Provider for MemoryProvider {
             out.extend(group);
         }
         out
+    }
+
+    fn include_candidates(&self, name: &str) -> Vec<String> {
+        self.search_paths.iter().map(|d| join(d, name)).collect()
     }
 }
 
@@ -323,5 +334,23 @@ mod tests {
             .with("pk/sub/b.rnl", "y")
             .with("other.rnl", "z");
         assert_eq!(p.package_files(), vec!["pk/a.rnl".to_string()]);
+    }
+
+    #[test]
+    fn memory_directories_are_searched_in_order_each_name_first() {
+        let p = MemoryProvider {
+            package_dirs: vec!["/a".into(), "/b".into()],
+            search_paths: vec!["/a".into(), "/b".into()],
+            ..Default::default()
+        }
+        .with("/a/lib.rnl", "x")
+        .with("/a/1.0/acme.rnl", "x")
+        .with("/b/acme.rnl", "y")
+        .with("/a/1.0/part.inc", "z");
+        // the directories in order; in each, NAME.rnl first
+        assert_eq!(p.package_candidates("acme"), ["/a/1.0/acme.rnl", "/a/lib.rnl", "/b/acme.rnl"]);
+        // a bare include is looked for in each directory itself, not in its version folders
+        assert_eq!(p.include_candidates("part.inc"), ["/a/part.inc", "/b/part.inc"]);
+        assert_eq!(MemoryProvider::new().include_candidates("part.inc"), Vec::<String>::new());
     }
 }

@@ -86,11 +86,14 @@ impl Provider for FsProvider {
     }
 }
 
-/// Direct files and one level of version directories, sorted for reproducible fallback order.
+/// Direct files and one level of version directories, sorted for reproducible fallback order. Hidden
+/// files and folders (a name that starts with `.`) are left out, as the viewers' listings of a PATH
+/// folder leave them out ([`crate::walk::path_listing`]).
 pub fn directory_packages(dir: &Path) -> Vec<String> {
     let mut out = Vec::new();
     let Ok(entries) = std::fs::read_dir(dir) else { return out };
-    for entry in entries.flatten() {
+    let visible = |e: &std::fs::DirEntry| !e.file_name().to_string_lossy().starts_with('.');
+    for entry in entries.flatten().filter(visible) {
         let path = entry.path();
         if path.is_file() && path.extension().is_some_and(|x| x.eq_ignore_ascii_case("rnl")) {
             out.push(path_str(&path));
@@ -102,6 +105,7 @@ pub fn directory_packages(dir: &Path) -> Vec<String> {
                     out.extend(
                         children
                             .flatten()
+                            .filter(visible)
                             .map(|e| e.path())
                             .filter(|p| p.is_file() && p.extension().is_some_and(|x| x.eq_ignore_ascii_case("rnl")))
                             .map(|p| path_str(&p)),

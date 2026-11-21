@@ -80,7 +80,8 @@ A call writes the request as UTF-8 JSON, calls `rnl_build`, and reads the answer
 | --- | --- |
 | `entry` | The path of the file to open, as the frontend names it. Required. [`rnl-view`](../../crates/rnl-view/README.md) says how to name the files of a workspace: by rooted paths, such as `/w/top.sp`, or by absolute ones. |
 | `files` | The texts of the workspace by path, the entry's among them. Paths are read as the runtime reads them: `\` as `/`, and without `.` and `..`. |
-| `package_dirs` | The directories, among the paths of `files`, whose `.rnl` files are packages found by name (16.2). |
+| `package_dirs` | The directories, among the paths of `files`, whose `.rnl` files are packages found by name (16.2), in order, after the `pool`: in each, `NAME.rnl` first, then its other packages, those of its version folders among them, as the CLI's `--package-dir` and `--path` search a folder. |
+| `search_paths` | The directories, among the paths of `files`, searched in order for a bare include name that is not beside the file that includes it, after the `pool`: `DIR/NAME` in each, not a file of that name in its sub-folders, as the CLI's `--path`. Also accepted by write and replace-records requests, and by the solver's module. |
 | `dialect` | `"spice"` or `"spectre"`, instead of guessing from the entry. |
 | `std` | Allow the standard package that `include_std` adds (16.3); true when not given. False disables `include_std`, but the packages a file names with USE-PACKAGE stay in effect. |
 | `include_std` | Add the standard package `rnl-std-all` to a main file whose header record has no USE-PACKAGE of it (16.3); a file of 0.4 has no implicit standard package. False when omitted. Also accepted by write, replace-records and catalog requests. Writing the main file persists the selected package version in its header; writing an included file does not. |
@@ -265,7 +266,7 @@ See the [roadmap](../../docs/roadmap.md) for planned work.
 
 ### Temporary file pools
 
-A build or snapshot request may include `pool: string[]`, the paths of explicitly included files in `files`. Pool packages are found by PACKAGE name/version before `package_dirs` and the bundled packages, even if their filenames differ. Bare include names fall back to matching pool filenames only after the including file’s relative path was tried. Merely supplying a file in `files` does not add it to the pool. `collect` still requests a missing relative file and rebuilds if it becomes available, so a pool fallback never displaces a relative include that the frontend can read.
+A build or snapshot request may include `pool: string[]`, the paths of explicitly included files in `files`. Pool packages are found by PACKAGE name/version before `package_dirs` and the bundled packages, even if their filenames differ. Bare include names fall back to matching pool filenames only after the including file’s relative path was tried. Merely supplying a file in `files` does not add it to the pool. A frontend gives its PATH folders as `package_dirs` and `search_paths`, and their files in `files` but not in `pool`: the pool is searched first, every file of it alike, and a PATH folder only by the order above, so that a package named by its file name in a later folder does not come before the packages of an earlier one, and a bare include is not taken from a version folder. The desktop viewer and the CLI search the same way. `collect` still requests a missing relative file and rebuilds if it becomes available, so a pool fallback never displaces a relative include that the frontend can read.
 
 ## Upgrading after 0.1.0-preview.13
 

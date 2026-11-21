@@ -57,9 +57,14 @@ pub struct SolveRequest {
     /// path it has here.
     #[serde(default)]
     pub files: BTreeMap<String, String>,
-    /// The directories, among the paths of `files`, whose packages are found by name (16.2).
+    /// The directories, among the paths of `files`, whose packages are found by name (16.2), in
+    /// order: in each, `NAME.rnl` first.
     #[serde(default)]
     pub package_dirs: Vec<String>,
+    /// The directories, among the paths of `files`, searched in order for a bare include name that
+    /// is not beside the file that includes it: `DIR/NAME` in each.
+    #[serde(default)]
+    pub search_paths: Vec<String>,
     /// "spice" or "spectre", instead of guessing from the entry.
     pub dialect: Option<String>,
     /// The format set for files, by path as in `files`.
@@ -151,6 +156,7 @@ fn workspace(request: &mut SolveRequest) -> Result<(MemoryProvider, BTreeMap<Str
     let files = MemoryProvider {
         files: std::mem::take(&mut request.files).into_iter().map(|(p, t)| (normalize(&p), t)).collect(),
         package_dirs: request.package_dirs.iter().map(|p| normalize(p)).collect(),
+        search_paths: request.search_paths.iter().map(|p| normalize(p)).collect(),
     };
     Ok((files, asked))
 }

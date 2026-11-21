@@ -377,7 +377,28 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
                 return Err(bad("the path is not absolute"));
             }
             app.roots.allow_chosen(&path).map_err(forbidden)?;
-            let (found, truncated) = files::path_files(&path, subfolders).map_err(bad)?;
+            // as the desktop lists it (rnl_cli::walk): its files, and the folders lookup searches for it, in order
+            let listing = rnl_cli::walk::path_listing(&path, subfolders).map_err(bad)?;
+            let names = |paths: &[std::path::PathBuf]| paths.iter().map(|p| files::page_path(p)).collect::<Vec<_>>();
+            Ok(Response::json(
+                200,
+                &json!({ "files": names(&listing.files), "dirs": names(&listing.dirs), "truncated": listing.truncated }),
+            ))
+        }
+        "/api/folder" if method == "POST" => {
+            // a folder the user chose to include in the Library: allowed as /api/allow allows it, and its files listed as
+            // the desktop's Include Folder lists them (rnl_cli::walk::INCLUDE_FOLDER)
+            #[derive(Deserialize)]
+            struct Folder {
+                dir: String,
+            }
+            let folder: Folder = json_body(request)?;
+            let dir = files::machine_path(&folder.dir);
+            if !dir.is_absolute() {
+                return Err(bad("the path is not absolute"));
+            }
+            app.roots.allow_chosen(&dir).map_err(forbidden)?;
+            let (found, truncated) = rnl_cli::walk::folder_files(&dir, rnl_cli::walk::INCLUDE_FOLDER).map_err(bad)?;
             Ok(Response::json(
                 200,
                 &json!({ "files": found.iter().map(|p| files::page_path(p)).collect::<Vec<_>>(), "truncated": truncated }),
