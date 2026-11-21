@@ -107,7 +107,6 @@ async function open(source, packages, isCurrent, initial, message, signal) {
     resetBuffers(built);
     adoptSource(source);
     showBuilt(built, false);
-    document.title = `${built.name} - RNL Viewer`;
     // the address's level first; else the manifest's, where "(top)" is the level it opens on
     const wanted = (initial && params.get("level")) || source.external?.level;
     if (wanted && wanted !== "(top)") await level(wanted, signal);

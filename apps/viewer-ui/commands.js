@@ -1,4 +1,4 @@
-import { languageFor, m, locale, setLanguage, translate, uiLanguages } from "./i18n.js";
+import { languageFor, m, locale, setLanguage, setText, translate, uiLanguages } from "./i18n.js";
 // The commands and the keys that run them. Both come from the command table, commands.json, which
 // the desktop viewer also builds its native menu from: the menus, their items and submenus, and per
 // item its id, its label, its keys and the platforms that offer it. A command runs by its id,
@@ -15,7 +15,7 @@ import { hoverNamesOn, hoverRolesOn, setHoverNames, setHoverRoles } from "./hove
 import { loadClipboard, pickAndOpen, reload } from "./open.js";
 import { setProblems, setSidebar, showPane } from "./panels.js";
 import { clearSelection } from "./selection.js";
-import { shell } from "./shell.js";
+import { downloads, shell } from "./shell.js";
 import { closePreview, saveSolved, solve } from "./solve.js";
 import { settings } from "./solve-settings.js";
 import { doc, selected } from "./state.js";
@@ -78,8 +78,8 @@ function languageChecks() {
 window.addEventListener("language-changed", languageChecks);
 
 /**
- * Run a command by its id. Exit and About are the platform's own: the page has nothing to do for
- * Exit, and shows the shell's About box, or a plain one (about).
+ * Run a command by its id. Exit is the platform's own: the page has nothing to do for it. About is the page's, with
+ * the versions the shell gives (about).
  */
 export function command(id, options = {}) {
   if (!isEnabled(id)) return;
@@ -180,16 +180,34 @@ export function command(id, options = {}) {
 }
 
 /**
- * The About box: the shell's, or, when it has none and the page shows the menu bar, a plain one of
- * the page's own. A platform whose menu shows About itself shows its own box.
+ * The About box, the same in every shell: the versions the shell gives (`buildInfo`), what the viewer does with the
+ * files (written where they were read, or downloaded) and where the core runs. A shell that gives no versions and has
+ * a menu of its own shows none.
  */
-function about() {
-  if (shell.about) shell.about();
-  else if (!shell.nativeMenu) {
-    const text =
-      m`${m("Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; ")}${m("nothing is written to a file until you save.")}`;
-    inform({ title: m("About RNL Viewer"), paragraphs: [text] });
+async function about() {
+  if (!shell.buildInfo && shell.nativeMenu) return;
+  let info = {};
+  try { info = (await shell.buildInfo?.()) ?? {}; } catch { /* the box names no version */ }
+  const name = document.createElement("p");
+  name.className = "dialog-name";
+  setText(name, ["RNL Viewer", info.viewer, info.commit && `(${info.commit})`].filter(Boolean).join(" "));
+  const writes = !downloads();
+  const paragraphs = [
+    name,
+    ...(info.core ? [`RNL core ${info.core}`] : []),
+    writes
+      ? m`${m("Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; ")}${m("nothing is written to a file until you save.")}`
+      : m`${m("Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; ")}${m("Download File downloads the file shown. Download Project saves the library's files and how they are set up as a ZIP, which Open Project reads again.")}`,
+  ];
+  // where the core runs: in the page, with the files of this computer read here (the web) or by the program (the
+  // local program); the desktop app's is its own
+  if (info.corePage) {
+    paragraphs.push(writes
+      ? m("The RNL core runs in this page as WebAssembly. The RNL program on the computer it runs on reads and writes the files.")
+      : m`${m("The RNL core runs in this page as WebAssembly. Files opened from this computer are read here ")}${m("and sent nowhere; a URL's files are fetched from its server.")}`);
   }
+  paragraphs.push(m("The drawing uses Noto Sans SC, copyright 2014–2021 Adobe, under the SIL Open Font License 1.1."));
+  await inform({ title: m("About RNL Viewer"), paragraphs });
 }
 
 /** The project site's page of the tools, which offers the desktop viewer, in a language of the site. */

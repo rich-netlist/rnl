@@ -1,6 +1,7 @@
 // Run before the main module graph is ready, so the loading screen can already name its version.
 // Use each platform's existing metadata rather than keeping another version number in the page.
 import { nextPaint } from "./loading.js";
+import { nativeStartup, openEventsReady, startupPainted, startupVersion } from "./shells/startup-hooks.js";
 
 // The command table and even the main module graph may still be loading when a user presses a
 // panel number. Keep a bounded recency list so an unavailable panel (web Solve) cannot discard
@@ -42,26 +43,22 @@ void styleReady("viewer-fonts", false);
 // The main graph might still be downloading when a stylesheet fails.
 stylesReady.catch(() => {});
 
-const version = window.__TAURI__
-  ? window.__TAURI__.app.getVersion()
-  : fetch("about.json").then((response) => response.ok ? response.json() : {}).then((about) => about.version);
-
-const named = Promise.resolve(version).then((value) => {
+const named = Promise.resolve().then(startupVersion).then((value) => {
   const label = document.getElementById("startup-version");
   if (label && value) label.textContent = `v${value}`;
 }).catch(() => {}); // Metadata failure must not prevent the viewer from opening.
 
 let nativeHandoff;
 function revealNativePage() {
-  if (!window.__TAURI__) return;
+  if (!nativeStartup) return;
   return nativeHandoff ??= (async () => {
     await nextPaint();
-    await window.__TAURI__.core.invoke("finish_startup");
+    await startupPainted();
   })();
 }
 // The native text covers WebView2 creation. Hand over as soon as the HTML startup screen has
 // painted, so it can show the shared file-loading stages while the main graph initializes.
-if (window.__TAURI__) void named.then(revealNativePage).catch(() => {});
+if (nativeStartup) void named.then(revealNativePage).catch(() => {});
 
 /**
  * Reveal the viewer once its panels, menus and keys work, before the core and the first document,
@@ -84,5 +81,5 @@ export async function finishStartup(runPanelShortcut) {
   await revealViewer(runPanelShortcut);
   // The native surface is handed over much earlier, while this module graph is still loading.
   // Finder events must stay queued until the listener and initial document have both started.
-  if (window.__TAURI__) await window.__TAURI__.core.invoke("open_events_ready");
+  await openEventsReady();
 }

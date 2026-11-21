@@ -30,6 +30,7 @@ mod startup;
 
 use std::ffi::OsString;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use core_thread::Core;
@@ -38,23 +39,14 @@ use rnl_view::UnplacedDrawing;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 
-/// The name of the document shown, and whether its files have changes that are not saved: for the
-/// window's title, and for asking before the window closes (decision 0011).
+/// Whether the files of the document shown have changes that are not saved: for asking before the window closes
+/// (decision 0011).
 #[derive(Default)]
-struct Unsaved(Mutex<(String, bool)>);
+struct Unsaved(AtomicBool);
 
 impl Unsaved {
-    /// Change the name or the flag, and name the window by them: `● name - RNL Viewer` while changes are not saved.
-    fn set(&self, window: &WebviewWindow, change: impl FnOnce(&mut (String, bool))) {
-        if let Ok(mut state) = self.0.lock() {
-            change(&mut state);
-            let mark = if state.1 { "\u{25cf} " } else { "" };
-            let _ = window.set_title(&format!("{mark}{} - RNL Viewer", state.0));
-        }
-    }
-
     fn unsaved(&self) -> bool {
-        self.0.lock().map(|state| state.1).unwrap_or(false)
+        self.0.load(Ordering::SeqCst)
     }
 }
 
@@ -101,10 +93,11 @@ fn file_argument(args: impl IntoIterator<Item = OsString>) -> Option<OsString> {
 /// The extensions offered first in the open dialog.
 const NETLISTS: [&str; 11] = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "inc", "lib", "scs", "rnl"];
 
-/// Name the window after the document the page shows, `name` (a reading of one of its files, or a solve's preview).
+/// Name the window `title`, which the page writes the same in every shell (apps/viewer-ui/window-title.js): the
+/// document shown, with a dot before it while its files have changes not saved.
 #[tauri::command]
-fn show_document(window: WebviewWindow, unsaved: State<'_, Unsaved>, name: String) {
-    unsaved.set(&window, |state| state.0 = name);
+fn set_title(window: WebviewWindow, title: String) {
+    let _ = window.set_title(&title);
 }
 
 /// The drawings of the objects at `items` of `levels[level].unplaced` of the reading shown, the last one read with
@@ -181,11 +174,10 @@ async fn save_file_as(
     Ok(Some(to.to_string_lossy().into_owned()))
 }
 
-/// The page says whether files have changes that are not saved: the window's title shows it, and
-/// closing the window asks the page first.
+/// The page says whether files have changes that are not saved: closing the window asks the page first.
 #[tauri::command]
-fn set_dirty(window: WebviewWindow, unsaved: State<'_, Unsaved>, dirty: bool) {
-    unsaved.set(&window, |state| state.1 = dirty);
+fn set_dirty(unsaved: State<'_, Unsaved>, dirty: bool) {
+    unsaved.0.store(dirty, Ordering::SeqCst);
 }
 
 /// Close the app, which the page asked the user about.
@@ -318,7 +310,7 @@ fn main() {
             reading::file_hashes,
             reading::file_texts,
             reading::file_symbols,
-            show_document,
+            set_title,
             unplaced_drawings,
             save_files,
             save_file_as,

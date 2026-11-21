@@ -19,6 +19,7 @@ import { doc } from "./state.js";
 import { fileShown, fileViews, showFile, sourceLineHeight, refreshSource, setRnlOnly } from "./text.js";
 import { setPathText, sourcePath } from "./source-path.js";
 import { $ } from "./util.js";
+import { titleDirty } from "./window-title.js";
 
 const source = $("source");
 const pane = $("pane-netlist");
@@ -248,6 +249,7 @@ ${path}: ${unapplied.includes(path) ? m("changes not applied; ") : ""}${m("not s
   const any = dirty.length > 0;
   if (any !== notified) {
     notified = any;
+    titleDirty(any);
     if (shell && shell.setDirty) shell.setDirty(any);
   }
 }

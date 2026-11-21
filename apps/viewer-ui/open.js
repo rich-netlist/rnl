@@ -34,6 +34,7 @@ import { startLoading, nextPaint } from "./loading.js";
 import { offerMissingPackages } from "./package-offers.js";
 import { askToSolve } from "./solve-on-open.js";
 import { entrySource } from "./visit-source.js";
+import { titleName } from "./window-title.js";
 
 let lastSource = null; // what was last opened, also when it failed to open, for reloading
 let loading = false;
@@ -201,7 +202,7 @@ export function isLoading() {
  */
 export function showBuilt(d, keep, navigation = null) {
   shell.commitBuild?.(d);
-  if (shell.platform === "web") document.title = `${d.name} - RNL Viewer`;
+  titleName(d.name);
   const before = keep && doc ? snapshot() : null;
   setDoc(d);
   showDocument(before, navigation);

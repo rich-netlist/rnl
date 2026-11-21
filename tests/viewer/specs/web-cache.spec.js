@@ -58,6 +58,26 @@ test('File › Memory Cache tells what the readings kept hold, and Clear Cache e
   expect(await page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name))).toEqual([]);
 });
 
+test('a file shown again from its reading kept says so, as every shell does: "Using cached drawing…"', async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => {
+    window.loadingStages = [];
+    new MutationObserver(() => window.loadingStages.push(document.getElementById('loading').dataset.stage))
+      .observe(document.getElementById('loading'), { attributes: true, attributeFilter: ['data-stage'] });
+  });
+  // the file of the subcircuit is read: nothing kept yet
+  await page.evaluate(() => import('./subcircuits.js').then(s => s.descend(window.viewer.doc.objects.findIndex(o => o.kind === 'instance' && o.name === 'X1'))));
+  await idle(page);
+  expect(await page.evaluate(() => window.loadingStages)).not.toContain('cached');
+  // the entry again: its reading is kept
+  await page.evaluate(() => window.loadingStages = []);
+  await page.evaluate(() => import('./subcircuits.js').then(s => s.ascend()));
+  await idle(page);
+  expect(await page.evaluate(() => window.viewer.doc.file)).toBe('top.sp');
+  expect(await page.evaluate(() => window.loadingStages)).toContain('cached');
+  expect(await page.evaluate(() => window.loadingStages.at(-1))).toBe('displaying');
+});
+
 test('the limits are checked and kept, and 0 keeps no reading', async ({ page }) => {
   await open(page);
   await openCache(page);

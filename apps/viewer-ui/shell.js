@@ -96,16 +96,16 @@
  * @property {(handler: (source: Source) => void | Promise<unknown>) => void | Promise<void>} [onOpen] Call `handler` with each source opened
  *   without `pick`, such as files dropped on the page. A shell that opens nothing so leaves it out.
  * @property {() => Promise<void>} [fileAssociations] Open the operating system's default-app settings.
- * @property {() => void} [about] Show the platform's About box, for Help > About in the page's own menu
- *   bar; without it the page shows a plain one. A platform whose menu shows its own About box leaves
- *   it out.
+ * @property {() => Promise<{viewer: string | null, core: string | null, commit: string | null, corePage: boolean}>} [buildInfo]
+ *   The versions Help > About names, the same box in every shell (commands.js): the viewer's, the core's and the
+ *   commit they were built from, null each where not known, and whether the core runs in the page (WebAssembly).
  * @property {(url: string) => void | Promise<void>} [browse] Show a web page outside the viewer: on the
  *   web in a new tab, on the desktop in the default browser. Help > Desktop Viewer shows the project
  *   site's page of the tools with it, and Help > Check for Updates a release's page; without it,
  *   those commands do nothing.
- * @property {() => Promise<string>} [version] The version of the app that runs, such as "0.1.0", for
- *   Help > Check for Updates (updates.js), which only the desktop offers; without it, that command
- *   does nothing.
+ * @property {() => Promise<string | null>} [version] The version of the viewer that runs, such as "0.1.0", for
+ *   Help > Check for Updates (updates.js), offered in every shell that has it: the desktop app's, the site's or the
+ *   local program's (`about.json`); without it, that command does nothing.
  * @property {(source: Source, settings: SolverSettings, edits?: Edits) => Promise<Solved>} [solve] Solve a
  *   source (or its one level, `settings.level`) as `rnl solve` solves it, without its records of the solver, and give it drawn as
  *   solved, nothing written (solve.js, decision 0010), with the solver's options set to
@@ -117,9 +117,6 @@
  *   `rnl solver-defaults --json` prints it (docs/solver-settings-table.md): its groups, each setting with
  *   its type, bounds, default and a line that says what it does, and its objectives, for Solve > Settings to
  *   draw its dialog from (solve-settings.js); the page keeps no setting of its own. Offered with `solve`.
- * @property {Record<string, unknown>} [solverDefaults] The shell's own defaults over the solver's, by key, such as
- *   `{ reroute_nets: true }`: Solve > Settings shows them as the defaults, and a solve is given them where the user did
- *   not change them, as a setting of the tool (solve-settings.js). Each is one the default layout takes.
  * @property {(config: string) => Promise<CheckedSettings>} [checkSettings] What the solver says of settings
  *   written as RNL named parameters, as `rnl solve --solver-config` takes them, with no file: what
  *   `rnl solve --check --json` prints, a level with the problems of each setting by its `key`. Rejects
@@ -163,6 +160,8 @@
  * @property {(source: Source, file: SavedFile, encoding?: "preserve" | "utf8") => Promise<Source | null>} [saveAs] Ask where to save the
  *   text of the netlist that was opened, write it there, and give the source of the file written; null
  *   when the user cancels. Rejects with a message when it cannot. Only the desktop offers it.
+ * @property {(title: string) => void} [setTitle] Name the window `title`, as the page writes it (window-title.js),
+ *   where the page's own title does not name it: the desktop's. Without it the page's title is set.
  * @property {(dirty: boolean) => void} [setDirty] Tell the platform that files have changes that are not
  *   saved, or have none, for the window's title and for closing it.
  * @property {(handler: () => void) => void} [onCloseRequested] Call `handler` when the user asks to

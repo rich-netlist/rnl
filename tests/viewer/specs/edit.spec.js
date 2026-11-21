@@ -103,8 +103,9 @@ test.describe("on the desktop", () => {
     // the drawing and the problems are those of the text applied
     expect(await viewer.builds()).toBe(builds);
     expect(await page.evaluate(() => window.viewer.doc.objects.some((o) => o.name === "C1"))).toBe(true);
-    // the platform is told that changes are not saved
+    // the platform is told that changes are not saved, and the window's title, which the page writes, has its dot
     expect(await viewer.calls("setDirty")).toEqual([[true]]);
+    await expect(page).toHaveTitle("\u25cf edit.sp - RNL Viewer");
     // and nothing applies itself, however long the text is left
     await page.keyboard.type(" ");
     expect(await viewer.builds()).toBe(builds);
@@ -361,6 +362,7 @@ test.describe("saving", () => {
     await expect(page.locator("#netlist-file[data-unsaved='true']")).toHaveCount(0);
     expect(await page.evaluate(() => window.viewer.edits.unsaved)).toEqual([]);
     expect(await viewer.calls("setDirty")).toEqual([[true], [false]]);
+    await expect(page).toHaveTitle("04-hierarchy.sp - RNL Viewer");
     // changes not applied are saved too: Save writes what the text boxes hold; and a second Save
     // has nothing to write
     await page.keyboard.press("Control+s");
@@ -647,9 +649,12 @@ test.describe("leaving with changes not saved", () => {
 test.describe("on the web", () => {
   test("the page offers Edit and Save, which downloads, and no Save As", async ({ page, viewer }) => {
     await viewer.open("edit");
+    await expect(page).toHaveTitle("edit.sp - RNL Viewer");
     await page.keyboard.press("Control+q");
     await expect(area(page)).toBeVisible();
     await rename(page);
+    // the tab's title has the dot the desktop's window has
+    await expect(page).toHaveTitle("\u25cf edit.sp - RNL Viewer");
     // Save is offered to the shell as it is on the desktop; of what is saved, the web shell
     // downloads the file shown
     await page.keyboard.press("Control+s");

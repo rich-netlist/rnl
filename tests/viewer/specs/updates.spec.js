@@ -1,8 +1,7 @@
-// Help > Check for Updates, which only the desktop offers: the newest release of the viewer that
-// GitHub lists against the version that runs, with GitHub's answer faked. A newer release is offered
-// with a button that opens its page; the same version is the latest; no answer, an error or no
-// release of the viewer gives a link to the releases' page. GitHub is asked nothing until the command
-// runs, and the web never asks.
+// Help > Check for Updates, which every shell that says its version offers (the desktop, the web, the local program):
+// the newest release of the viewer that GitHub lists against the version that runs, with GitHub's answer faked. A
+// newer release is offered with a button that opens its page; the same version is the latest; no answer, an error or
+// no release of the viewer gives a link to the releases' page. GitHub is asked nothing until the command runs.
 
 import { expect, test } from "../viewer.js";
 
@@ -142,13 +141,28 @@ test.describe("on the desktop", () => {
   });
 });
 
-test("the web offers no Check for Updates, and asks GitHub nothing", async ({ page, viewer }) => {
+test("the web offers Check for Updates too, against the version the site was built from", async ({ page, viewer }) => {
+  const asked = await github(page, json(LISTED));
+  await viewer.open("04-hierarchy", { version: "0.1.0" });
+  await viewer.menuTitle("Help").click();
+  const help = page.locator("#menubar .menu", { has: page.locator(".menu-title", { hasText: "Help" }) });
+  await expect(help.locator(".menu-item", { hasText: "Check for Updates" })).toHaveCount(1);
+  await expect(help.locator(".menu-item", { hasText: "About RNL Viewer" })).toHaveCount(1);
+  // GitHub is asked nothing until the command runs
+  expect(asked).toEqual([]);
+  await help.locator(".menu-item", { hasText: "Check for Updates" }).click();
+  const dialog = page.locator("dialog.dialog");
+  await expect(dialog.locator(".dialog-title")).toHaveText("Check for Updates");
+  await expect(dialog).toContainText("RNL Viewer 0.2.0 is available.");
+  expect(asked).toEqual([API]);
+});
+
+test("a shell that does not say its version offers no Check for Updates, and asks GitHub nothing", async ({ page, viewer }) => {
   const asked = await github(page, json(LISTED));
   await viewer.open("04-hierarchy");
   await viewer.menuTitle("Help").click();
   const help = page.locator("#menubar .menu", { has: page.locator(".menu-title", { hasText: "Help" }) });
   await expect(help.locator(".menu-item", { hasText: "Check for Updates" })).toHaveCount(0);
-  await expect(help.locator(".menu-item", { hasText: "About RNL Viewer" })).toHaveCount(1);
   await page.keyboard.press("Escape");
   await page.evaluate(() => window.viewer.command("check-updates"));
   await expect(page.locator("dialog.dialog")).toHaveCount(0);
