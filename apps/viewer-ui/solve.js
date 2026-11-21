@@ -189,6 +189,17 @@ export function endPreview() {
   status("", false);
 }
 
+/**
+ * What Save Solved Copy says the shell saved: its sentence, or, of a shell that downloads it, the file downloaded,
+ * `{ downloaded, written, copied }`.
+ */
+function savedSentence(said) {
+  if (typeof said === "string") return said;
+  return said.written === 1 && said.copied === 0
+    ? m("Downloaded the solved copy as {0}.", said.downloaded)
+    : m("Downloaded {0}: the solved files and the files they read, in their places.", said.downloaded);
+}
+
 /** Solve > Save Solved Copy As: a copy of the solve shown, where the user says. */
 export async function saveSolved(encoding = "preserve") {
   if (!shell || !shell.saveSolved || modal()) return;
@@ -199,7 +210,7 @@ export async function saveSolved(encoding = "preserve") {
   }
   try {
     const said = await shell.saveSolved(encoding);
-    if (said) await inform({ title, paragraphs: [said, m("The files that were opened are unchanged.")] });
+    if (said) await inform({ title, paragraphs: [savedSentence(said), m("The files that were opened are unchanged.")] });
   } catch (e) {
     await inform({ title, paragraphs: [m`The copy was not saved: ${e instanceof Error ? e.message : String(e)}`] });
   }

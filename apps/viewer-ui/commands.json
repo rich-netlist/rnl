@@ -125,7 +125,7 @@
         { "id": "solve-close", "label": "&Close Preview", "platforms": ["desktop"], "with": "solve" },
         { "id": "toggle-solve-on-open", "label": "As&k to Solve on Open", "check": true, "platforms": ["desktop"], "with": "solve" },
         "-",
-        { "id": "solve-save", "label": "Save Solved Cop&y As...", "keys": ["Ctrl+Shift+S"], "platforms": ["desktop"] },
+        { "id": "solve-save", "label": "Save Solved Cop&y As...", "keys": ["Ctrl+Shift+S"], "platforms": ["desktop"], "with": "saveSolved" },
         { "id": "solve-save-utf8", "label": "Save Solved Copy As UTF-8...", "platforms": ["desktop"] },
         "-",
         { "id": "toggle-layout", "label": "Show &Layout Table", "check": true, "page": true },

@@ -14,6 +14,7 @@ import { removeOldStore } from "../result-cache.js";
 import { libraryStamps, requestPath, textHash } from "../file-results.js";
 import { loadManifest, readManifest } from "../manifest.js";
 import { ask, choose, inform, modal } from "../dialog.js";
+import { libraryZip } from "../zip.js";
 import { openWebWindow, receiveWebSession } from "../window-session.js";
 import { load } from "../util.js";
 import { sourcePath } from "../source-path.js";
@@ -77,6 +78,9 @@ async function browserSolver() {
 }
 const inBrowser = await browserSolver();
 let lastBuilt = null; // the Document of a build the page accepted last: what a solve is of, not a preview of one
+// the last solve in the browser: the request of the build it solved, with the texts applied over its files, and the texts
+// the solve wrote, by the paths of the request (Save Solved Copy, and Export Image of the preview)
+let lastSolved = null;
 let solving = null; // the AbortController of the solve under way
 let solverWorker = null; // the Worker of the solver in the browser, once a call has started it
 const solverCalls = new Map(); // the calls the Worker has not answered, by id: { resolve, reject, onEvent }
@@ -1328,6 +1332,7 @@ export default {
           solver_config: settings?.config || "", ...(settings?.timeall ? { timeall: settings.timeall } : {}), ...(settings?.respace ? { respace: true } : {}), level: settings?.level ?? null } }, (event) => solveProgress?.(event));
         if (answer.cancelled) throw "the solve was cancelled";
         if (answer.error !== undefined) throw answer.error;
+        lastSolved = { request: { ...request, files }, written: answer.files ?? {} };
         return answer;
       } finally {
         if (solving === own) solving = null;
@@ -1342,6 +1347,28 @@ export default {
     },
     onSolveProgress(handler) {
       solveProgress = handler;
+    },
+    /**
+     * Solve > Save Solved Copy As: the last solve shown, downloaded, as the web cannot write where the files were read
+     * (decision 0011): the netlist alone, under its name with `-solved`, when it reads no other file; else a ZIP of
+     * every file the solve wrote and read, in their places. What was downloaded, for the page to say.
+     */
+    async saveSolved() {
+      if (!lastSolved) throw "solve the netlist first: there is no solve to save";
+      const { request, written } = lastSolved;
+      const read = Object.keys(request.files).filter((path) => !request.pool.includes(path) || written[path] !== undefined);
+      const name = request.entry.split("/").pop();
+      const stem = name.includes(".") ? name.slice(0, name.lastIndexOf(".")) : name;
+      if (read.length === 1 && read[0] === request.entry) {
+        const copy = name.includes(".") ? `${stem}-solved${name.slice(name.lastIndexOf("."))}` : `${stem}-solved`;
+        download(copy, written[request.entry] ?? request.files[request.entry]);
+        return { downloaded: copy, written: 1, copied: 0 };
+      }
+      const paths = [...new Set([...Object.keys(written), ...read])].sort();
+      const zip = await libraryZip(paths.map((path) => ({ path, read: () => written[path] ?? request.files[path] })));
+      download(`${stem}-solved.zip`, zip);
+      const copied = paths.filter((path) => written[path] === undefined).length;
+      return { downloaded: `${stem}-solved.zip`, written: paths.length - copied, copied };
     },
   } : {}),
   /** The drawings of the objects the last Document lists without a position, which the core keeps. */
@@ -1416,9 +1443,13 @@ export default {
    * The SVG of `levels[level]` of `doc`, the Document shown, with `overlays` (File > Export Image):
    * the core builds its request again, with the files it was built from, on the core that holds it.
    */
-  async exportSvg({ doc: shown, level, title, overlays }) {
-    const request = builtRequests.get(shown);
-    const worker = candidates.get(shown) ?? core;
+  async exportSvg({ doc: shown, level, title, overlays, preview }) {
+    // a solve's preview is drawn again from the files the solve wrote, over those it read, as the desktop does
+    const solved = preview && lastSolved && builtRequests.get(lastBuilt);
+    const request = solved
+      ? { ...lastSolved.request, files: { ...lastSolved.request.files, ...lastSolved.written } }
+      : builtRequests.get(shown);
+    const worker = solved ? core : candidates.get(shown) ?? core;
     if (!request || !worker) throw new Error("This document was not loaded in this page. Reopen the file and export again.");
     // a reading of one file is read again as one
     const built = request.file === undefined ? await worker.build({ ...request, lazy_unplaced: false, overlays })

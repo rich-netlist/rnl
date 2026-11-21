@@ -218,3 +218,17 @@ test('the File menu has Export Image with Export SVG and Export PNG, in both lan
     await page.keyboard.press('Escape');
   }
 });
+
+test('the preview of a solve in the browser is exported as it is drawn, from the files the solve wrote', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.goto(`${process.env.RNL_WEB_URL}/?url=samples/cases/01-rc-lowpass.sp`);
+  await page.waitForFunction(() => window.viewer.doc && !document.body.classList.contains('busy'));
+  await page.keyboard.press('F9');
+  await page.waitForFunction(() => document.body.classList.contains('preview') && !document.body.classList.contains('solving'), null, { timeout: 90000 });
+  const drawn = await page.evaluate(() => window.viewer.doc.levels[window.viewer.level].svg);
+  const text = (await exported(page, 'export-svg')).bytes.toString();
+  expect(text.startsWith('<?xml')).toBe(true);
+  // the solved drawing: the positions of the preview shown, not those of the file as read
+  const positions = (svg) => [...svg.matchAll(/transform="translate\(([^)]*)\)"/g)].map((t) => t[1]).sort();
+  expect(positions(text)).toEqual(positions(drawn));
+});
