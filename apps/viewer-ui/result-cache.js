@@ -40,10 +40,14 @@ export function removeOldStore(name = "results") {
   } catch { /* nothing to delete, or not ours to */ }
 }
 
-/** The results kept for a page, in memory, within `memoryLimit` bytes (their JSON text, counted at two bytes a character). */
+/**
+ * The results kept for a page, in memory, within `memoryLimit` bytes (their JSON text, counted at two bytes a character).
+ * A result kept with `counted: false`, such as the outline of a document, takes its room like any other but is not
+ * among the entries, hits and misses the stats tell.
+ */
 export class ResultCache {
   constructor({ memoryLimit = MEMORY_LIMIT } = {}) {
-    this.memory = new Map(); // key → { value, inputs, size }, the least recently used first
+    this.memory = new Map(); // key → { value, inputs, size, counted }, the least recently used first
     this.memoryUsed = 0;
     this.memoryLimit = memoryLimit;
     this.hits = 0;
@@ -51,14 +55,14 @@ export class ResultCache {
   }
 
   /** The value kept under `key` when `valid(inputs)` says that what it was made from still holds; null otherwise. */
-  async get(key, valid = async () => true) {
+  async get(key, valid = async () => true, { counted = true } = {}) {
     const entry = this.memory.get(key);
     if (!entry || !(await valid(entry.inputs))) {
-      if (entry) this.forget(key);
-      this.misses++;
+      if (entry && this.memory.get(key) === entry) this.forget(key);
+      if (counted) this.misses++;
       return null;
     }
-    this.hits++;
+    if (counted) this.hits++;
     this.remember(key, entry);
     return entry.value;
   }
@@ -74,10 +78,10 @@ export class ResultCache {
   }
 
   /** Keep `value`, made from `inputs`, under `key`. */
-  async put(key, value, inputs = []) {
+  async put(key, value, inputs = [], { counted = true } = {}) {
     const size = JSON.stringify(value).length * 2;
     if (this.fits(size)) {
-      this.remember(key, { value, inputs, size });
+      this.remember(key, { value, inputs, size, counted });
       this.trimMemory();
     } else this.forget(key);
   }
@@ -92,16 +96,18 @@ export class ResultCache {
     this.trimMemory();
   }
 
-  /** Empty the memory, and count again from 0. */
-  async clear() {
+  /** Empty the memory, and count again from 0, unless `counts` is false. */
+  async clear({ counts = true } = {}) {
     this.memory.clear();
     this.memoryUsed = 0;
-    this.hits = this.misses = 0;
+    if (counts) this.hits = this.misses = 0;
   }
 
   /** What is kept, for File › Memory Cache: the entries and bytes in memory, the limit, hits and misses. */
   stats() {
-    return { kind: "readings", entries: this.memory.size, used: this.memoryUsed, limit: this.memoryLimit, hits: this.hits, misses: this.misses };
+    let entries = 0;
+    for (const entry of this.memory.values()) if (entry.counted !== false) entries++;
+    return { kind: "readings", entries, used: this.memoryUsed, limit: this.memoryLimit, hits: this.hits, misses: this.misses };
   }
 
   /** Whether a result of `size` bytes is kept in memory at all. */

@@ -37,7 +37,7 @@ pub struct Saved {
 }
 
 /// The file at `path`, as the Document names it, of the netlist `entry`: where it is on disk.
-fn located(entry: &str, path: &str) -> String {
+pub fn located(entry: &str, path: &str) -> String {
     join(&dirname(&normalize(entry)), path)
 }
 
@@ -55,6 +55,34 @@ pub fn held_text(entry: &str, text: &str, edits: &Edits) -> MemoryProvider {
     let mut files = MemoryProvider::new().with(entry, text);
     files.files.extend(held(entry, edits).files);
     files
+}
+
+/// The entry of the netlist at `path`, absolute, or of the text held as the file `name`, `/name`, and the files held in
+/// memory over the disk: the edits, and the text.
+pub fn entry_held(
+    path: Option<String>,
+    name: Option<String>,
+    text: Option<String>,
+    edits: &Edits,
+) -> Result<(String, MemoryProvider), String> {
+    match (path, name, text) {
+        (Some(path), _, _) => {
+            let path = if path.starts_with(rnl_view::BUNDLED_DIR) {
+                PathBuf::from(&path)
+            } else {
+                std::path::absolute(&path).map_err(|e| format!("{path}: {e}"))?
+            };
+            let entry = path.to_string_lossy().into_owned();
+            let held = held(&entry, edits);
+            Ok((entry, held))
+        }
+        (None, Some(name), Some(text)) => {
+            let entry = format!("/{name}");
+            let held = held_text(&entry, &text, edits);
+            Ok((entry, held))
+        }
+        _ => Err("a path, or a name and a text, is needed".to_string()),
+    }
 }
 
 /// The files of the netlist `entry` as the core reads them: the edits over the disk.

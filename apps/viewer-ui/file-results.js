@@ -1,13 +1,16 @@
-// The core's readings of one file (FileResult) kept between reads, for a shell that reads the file shown alone
-// (per-file loading): the key a reading is kept under, and whether what it recorded it depends on (`FileInputs`) still
-// holds. The cache itself is result-cache.js, which knows nothing of what it keeps.
+// The rules of the readings kept (file-reading.js): the key each is kept under, and when one kept still holds. The
+// cache itself is result-cache.js, which knows nothing of what it keeps. Every shell keeps its readings by these rules:
+// they are the page's, not the shell's.
 //
-// A reading is found by its key: the core's version and the shape of its results, the options that change it, the
-// entry, the file and the hash of its text. It is given again only when every input still holds: the hash of each
-// file and package it read (a bundled package changes only with the core, which the key has), where each name its
-// levels instantiate is defined and the global nets, as the outline read now has them, the Library, and the host
-// levels it names, which the outline numbers: a file that gains or loses a subcircuit before it moves them, and the
-// reading is made again.
+// A reading of one file (a FileResult) is found by its key: the core's version and the shape of its results, the
+// options that change it, the entry, the file and the hash of its text. It is given again only while:
+//   - the hash of every file and package it records it read (`inputs.files`) is the same, a bundled package aside,
+//     which only another core changes, and the key has the core;
+//   - the outline of the document has the same shape (`outlineShape`): the levels, their numbers and where they are;
+//   - for a reading that depends on the Library (`inputs.library`), the Library is the same (`libraryStamps`).
+// The outline of a document is kept too, by its entry and the options, while the hash of each file it read is the same,
+// the files it found missing are still missing and, when it names a subcircuit no file defines, the Library is the same.
+// A real change of the Library empties the cache (`libraryChanged`). Nothing else is looked at: the netlist is not read.
 
 import { cacheKey } from "./result-cache.js";
 
@@ -17,16 +20,17 @@ export async function textHash(text) {
   return [...new Uint8Array(digest).slice(0, 8)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** The options of a request that change a reading, as its key has them. */
-const OPTIONS = ["svg", "primitives", "flylines", "hints", "lazy_unplaced", "auto_include", "library_prefix", "formats", "bind", "constraints", "dialect"];
-
-/** The key of the reading of `file` of the document `request.entry` names, whose text is `text`, with the core `core`. */
-export async function readingKey(core, request, file, text) {
-  const options = Object.fromEntries(OPTIONS.filter((k) => request[k] !== undefined).map((k) => [k, request[k]]));
-  return cacheKey({ core: core.version, format: core.format, entry: request.entry, file, text: await textHash(text), options });
+/** The key of the outline of the document `entry`, as the shell reads it with `options`, with the core `core`. */
+export function outlineKey(core, entry, options) {
+  return cacheKey({ kind: "outline", core: core.version, format: core.format, entry, options });
 }
 
-/** The file `name`, as the document names it (relative to the entry's folder, or a path of its own), as the files of a request name it. */
+/** The key of the reading of `file` of the document `entry`, whose text has the hash `hash`, as the shell reads it with `options`. */
+export function readingKey(core, entry, options, file, hash) {
+  return cacheKey({ kind: "reading", core: core.version, format: core.format, entry, file, hash, options });
+}
+
+/** The file `name`, as the document names it (relative to the entry's folder, or a path of its own), as the files of a web request name it. */
 export function requestPath(entry, name) {
   // (a file of the Library, which the document names under <pool>/, is under /<pool>/ in the files of the request)
   if (name.startsWith("<pool>/")) return `/${name}`;
@@ -34,45 +38,77 @@ export function requestPath(entry, name) {
   return `${entry.slice(0, entry.lastIndexOf("/") + 1)}${name}`;
 }
 
-/** Where each name the levels of `file` call is defined, by the outline: master → `{ file, title }`. */
-function calls(outline, file) {
-  const at = outline.files.findIndex((f) => f.path === file);
-  const out = new Map();
-  if (at < 0) return out;
-  for (const l of outline.files[at].levels) {
-    for (const c of outline.levels[l].calls) {
-      if (out.has(c.master)) continue;
-      const def = c.level === null ? null : outline.levels[c.level];
-      out.set(c.master, def ? { file: def.file === null ? null : outline.files[def.file].path, title: def.title, host: c.level } : { file: null, title: null, host: null });
-    }
-  }
-  return out;
+/**
+ * The shape of an outline, as a text: what a reading of one file takes from the outline of the whole document. The
+ * user's rule (decided): a change of the structure, the levels and their numbers, makes every reading of the document
+ * made again; a change of values, positions or RNL records alone keeps them. So the shape is the files in their order
+ * with what each includes, the levels in their order (their kind, name, file, parent, ports and the levels their
+ * instances call), the roots and the global nets; lines, counts of instances, the language versions and packages of
+ * the files (RNL records: a reading has the files above it among its inputs), diagnostics and hashes are not in it.
+ * To make the rule stricter or looser, change what this gives.
+ */
+export function outlineShape(outline) {
+  return JSON.stringify([
+    outline.dialect,
+    outline.files.map((f) => [f.path, f.format, f.default_format, f.includes.map((i) => i.file), f.levels]),
+    outline.levels.map((l) => [l.kind, l.title, l.file, l.parent, l.circuit, l.ports, l.calls.map((c) => [c.master, c.level])]),
+    outline.roots,
+    outline.globals,
+  ]);
 }
 
 /**
- * Whether the reading `kept` (a FileResult) still holds for the document as it is read now: `outline` its outline,
- * `textOf(path)` the text of a file or package by the path a request names it by (undefined when there is none), and
- * `library` the stamp of the Library now, against `kept.library`, the one it was read with.
+ * The stamps of the Library: `user`, of the files the user put there (Include, PATH, a manifest), and `all`, with those
+ * that joined it by being opened. Each is made of the path and the hash of the text of each file; `items` are the
+ * Library's files as pool.js gives them to the shell (`opened` for one that joined by being opened), `hashOf(path)` the
+ * hash of one's text, or null when it cannot be read.
  */
-export async function holds({ result, library: stamp }, { outline, textOf, library }) {
-  const inputs = result.inputs;
-  for (const input of inputs.files) {
-    if (input.bundled) continue;
-    const text = textOf(input.role === "package" ? input.path : requestPath(inputs.entry, input.path));
-    if (text === undefined || await textHash(text) !== input.hash) return false;
-  }
-  // the Library, always: a reading that found no package, or no definition, by a name depends on it too, though it does
-  // not say so (`inputs.library` is set only when it used a file of it)
-  if (stamp !== library) return false;
-  const now = calls(outline, inputs.file);
-  for (const c of inputs.outline.calls) {
-    const found = now.get(c.master);
-    if (!found || found.file !== c.file || found.title !== c.title) return false;
-  }
-  if (JSON.stringify(inputs.outline.globals) !== JSON.stringify(outline.globals)) return false;
-  // the host levels it names: its own, in the order of the file, and those of the subcircuits it calls
-  const at = outline.files.findIndex((f) => f.path === inputs.file);
-  const own = at < 0 ? [] : outline.files[at].levels.filter((l) => outline.levels[l].circuit);
-  if (JSON.stringify(own) !== JSON.stringify(result.levels.map((l) => l.host))) return false;
-  return result.children.every((c) => c.host === null || now.get(c.master)?.host === c.host);
+export async function libraryStamps(items, hashOf) {
+  const listed = await Promise.all(items.filter((i) => !i.builtin).map(async (i) => [i.path, await hashOf(i.path), !!i.opened]));
+  listed.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return {
+    user: await textHash(JSON.stringify(listed.filter(([, , opened]) => !opened).map(([p, h]) => [p, h]))),
+    all: await textHash(JSON.stringify(listed.map(([p, h]) => [p, h]))),
+  };
 }
+
+/**
+ * Whether the Library really changed, from the stamps before (null at the start) to those now, which empties the cache
+ * (decided): a scan at the start, or one again, that finds the same files with the same texts changes nothing, nor
+ * does a file that joins it by being opened; a reading that depends on the Library looks at `all` itself.
+ */
+export function libraryChanged(before, now) {
+  return before !== null && before.user !== now.user;
+}
+
+/** Whether the outline names a subcircuit no file of the document defines, which a file of the Library may come to. */
+export const outlineUsesLibrary = (outline) => outline.levels.some((l) => l.calls.some((c) => c.level === null));
+
+/**
+ * Whether a kept reading `kept` (`{ result, shape, library }`) holds now: `hashes` the hash of each file it read now
+ * (by its path as `inputs.files` names it; null when it is not there), `shape` the shape of the outline now, `library`
+ * the Library's stamps now.
+ */
+export function readingHolds(kept, hashes, shape, library) {
+  for (const input of kept.result.inputs.files) {
+    if (!input.bundled && hashes.get(input.path) !== input.hash) return false;
+  }
+  if (kept.shape !== shape) return false;
+  return !kept.result.inputs.library || kept.library === library.all;
+}
+
+/** The paths whose hashes `readingHolds` compares: those of the files and packages the reading read, a bundled one aside. */
+export const readingPaths = (result) => result.inputs.files.filter((i) => !i.bundled).map((i) => i.path);
+
+/**
+ * Whether a kept outline `kept` (`{ outline, library }`) holds now: `hashes` the hash of each file it read and of each
+ * it found missing, by their paths (null for one not there), `library` the Library's stamps now.
+ */
+export function outlineHolds(kept, hashes, library) {
+  if (kept.outline.files.some((f) => hashes.get(f.path) !== f.text_hash)) return false;
+  if (kept.outline.missing.some((p) => hashes.get(p) !== null)) return false;
+  return !outlineUsesLibrary(kept.outline) || kept.library === library.all;
+}
+
+/** The paths whose hashes `outlineHolds` compares. */
+export const outlinePaths = (outline) => [...outline.files.map((f) => f.path), ...outline.missing];

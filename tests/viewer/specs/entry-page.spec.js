@@ -43,8 +43,8 @@ test('an entry that only includes other files lists the subcircuits nothing call
   // each with a symbol of its ports, as it gives itself none; neither file has been read
   await expect(roots(page).nth(1).locator('.entry-symbol svg text')).toHaveText(['x', 'y', 'z']);
   await expect(roots(page).locator('.entry-status')).toHaveText(['', '']);
-  // the shell tells the symbols the subcircuits give themselves
-  const summaries = await page.evaluate(() => import('./shell.js').then(s => s.shell.fileSummaries(['b.inc'])));
+  // the symbols the subcircuits give themselves, which the core tells
+  const summaries = await page.evaluate(() => import('./file-reading.js').then(s => s.fileSummaries(['b.inc'])));
   expect(summaries['b.inc']).toMatchObject({ kept: false, took: null, subckts: [{ title: 'beta', ports: ['x', 'y', 'z'], symbol: null }] });
   // a click opens one, as the root of the path
   await roots(page).nth(1).click();

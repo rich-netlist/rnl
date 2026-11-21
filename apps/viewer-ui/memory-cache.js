@@ -1,5 +1,6 @@
 import { append, m, setText, tr } from "./i18n.js";
 import { form, inform, modal } from './dialog.js';
+import { memoryCache as readings, readsByFile } from './file-reading.js';
 import { isLoading } from './open.js';
 import { shell } from './shell.js';
 import { load, save } from './util.js';
@@ -8,48 +9,25 @@ const MIB = 1024 * 1024;
 const mib = (bytes) => (bytes / MIB).toFixed(1);
 
 /**
- * File > Memory Cache. On the desktop, a per-window LRU budget, independent of the current drawing. In a shell that
- * reads the file shown alone (the web viewer and the local program's page), the readings of each file kept in memory
- * for the page (`ResultCache` of result-cache.js): a limit, 0 to keep none, and Clear Cache empties it.
+ * File > Memory Cache, the same in every shell that reads the file shown alone: the readings of each file kept in
+ * memory for this window or page (file-reading.js): a limit, 0 to keep none, how many readings it holds, their size
+ * and the hits and misses, and Clear Cache, which empties it, the document shown staying as it is.
  */
 export async function memoryCache() {
-  if (!shell.memoryCache || isLoading() || modal()) return;
+  if (!readsByFile() || shell.embed || isLoading() || modal()) return;
   try {
-    const stats = await shell.memoryCache();
+    const stats = await readings();
     if (isLoading() || modal()) return;
-    // the readings of each file kept by the web shell
-    const web = stats.kind === 'readings';
-    const field = (text, value, max) => {
-      const label = document.createElement('label');
-      label.className = 'dialog-line';
-      setText(label, text);
-      const input = document.createElement('input');
-      input.type = 'number'; input.min = '0'; input.max = String(max); input.step = '1';
-      input.value = String(value);
-      append(label, input);
-      return { label, input };
-    };
-    const limit = web
-      ? field(m('Limit in memory (MiB)'), load('file-cache-memory-mib', stats.limit / MIB), 4096)
-      : field(m('Cache limit (MiB)'), stats.limit / MIB, 4096);
+    const label = document.createElement('label');
+    label.className = 'dialog-line';
+    setText(label, m('Limit in memory (MiB)'));
+    const input = document.createElement('input');
+    input.type = 'number'; input.min = '0'; input.max = '4096'; input.step = '1';
+    input.value = String(load('file-cache-memory-mib', stats.limit / MIB));
+    append(label, input);
     const state = document.createElement('p');
-    const prepared = document.createElement('p');
-    prepared.hidden = !shell.preload;
-    const show = s => {
-      setText(prepared, m`${s.prefetched || 0} preloaded documents. Uses the same cache budget; starts new jobs only while idle.`);
-      if (!web) {
-        setText(state, m`${s.entries} cached document${s.entries === 1 ? '' : 's'} · ${mib(s.used)} MiB retained · ${s.hits} cache hits`);
-        return;
-      }
-      setText(state, m`Readings in memory: ${s.entries} (${mib(s.used)} MiB) · ${s.hits} hits, ${s.misses} misses`);
-    };
+    const show = (s) => setText(state, m`Readings in memory: ${s.entries} (${mib(s.used)} MiB) · ${s.hits} hits, ${s.misses} misses`);
     show(stats);
-    const preload = document.createElement('label');
-    preload.className = 'dialog-line';
-    preload.hidden = !shell.preload;
-    const enabled = document.createElement('input');
-    enabled.type = 'checkbox'; enabled.checked = load('background-preload', true) === true;
-    append(preload, enabled, m('Preload nearby netlists while idle'));
     const error = document.createElement('p');
     error.className = 'dialog-error'; error.setAttribute('role', 'alert');
     const clear = document.createElement('button');
@@ -58,23 +36,21 @@ export async function memoryCache() {
     clear.type = 'button'; setText(clear, m('Clear Cache'));
     clear.addEventListener('click', async () => {
       clear.disabled = true;
-      try { clearing = shell.memoryCache(true); show(await clearing); setText(error, ''); }
+      try { clearing = readings(true); show(await clearing); setText(error, ''); }
       catch (e) { setText(error, String(e)); }
       finally { clear.disabled = false; }
     });
-    const whole = (input, max) => input.checkValidity() && Number.isInteger(input.valueAsNumber) && input.valueAsNumber <= max;
+    const whole = () => input.checkValidity() && Number.isInteger(input.valueAsNumber) && input.valueAsNumber <= 4096;
     await form({ title: m('Memory Cache'),
-      text: web
-        ? m("Keep the reading of each file in memory for this page, so that a file shown again is not read again. The least recently used go first. Set 0 to keep none.")
-        : m('Reuse compiled netlists and drawings. Least recently used results are removed first. Set 0 to disable caching. This budget excludes the current view and temporary build memory.'),
-      parts: [limit.label, preload, state, prepared, clear, error], focus: limit.input, action: tr('Apply'),
+      text: m("Keep the reading of each file in memory for this page, so that a file shown again is not read again. The least recently used go first. Set 0 to keep none."),
+      parts: [label, state, clear, error], focus: input, action: tr('Apply'),
       answer: async () => {
-        if (!whole(limit.input, 4096)) { setText(error, m('Enter a whole number from 0 to 4096.')); return; }
+        if (!whole()) { setText(error, m('Enter a whole number from 0 to 4096.')); return; }
         try {
           await clearing.catch(() => {});
-          await save(web ? 'file-cache-memory-mib' : 'render-cache-mib', limit.input.valueAsNumber);
-          if (shell.preload) await save('background-preload', enabled.checked);
-          await shell.memoryCache(); window.dispatchEvent(new Event('preload-reset')); return true;
+          await save('file-cache-memory-mib', input.valueAsNumber);
+          await readings();
+          return true;
         }
         catch (e) { setText(error, String(e)); }
       },

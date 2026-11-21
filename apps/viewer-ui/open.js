@@ -11,6 +11,7 @@ import { append, m, setAttr, setText, tr } from "./i18n.js";
 
 import { form, inform, modal } from "./dialog.js";
 import { sourceOpened } from "./pool.js";
+import { readDocument } from "./file-reading.js";
 import { adoptBuffers, changes, resetBuffers } from "./edits.js";
 import { confirmLeave } from "./editor.js";
 import { shell } from "./shell.js";
@@ -68,10 +69,10 @@ export async function openSource(source, keep, edited, fresh = false, navigation
   let d;
   try {
     await progress.stage("reading");
-    d = await shell.build(source, edited, stage => {
+    d = await readDocument(source, edited, stage => {
       if (operation.signal.aborted) throw new Error('Opening superseded');
       progress.setStage(stage);
-    }, undefined, operation.signal, { fresh, bind: options.bind, ...(constraintsWanted ? { constraints: true } : {}), ...(shell.perFile ? { perFile: true } : {}) });
+    }, operation.signal, { fresh, bind: options.bind, ...(constraintsWanted ? { constraints: true } : {}) });
     if (operation.signal.aborted) return;
     if (options.bound) bindings.set(d, options.bound);
     await progress.stage("displaying");
@@ -146,7 +147,7 @@ export async function applyEdits() {
   let d;
   try {
     await progress.stage("reading");
-    d = await shell.build(lastSource, changes(false), progress.setStage, undefined, operation.signal, shell.perFile ? { perFile: true } : {});
+    d = await readDocument(lastSource, changes(false), progress.setStage, operation.signal);
     if (operation.signal.aborted) return false;
     await progress.stage("displaying");
     if (operation.signal.aborted) return false;

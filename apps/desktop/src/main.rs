@@ -10,7 +10,6 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 mod atomic;
-mod build_cache;
 mod core_thread;
 mod export;
 mod files;
@@ -21,9 +20,9 @@ mod load_progress;
 mod macos;
 mod menu;
 mod pool;
-mod preload;
 mod project;
 mod public_packages;
+mod reading;
 mod session;
 mod settings;
 mod solve;
@@ -34,7 +33,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use core_thread::Core;
-use files::{Edits, Saved, SavedFile};
+use files::{Saved, SavedFile};
 use rnl_view::UnplacedDrawing;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
@@ -102,132 +101,15 @@ fn file_argument(args: impl IntoIterator<Item = OsString>) -> Option<OsString> {
 /// The extensions offered first in the open dialog.
 const NETLISTS: [&str; 11] = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "inc", "lib", "scs", "rnl"];
 
-/// Read and draw a file, and name the window after it. With `edits`, the texts of some of its
-/// files are those, over what is on disk. The drawings of the objects it lists without a position
-/// are kept for `unplaced_drawings`, in place of those of the last document. With `bind`, the parameters of a
-/// subcircuit are built with those values, to show; with `constraints`, the levels have their constraints
-/// (`Level.constraints`), which the Solve view lists; such a document is not kept among those the cache reuses.
+/// Name the window after the document the page shows, `name` (a reading of one of its files, or a solve's preview).
 #[tauri::command]
-// Tauri injects the window and managed state alongside the separate IPC arguments.
-#[allow(clippy::too_many_arguments)]
-async fn open_document(
-    window: WebviewWindow,
-    unsaved: State<'_, Unsaved>,
-    core: State<'_, Core>,
-    settings: State<'_, settings::Settings>,
-    library: State<'_, library::Library>,
-    auto_include: Option<bool>,
-    pool: Option<Vec<String>>,
-    path: String,
-    edits: Option<Edits>,
-    request_id: Option<String>,
-    fresh: Option<bool>,
-    formats: Option<formats::Formats>,
-    bind: Option<rnl_view::Bind>,
-    constraints: Option<bool>,
-) -> Result<tauri::ipc::Response, String> {
-    core.preload.cancel();
-    let core = core.inner().clone();
-    let paths = settings.paths()?;
-    let cache_limit = settings.cache_limit()?;
-    let library = library.snapshot()?;
-    let pool = pool.unwrap_or_default();
-    let formats = formats.unwrap_or_default();
-    let progress_window = window.clone();
-    let doc = tauri::async_runtime::spawn_blocking(move || {
-        core.run(move |drawn| {
-            let path = if path.starts_with(rnl_view::BUNDLED_DIR) {
-                PathBuf::from(&path)
-            } else {
-                std::path::absolute(&path).map_err(|e| format!("{path}: {e}"))?
-            };
-            let entry = path.to_string_lossy().into_owned();
-            let held = files::held(&entry, &edits.unwrap_or_default());
-            let disk = crate::public_packages::provider(&paths);
-            let disk = rnl_runtime::source::FilePool { files: &disk, paths: &pool };
-            let layered = files::layered(&held, &disk);
-            let index = library.with_edits(&held, &layered);
-            let layered =
-                rnl_view::LibraryProvider { files: &layered, index: &index, enabled: auto_include.unwrap_or(false) };
-            let provider = load_progress::LoadingProvider::new(&layered, &progress_window, request_id.as_deref());
-            drawn.set_limit(cache_limit);
-            let built = match (&bind, constraints.unwrap_or(false)) {
-                (None, false) => drawn.build(&entry, &provider, &formats, fresh.unwrap_or(false))?,
-                (bind, constraints) => drawn.build_unkept(&entry, &provider, &formats, bind.as_ref(), constraints)?,
-            };
-            if built.hit {
-                provider.cached();
-            }
-            Ok::<_, String>(built)
-        })
-    })
-    .await
-    .map_err(|e| e.to_string())???;
-    unsaved.set(&window, |state| state.0 = doc.name.clone());
-    Ok(tauri::ipc::Response::new(doc.json))
+fn show_document(window: WebviewWindow, unsaved: State<'_, Unsaved>, name: String) {
+    unsaved.set(&window, |state| state.0 = name);
 }
 
-/// Draw a netlist held in memory, such as one from the clipboard, as the file `name`, whose
-/// extension says how it is read. Bare includes can use the file pool and PATH.
-#[tauri::command]
-// Tauri injects the window and managed state alongside the separate IPC arguments.
-#[allow(clippy::too_many_arguments)]
-async fn open_text(
-    window: WebviewWindow,
-    unsaved: State<'_, Unsaved>,
-    core: State<'_, Core>,
-    settings: State<'_, settings::Settings>,
-    library: State<'_, library::Library>,
-    auto_include: Option<bool>,
-    pool: Option<Vec<String>>,
-    name: String,
-    text: String,
-    edits: Option<Edits>,
-    request_id: Option<String>,
-    fresh: Option<bool>,
-    formats: Option<formats::Formats>,
-    bind: Option<rnl_view::Bind>,
-    constraints: Option<bool>,
-) -> Result<tauri::ipc::Response, String> {
-    core.preload.cancel();
-    let core = core.inner().clone();
-    let paths = settings.paths()?;
-    let cache_limit = settings.cache_limit()?;
-    let library = library.snapshot()?;
-    let pool = pool.unwrap_or_default();
-    let formats = formats.unwrap_or_default();
-    let progress_window = window.clone();
-    let doc = tauri::async_runtime::spawn_blocking(move || {
-        core.run(move |drawn| {
-            let entry = format!("/{name}");
-            let held = files::held_text(&entry, &text, &edits.unwrap_or_default());
-            let disk = crate::public_packages::provider(&paths);
-            let disk = rnl_runtime::source::FilePool { files: &disk, paths: &pool };
-            let files = files::layered(&held, &disk);
-            let index = library.with_edits(&held, &files);
-            let files =
-                rnl_view::LibraryProvider { files: &files, index: &index, enabled: auto_include.unwrap_or(false) };
-            let provider = load_progress::LoadingProvider::new(&files, &progress_window, request_id.as_deref());
-            drawn.set_limit(cache_limit);
-            let built = match (&bind, constraints.unwrap_or(false)) {
-                (None, false) => drawn.build(&entry, &provider, &formats, fresh.unwrap_or(false))?,
-                (bind, constraints) => drawn.build_unkept(&entry, &provider, &formats, bind.as_ref(), constraints)?,
-            };
-            if built.hit {
-                provider.cached();
-            }
-            Ok::<_, String>(built)
-        })
-    })
-    .await
-    .map_err(|e| e.to_string())???;
-    unsaved.set(&window, |state| state.0 = doc.name.clone());
-    Ok(tauri::ipc::Response::new(doc.json))
-}
-
-/// The drawings of the objects at `items` of `levels[level].unplaced` of the document opened last:
-/// `{ svg }` each, in order. The page asks for the rows it shows, with their `names`, which must
-/// be those of that document: a request about one that was opened since is refused.
+/// The drawings of the objects at `items` of `levels[level].unplaced` of the reading shown, the last one read with
+/// `keep` (reading.rs): `{ svg }` each, in order. The page asks for the rows it shows, with their `names`, which must
+/// be those of that reading: a request about another one is refused.
 #[tauri::command]
 async fn unplaced_drawings(
     core: State<'_, Core>,
@@ -239,36 +121,6 @@ async fn unplaced_drawings(
     tauri::async_runtime::spawn_blocking(move || core.run(move |drawn| drawn.unplaced(level, &items, &names)))
         .await
         .map_err(|e| e.to_string())??
-}
-
-/// Inspect/configure the bounded cache without changing the document currently displayed.
-#[tauri::command]
-async fn memory_cache(
-    core: State<'_, Core>,
-    settings: State<'_, settings::Settings>,
-    clear: Option<bool>,
-) -> Result<build_cache::Stats, String> {
-    let core = core.inner().clone();
-    let limit = settings.cache_limit()?;
-    let clear = clear.unwrap_or(false);
-    if clear || !settings.preload_enabled()? {
-        core.preload.cancel();
-    }
-    let preload = core.preload.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        core.run(move |cache| {
-            if cache.stats().limit != limit {
-                preload.cancel();
-            }
-            cache.set_limit(limit);
-            if clear {
-                cache.clear();
-            }
-            cache.stats()
-        })
-    })
-    .await
-    .map_err(|e| e.to_string())?
 }
 
 /// Write the files of the netlist at `entry` that the user chose to save where they were read from,
@@ -460,13 +312,14 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             core_build_info,
-            preload::preload_document,
-            preload::cancel_preload,
-            preload::preload_ticket,
-            open_document,
-            open_text,
+            reading::reading_core,
+            reading::read_outline,
+            reading::read_file,
+            reading::file_hashes,
+            reading::file_texts,
+            reading::file_symbols,
+            show_document,
             unplaced_drawings,
-            memory_cache,
             save_files,
             save_file_as,
             set_dirty,
@@ -496,6 +349,7 @@ fn main() {
             project::pick_project_folder,
             project::existing_files,
             library::update_library,
+            library::library_hashes,
             formats::formats,
             formats::detect_format,
             menu::set_view_check,

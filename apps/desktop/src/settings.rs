@@ -76,27 +76,6 @@ pub fn save_setting(state: State<'_, Settings>, key: String, value: Value) -> Re
 }
 
 impl Settings {
-    pub fn preload_enabled(&self) -> Result<bool, String> {
-        let state = self.0.lock().map_err(|e| e.to_string())?;
-        Ok(state
-            .as_ref()
-            .ok_or("settings have not been loaded")?
-            .1
-            .get("background-preload")
-            .and_then(Value::as_bool)
-            .unwrap_or(true))
-    }
-
-    pub fn cache_limit(&self) -> Result<usize, String> {
-        let state = self.0.lock().map_err(|e| e.to_string())?;
-        let values = &state.as_ref().ok_or("settings have not been loaded")?.1;
-        Ok(values
-            .get("render-cache-mib")
-            .and_then(Value::as_u64)
-            .filter(|n| *n <= 4096)
-            .map_or(crate::build_cache::DEFAULT_LIMIT, |n| n as usize * 1024 * 1024))
-    }
-
     /// The PATH directories in order, each followed by its sub-folders when it was added with them
     /// (`search-paths-subfolders`), as package and include lookup searches them. The public packages that
     /// this build bundles are searched for packages only, after these (`public_packages::provider`).
@@ -194,21 +173,6 @@ mod tests {
         assert_eq!(paths.len(), 2 + 5);
         std::fs::remove_dir_all(&dir).unwrap();
         std::fs::remove_dir_all(&flat).unwrap();
-    }
-    #[test]
-    fn cache_limits_default_validate_and_disable() {
-        for (value, expected) in [
-            (Value::Null, 256),
-            (serde_json::json!(-1), 256),
-            (serde_json::json!(4097), 256),
-            (serde_json::json!(0), 0),
-            (serde_json::json!(128), 128),
-            (serde_json::json!(4096), 4096),
-        ] {
-            let values = Map::from_iter([("render-cache-mib".to_string(), value)]);
-            let settings = Settings(Mutex::new(Some((PathBuf::new(), values))));
-            assert_eq!(settings.cache_limit().unwrap(), expected * 1024 * 1024);
-        }
     }
     #[test]
     fn independent_writers_preserve_each_others_settings() {

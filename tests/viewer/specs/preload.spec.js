@@ -1,24 +1,5 @@
 import { expect, test } from '../viewer.js';
 
-test('cancelling while Library awaits prevents the stale native preload IPC', async ({page, viewer}) => {
-  await viewer.open('04-hierarchy');
-  const result = await page.evaluate(async () => {
-    let release;
-    const pending = new Promise(r=>{release=r}), calls=[];
-    const before = window.__TAURI__;
-    window.__TAURI__ = {core:{invoke: async cmd=>{calls.push(cmd); return cmd==='update_library'?pending:undefined;}}};
-    try {
-      const {default:shell} = await import('./shells/desktop.js?preload-race');
-      const library = shell.setPool([]);
-      const stale = shell.preload({path:'C:/stale.sp'});
-      await shell.cancelPreload();
-      release([]); await library;
-      return {status:await stale, sent:calls.includes('preload_document')};
-    } finally {window.__TAURI__=before;}
-  });
-  expect(result).toEqual({status:'cancelled',sent:false});
-});
-
 test('preload order follows descendants breadth first, deduplicates cycles and appends PATH', async ({page, viewer}) => {
   await viewer.open('04-hierarchy');
   const candidates = await page.evaluate(async () => {
