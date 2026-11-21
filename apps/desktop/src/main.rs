@@ -12,6 +12,7 @@
 mod atomic;
 mod build_cache;
 mod core_thread;
+mod disk_cache;
 mod export;
 mod files;
 mod formats;
@@ -133,6 +134,7 @@ async fn open_document(
     let core = core.inner().clone();
     let paths = settings.paths()?;
     let cache_limit = settings.cache_limit()?;
+    let disk_limit = settings.disk_cache_limit()?;
     let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
     let formats = formats.unwrap_or_default();
@@ -154,6 +156,7 @@ async fn open_document(
                 rnl_view::LibraryProvider { files: &layered, index: &index, enabled: auto_include.unwrap_or(false) };
             let provider = load_progress::LoadingProvider::new(&layered, &progress_window, request_id.as_deref());
             drawn.set_limit(cache_limit);
+            drawn.set_disk_limit(disk_limit);
             let built = match (&bind, constraints.unwrap_or(false)) {
                 (None, false) => drawn.build(&entry, file.as_deref(), &provider, &formats, fresh.unwrap_or(false))?,
                 (bind, constraints) => {
@@ -200,6 +203,7 @@ async fn open_text(
     let core = core.inner().clone();
     let paths = settings.paths()?;
     let cache_limit = settings.cache_limit()?;
+    let disk_limit = settings.disk_cache_limit()?;
     let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
     let formats = formats.unwrap_or_default();
@@ -216,6 +220,7 @@ async fn open_text(
                 rnl_view::LibraryProvider { files: &files, index: &index, enabled: auto_include.unwrap_or(false) };
             let provider = load_progress::LoadingProvider::new(&files, &progress_window, request_id.as_deref());
             drawn.set_limit(cache_limit);
+            drawn.set_disk_limit(disk_limit);
             let built = match (&bind, constraints.unwrap_or(false)) {
                 (None, false) => drawn.build(&entry, file.as_deref(), &provider, &formats, fresh.unwrap_or(false))?,
                 (bind, constraints) => {
@@ -354,7 +359,8 @@ async fn file_summaries(
     .await
 }
 
-/// Inspect/configure the bounded cache without changing the document currently displayed.
+/// Inspect/configure the bounded caches, in memory and on disk, without changing the document currently displayed;
+/// `clear` empties both, the one on disk for every window.
 #[tauri::command]
 async fn memory_cache(
     core: State<'_, Core>,
@@ -363,6 +369,7 @@ async fn memory_cache(
 ) -> Result<build_cache::Stats, String> {
     let core = core.inner().clone();
     let limit = settings.cache_limit()?;
+    let disk_limit = settings.disk_cache_limit()?;
     let clear = clear.unwrap_or(false);
     if clear || !settings.preload_enabled()? {
         core.preload.cancel();
@@ -374,8 +381,10 @@ async fn memory_cache(
                 preload.cancel();
             }
             cache.set_limit(limit);
+            cache.set_disk_limit(disk_limit);
             if clear {
                 cache.clear();
+                cache.clear_disk();
             }
             cache.stats()
         })
@@ -553,6 +562,7 @@ fn main() {
         .manage(startup)
         .setup(|app| {
             public_packages::init(app.handle());
+            disk_cache::init(app.handle());
             Ok(())
         })
         .menu(menu::menu)

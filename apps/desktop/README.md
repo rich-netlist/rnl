@@ -94,11 +94,22 @@ one file at a time) come with it, as on the web. A solve's preview is still the 
 
 Each desktop window keeps a **256 MiB LRU memory cache** of these readings, one for each entry, file, choice of
 formats and Auto Include, with their SVG drawings and lazy drawings for the Not drawn pane. Switching back to an unchanged file reuses them;
-the least recently used results are evicted first. **File > Memory Cache…** shows its retained
-budget and hit count, changes the limit (0 disables caching), or clears it. An oversized document
-still opens but is not retained. The budget conservatively estimates owned cache data, including
-source snapshots and nested drawing data; the active view and temporary build/IPC buffers are
-additional memory, so this is not a cap on the entire process. Results stay only until the window closes.
+the least recently used results are evicted first. An oversized reading still opens but is not retained. The budget
+conservatively estimates owned cache data, including source snapshots and nested drawing data; the active view and
+temporary build/IPC buffers are additional memory, so this is not a cap on the entire process.
+
+The readings are also kept **on disk** ([`src/disk_cache.rs`](src/disk_cache.rs)), for every window and every start of
+the app: one file each in `readings` of the app's cache folder (Tauri's `app_cache_dir`: on Windows
+`%LOCALAPPDATA%\io.github.rich-netlist.viewer`), in a folder for the version of the app and its core, **2 GiB** in all
+by default, whatever the versions, the least recently used going first. A reading is written to a name of its own and
+renamed into place, and one that cannot be read is removed. On disk a reading keeps what it read by the hashes of the
+texts and answers, and no lazy drawings: shown from there, the page reads the file again quietly the first time the
+Not drawn list asks for a drawing. A reading more than a quarter of the limit is not written.
+
+**File > Memory Cache…** has both limits, in memory (`file-cache-memory-mib`, 256 MiB, up to 4096) and on disk
+(`file-cache-store-mib`, 2048 MiB, up to 65536), each 0 to keep none there; how many readings each holds and their size,
+with the hits and misses of the window; and Clear Cache, which empties both, the one on disk for every window. The
+document shown stays as it is.
 
 A cache hit checks the contents of all observed inputs, including failed reads, and the ordering
 of package/include and Auto Include candidates. File edits, newly available dependencies and

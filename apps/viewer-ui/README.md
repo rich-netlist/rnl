@@ -165,7 +165,8 @@ view of it: the entry's source with `view`, the file as the document names it (`
   0 in the browser's storage reads nothing from it either. The dialog says how many readings each holds and their
   size, with the hits and misses of the page, and Clear Cache empties both, the document shown staying as it is. A
   browser that keeps nothing for the site, as in a private window, has the limit in memory alone. An embedded viewer
-  has no menu, and keeps its readings in memory alone.
+  has no menu, and keeps its readings in memory alone. On the desktop the dialog has the same two limits, the second on
+  disk, for every window ([the app](../desktop/README.md)), and says that the readings there are on this computer.
 - **The problems** (`file-checks.js`, `problems.js`) are those of the file shown: the reading of a file has the
   problems of the files above it too, which it reads in its context, and of the packages it uses; the list has those
   of its own file, of no file and of a package. **All Files**, a switch at the right of the problems' heading, adds

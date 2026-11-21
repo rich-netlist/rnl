@@ -1,5 +1,6 @@
 //! Per-window LRU of the readings of one file of a document in the context of its entry (`rnl_view::build_file`),
-//! serialized, and their lazy drawings. A hit checks the complete
+//! serialized, and their lazy drawings; and the readings kept on disk for every window (disk_cache.rs), without
+//! their lazy drawings, which a reading from there is read again for (`UNDRAWN`). A hit checks the complete
 //! observed input: source/package text (including failed reads), lookup order and auto-includes.
 //! The foreground core owns this cache; completed background builds may be offered to it.
 use std::cell::RefCell;
@@ -11,8 +12,10 @@ use std::time::Instant;
 use rnl_runtime::source::{dirname, join, normalize, LibraryDefinition, LibraryLookup, Provider};
 use rnl_view::{Bind, BuildOptions, Drawings, Outline, UnplacedDrawing};
 
+use crate::disk_cache::{self, DiskCache};
 use crate::formats::Formats;
-use serde::Serialize;
+use rnl_runtime::numbering::{hex, sha256};
+use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_LIMIT: usize = 256 * 1024 * 1024;
 
@@ -124,6 +127,81 @@ impl LibraryLookup for Observed<'_> {
     }
 }
 
+/// The SHA-256 of a text, in hexadecimal digits.
+fn digest(text: &str) -> String {
+    hex(&sha256(text.as_bytes()))
+}
+
+/// What a reading read (`Inputs`), as it is kept on disk: the hash of each text and of each answer, in place of them.
+#[derive(Serialize, Deserialize, Default, PartialEq, Debug)]
+struct Digest {
+    reads: BTreeMap<String, Option<String>>,
+    packages: Option<String>,
+    package_queries: BTreeMap<String, String>,
+    include_queries: BTreeMap<String, String>,
+    candidates: Vec<(String, bool, String)>,
+    definitions: BTreeMap<String, String>,
+}
+
+fn strings_digest(v: &[String]) -> String {
+    digest(&serde_json::to_string(v).unwrap_or_default())
+}
+/// The definitions the Library gives, as their debug text, which the app's version stamps the folder of (disk_cache.rs).
+fn definitions_digest(v: &[LibraryDefinition]) -> String {
+    digest(&format!("{v:?}"))
+}
+
+impl Inputs {
+    fn digest(&self) -> Digest {
+        Digest {
+            reads: self.reads.iter().map(|(p, t)| (p.clone(), t.as_deref().map(digest))).collect(),
+            packages: self.packages.as_deref().map(strings_digest),
+            package_queries: self.package_queries.iter().map(|(n, v)| (n.clone(), strings_digest(v))).collect(),
+            include_queries: self.include_queries.iter().map(|(n, v)| (n.clone(), strings_digest(v))).collect(),
+            candidates: self.candidates.iter().map(|((n, s), v)| (n.clone(), *s, definitions_digest(v))).collect(),
+            definitions: self.definitions.iter().map(|(p, v)| (p.clone(), definitions_digest(v))).collect(),
+        }
+    }
+}
+
+impl Digest {
+    /// Whether what was read is still what `files` give, as `Inputs::valid` says, by the hashes.
+    fn valid(&self, files: &dyn Provider) -> bool {
+        self.reads.iter().all(|(p, h)| files.read(p).as_deref().map(digest) == *h)
+            && self.packages.as_ref().is_none_or(|h| strings_digest(&files.package_files()) == *h)
+            && self.package_queries.iter().all(|(n, h)| strings_digest(&files.package_candidates(n)) == *h)
+            && self.include_queries.iter().all(|(n, h)| strings_digest(&files.include_candidates(n)) == *h)
+            && self.candidates.iter().all(|(n, sensitive, h)| {
+                files.auto_include().is_some_and(|i| definitions_digest(&i.candidates(n, *sensitive)) == *h)
+            })
+            && self
+                .definitions
+                .iter()
+                .all(|(p, h)| files.auto_include().is_some_and(|i| definitions_digest(&i.definitions(p)) == *h))
+    }
+}
+
+/// A reading as it is kept on disk.
+#[derive(Serialize, Deserialize)]
+struct Stored {
+    entry: String,
+    file: String,
+    own: bool,
+    inputs: Digest,
+    json: String,
+    name: String,
+    took: f64,
+}
+
+/// What `unplaced` says when the reading shown came from the disk, which keeps no drawings: the page reads the file
+/// again (shells/desktop.js), and asks again.
+pub const UNDRAWN: &str = "the drawings of this reading were not kept";
+
+/// The key of the reading of `file` of `entry` on disk: the hash of what finds it in memory.
+fn disk_key(entry: &str, file: &str, auto_include: bool, formats: &Formats) -> String {
+    digest(&serde_json::to_string(&(entry, file, auto_include, formats)).unwrap_or_default())
+}
+
 /// The reading of one file of a document, in the context of its entry (`rnl_view::build_file`), as it is kept: its
 /// FileResult as JSON, with the texts of the document's other files filled in for the netlist pane, what it read,
 /// and the drawings of its objects without a position.
@@ -137,9 +215,12 @@ pub struct Prepared {
     /// The formats chosen for files that it was built with: another choice is another entry.
     formats: Formats,
     inputs: Inputs,
+    /// For a reading from the disk, what it read, by the hashes, in place of `inputs`.
+    digest: Option<Digest>,
     json: String,
     name: String,
-    drawings: Arc<Drawings>,
+    /// None for a reading from the disk.
+    drawings: Option<Arc<Drawings>>,
     bytes: usize,
     speculative: bool,
     /// How long the reading took, in milliseconds.
@@ -161,6 +242,16 @@ pub struct Stats {
     pub hits: u64,
     pub misses: u64,
     pub prefetched: usize,
+    /// The readings on disk, of every version, their bytes, and the limit; None without a cache on disk.
+    #[serde(rename = "storedEntries")]
+    pub stored_entries: Option<usize>,
+    pub stored: Option<u64>,
+    #[serde(rename = "storeLimit")]
+    pub store_limit: u64,
+    /// Whether there is a cache on disk.
+    pub persistent: bool,
+    /// That the second limit is on disk, not in a browser's storage (memory-cache.js).
+    pub disk: bool,
 }
 
 /// Of a file of the document shown, for the entry page (entry-page.js): the symbols its subcircuits give themselves
@@ -180,10 +271,12 @@ pub struct BuildCache {
     used: usize,
     hits: u64,
     misses: u64,
+    /// The cache on disk; the app's (`disk_cache::shared`) when None.
+    disk: Option<Arc<DiskCache>>,
 }
 impl Default for BuildCache {
     fn default() -> Self {
-        Self { entries: VecDeque::new(), active: None, limit: DEFAULT_LIMIT, used: 0, hits: 0, misses: 0 }
+        Self { entries: VecDeque::new(), active: None, limit: DEFAULT_LIMIT, used: 0, hits: 0, misses: 0, disk: None }
     }
 }
 
@@ -229,6 +322,8 @@ fn with_outline(json: &str, outline: &Outline) -> Result<String, String> {
 
 impl BuildCache {
     pub fn stats(&self) -> Stats {
+        let disk = self.disk();
+        let (stored_entries, stored) = disk.as_ref().map(|d| d.stats()).unzip();
         Stats {
             limit: self.limit,
             used: self.used,
@@ -236,6 +331,87 @@ impl BuildCache {
             hits: self.hits,
             misses: self.misses,
             prefetched: self.entries.iter().filter(|e| e.speculative).count(),
+            stored_entries,
+            stored,
+            store_limit: disk.as_ref().map_or(disk_cache::DEFAULT_LIMIT, |d| d.limit()),
+            persistent: disk.is_some(),
+            disk: true,
+        }
+    }
+
+    /// The cache on disk: this one's, or the app's.
+    fn disk(&self) -> Option<Arc<DiskCache>> {
+        self.disk.clone().or_else(disk_cache::shared)
+    }
+
+    /// Set the limit of the cache on disk.
+    pub fn set_disk_limit(&self, limit: u64) {
+        if let Some(disk) = self.disk() {
+            disk.set_limit(limit);
+        }
+    }
+
+    /// Empty the cache on disk, for every window.
+    pub fn clear_disk(&self) {
+        if let Some(disk) = self.disk() {
+            disk.clear();
+        }
+    }
+
+    /// The reading of `file` of `entry` kept on disk, as `stored`, when one is there and can be read; one that cannot
+    /// is removed. With `using`, it becomes the most recently used there.
+    fn stored(&self, entry: &str, file: &str, auto_include: bool, formats: &Formats, using: bool) -> Option<Stored> {
+        let disk = self.disk()?;
+        let key = disk_key(entry, file, auto_include, formats);
+        let bytes = if using { disk.get(&key) } else { disk.peek(&key) }?;
+        match serde_json::from_slice::<Stored>(&bytes) {
+            Ok(stored) if stored.entry == entry && stored.file == file => Some(stored),
+            _ => {
+                disk.remove(&key);
+                None
+            }
+        }
+    }
+
+    /// The reading of `file` of `entry` kept on disk, when it still holds for `files`, as a reading without drawings.
+    fn kept_on_disk(&self, entry: &str, file: &str, files: &dyn Provider, formats: &Formats) -> Option<Prepared> {
+        let auto_include = files.auto_include().is_some();
+        let stored = self.stored(entry, file, auto_include, formats, true)?;
+        if !stored.inputs.valid(files) {
+            return None;
+        }
+        let bytes = 2 * size_of::<Prepared>() + 128 + 2 * entry.len() + 2 * file.len() + 2 * stored.json.len();
+        Some(Prepared {
+            entry: stored.entry,
+            file: stored.file,
+            own: stored.own,
+            auto_include,
+            formats: formats.clone(),
+            inputs: Inputs::default(),
+            digest: Some(stored.inputs),
+            json: stored.json,
+            name: stored.name,
+            drawings: None,
+            bytes,
+            speculative: false,
+            took: stored.took,
+        })
+    }
+
+    /// Keep `read`, a new reading, on disk too, for every window.
+    fn store(&self, read: &Prepared) {
+        let Some(disk) = self.disk() else { return };
+        let stored = Stored {
+            entry: read.entry.clone(),
+            file: read.file.clone(),
+            own: read.own,
+            inputs: read.inputs.digest(),
+            json: read.json.clone(),
+            name: read.name.clone(),
+            took: read.took,
+        };
+        if let Ok(bytes) = serde_json::to_vec(&stored) {
+            disk.put(&disk_key(&read.entry, &read.file, read.auto_include, &read.formats), &bytes);
         }
     }
     pub fn clear(&mut self) {
@@ -260,7 +436,7 @@ impl BuildCache {
         }
     }
     pub fn unplaced(&self, level: usize, items: &[usize], names: &[String]) -> Result<Vec<UnplacedDrawing>, String> {
-        self.active.as_ref().ok_or_else(|| "no document has kept drawings".to_string())?.unplaced(level, items, names)
+        self.active.as_ref().ok_or_else(|| UNDRAWN.to_string())?.unplaced(level, items, names)
     }
 
     fn position(&self, entry: &str, file: &str, auto_include: bool, formats: &Formats) -> Option<usize> {
@@ -275,7 +451,7 @@ impl BuildCache {
         let at = self.position(entry, file, files.auto_include().is_some(), formats)?;
         let entry = self.entries.remove(at).unwrap();
         self.used -= entry.bytes;
-        entry.inputs.valid(files).then_some(entry)
+        entry.holds(files).then_some(entry)
     }
 
     /// Keep `entry` as the most recently used, when it fits.
@@ -302,9 +478,12 @@ impl BuildCache {
     ) -> Result<Built, String> {
         let entry = normalize(entry);
         let (outline, file) = outline_of(&entry, file, files, formats)?;
-        if let Some(mut kept) = self.take_valid(&entry, &file, files, formats).filter(|_| !fresh) {
+        let kept = self.take_valid(&entry, &file, files, formats).filter(|_| !fresh);
+        if let Some(mut kept) =
+            kept.or_else(|| if fresh { None } else { self.kept_on_disk(&entry, &file, files, formats) })
+        {
             kept.speculative = false;
-            self.active = Some(kept.drawings.clone());
+            self.active = kept.drawings.clone();
             let built = Built { json: with_outline(&kept.json, &outline)?, name: kept.name.clone(), hit: true };
             self.used += kept.bytes;
             self.entries.push_back(kept);
@@ -314,8 +493,9 @@ impl BuildCache {
         self.misses += 1;
         let own = outline.files.first().is_some_and(|f| f.path == file);
         let read = Prepared::build_with(&entry, &file, own, files, formats, None, false)?;
-        self.active = Some(read.drawings.clone());
+        self.active = read.drawings.clone();
         let built = Built { json: with_outline(&read.json, &outline)?, name: read.name.clone(), hit: false };
+        self.store(&read);
         self.keep(read);
         Ok(built)
     }
@@ -337,7 +517,7 @@ impl BuildCache {
         let (outline, file) = outline_of(&entry, file, files, formats)?;
         self.misses += 1;
         let read = Prepared::build_with(&entry, &file, false, files, formats, bind, constraints)?;
-        self.active = Some(read.drawings.clone());
+        self.active = read.drawings.clone();
         Ok(Built { json: with_outline(&read.json, &outline)?, name: read.name, hit: false })
     }
 
@@ -351,7 +531,9 @@ impl BuildCache {
         formats: &Formats,
     ) -> Result<String, String> {
         let entry = normalize(entry);
-        if let Some(kept) = self.take_valid(&entry, file, files, formats) {
+        if let Some(kept) =
+            self.take_valid(&entry, file, files, formats).or_else(|| self.kept_on_disk(&entry, file, files, formats))
+        {
             let json = kept.json.clone();
             self.used += kept.bytes;
             self.entries.push_back(kept);
@@ -362,6 +544,7 @@ impl BuildCache {
         let mut read = Prepared::build_with(&entry, file, false, files, formats, None, false)?;
         read.speculative = true;
         let json = read.json.clone();
+        self.store(&read);
         self.keep(read);
         Ok(json)
     }
@@ -382,9 +565,13 @@ impl BuildCache {
             .iter()
             .map(|file| {
                 let subckts = rnl_view::symbols(&entry, file, files, &options).ok().map(|s| s.subckts);
-                let kept = self.position(&entry, file, automatic, formats).map(|at| &self.entries[at]);
-                let summary =
-                    Summary { subckts, kept: kept.is_some_and(|k| k.inputs.valid(files)), took: kept.map(|k| k.took) };
+                let summary = match self.position(&entry, file, automatic, formats).map(|at| &self.entries[at]) {
+                    Some(k) => Summary { subckts, kept: k.holds(files), took: Some(k.took) },
+                    None => match self.stored(&entry, file, automatic, formats, false) {
+                        Some(s) => Summary { subckts, kept: s.inputs.valid(files), took: Some(s.took) },
+                        None => Summary { subckts, kept: false, took: None },
+                    },
+                };
                 (file.clone(), summary)
             })
             .collect()
@@ -419,6 +606,14 @@ impl BuildCache {
 }
 
 impl Prepared {
+    /// Whether what it read still holds for `files`.
+    fn holds(&self, files: &dyn Provider) -> bool {
+        match &self.digest {
+            Some(digest) => digest.valid(files),
+            None => self.inputs.valid(files),
+        }
+    }
+
     /// The reading of the entry's own file of the document `entry`, as an open of the entry reads it: for preloading.
     pub fn build(entry: &str, files: &dyn Provider, formats: &Formats) -> Result<Self, String> {
         let entry = normalize(entry);
@@ -469,9 +664,10 @@ impl Prepared {
             auto_include: files.auto_include().is_some(),
             formats: formats.clone(),
             inputs,
+            digest: None,
             json,
             name,
-            drawings,
+            drawings: Some(drawings),
             bytes,
             speculative: false,
             took: started.elapsed().as_secs_f64() * 1000.0,
@@ -850,5 +1046,78 @@ R2 b c 1k
         assert_eq!(value["file"], "top.sp");
         assert_eq!(value["outline"]["path"], "/w/top.sp");
         assert!(serde_json::from_str::<serde_json::Value>(&with_outline("{}", &outline).unwrap()).is_ok());
+    }
+
+    /// A cache in memory with the cache on disk in `folder`, as another window, or the app started again, has it.
+    fn with_disk(folder: &crate::disk_cache::tests::Folder) -> BuildCache {
+        BuildCache { disk: Some(Arc::new(DiskCache::new(folder.0.clone(), "test"))), ..BuildCache::default() }
+    }
+
+    #[test]
+    fn a_reading_kept_on_disk_is_shown_by_another_window_without_its_drawings_until_read_again() {
+        let folder = crate::disk_cache::tests::Folder::new("window");
+        let mut files = two_files();
+        let first = with_disk(&folder).build("/w/top.sp", Some("cells.inc"), &files, &none(), false).unwrap();
+        assert!(!first.hit);
+        let mut other = with_disk(&folder);
+        assert_eq!(other.stats().stored_entries, Some(1));
+        let again = other.build("/w/top.sp", Some("cells.inc"), &files, &none(), false).unwrap();
+        assert!(again.hit);
+        assert_eq!(again.json, first.json);
+        assert_eq!(other.unplaced(0, &[0], &["R1".into()]).err().as_deref(), Some(UNDRAWN));
+        // read again, it has its drawings, and the one in memory is that one
+        assert!(!other.build("/w/top.sp", Some("cells.inc"), &files, &none(), true).unwrap().hit);
+        assert!(other.unplaced(0, &[0], &["R1".into()]).is_ok());
+        // a file it read changed: neither in memory nor on disk does it hold
+        files.insert("/w/cells.inc", ".subckt cell p n\nR1 p n 2k\n.ends\n");
+        assert!(!with_disk(&folder).build("/w/top.sp", Some("cells.inc"), &files, &none(), false).unwrap().hit);
+    }
+
+    #[test]
+    fn a_check_and_the_entry_page_find_the_readings_on_disk_and_clear_empties_it() {
+        let folder = crate::disk_cache::tests::Folder::new("check");
+        let files = two_files();
+        let checked = with_disk(&folder).check("/w/top.sp", "cells.inc", &files, &none()).unwrap();
+        let other = with_disk(&folder);
+        let summaries = other.summaries("/w/top.sp", &["cells.inc".to_string()], &files, &none());
+        assert!(summaries["cells.inc"].kept && summaries["cells.inc"].took.is_some());
+        let mut other = other;
+        assert_eq!(other.check("/w/top.sp", "cells.inc", &files, &none()).unwrap(), checked);
+        assert_eq!(other.stats().hits, 1);
+        other.clear_disk();
+        assert_eq!(other.stats().stored_entries, Some(0));
+        assert!(
+            !with_disk(&folder).summaries("/w/top.sp", &["cells.inc".to_string()], &files, &none())["cells.inc"].kept
+        );
+    }
+
+    #[test]
+    fn a_reading_with_parameters_bound_or_a_limit_of_0_keeps_nothing_on_disk() {
+        let folder = crate::disk_cache::tests::Folder::new("unkept");
+        let mut cache = with_disk(&folder);
+        let files =
+            MemoryProvider::new().with("/p.sp", "* p\n.subckt amp a b w=1u\nR1 a b 1k\n.ends\nX1 a b amp\n.end\n");
+        let bind = Bind { subckt: "amp".into(), params: BTreeMap::from([("w".to_string(), "2u".to_string())]) };
+        cache.build_unkept("/p.sp", None, &files, &none(), Some(&bind), false).unwrap();
+        assert_eq!(cache.stats().stored_entries, Some(0));
+        cache.set_disk_limit(0);
+        cache.build("/p.sp", None, &files, &none(), false).unwrap();
+        assert_eq!(cache.stats().stored_entries, Some(0));
+        assert_eq!(cache.stats().store_limit, 0);
+    }
+
+    #[test]
+    fn a_digest_holds_as_the_inputs_do() {
+        let mut files = two_files();
+        let observed = Observed { files: &files, inputs: RefCell::new(Inputs::default()) };
+        observed.read("/w/top.sp");
+        observed.read("/w/missing.inc");
+        observed.include_candidates("cells.inc");
+        let digest = observed.inputs.into_inner().digest();
+        assert!(digest.valid(&files));
+        let back: Digest = serde_json::from_str(&serde_json::to_string(&digest).unwrap()).unwrap();
+        assert_eq!(back, digest);
+        files.insert("/w/missing.inc", "* now here\n");
+        assert!(!digest.valid(&files));
     }
 }

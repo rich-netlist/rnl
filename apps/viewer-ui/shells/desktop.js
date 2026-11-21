@@ -29,8 +29,10 @@ const sessionSource = source => source ? { path: source.path, name: source.name,
   temporary: source.temporary, ...(source.view ? { view: source.view, entrySource: sessionSource(source.entrySource) } : {}) } : null;
 /** What the app reads a source from: the file at its path, or the text it holds as the file of its name. */
 const reading = (source) => source.text === undefined ? { path: source.path } : { name: source.name, text: source.text };
-// what the last build read, which the entry page asks about (fileSummaries)
+// what the last build read, which the entry page asks about (fileSummaries), and the file it showed
 let lastRead = null;
+// what the app says of the drawings of a reading it kept on disk, which keeps none (build_cache.rs `UNDRAWN`)
+const UNDRAWN = "the drawings of this reading were not kept";
 let openingDrop = false;
 // the project archive this window opened or saved last, where Save Project offers to save again
 let lastProject = null;
@@ -166,7 +168,7 @@ export default {
       const doc = await (source.text === undefined
         ? invoke("open_document", { path: source.path, file, edits: edits || null, pool, requestId, autoInclude, fresh, formats, bind, constraints })
         : invoke("open_text", { name: source.name, text: source.text, file, edits: edits || null, pool, requestId, autoInclude, fresh, formats, bind, constraints }));
-      lastRead = { ...reading(source), edits: edits || null, pool, autoInclude, formats };
+      lastRead = { ...reading(source), file, edits: edits || null, pool, autoInclude, formats };
       return doc;
     } finally { unlisten?.(); }
   },
@@ -191,10 +193,19 @@ export default {
   /** The entry page (entry-page.js): of each of `files` of the document shown, its symbols and whether its reading is kept. */
   async fileSummaries(files) {
     if (!lastRead) return {};
-    try { return await invoke("file_summaries", { ...lastRead, files }); } catch { return {}; }
+    const { file: _shown, ...read } = lastRead;
+    try { return await invoke("file_summaries", { ...read, files }); } catch { return {}; }
   },
-  // the drawings of the objects listed without a position, which the app keeps from the last build
-  unplacedDrawings: (level, items, names) => invoke("unplaced_drawings", { level, items, names }),
+  // the drawings of the objects listed without a position, which the app keeps from the last build; a reading the app
+  // had kept on disk has none, and the file is read again as it was, quietly, for them
+  unplacedDrawings: async (level, items, names) => {
+    try { return await invoke("unplaced_drawings", { level, items, names }); }
+    catch (e) {
+      if (String(e) !== UNDRAWN || !lastRead) throw e;
+      await invoke(lastRead.path !== undefined ? "open_document" : "open_text", { ...lastRead, requestId: null, fresh: true, bind: null, constraints: false });
+      return invoke("unplaced_drawings", { level, items, names });
+    }
+  },
   setCheck(id, checked) {
     invoke("set_view_check", { id, checked }).catch(() => {});
   },

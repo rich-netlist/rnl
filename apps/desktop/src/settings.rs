@@ -91,10 +91,22 @@ impl Settings {
         let state = self.0.lock().map_err(|e| e.to_string())?;
         let values = &state.as_ref().ok_or("settings have not been loaded")?.1;
         Ok(values
-            .get("render-cache-mib")
+            .get("file-cache-memory-mib")
             .and_then(Value::as_u64)
             .filter(|n| *n <= 4096)
             .map_or(crate::build_cache::DEFAULT_LIMIT, |n| n as usize * 1024 * 1024))
+    }
+
+    /// The limit of the readings kept on disk (disk_cache.rs), `file-cache-store-mib` as the web viewer names its
+    /// limit in the browser's storage: 2 GiB by default, at most 64 GiB.
+    pub fn disk_cache_limit(&self) -> Result<u64, String> {
+        let state = self.0.lock().map_err(|e| e.to_string())?;
+        let values = &state.as_ref().ok_or("settings have not been loaded")?.1;
+        Ok(values
+            .get("file-cache-store-mib")
+            .and_then(Value::as_u64)
+            .filter(|n| *n <= crate::disk_cache::MAX_MIB)
+            .map_or(crate::disk_cache::DEFAULT_LIMIT, |n| n * 1024 * 1024))
     }
 
     /// The PATH directories in order, each followed by its sub-folders when it was added with them
@@ -205,9 +217,24 @@ mod tests {
             (serde_json::json!(128), 128),
             (serde_json::json!(4096), 4096),
         ] {
-            let values = Map::from_iter([("render-cache-mib".to_string(), value)]);
+            let values = Map::from_iter([("file-cache-memory-mib".to_string(), value)]);
             let settings = Settings(Mutex::new(Some((PathBuf::new(), values))));
             assert_eq!(settings.cache_limit().unwrap(), expected * 1024 * 1024);
+        }
+    }
+    #[test]
+    fn the_limit_on_disk_defaults_to_2_gib_and_validates() {
+        for (value, expected) in [
+            (Value::Null, 2048),
+            (serde_json::json!(-1), 2048),
+            (serde_json::json!(65537), 2048),
+            (serde_json::json!(0), 0),
+            (serde_json::json!(512), 512),
+            (serde_json::json!(65536), 65536),
+        ] {
+            let values = Map::from_iter([("file-cache-store-mib".to_string(), value)]);
+            let settings = Settings(Mutex::new(Some((PathBuf::new(), values))));
+            assert_eq!(settings.disk_cache_limit().unwrap(), expected * 1024 * 1024);
         }
     }
     #[test]

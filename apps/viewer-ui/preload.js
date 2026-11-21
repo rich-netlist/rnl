@@ -15,7 +15,7 @@ export function startPreload() {
     candidates: () => preloadSources(doc, current, currentSource(), shell),
     prepare: source => shell.preload(source),
     cancel: () => shell.cancelPreload(),
-    allowed: () => load('background-preload', true) === true && load('render-cache-mib', 256) > 0 &&
+    allowed: () => load('background-preload', true) === true && load('file-cache-memory-mib', 256) > 0 &&
       !document.hidden && !isLoading() && !modal() && !editing && !previewing() &&
       !document.body.classList.contains('solving') && !dirtyPaths().length && !unappliedPaths().length,
   });
