@@ -124,10 +124,10 @@
  *   `rnl solve --check --json` prints, a level with the problems of each setting by its `key`. Rejects
  *   with a message when the text does not read at all. Offered with `solve`.
  * @property {() => void} [cancelSolve] Stop the solve under way.
- * @property {(encoding?: "preserve" | "utf8") => Promise<string | {downloaded: string, written: number, copied: number} | null>} [saveSolved]
- *   Save a copy of the last solve shown where the user says, never over a file that was read: what was saved, in a
- *   sentence (the desktop's), or, where it is downloaded (the web's, in the browser), the file downloaded and how many
- *   files it holds that the solve wrote and that it only read, for the page to say; null when the user cancelled.
+ * @property {(encoding?: "preserve" | "utf8") => Promise<{to?: string, downloaded?: string, written: number, copied: number} | null>} [saveSolved]
+ *   Save a copy of the last solve shown where the user says, never over a file that was read: where it was written,
+ *   `to` (the desktop's), or the file downloaded, `downloaded` (the web's, in the browser), and how many files the
+ *   solve wrote and how many it only read are with them, which the page says (solve.js); null when the user cancelled.
  *   Rejects with a message when it cannot. Solve › Save Solved Copy As is offered where the shell has it.
  * @property {(handler: (event: SolveEvent) => void) => void} [onSolveProgress] Call `handler` with each
  *   event of the solve under way, as it comes (the panel of solve-progress.js and the status bar follow them).

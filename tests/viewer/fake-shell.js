@@ -224,7 +224,8 @@ const fake = {
     if (closing) closing();
   },
   /** What the next copy saved says, or a message it rejects with when `saveFail` is set. */
-  saved: "Saved the solved copy as /copies/solved.sp.",
+  // what the desktop gives of a copy saved: where, and how many files the solve wrote and only read (the page says it)
+  saved: { to: "/copies/solved.sp", written: 1, copied: 0 },
   saveFail: null,
   /** The check each level of the next solves' reports carries, as `rnl solve --check --json` gives a level's: `{ settings, warnings, errors }`; none leaves what the fixture has. */
   levelCheck: null,

@@ -281,6 +281,12 @@ test.describe("on the desktop", () => {
     await expect(dialog(page)).toContainText("The files that were opened are unchanged.");
     await dialog(page).getByRole("button", { name: "Close" }).click();
     await dialogGone(page);
+    // a netlist that reads other files is saved into a folder, with those it only read beside them: the page says so
+    await page.evaluate(() => (window.fakeShell.saved = { to: "/copies", written: 2, copied: 1 }));
+    await page.keyboard.press("Control+Shift+S");
+    await expect(dialog(page)).toContainText("Saved 2 solved files into /copies, along with 1 other file copied alongside them.");
+    await dialog(page).getByRole("button", { name: "Close" }).click();
+    await dialogGone(page);
     // a place refused, as over a file that was read, says why
     await page.evaluate(() => (window.fakeShell.saveFail = "a copy is never saved over a file that was read"));
     await page.evaluate(() => window.viewer.command("solve-save"));
