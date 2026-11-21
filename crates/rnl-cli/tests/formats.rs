@@ -49,15 +49,40 @@ const CELLS: &str =
 
 #[test]
 fn the_formats_are_listed_spice_first() {
+    let strings = |s: &[&str]| s.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+    let netlists = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist"];
     let want = [
-        FormatInfo { name: "spice".into(), title: "SPICE".into(), extensions: vec![], fallback: true },
-        FormatInfo { name: "spectre".into(), title: "Spectre".into(), extensions: vec!["scs".into()], fallback: false },
-        FormatInfo { name: "rnl".into(), title: "RNL package".into(), extensions: vec!["rnl".into()], fallback: false },
+        FormatInfo {
+            name: "spice".into(),
+            title: "SPICE".into(),
+            extensions: vec![],
+            fallback: true,
+            listed: strings(&[&netlists[..], &["inc", "lib"]].concat()),
+            entries: strings(&netlists),
+        },
+        FormatInfo {
+            name: "spectre".into(),
+            title: "Spectre".into(),
+            extensions: strings(&["scs"]),
+            fallback: false,
+            listed: strings(&["scs"]),
+            entries: strings(&["scs"]),
+        },
+        FormatInfo {
+            name: "rnl".into(),
+            title: "RNL package".into(),
+            extensions: strings(&["rnl"]),
+            fallback: false,
+            listed: strings(&["rnl"]),
+            entries: vec![],
+        },
         FormatInfo {
             name: "text".into(),
             title: "Text".into(),
-            extensions: ["va", "vams", "v", "vh", "sv", "svh", "vhd", "vhdl"].map(String::from).to_vec(),
+            extensions: strings(&["va", "vams", "v", "vh", "sv", "svh", "vhd", "vhdl"]),
             fallback: false,
+            listed: strings(&["va", "vams"]),
+            entries: vec![],
         },
     ];
     assert_eq!(rnl_view::formats(), want);
