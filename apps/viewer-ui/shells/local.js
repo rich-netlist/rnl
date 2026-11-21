@@ -46,6 +46,16 @@ const address = (path) => new URL(`f${encodePath(path)}`, location.href).href;
 /** Whether a workspace path is a file of the machine: rooted, and not one of the page's own virtual places. */
 const onMachine = (path) => typeof path === "string" && path.startsWith("/") && !path.startsWith("/<");
 
+// the files the page has read from the machine, by their paths: the program can name them again, at the next start too
+const machineFiles = new Set();
+
+/** A file's bytes, as the program serves it; rejects when it does not (it is not there, or not below an allowed folder). */
+async function fileBytes(path) {
+  const response = await fetch(address(path), { cache: "no-store", credentials: "same-origin" });
+  if (!response.ok) throw new Error(`${path} could not be read (${response.status}).`);
+  return new Uint8Array(await response.arrayBuffer());
+}
+
 /** A file's text, or null when the program does not serve it (it is not there, or not below an allowed folder); `why` says. */
 async function readFile(path, again) {
   let response;
@@ -59,6 +69,7 @@ async function readFile(path, again) {
     return { text: null, why };
   }
   if (!response.ok) throw new Error(`${path} could not be read (${response.status}).`);
+  machineFiles.add(path);
   return { text: decodeText(await response.arrayBuffer()) };
 }
 
@@ -220,6 +231,10 @@ export default {
    * below it: the program lists a folder only when the settings have it as PATH (and with its sub-folders, for those).
    */
   pathPackages: (dir, subfolders = false) => api(`api/path?${new URLSearchParams({ dir, ...(subfolders ? { subfolders: "1" } : {}) })}`),
+  /** The bytes of a file of the machine, such as a PATH file that Download Project holds (project.js). */
+  readFile: fileBytes,
+  /** A format chosen for a file of the machine is kept for the next start, as the desktop keeps it; else as the web does. */
+  keepsFormat: (path) => machineFiles.has(path) || web.keepsFormat(path),
   /** A file of a PATH folder, read from the machine as a file opened is. */
   pathItem(path) {
     const source = { ...serverSource(path), library: true };

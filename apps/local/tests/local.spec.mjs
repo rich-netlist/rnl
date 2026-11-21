@@ -347,3 +347,33 @@ test("Save As asks before it replaces a file, and nothing is written until the u
   await dialog.getByRole("button", { name: "Replace" }).click();
   await expect.poll(() => readFileSync(other, "utf8")).toContain("A top level");
 });
+
+test("Download Project holds the files of a PATH folder, read from the machine", async ({ page }) => {
+  server.kill();
+  mkdirSync(join(work, "lib"), { recursive: true });
+  writeFileSync(join(work, "lib", "amp.sp"), "* An amplifier\nR5 in out 5k\n.end\n");
+  const lib = join(work, "lib").replaceAll("\\", "/");
+  const pagePath = (p) => (process.platform === "win32" ? `/${p}` : p);
+  writeFileSync(join(work, "settings.json"), JSON.stringify({ "search-paths": [pagePath(lib)] }));
+  ({ child: server, base, address } = await start(join(work, "proj", "sim", "top.sp")));
+  await open(page);
+  await page.locator("#tab-files").click();
+  await expect(page.locator("#library-groups")).not.toHaveAttribute("aria-busy", "true");
+  // (the browser's own save dialog, where it has one, is not one a test can answer: the archive is downloaded)
+  await page.evaluate(() => { window.showSaveFilePicker = undefined; });
+  const download = page.waitForEvent("download");
+  // the command waits for the dialog of what the archive holds, which is answered
+  await page.evaluate(() => { void window.viewer.command("save-project"); });
+  await page.locator("dialog.dialog").getByRole("button", { name: "Download", exact: true }).click();
+  const zip = readFileSync(await (await download).path(), "latin1");
+  expect(zip.startsWith("PK")).toBe(true);
+  expect(zip).toContain("PATH/1-lib/amp.sp");
+  expect(zip).toContain("R5 in out 5k");
+});
+
+test("the format chosen for a file of the machine is kept for the next start", async ({ page }) => {
+  await open(page);
+  const top = (await document(page)).path;
+  await page.evaluate((path) => import("./formats.js").then((f) => f.chooseFormat(path, "spectre")), top);
+  await expect.poll(() => JSON.parse(readFileSync(join(work, "settings.json"), "utf8"))["file-formats"] ?? {}).toEqual({ [top]: "spectre" });
+});
