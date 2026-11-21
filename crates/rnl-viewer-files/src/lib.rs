@@ -6,6 +6,7 @@
 //! said by names and numbers only: the page says it, in the user's language.
 
 pub mod atomic;
+pub mod bundled;
 pub mod project;
 pub mod save;
 pub mod watch;

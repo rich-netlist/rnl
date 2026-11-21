@@ -165,6 +165,15 @@ fn main() {
     }
 }
 
+/// The public packages of the package that bundles them: the folder `public-packages` beside the program, or the one the
+/// Debian package of the public packages puts in /usr/share/rnl-viewer, as the desktop finds them; none in the program alone.
+fn bundled_packages() -> Option<std::path::PathBuf> {
+    use rnl_viewer_files::bundled::{find, DIR};
+    let beside = std::env::current_exe().ok().as_deref().and_then(std::path::Path::parent).map(|d| d.join(DIR));
+    let system = std::path::PathBuf::from("/usr/share/rnl-viewer").join(DIR);
+    find(beside.into_iter().chain([system])).and_then(|root| files::canonical(&root))
+}
+
 fn run(options: Options) -> Result<(), String> {
     let site = match &options.site {
         Some(dir) => assets::Site::Directory(dir.clone()),
@@ -207,6 +216,7 @@ fn run(options: Options) -> Result<(), String> {
         bodies: AtomicUsize::new(0),
         last_solve: Default::default(),
         project_root: Mutex::new(None),
+        bundled: bundled_packages(),
     });
     for file in &app.initial {
         app.watcher.watch(file);

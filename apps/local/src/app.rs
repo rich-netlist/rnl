@@ -15,6 +15,8 @@
 //!   POST /api/project-file?path= the bytes of the body, as the project's file of that name in that folder
 //!   POST /api/save-solved        {to, encoding, overwrite}: the desktop's Save Solved Copy As, of the last solve shown
 //!   POST /api/encode-like        {path, text}: the bytes of the text in the encoding of that file, as Save writes it
+//!   GET  /api/public-packages    the public packages bundled beside the program, as the desktop's Help › Public Packages
+//!                                and the Library list them; their files are read below `/f/` too, and never written
 //!   GET  /api/changes?since=N    the files read that changed on disk since version N
 //!   GET  /f/ABSOLUTE/PATH        a file, below the folders allowed
 //!   GET  /rnl-solver             what the solver service is;  GET /rnl-solver/table  the table of its settings;
@@ -70,6 +72,8 @@ pub struct App {
     pub last_solve: crate::service::LastSolve,
     /// The folder the user chose to open a project in: the only place a project's files are written.
     pub project_root: Mutex<Option<PathBuf>>,
+    /// The folder of the public packages bundled beside the program, as it is on disk: read only.
+    pub bundled: Option<PathBuf>,
 }
 
 impl App {
@@ -527,6 +531,10 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
                 rnl_viewer_files::project::write_file(&root, &relative, &request.body).map_err(|e| Failure(500, e))?;
             Ok(Response::json(200, &json!({ "path": files::page_path(&at) })))
         }
+        "/api/public-packages" if get => {
+            let info = app.bundled.as_deref().map(|root| rnl_viewer_files::bundled::info(root, files::page_path));
+            Ok(Response::json(200, &json!(info.unwrap_or_default())))
+        }
         "/api/encode-like" if method == "POST" => {
             // an edited file that Save Project holds, in the encoding Save would write it in (apps/viewer-ui/project.js)
             #[derive(Deserialize)]
@@ -585,7 +593,14 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
 
 /// A file below the folders allowed, by its absolute path.
 fn file(app: &App, path: &str) -> Result<Response, Failure> {
-    let real = app.roots.check(&files::machine_path(path), true).map_err(forbidden)?;
+    let asked = files::machine_path(path);
+    // a file of the public packages bundled beside the program is read as one of an allowed folder is; it is never written
+    let bundled =
+        app.bundled.as_deref().and_then(|root| files::canonical(&asked).filter(|real| real.starts_with(root)));
+    let real = match bundled {
+        Some(real) => real,
+        None => app.roots.check(&asked, true).map_err(forbidden)?,
+    };
     let meta = std::fs::metadata(&real).map_err(|e| Failure(404, format!("{}: {e}", real.display())))?;
     if !meta.is_file() {
         return Err(Failure(404, format!("{} is not a file", real.display())));
@@ -631,6 +646,7 @@ mod tests {
             bodies: AtomicUsize::new(0),
             last_solve: Default::default(),
             project_root: Mutex::new(None),
+            bundled: None,
         };
         app.roots.allow_file(&top).unwrap();
         (app, token, dir)
@@ -1105,6 +1121,46 @@ mod tests {
             post("/api/encode-like", &key, &json!({ "path": files::page_path(&elsewhere), "text": "y" }));
         assert_eq!(ask(&app, &head, &body).0, 403);
         let _ = std::fs::remove_file(&elsewhere);
+        let _ = std::fs::remove_dir_all(dir.parent().unwrap());
+    }
+
+    #[test]
+    fn the_public_packages_bundled_beside_the_program_are_listed_and_read_and_never_written() {
+        let (mut app, token, dir) = app(Site::Embedded);
+        let key = sign_in(&app, &token);
+        let listed = |app: &App| {
+            let (status, _, body) = ask(app, &get("/api/public-packages", Some(&key)), b"");
+            assert_eq!(status, 200);
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap()
+        };
+        // the program alone bundles none
+        assert_eq!(listed(&app)["bundled"], json!(false));
+        // (beside no folder the page was given: what makes it readable is that it is the program's)
+        let root = std::env::temp_dir()
+            .join(format!("rnl-local-bundled-{}-{}", std::process::id(), &crate::security::random_hex()[..8]))
+            .join("public-packages");
+        let package = root.join("eda-style/0.1/eda-style.rnl");
+        std::fs::create_dir_all(package.parent().unwrap()).unwrap();
+        std::fs::write(&package, "* @RNL(type=\"package\")\n").unwrap();
+        std::fs::write(
+            root.join("public-packages.json"),
+            r#"{"packages":[{"name":"eda-style","version":"0.1","kind":"extension"}]}"#,
+        )
+        .unwrap();
+        app.bundled = files::canonical(&root);
+        let info = listed(&app);
+        assert_eq!(info["bundled"], json!(true));
+        let path = files::page_path(&files::canonical(&package).unwrap());
+        assert_eq!(info["packages"][0]["path"].as_str(), Some(path.as_str()));
+        assert_eq!(info["dirs"].as_array().map(Vec::len), Some(1));
+        // read as a file of an allowed folder is, though it is in none
+        let (status, _, body) = ask(&app, &get(&furl(&package), Some(&key)), b"");
+        assert_eq!((status, body), (200, b"* @RNL(type=\"package\")\n".to_vec()));
+        // and never written
+        let query = format!("/api/write?to={}&overwrite=1", encode_path(&files::page_path(&package)));
+        assert_eq!(ask(&app, &post_bytes(&query, &key, b"x"), b"x").0, 500);
+        assert_eq!(std::fs::read_to_string(&package).unwrap(), "* @RNL(type=\"package\")\n");
+        let _ = std::fs::remove_dir_all(root.parent().unwrap());
         let _ = std::fs::remove_dir_all(dir.parent().unwrap());
     }
 

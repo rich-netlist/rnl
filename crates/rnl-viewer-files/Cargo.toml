@@ -11,3 +11,4 @@ publish.workspace = true
 [dependencies]
 rnl-cli = { path = "../rnl-cli" }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"

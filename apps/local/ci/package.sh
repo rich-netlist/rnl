@@ -1,22 +1,29 @@
 #!/bin/sh
 # Makes the packages of the local program (apps/local) for Linux x86_64 from the static program:
 #
-#   sh apps/local/ci/package.sh PROGRAM VERSION OUT_DIR [FIREFOX_TARBALL]
+#   sh apps/local/ci/package.sh PROGRAM VERSION OUT_DIR [FIREFOX_TARBALL [PUBLIC_PACKAGES]]
 #
-#   rnl-viewer-local-VERSION-linux-x86_64.tar.gz                the program, its README, the licence, and get-firefox.sh with
-#                                                               firefox.lock, which puts Mozilla's Firefox ESR beside it
-#   rnl-viewer-local-VERSION-linux-x86_64-with-firefox.tar.gz   the same with Mozilla's official Firefox ESR, unmodified,
-#                                                               in the folder `firefox`, where the program looks first
+#   rnl-viewer-local-VERSION-linux-x86_64.tar.gz                 the program, its README, the licence, and get-firefox.sh with
+#                                                                firefox.lock, which puts Mozilla's Firefox ESR beside it
+#   rnl-viewer-local-VERSION-linux-x86_64-with-packages.tar.gz   the same with the public packages, in the folder
+#                                                                `public-packages` beside the program, where it finds them
+#   rnl-viewer-local-VERSION-linux-x86_64-with-firefox.tar.gz    the same with the public packages and Mozilla's official
+#                                                                Firefox ESR, unmodified, in the folder `firefox`, where the
+#                                                                program looks first: nothing else to get or install
 #
-# The second only if the Firefox tarball is given (already checked against firefox.lock). Firefox is unpacked as it is: nothing
-# is added to it, taken from it or changed in it (Mozilla's distribution policy for unaltered software); what is added is
-# beside it, in FIREFOX-NOTICE.txt. SHA256SUMS.txt lists the files made.
+# As the desktop's single executable is given with and without the public packages, so is the program, for a download that
+# needs no packages to be smaller. The public packages are a folder that scripts/bundle_packages.py fetched, with its lock file
+# and licences; the second package only if it is given, and the third only if the Firefox tarball is given (already checked
+# against firefox.lock), with the packages when they are given. Firefox is unpacked as it is: nothing is added to it, taken
+# from it or changed in it (Mozilla's distribution policy for unaltered software); what is added is beside it, in
+# FIREFOX-NOTICE.txt. SHA256SUMS.txt lists the files made.
 set -eu
 
 program=${1:?the program}
 version=${2:?the version}
 out=${3:?the output folder}
 firefox=${4:-}
+packages=${5:-}
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../../.." && pwd)
 # shellcheck disable=SC1091
@@ -44,12 +51,26 @@ pack() { # DIRECTORY: a tar.gz with the same bytes whenever it is made from the 
   tar -C "$work" --sort=name --owner=0 --group=0 --numeric-owner --mtime='2000-01-01 00:00:00 UTC' -cf - "$1" | gzip -9n > "$out/$1.tar.gz"
 }
 
+with_packages() { # DIRECTORY: the public packages beside the program, as the program looks for them
+  cp -r "$packages" "$1/public-packages"
+  [ -f "$1/public-packages/public-packages.json" ] || { echo "package.sh: no public-packages.json in $packages" >&2; exit 1; }
+}
+
 lay "$work/$name"
 pack "$name"
+
+made="$name.tar.gz"
+if [ -n "$packages" ]; then
+  lay "$work/$name-with-packages"
+  with_packages "$work/$name-with-packages"
+  pack "$name-with-packages"
+  made="$made $name-with-packages.tar.gz"
+fi
 
 if [ -n "$firefox" ]; then
   with="$name-with-firefox"
   lay "$work/$with"
+  [ -z "$packages" ] || with_packages "$work/$with"
   tar -xJf "$firefox" -C "$work/$with"
   [ -x "$work/$with/firefox/firefox" ] || { echo "package.sh: no firefox/firefox in $firefox" >&2; exit 1; }
   cat > "$work/$with/FIREFOX-NOTICE.txt" <<NOTICE
@@ -65,8 +86,10 @@ computer whose own is not, and does not need to be installed: the program starts
 the user's own Firefox or its profile. Nothing of it is changed. To use the program with another Firefox, remove the folder.
 NOTICE
   pack "$with"
+  made="$made $with.tar.gz"
 fi
 
-(cd "$out" && sha256sum "$name.tar.gz" ${firefox:+"$name-with-firefox.tar.gz"} > SHA256SUMS.txt)
+# shellcheck disable=SC2086
+(cd "$out" && sha256sum $made > SHA256SUMS.txt)
 ls -l "$out"
 cat "$out/SHA256SUMS.txt"
