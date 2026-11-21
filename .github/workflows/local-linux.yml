@@ -1,10 +1,11 @@
 # The local viewer (apps/local) for older enterprise Linux (CentOS 7 / RHEL 8 / RHEL 9): builds it static (musl, with mimalloc) so that
 # it has no library to find on the machine, checks that it is static, and times a solve with it against a glibc build of the same
 # program (a static musl build with musl's own allocator was a quarter slower; the job fails if this one is much slower, and then the
-# program is to be built for glibc 2.17 instead). It makes the two packages (the program with get-firefox.sh, and the program with
-# Mozilla's official Firefox ESR, unmodified, beside it) and tests the one with Firefox in a container of each of centos:7,
+# program is to be built for glibc 2.17 instead). It makes the three packages (the program with get-firefox.sh; the same with the
+# public packages beside it; and that with Mozilla's official Firefox ESR, unmodified, beside it too) and tests the one with
+# Firefox in a container of each of centos:7,
 # rockylinux:8 and rockylinux:9: the program starts the Firefox itself, as a user would, and the page opens the netlist named on its
-# command line and solves it. It publishes nothing; viewer-release.yml, which calls this, attaches the two packages to the Viewer's
+# command line and solves it. It publishes nothing; viewer-release.yml, which calls this, attaches the three packages to the Viewer's
 # release (from a tag viewer-v<version>, the Viewer's version, which apps/local/Cargo.toml has too).
 name: Local viewer, Linux
 
@@ -115,8 +116,12 @@ jobs:
             "glibc=$PWD/out/rnl-viewer-local-glibc" "musl=$PWD/out/rnl-viewer-local"
       - name: Fetch the official Firefox ESR of firefox.lock, and check it
         run: sh apps/local/ci/fetch-firefox.sh "$RUNNER_TEMP/firefox.tar.xz"
+      - name: Fetch the public packages, as the desktop's release bundles them
+        run: |
+          python scripts/bundle_packages.py fetch --out "$RUNNER_TEMP/public-packages"
+          python scripts/bundle_packages.py check "$RUNNER_TEMP/public-packages"
       - name: Make the packages
-        run: sh apps/local/ci/package.sh out/rnl-viewer-local "${{ steps.version.outputs.version }}" packages "$RUNNER_TEMP/firefox.tar.xz"
+        run: sh apps/local/ci/package.sh out/rnl-viewer-local "${{ steps.version.outputs.version }}" packages "$RUNNER_TEMP/firefox.tar.xz" "$RUNNER_TEMP/public-packages"
       - name: The plain package runs on this computer, and its own check of Firefox says what it should
         run: |
           mkdir -p "$RUNNER_TEMP/plain"
@@ -126,6 +131,12 @@ jobs:
           # (a file that is not Mozilla's Firefox is refused)
           echo not-firefox > "$RUNNER_TEMP/bad.tar.xz"
           if sh "$RUNNER_TEMP/plain"/rnl-viewer-local-*/get-firefox.sh --from "$RUNNER_TEMP/bad.tar.xz"; then echo "a file that is not Firefox was taken"; exit 1; fi
+          # (the plain package has no public packages; the two others have them beside the program)
+          if tar -tzf packages/rnl-viewer-local-${{ steps.version.outputs.version }}-linux-x86_64.tar.gz | grep -q public-packages; then echo "the plain package has public packages"; exit 1; fi
+          for with in with-packages with-firefox; do
+            tar -tzf packages/rnl-viewer-local-${{ steps.version.outputs.version }}-linux-x86_64-$with.tar.gz | grep -q "/public-packages/public-packages.json$" \
+              || { echo "the package $with has no public packages"; exit 1; }
+          done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: local-packages

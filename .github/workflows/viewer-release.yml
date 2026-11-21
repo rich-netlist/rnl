@@ -4,8 +4,9 @@
 # own, which the user chooses. On Linux: the AppImage and a second one with the public packages among its
 # resources, a Debian package and a small one of the public packages; on macOS two disk images for each
 # architecture, the second with the packages among the app's resources. With them, the local viewer for older
-# enterprise Linux (apps/local, at the Viewer's version): its two packages, the second with Mozilla's official
-# Firefox ESR, unmodified, which local-linux.yml builds and tests in containers of CentOS 7, Rocky 8 and Rocky 9;
+# enterprise Linux (apps/local, at the Viewer's version): its three packages, the second with the public packages
+# beside the program, the third with them and Mozilla's official Firefox ESR, unmodified, which local-linux.yml
+# builds and tests in containers of CentOS 7, Rocky 8 and Rocky 9;
 # a release is made with the newest Firefox ESR, which the validation checks. The Tauri command
 # line that apps/desktop/package.json pins builds them on GitHub's Windows runner, whose MSVC
 # toolchain links the WebView2 loader into the executable. The workflow checks that the executable
@@ -552,7 +553,8 @@ jobs:
             find "$dir" -maxdepth 1 -type f ! -name SHA256SUMS.txt -exec cp {} assets/ \;
           done
           (cd incoming/local && sha256sum --check SHA256SUMS.txt)
-          for name in "rnl-viewer-local-$VERSION-linux-x86_64.tar.gz" "rnl-viewer-local-$VERSION-linux-x86_64-with-firefox.tar.gz"; do
+          for name in "rnl-viewer-local-$VERSION-linux-x86_64.tar.gz" "rnl-viewer-local-$VERSION-linux-x86_64-with-packages.tar.gz" \
+                      "rnl-viewer-local-$VERSION-linux-x86_64-with-firefox.tar.gz"; do
             cp "incoming/local/$name" assets/
           done
           cd assets

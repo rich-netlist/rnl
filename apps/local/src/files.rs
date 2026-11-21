@@ -226,13 +226,6 @@ pub fn list_dir(dir: &Path) -> Result<(PathBuf, Vec<Entry>, bool), String> {
     Ok((real, entries, truncated))
 }
 
-/// The modification time of a file in milliseconds since 1970: what the program watches for a change; None when it is gone.
-pub fn modified(path: &Path) -> Option<u64> {
-    let meta = std::fs::metadata(path).ok()?;
-    let t = meta.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?;
-    Some(t.as_millis() as u64 ^ meta.len().rotate_left(40))
-}
-
 pub use rnl_viewer_files::save::{Saved, SavedAs, SavedFile};
 
 /// The file at `path`, as the Document names it, of the netlist `entry`: where it is on disk; a path that is rooted is its own.
@@ -286,9 +279,81 @@ pub fn save_as(
     rnl_viewer_files::save::save_as(source.as_deref(), &to, text, encoding, overwrite)
 }
 
+/// Bytes the page made (a project's archive, an image) written as a file the user chose, which the folders allowed must
+/// hold: as Save As writes one (rnl-viewer-files), not over a file that is there unless `overwrite`, never through a link.
+pub fn write_chosen(roots: &Roots, to: &Path, bytes: &[u8], overwrite: bool) -> Result<SavedAs, String> {
+    let to = roots.check(to, false)?;
+    rnl_viewer_files::save::write_chosen(&to, bytes, overwrite)
+}
+
+/// What a Save Solved Copy As came to: saved, as the desktop says it (where, how many files the solve wrote there, how many
+/// it read and were copied beside them), or the file chosen for a netlist that reads no other is there already, which is
+/// not replaced unless the user says so.
+#[derive(Debug, PartialEq)]
+pub enum SavedSolve {
+    Saved { to: PathBuf, written: usize, copied: usize },
+    Exists(PathBuf),
+}
+
+/// A path of a solve as the page gave it, on this machine: the Library's files, which the page holds under `/<pool>`, by
+/// their own paths; a text that no file of the machine holds (`/<…>`) as it is.
+fn solved_path(path: &str) -> String {
+    let path = path.strip_prefix("/<pool>").filter(|p| p.starts_with('/')).unwrap_or(path);
+    if path.starts_with("/<") {
+        return path.to_string();
+    }
+    machine_path(path).to_string_lossy().replace('\\', "/")
+}
+
+/// Save Solved Copy As, as the desktop saves it (rnl_cli::preview::save_copy): the copy of the last solve as the file `to`
+/// when it is one file, else into the folder `to`, which the folders allowed must hold; never over a file the solve read.
+/// A solve of a text that no file holds is saved in UTF-8: there are no bytes of its own to keep the encoding of.
+pub fn save_solved(
+    roots: &Roots,
+    copy: &rnl_cli::preview::Copy,
+    to: &Path,
+    encoding: OutputEncoding,
+    overwrite: bool,
+) -> Result<SavedSolve, String> {
+    let in_memory = copy.entry.starts_with("/<") && !copy.entry.starts_with("/<pool>/");
+    let encoding = if in_memory { OutputEncoding::Utf8 } else { encoding };
+    let copy = rnl_cli::preview::Copy {
+        entry: solved_path(&copy.entry),
+        files: copy
+            .files
+            .iter()
+            .map(|f| rnl_cli::solve::SolvedFile { path: solved_path(&f.path), text: f.text.clone() })
+            .collect(),
+        read: copy.read.iter().map(|p| solved_path(p)).collect(),
+    };
+    let to = if rnl_cli::preview::one_file(&copy) {
+        let to = roots.check(to, false)?;
+        if !overwrite && std::fs::symlink_metadata(&to).is_ok() {
+            return Ok(SavedSolve::Exists(to));
+        }
+        to
+    } else {
+        let to = roots.check(to, true)?;
+        if !to.is_dir() {
+            return Err(format!("{} is not a folder", to.display()));
+        }
+        to
+    };
+    let saved = rnl_cli::preview::save_copy_with_encoding(&copy, &to, encoding)?;
+    Ok(SavedSolve::Saved { to, written: saved.written.len(), copied: saved.copied.len() })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_solves_paths_are_the_machines_and_the_librarys_files_lose_the_pages_prefix() {
+        let machine = |p: &str| machine_path(p).to_string_lossy().replace('\\', "/");
+        assert_eq!(solved_path("/<pool>/w/lib/a.inc"), machine("/w/lib/a.inc"));
+        assert_eq!(solved_path("/w/top.sp"), machine("/w/top.sp"));
+        assert_eq!(solved_path("/<api>/pkg.rnl"), "/<api>/pkg.rnl");
+    }
 
     fn temp(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("rnl-local-{name}-{}", std::process::id()));

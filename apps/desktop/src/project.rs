@@ -3,10 +3,10 @@
 //! writes the archive, or a project's files into the folder the user chose to open it in. Nothing is
 //! written anywhere the user did not choose: the app keeps, for each window, the archive and the folder its dialogs gave,
 //! and writes the archive to that one alone and a project's files only by their names within that folder, never through a
-//! link or a junction, and each file as Save writes one (atomic.rs): an archive that cannot be written whole leaves the
-//! old one as it was. A file of the folder that has other names, hard links, is the one exception: Save keeps them, but
-//! a project's file replaces it at its name in the folder alone (`rnl_viewer_files::atomic::write_own`), so that a name outside the folder
-//! the user chose keeps what it had.
+//! link or a junction, and each file as Save writes one: an archive that cannot be written whole leaves the old one as it
+//! was. A file of the folder that has other names, hard links, is the one exception: Save keeps them, but a project's file
+//! replaces it at its name in the folder alone, so that a name outside the folder the user chose keeps what it had
+//! (`rnl_viewer_files::project`, as the local viewer writes a project's files).
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -79,7 +79,7 @@ pub async fn write_project_archive(
 }
 
 /// Write the request's bytes to the project's file its `path` header names (URI-encoded), relative to the folder the user
-/// chose to open the project in (`pick_project_folder`), with the folders it needs (`inside`).
+/// chose to open the project in (`pick_project_folder`), with the folders it needs (`rnl_viewer_files::project`).
 #[tauri::command]
 pub async fn write_project_file(
     window: WebviewWindow,
@@ -96,70 +96,10 @@ pub async fn write_project_file(
     let root = choices.get(&window).root.ok_or("no folder was chosen to open the project in")?;
     let bytes = bytes.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let path = inside(&root, &relative, true)?;
-        // (a file of the folder with other names, hard links, is replaced at its name in the folder alone)
-        rnl_viewer_files::atomic::write_own(&path, &bytes).map_err(|e| format!("{}: {e}", path.display()))
+        rnl_viewer_files::project::write_file(&root, &relative, &bytes).map(|_| ())
     })
     .await
     .map_err(|e| e.to_string())?
-}
-
-/// Whether a file's metadata, not followed, is a link: a symbolic link, or on Windows any reparse point, a junction among
-/// them.
-fn is_link(meta: &std::fs::Metadata) -> bool {
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
-        if meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
-            return true;
-        }
-    }
-    meta.file_type().is_symlink()
-}
-
-/// The file `relative` names within `root`: a relative name of folders and a file, `/` or `\` between them, none empty,
-/// `.`, `..` or with a `:` (a drive, or a stream of a file). Each folder on the way is one of its own, not a link or a
-/// junction, which could lead out of the root; with `make`, those not there are made. The file is not a link either.
-/// Where the folders are found or made, they are still in the root, for a link made in the meantime.
-fn inside(root: &Path, relative: &str, make: bool) -> Result<PathBuf, String> {
-    let parts: Vec<&str> = relative.split(['/', '\\']).collect();
-    if parts.iter().any(|p| p.is_empty() || *p == "." || *p == ".." || p.contains(':')) {
-        return Err(format!("{relative}: not a name within the project's folder"));
-    }
-    let real = std::fs::canonicalize(root).map_err(|e| format!("{}: {e}", root.display()))?;
-    let mut at = real.clone();
-    for (k, part) in parts.iter().enumerate() {
-        at.push(part);
-        let last = k + 1 == parts.len();
-        match std::fs::symlink_metadata(&at) {
-            Ok(meta) if is_link(&meta) => {
-                return Err(format!(
-                    "{}: a link or a junction; a project's file is not written through it",
-                    at.display()
-                ))
-            }
-            Ok(meta) if !last && !meta.is_dir() => return Err(format!("{}: not a folder", at.display())),
-            Ok(meta) if last && !meta.is_file() => return Err(format!("{}: not a file", at.display())),
-            Ok(_) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                if !last && make {
-                    std::fs::create_dir(&at).map_err(|e| format!("{}: {e}", at.display()))?;
-                } else if !last {
-                    break;
-                }
-            }
-            Err(e) => return Err(format!("{}: {e}", at.display())),
-        }
-    }
-    let folder = at.parent().unwrap_or(&real);
-    if folder.exists() {
-        let folder = std::fs::canonicalize(folder).map_err(|e| format!("{}: {e}", folder.display()))?;
-        if !folder.starts_with(&real) {
-            return Err(format!("{relative}: not within the project's folder"));
-        }
-    }
-    Ok(real.join(parts.join(std::path::MAIN_SEPARATOR_STR)))
 }
 
 /// Percent-decoding of `encodeURIComponent`, as UTF-8.
@@ -245,105 +185,16 @@ pub async fn pick_project_folder(
 }
 
 /// Which of the files at `paths`, relative to the folder chosen to open the project in, are there already, or are not
-/// names a project's file can be written at (`inside`), which the user is told of before anything is written.
+/// names a project's file can be written at, which the user is told of before anything is written.
 #[tauri::command]
 pub fn existing_files(window: WebviewWindow, choices: State<'_, Choices>, paths: Vec<String>) -> Vec<String> {
     let Some(root) = choices.get(&window).root else { return paths };
-    paths
-        .into_iter()
-        .filter(|path| inside(&root, path, false).map_or(true, |at| std::fs::symlink_metadata(at).is_ok()))
-        .collect()
+    rnl_viewer_files::project::existing(&root, paths)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{decode, inside};
-    use std::path::{Path, PathBuf};
-
-    struct Dir(PathBuf);
-    impl Dir {
-        fn new(name: &str) -> Self {
-            let dir = std::env::temp_dir().join(format!("rnl-project-test-{}-{name}", std::process::id()));
-            let _ = std::fs::remove_dir_all(&dir);
-            std::fs::create_dir_all(&dir).unwrap();
-            Dir(dir)
-        }
-    }
-    impl Drop for Dir {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
-    }
-
-    /// A link to the folder `to` at `at`: a junction on Windows, which needs no privilege; a symbolic link elsewhere.
-    fn link_folder(at: &Path, to: &Path) -> bool {
-        #[cfg(windows)]
-        {
-            std::process::Command::new("cmd")
-                .args(["/C", "mklink", "/J"])
-                .arg(at)
-                .arg(to)
-                .output()
-                .is_ok_and(|o| o.status.success())
-        }
-        #[cfg(not(windows))]
-        {
-            std::os::unix::fs::symlink(to, at).is_ok()
-        }
-    }
-
-    #[test]
-    fn a_projects_files_are_written_by_their_names_within_the_folder_chosen() {
-        let dir = Dir::new("inside");
-        let root = dir.0.join("root");
-        std::fs::create_dir(&root).unwrap();
-        let at = inside(&root, "lib/models/a.inc", true).unwrap();
-        assert!(at.starts_with(std::fs::canonicalize(&root).unwrap()));
-        assert!(at.parent().unwrap().is_dir(), "the folders it needs are made");
-        for name in ["../out.sp", "lib/../../out.sp", "", "a//b.sp", "./a.sp", "C:/out.sp", "a.sp:stream", "/abs.sp"] {
-            assert!(inside(&root, name, true).is_err(), "{name}");
-        }
-        assert!(!dir.0.join("out.sp").exists());
-    }
-
-    #[test]
-    fn a_link_or_a_junction_in_the_folder_chosen_is_not_written_through() {
-        let dir = Dir::new("links");
-        let root = dir.0.join("root");
-        let outside = dir.0.join("outside");
-        std::fs::create_dir_all(&root).unwrap();
-        std::fs::create_dir_all(&outside).unwrap();
-        if !link_folder(&root.join("lib"), &outside) {
-            eprintln!("no link could be made here: nothing to try");
-            return;
-        }
-        let e = inside(&root, "lib/a.inc", true).unwrap_err();
-        assert!(e.contains("link or a junction"), "{e}");
-        assert!(std::fs::read_dir(&outside).unwrap().next().is_none(), "nothing is written outside");
-        // the folder chosen may itself be reached by a link: the user chose it
-        let at = inside(&root.join("lib"), "a.inc", true).unwrap();
-        assert!(at.starts_with(std::fs::canonicalize(&outside).unwrap()));
-    }
-
-    #[test]
-    fn a_file_with_another_name_outside_the_folder_is_replaced_at_its_name_in_the_folder_alone() {
-        let dir = Dir::new("hard-link");
-        let root = dir.0.join("root");
-        std::fs::create_dir(&root).unwrap();
-        let outside = dir.0.join("outside.sp");
-        std::fs::write(&outside, "* outside\n").unwrap();
-        if std::fs::hard_link(&outside, root.join("top.sp")).is_err() {
-            eprintln!("no hard link could be made here: nothing to try");
-            return;
-        }
-        let at = inside(&root, "top.sp", true).unwrap();
-        rnl_viewer_files::atomic::write_own(&at, b"* the project's\n").unwrap();
-        assert_eq!(std::fs::read_to_string(&at).unwrap(), "* the project's\n");
-        assert_eq!(std::fs::read_to_string(&outside).unwrap(), "* outside\n", "the name outside keeps what it had");
-        // a file of one name is replaced as Save replaces it
-        rnl_viewer_files::atomic::write_own(&outside, b"* again\n").unwrap();
-        assert_eq!(std::fs::read_to_string(&outside).unwrap(), "* again\n");
-    }
+    use super::decode;
 
     #[test]
     fn paths_are_decoded_as_encode_uri_component_wrote_them() {
