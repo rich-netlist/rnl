@@ -263,6 +263,11 @@ export default {
   setDirty(dirty) {
     invoke("set_dirty", { dirty }).catch(() => {});
   },
+  // a file of the document shown that changed on disk (disk-changes.js): the app looks at those the page gives it
+  watchFiles(paths) {
+    invoke("watch_files", { paths }).catch(() => {});
+  },
+  fileChanges: (since) => invoke("file_changes", { since }),
   // File > Export Image: the core draws the level again, with the overlays, from what the document shown was built from
   // (a solve's preview: from the files the solve wrote)
   exportSvg: async ({ level, title, overlays, source, edits, preview }) => {

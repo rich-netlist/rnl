@@ -171,6 +171,13 @@
  *   where the page's own title does not name it: the desktop's. Without it the page's title is set.
  * @property {(dirty: boolean) => void} [setDirty] Tell the platform that files have changes that are not
  *   saved, or have none, for the window's title and for closing it.
+ * @property {(paths: string[]) => void} [watchFiles] Look at the files of the Document shown, by the paths the page names
+ *   them by (source-path.js), for a change on disk (disk-changes.js). The desktop; the local program looks at the files
+ *   the page reads itself.
+ * @property {(since: number) => Promise<{ version: number, changed: string[] }>} [fileChanges] The files looked at that
+ *   changed on disk, went or came back since the version `since`, each once, and the version now; the shell's own
+ *   writes are not changes. The page asks once a second and tells the user (disk-changes.js). The desktop and the local
+ *   program (rnl-viewer-files watch.rs); the web reads no file of a disk.
  * @property {(handler: () => void) => void} [onCloseRequested] Call `handler` when the user asks to
  *   close the window while `setDirty(true)` was the last word: the window stays until `quit`.
  * @property {() => void} [quit] Close the window, as `onCloseRequested` asked.
