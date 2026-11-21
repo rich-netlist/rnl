@@ -4,9 +4,12 @@
 //!   GET  /rnl-solver/table  the table of the solver's settings (docs/solver-settings-table.md), which the page's settings
 //!                           dialog is drawn from: what `rnl solver-defaults --json` prints
 //!   POST /rnl-solver/check  {"config"}  ->  what `rnl solve --check --json` prints of those settings, with no file
-//!   POST /rnl-solver/solve  {"entry", "files", "pool", "formats", "config", "timeall", "level", "respace", "stream"}  ->  {"document", "report"}
+//!   POST /rnl-solver/solve  {"entry", "files", "pool", "package_dirs", "search_paths", "auto_include", "library_prefix",
+//!                            "library_edits", "formats", "config", "timeall", "level", "respace", "stream"}  ->  {"document", "report"}
 //!
 //! `config` is the settings that differ from the defaults, as RNL named parameters, as `--solver-config` takes them.
+//! The files are those of the page's build request, read as the core reads them for every frontend
+//! (`rnl_view::RequestFiles`): the pool first, then the PATH folders, and Auto Include.
 //! `formats` is the format set for each file, by its path, as the page read the netlist with (`rnl --format`).
 //!
 //! `level` is the title of the one level to solve (`rnl solve --level`), none for every level. With `"stream": true` the
@@ -37,9 +40,25 @@ use serde::Deserialize;
 pub struct Request {
     pub entry: String,
     pub files: BTreeMap<String, String>,
-    /// The paths of the files of the Library among them: the packages by name, the includes by path.
+    /// The paths of the files of the Library among them: searched first, for packages by name and for bare includes, and
+    /// indexed for Auto Include.
     #[serde(default)]
     pub pool: Vec<String>,
+    /// The PATH folders among them, in order: searched for packages by name after the pool (`package_dirs`) and for bare
+    /// includes (`search_paths`), as a build request has them.
+    #[serde(default)]
+    pub package_dirs: Vec<String>,
+    #[serde(default)]
+    pub search_paths: Vec<String>,
+    /// Whether a subcircuit no file read defines is taken from the Library's files (Auto Include).
+    #[serde(default)]
+    pub auto_include: bool,
+    /// The start of the Library's paths that its index leaves out, and the texts applied over its files, as a build
+    /// request has them.
+    #[serde(default)]
+    pub library_prefix: String,
+    #[serde(default)]
+    pub library_edits: BTreeMap<String, String>,
     /// The format set for each file by its path, such as `spectre`, as the page opened it with: the solve reads the files
     /// as the page did (`rnl --format`).
     #[serde(default)]
@@ -96,15 +115,10 @@ pub fn check(request: &Check) -> Result<serde_json::Value, String> {
     serde_json::to_value(checked).map_err(|e| e.to_string())
 }
 
-/// The directory of a path of the page's workspace, `/`-separated.
-fn dir_of(path: &str) -> &str {
-    path.rsplit_once('/').map_or("", |(d, _)| d)
-}
-
 /// A request that is right: what a solve is made of.
 pub struct Prepared {
     entry: String,
-    files: MemoryProvider,
+    files: rnl_view::Opened,
     options: SolveOptions,
     respace: bool,
 }
@@ -115,21 +129,21 @@ pub fn prepare(request: &Request) -> Result<Prepared, String> {
     {
         return Err("the request has no entry file".into());
     }
-    let mut files = MemoryProvider::new();
-    for (path, text) in &request.files {
-        if path.starts_with('/') && !path.split('/').any(|part| part == "..") {
-            files.insert(path, text);
-        }
-    }
-    // the packages of the Library are found by name in the folders that hold them
-    for path in &request.pool {
-        if path.ends_with(".rnl") && request.files.contains_key(path) {
-            let dir = dir_of(path).to_string();
-            if !files.package_dirs.contains(&dir) {
-                files.package_dirs.push(dir);
-            }
-        }
-    }
+    let inside = |path: &str| path.starts_with('/') && !path.split('/').any(|part| part == "..");
+    let workspace = rnl_view::RequestFiles {
+        files: request
+            .files
+            .iter()
+            .filter(|(path, _)| inside(path.as_str()))
+            .map(|(p, t)| (p.clone(), t.clone()))
+            .collect(),
+        pool: request.pool.clone(),
+        package_dirs: request.package_dirs.clone(),
+        search_paths: request.search_paths.clone(),
+        auto_include: request.auto_include,
+        library_prefix: request.library_prefix.clone(),
+        library_edits: request.library_edits.clone(),
+    };
     let solver = SolverOptions::default().with_config(&request.config)?;
     let level = request.level.clone().filter(|title| !title.is_empty());
     if request.timeall.is_some_and(|s| !s.is_finite() || s <= 0.0) {
@@ -148,6 +162,7 @@ pub fn prepare(request: &Request) -> Result<Prepared, String> {
         formats: formats.collect(),
         ..SolveOptions::default()
     };
+    let files = workspace.open(&options.formats);
     Ok(Prepared { entry: request.entry.clone(), files, options, respace: request.respace })
 }
 
@@ -253,6 +268,11 @@ mod tests {
             entry: entry.into(),
             files: BTreeMap::from([(entry.to_string(), text.to_string())]),
             pool: Vec::new(),
+            package_dirs: Vec::new(),
+            search_paths: Vec::new(),
+            auto_include: false,
+            library_prefix: String::new(),
+            library_edits: BTreeMap::new(),
             config: String::new(),
             timeall: None,
             level: None,
@@ -295,6 +315,50 @@ mod tests {
         let json: serde_json::Value = serde_json::from_str(&answer).unwrap();
         assert!(json["document"]["levels"].as_array().is_some_and(|l| !l.is_empty()));
         assert!(json["report"]["levels"].as_array().is_some());
+    }
+
+    #[test]
+    fn a_solve_reads_the_library_and_auto_include_as_the_pages_build() {
+        let (_client, server) = pair();
+        let top = "* top
+* @RNL(type=\"header\") { @VERSION(\"0.4\") }
+X1 a 0 cell
+X2 a 0 part
+.include part.inc
+.end
+";
+        let mut r = request("/w/top.sp", top);
+        r.files.insert(
+            "/<pool>/lib/cell.inc".into(),
+            "* cell
+.subckt cell a b
+R1 a b 1k
+.ends
+"
+            .into(),
+        );
+        r.files.insert(
+            "/P/part.inc".into(),
+            "* part
+.subckt part a b
+R1 a b 1k
+.ends
+"
+            .into(),
+        );
+        r.pool = vec!["/<pool>/lib/cell.inc".into()];
+        r.library_prefix = "/<pool>".into();
+        r.search_paths = vec!["/P".into()];
+        let read = |r: &Request| {
+            let json: serde_json::Value = serde_json::from_str(&solve(r, &server).unwrap()).unwrap();
+            let files = json["document"]["files"].as_array().unwrap().clone();
+            let has = |name: &str| files.iter().any(|f| f["path"].as_str().unwrap().ends_with(name));
+            (has("cell.inc"), has("part.inc"))
+        };
+        // a bare include from a PATH folder; a subcircuit from the Library with Auto Include, not without
+        assert_eq!(read(&r), (false, true));
+        r.auto_include = true;
+        assert_eq!(read(&r), (true, true));
     }
 
     #[test]

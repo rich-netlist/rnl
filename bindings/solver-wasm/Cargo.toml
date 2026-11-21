@@ -14,6 +14,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 rnl-cli = { path = "../../crates/rnl-cli" }
+rnl-view = { path = "../../crates/rnl-view" }
 rnl-runtime.workspace = true
 rnl-solver.workspace = true
 serde.workspace = true

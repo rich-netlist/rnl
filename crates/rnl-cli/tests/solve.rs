@@ -2216,3 +2216,59 @@ fn solve_and_preview_print_nothing_on_the_standard_error_when_they_have_nothing_
     let v: serde_json::Value = serde_json::from_str(&stdout).unwrap();
     assert!(v.get("document").is_some() && v.get("report").is_some(), "{v}");
 }
+
+#[test]
+fn a_preview_of_a_request_reads_its_files_as_a_viewer_does_and_nothing_from_disk() {
+    let dir = scratch("preview-request");
+    let top = "* top
+* @RNL(type=\"header\") { @VERSION(\"0.4\") }
+X1 a 0 cell
+X2 a 0 part
+.include part.inc
+.end
+";
+    let request = |auto_include: bool| {
+        serde_json::json!({
+            "entry": "/w/top.sp",
+            "files": {
+                "/w/top.sp": top,
+                "/<pool>/lib/cell.inc": "* cell
+.subckt cell a b
+R1 a b 1k
+.ends
+",
+                "/P/part.inc": "* part
+.subckt part a b
+R1 a b 1k
+.ends
+"
+            },
+            "pool": ["/<pool>/lib/cell.inc"],
+            "library_prefix": "/<pool>",
+            "search_paths": ["/P"],
+            "auto_include": auto_include
+        })
+    };
+    let read = |auto_include: bool| {
+        let file = dir.join(format!("request-{auto_include}.json"));
+        std::fs::write(&file, request(auto_include).to_string()).unwrap();
+        let (code, stdout, stderr) =
+            rnl(&["preview", &path_str(&file), "--request", "--solver-config", "limit=\"work\",work=1000000"]);
+        assert_eq!(code, 0, "{stderr}");
+        let v: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+        let files = v["document"]["files"].as_array().unwrap().clone();
+        let has = |name: &str| files.iter().any(|f| f["path"].as_str().unwrap().ends_with(name));
+        (v["document"]["path"].as_str().unwrap().to_string(), has("cell.inc"), has("part.inc"))
+    };
+    // the entry by its path in the request; a bare include from a search path; the Library's subcircuit with Auto Include
+    assert_eq!(read(false), ("/w/top.sp".to_string(), false, true));
+    assert_eq!(read(true), ("/w/top.sp".to_string(), true, true));
+    // --request is preview's alone, and a request that is not one says so
+    let (code, _, stderr) = rnl(&["solve", "x.json", "--request", "-o", &path_str(&dir)]);
+    assert_ne!(code, 0, "{stderr}");
+    let bad = dir.join("bad.json");
+    std::fs::write(&bad, "{").unwrap();
+    let (code, _, stderr) = rnl(&["preview", &path_str(&bad), "--request"]);
+    assert_ne!(code, 0);
+    assert!(stderr.contains("cannot read"), "{stderr}");
+}

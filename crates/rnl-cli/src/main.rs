@@ -50,7 +50,10 @@ A file whose suffix marks a hardware description language (.va, .vams, .v, .vh, 
 options:
   --path DIR          search packages and bare include filenames here; repeatable
   --confine DIR       read files only within the folder DIR: one outside it, as an include by an absolute
-                      path, or one a link leads out to, is not found (preview only; a server's solve)
+                      path, or one a link leads out to, is not found (preview only)
+  --request           FILE is a solve request, JSON, as the WebAssembly solver takes it, and nothing is
+                      read from disk: its entry, files, pool, package_dirs, search_paths, auto_include and
+                      formats, read as every viewer reads them (preview only; a server's solve)
   --package-dir DIR   look for packages in DIR as well (16.2), its .rnl files; repeatable
   --no-std            do not use the standard package at the root (16.3)
   --include-std       add the standard package to a main file that has no USE-PACKAGE of it (off
@@ -190,6 +193,8 @@ struct Args {
     /// `--package`: the names `catalog` lists; every name when there are none.
     packages: Vec<String>,
     all_versions: bool,
+    /// `preview --request`: FILE is a solve request, JSON.
+    request: bool,
     encoding: OutputEncoding,
     /// `explain`'s REF, and `--json`.
     reference: Option<String>,
@@ -295,6 +300,7 @@ fn parse_args() -> Result<Args, Said> {
     let mut written_options = Vec::new();
     let mut json = false;
     let mut all = false;
+    let mut request = false;
     let mut layout = None;
     let mut constraints = false;
     let mut bind_subckt: Option<String> = None;
@@ -414,6 +420,7 @@ fn parse_args() -> Result<Args, Said> {
             "--file" => only_file = Some(it.next().ok_or_else(|| needs("--file needs a file of the document"))?),
             "--each-file" => each_file = true,
             "--all" => all = true,
+            "--request" => request = true,
             "--layout" => {
                 let layouts = rnl_cli::solver_table::layouts();
                 let named = layouts.join(", ");
@@ -455,7 +462,7 @@ fn parse_args() -> Result<Args, Said> {
             "--in-place" => &["solve", "replace-records"],
             "--solver-options" | "--solver-config" => &["problem", "solve", "preview"],
             "--progress=json" | "--respace" | "--timeall" => &["solve", "preview"],
-            "--confine" => &["preview"],
+            "--confine" | "--request" => &["preview"],
             "--progress" | "--check" | "--external-solver" | "--external-arg" | "--external-timeout" => &["solve"],
             "--previous" | "--solver-input" => &["problem"],
             "--png" | "--scale" | "--net-names" => &["render"],
@@ -569,6 +576,7 @@ fn parse_args() -> Result<Args, Said> {
         parts,
         packages,
         all_versions,
+        request,
         encoding: encoding.unwrap_or_default(),
         reference,
         json,

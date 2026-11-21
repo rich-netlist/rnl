@@ -51,9 +51,11 @@ The call is synchronous and can take the solver's whole time limit. Run it in a 
 
 ## The request and the answer
 
-The request is all the solve reads: `entry`, `files`, `package_dirs`, `dialect`, `formats`, `std`, `include_std`, `solver_config` (RNL named parameters, as `--solver-config` takes them), `level`, `respace` and `timeall` (the whole file's time in seconds, as `--timeall` takes it). A Worker that runs it needs nothing from the core's Worker.
+The request is all the solve reads: `entry`, `files`, `pool`, `package_dirs`, `search_paths`, `auto_include`, `library_prefix`, `library_edits`, `dialect`, `formats`, `std`, `include_std`, `solver_config` (RNL named parameters, as `--solver-config` takes them), `level`, `respace` and `timeall` (the whole file's time in seconds, as `--timeall` takes it). A Worker that runs it needs nothing from the core's Worker.
 
-Other fields are ignored. That includes fields of the core's build request that this module does not read: `pool`, `auto_include`, `library_prefix`, `library_edits` and `std_version`.
+The files and how they are searched are those of the core's build request, read as it reads them ([`rnl_view::RequestFiles`](../../crates/rnl-view/README.md)): the pool first, then the package directories and search paths in order, and with `auto_include` the subcircuits the pool's files define. A frontend sends the fields of the build it shows, so that the solve finds what that build found. The local viewer's solve and `rnl preview --request` read a request the same way.
+
+Other fields are ignored. That includes the field of the core's build request that this module does not read, `std_version`.
 
 The answer is one of three:
 

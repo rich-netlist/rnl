@@ -300,11 +300,24 @@ pub(crate) fn problem(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
     Ok(ExitCode::SUCCESS)
 }
 
+/// What `rnl preview --request` reads: a solve request as the WebAssembly solver takes it, the files
+/// in it ([`rnl_view::RequestFiles`]).
+#[derive(serde::Deserialize)]
+struct SolveRequest {
+    entry: String,
+    dialect: Option<String>,
+    #[serde(default)]
+    formats: std::collections::BTreeMap<String, String>,
+    #[serde(flatten)]
+    workspace: rnl_view::RequestFiles,
+}
+
 /// `rnl preview`: as `rnl solve` solves, and nothing written: the Document of the files as solved
-/// and the report, which the desktop viewer shows (decision 0010).
+/// and the report, which the desktop viewer shows (decision 0010). With `--request`, FILE is a solve
+/// request and the files are its own, read as every viewer reads them, none from disk.
 pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> {
     let solver = configured(args)?;
-    let options = SolveOptions {
+    let mut options = SolveOptions {
         dialect: args.dialect.clone(),
         formats: args.formats.clone(),
         std: args.std,
@@ -313,7 +326,18 @@ pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
         solver,
         total_seconds: args.solver.timeall,
     };
-    let entry = rnl_cli::path_str(&args.file);
+    let opened;
+    let (entry, provider): (String, &dyn rnl_runtime::source::Provider) = if args.request {
+        let cannot = |e: String| Said::new(codes::CLI_CANNOT_READ, format!("cannot read {}: {e}", args.file.display()));
+        let text = std::fs::read_to_string(&args.file).map_err(|e| cannot(e.to_string()))?;
+        let request: SolveRequest = serde_json::from_str(&text).map_err(|e| cannot(e.to_string()))?;
+        options.formats.extend(request.formats);
+        options.dialect = request.dialect.or(options.dialect);
+        opened = request.workspace.open(&options.formats);
+        (request.entry, &opened)
+    } else {
+        (rnl_cli::path_str(&args.file), provider)
+    };
     if !args.solver.progress_json {
         let shown = if args.solver.respace {
             rnl_cli::preview::respace(&entry, provider, &options, &WallClock::new(), &|_| true)?

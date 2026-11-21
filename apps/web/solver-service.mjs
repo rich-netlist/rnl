@@ -6,9 +6,12 @@
 //   GET  /rnl-solver/table  what `rnl solver-defaults --json` prints: the table of the solver's settings
 //                           (docs/solver-settings-table.md), which the page's settings dialog is drawn from
 //   POST /rnl-solver/check  {"config"}  ->  what `rnl solve --check --json` prints of those settings, with no file
-//   POST /rnl-solver/solve  {"entry", "files", "pool", "formats", "config", "timeall", "level", "respace"}  ->  {"document", "report"}
-//     "formats": the format set for each file by its path, such as "spectre", as the page opened the netlist with: each
-//     is given to `rnl preview` as `--format PATH=NAME`, so the solve reads the files as the page did.
+//   POST /rnl-solver/solve  {"entry", "files", "pool", "package_dirs", "search_paths", "auto_include", "library_prefix",
+//                            "library_edits", "formats", "config", "timeall", "level", "respace"}  ->  {"document", "report"}
+//     The files and how they are searched are those of the page's build request: `rnl preview --request` reads them
+//     as the core reads them for every viewer (the pool first, then the PATH folders, and Auto Include), so the solve
+//     finds what the build found. "formats": the format set for each file by its path, such as "spectre", as the page
+//     opened the netlist with.
 //     "timeall": the seconds that all levels of a time limit share, `rnl preview --timeall`; none for each level's own.
 //     "respace": each level as the record of the solver in the file last drew it, spaced again as the settings say,
 //     nothing searched (`rnl preview --respace`, docs/solver-respace.md); the report says its mode. Not with "timeall".
@@ -19,12 +22,11 @@
 //     {"result": {"document", "report"}}, or {"error": message} when the solve failed after the first event.
 //     A request that fails before any event is answered as without "stream": a status and {"error": message}.
 //
-// A solve writes the files the page sends into a directory of its own, runs `rnl preview` on the entry
-// there, as the desktop viewer solves (decision 0010), and gives what it prints: the Document of the
-// netlist as solved, with its constraints, and the report of what became of each fact. The directory is
-// removed afterwards.
-// Nothing is written but there, and the `rnl` that runs is the one named when the server started. It reads nothing but
-// there either (`--confine`): a file the netlist names outside the files the page sent, such as an include by an
+// A solve writes the request into a directory of its own, runs `rnl preview --request` on it, as the desktop viewer
+// solves (decision 0010), and gives what it prints: the Document of the netlist as solved, with its constraints, and
+// the report of what became of each fact. The directory is removed afterwards.
+// Nothing is written but there, and the `rnl` that runs is the one named when the server started. It reads no file but
+// the request (`--request`): a file the netlist names outside the files the page sent, such as an include by an
 // absolute path, is not found, as it is not in the browser.
 //
 // The service answers only the page of this server: the Host must be this computer's address and port,
@@ -34,7 +36,7 @@
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, posix, relative, resolve } from "node:path";
+import { join } from "node:path";
 
 /** The most the page may send in one solve. */
 const MAX_BODY = 512 * 1024 * 1024;
@@ -113,45 +115,33 @@ function isEvent(line) {
  * `--solver-config` takes them, the server's first; `level` is the title of the one level to solve. `onEvent` is given the events of the solve, as lines of JSON, as they come.
  */
 export async function solve({ rnl, prefix = [], work, request, defaults, signal, onEvent }) {
-  const { entry, files, pool = [], formats = {}, config = "", timeall = null, level = null, respace = false } = request;
+  const { entry, files, pool = [], package_dirs = [], search_paths = [], auto_include = false, library_prefix = "", library_edits = {},
+    formats = {}, config = "", timeall = null, level = null, respace = false } = request;
   if (timeall !== null && !(typeof timeall === "number" && Number.isFinite(timeall) && timeall > 0)) throw new Error("timeall must be a positive number of seconds");
-  const entryPath = insidePath(entry);
-  if (!entryPath || !files || typeof files !== "object" || typeof files[entry] !== "string") throw new Error("the request has no entry file");
+  if (!insidePath(entry) || !files || typeof files !== "object" || typeof files[entry] !== "string") throw new Error("the request has no entry file");
   await mkdir(work, { recursive: true });
   const dir = await mkdtemp(join(work, "solve-"));
   try {
-    const packageDirs = new Set();
-    const searchDirs = new Set();
-    const poolSet = new Set(pool);
-    for (const [path, text] of Object.entries(files)) {
-      const inside = insidePath(path);
-      if (inside === null || typeof text !== "string") continue;
-      const target = resolve(dir, inside);
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, text);
-      // the files of the Library are found by name: the packages by `--package-dir`, the includes by `--path`
-      if (poolSet.has(path)) {
-        searchDirs.add(dirname(target));
-        if (path.endsWith(".rnl")) packageDirs.add(dirname(target));
-      }
-    }
+    // the files of the page by their paths, as its build had them, and how they are searched; a value of the wrong kind is
+    // left out, as is a format name that is not one
+    const texts = (map) => Object.fromEntries(Object.entries(map && typeof map === "object" ? map : {})
+      .filter(([path, text]) => insidePath(path) !== null && typeof text === "string"));
+    const paths = (list) => (Array.isArray(list) ? list.filter((p) => typeof p === "string") : []);
+    const sent = texts(files);
+    const named = Object.entries(formats && typeof formats === "object" ? formats : {})
+      .filter(([path, name]) => typeof sent[path] === "string" && typeof name === "string" && /^[A-Za-z0-9_.-]+$/.test(name));
+    const solveRequest = { entry, files: sent, pool: paths(pool), package_dirs: paths(package_dirs), search_paths: paths(search_paths),
+      auto_include: auto_include === true, library_prefix: typeof library_prefix === "string" ? library_prefix : "",
+      library_edits: texts(library_edits), formats: Object.fromEntries(named) };
+    await writeFile(join(dir, "request.json"), JSON.stringify(solveRequest));
     const solverConfig = joinConfig(defaults, config);
-    const cwd = resolve(dir, dirname(entryPath));
-    const common = [posix.basename(entryPath), "--confine", dir];
-    // the formats of the files sent, each by its path from the entry's directory, where rnl runs
-    for (const [path, name] of Object.entries(formats && typeof formats === "object" ? formats : {})) {
-      const inside = insidePath(path);
-      if (inside === null || typeof files[path] !== "string" || typeof name !== "string" || !/^[A-Za-z0-9_.-]+$/.test(name)) continue;
-      common.push("--format", `${relative(cwd, resolve(dir, inside)).replaceAll("\\", "/")}=${name}`);
-    }
-    for (const d of packageDirs) common.push("--package-dir", d);
-    for (const d of searchDirs) common.push("--path", d);
+    const common = ["request.json", "--request"];
     if (solverConfig) common.push("--solver-config", solverConfig);
     if (typeof level === "string" && level !== "") common.push("--level", level);
     if (timeall !== null) common.push("--timeall", String(timeall));
     if (respace === true) common.push("--respace");
     if (onEvent) common.push("--progress=json");
-    return await run(rnl, prefix, ["preview", ...common], cwd, signal, onEvent);
+    return await run(rnl, prefix, ["preview", ...common], dir, signal, onEvent);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

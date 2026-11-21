@@ -23,6 +23,7 @@ pub use overlays::{CurrentArrow, OverlayOptions, OverlayStyle, UsageFrame, Usage
 mod snapshot;
 #[cfg(test)]
 mod types;
+mod workspace;
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -69,6 +70,7 @@ pub use snapshot::{
     PackageUse, Parts, PinLabel, PinView, PointView, ShapeView, Slot, Snapshot, SymbolDefinition, SymbolPin,
     SymbolPrim, SymbolRef, TextView, UsageOf, Vertex, WireView, SCHEMA,
 };
+pub use workspace::{Opened, RequestFiles};
 
 include!(concat!(env!("OUT_DIR"), "/bundled.rs"));
 
