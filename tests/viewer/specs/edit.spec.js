@@ -111,6 +111,30 @@ test.describe("on the desktop", () => {
     expect(await viewer.builds()).toBe(builds);
   });
 
+  test("New Window carries the changes applied and not saved, and the new window shows them as not saved", async ({ page, viewer }) => {
+    await open(viewer, page);
+    await rename(page);
+    const edited = await text(page);
+    await page.evaluate(() => (window.fakeShell.next = "edit-changed"));
+    await viewer.build(() => page.locator("#apply-edits").click());
+    // a change not applied yet stays here, and the user is told so
+    await begin(page);
+    await type(page, `${edited}\n* not applied`);
+    await page.evaluate(() => { void window.viewer.command("new-window"); });
+    await expect(dialog(page)).toContainText("The new window shows the changes applied here, but not those not applied yet.");
+    await answer(page, "Open Anyway");
+    await expect.poll(() => viewer.calls("newWindow")).toHaveLength(1);
+    const [[session]] = await viewer.calls("newWindow");
+    expect(session.edits).toEqual({ "edit.sp": edited });
+    // the new window, started with that session: the file read from disk, the change applied over it, not saved
+    await page.addInitScript((s) => { window.fakeInitialSession = s; }, session);
+    await page.reload();
+    await expect.poll(() => page.evaluate(() => window.viewer?.edits)).toEqual({ unsaved: ["edit.sp"], unapplied: [] });
+    expect(await page.evaluate(() => window.fakeShell.buildEdits.at(-1))).toEqual({ "edit.sp": edited });
+    await expect(page).toHaveTitle("\u25cf edit.sp - RNL Viewer");
+    await expect(page.locator("#source .file:not([hidden]) .ln").nth(2)).toContainText("C2 b 0 1p");
+  });
+
   test("Apply and Exit builds text and leaves editing", async ({ page, viewer }) => {
     await open(viewer, page);
     await rename(page);

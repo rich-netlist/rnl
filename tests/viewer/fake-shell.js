@@ -388,6 +388,8 @@ export default {
   sourceForFile(src, document, index) { return fake.fileSources?.[document.files[index].path] || src; },
   sourceForPath(src, path) { fake.calls.push(["sourceForPath", path]); return fake.fileSources?.[path] || { ...src, path, fake: path }; },
   newWindow(session) { fake.calls.push(["newWindow", JSON.parse(JSON.stringify(session))]); },
+  // the session a new window starts with, as the desktop gives it: what a test put in `window.fakeInitialSession`
+  initialSession: async () => window.fakeInitialSession ?? null,
   include: async (kind) => { fake.calls.push(["include", kind]); return fake.includes || []; },
   ...(params.has("pool") ? {
     bundledFiles: async () => ({ "<bundled>/0.3/rnl-std.rnl": "@RNL(type=\"header\") { @PACKAGE(name=\"rnl-std\", version=\"0.3\") }" }),

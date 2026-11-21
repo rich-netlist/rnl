@@ -3,8 +3,8 @@ import { m, tr } from "./i18n.js";
 // Rendering/rebuilding a document is not navigation. Targets carry a source, a hierarchy path,
 // and optionally an object to select; Shift sends that same target to another viewer.
 import { decide, inform, modal } from "./dialog.js";
-import { changes } from "./edits.js";
-import { currentSource, isLoading, openSource } from "./open.js";
+import { changes, hasBuffer, setText, unappliedPaths } from "./edits.js";
+import { applyEdits, currentSource, isLoading, openSource } from "./open.js";
 import { poolSnapshot, restorePool } from "./pool.js";
 import { shell } from "./shell.js";
 import { doc, expanded, path, selected, selectedAsUsage, viewCache } from "./state.js";
@@ -75,13 +75,17 @@ export function duplicateWindow() {
 async function newWindow(visit) {
   if (modal()) return;
   const source = visit.entry;
-  // Desktop sessions re-read disk. Pending editor text never becomes a new window's input.
-  if (shell.platform === "desktop" && Object.keys(changes(true)).length &&
-      await decide({ title: m("New Window"), paragraphs: [m("The new window reads files from disk and will not see the unsaved changes here.")],
+  // A desktop window reads the files from disk: the texts applied here and not saved go with it, which it shows as not
+  // saved (restoreSession); a text not applied yet stays here.
+  const desktop = shell.platform === "desktop";
+  if (desktop && unappliedPaths().length &&
+      await decide({ title: m("New Window"), paragraphs: [m("The new window shows the changes applied here, but not those not applied yet.")],
         action: tr("Open Anyway"), cancel: tr("Cancel") }) !== "Open Anyway") return;
+  const edited = desktop ? changes(true) : {};
   const session = {
     ...visit,
     pool: poolSnapshot(),
+    ...(Object.keys(edited).length ? { edits: edited } : {}),
   };
   try {
     // Web shells reserve a tab synchronously, before serializing local files loses user activation.
@@ -95,6 +99,12 @@ async function newWindow(visit) {
 export async function restoreSession(session) {
   await restorePool(session.pool || []);
   if (!session.entry || !await openSource(session.entry, false, undefined, false, session, null, false, { bind: session.bind, bound: session.bound })) return;
+  // the texts applied in the window this one came from and not saved there: applied here too, and not saved
+  const edited = Object.entries(session.edits || {}).filter(([path]) => hasBuffer(path));
+  if (edited.length) {
+    for (const [path, text] of edited) setText(path, text);
+    await applyEdits();
+  }
   if (session.netlist) setPane('netlist');
   if (session.sourceFile) {
     const file = doc.files.findIndex(f => f.path === session.sourceFile);

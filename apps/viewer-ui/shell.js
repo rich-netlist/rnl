@@ -54,6 +54,8 @@
  * @property {(legacy: object) => Promise<{ path: string, values: object }>} [loadSettings] Native settings and migration.
  * @property {(key: string, value: unknown) => Promise<void>} [saveSetting] Persist a native setting.
  * @property {(session: object, doc?: object) => Promise<unknown>} [newWindow] Open an independent viewer with a session.
+ *   On the desktop, a session's `edits` are the texts applied and not saved, by path, which the new window applies and
+ *   shows as not saved (navigation.js restoreSession).
  * @property {() => Promise<object | null>} [initialSession] Consume the one-use startup session, before initial().
  * @property {(id: string, enabled: boolean) => void} [setEnabled] Update a native command enabled state.
  * @property {boolean} [overwrites] A shell of the "web" platform that writes the files where they were read from, as the
