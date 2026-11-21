@@ -13,5 +13,5 @@
   "1 V differential input and a 1 pF load, simulated from the netlist lines in the file.": "1 V 차동 입력과 1 pF 부하 조건에서 파일의 넷리스트 줄로 시뮬레이션한 결과입니다.",
   "<b>M1</b> and <b>M2</b> are the input pair, <b>M5</b> its tail source.": "<b>M1</b>과 <b>M2</b>는 입력쌍이고, <b>M5</b>는 그 꼬리 트랜지스터입니다.",
   "<b>Structure</b>: <code>$DIFFERENTIAL_PAIR_N</code> says which devices form the pair of N devices and which is its tail. The standard package draws the pair as mirror images about one axis, with the tail under its middle.": "<b>구조</b>: <code>$DIFFERENTIAL_PAIR_N</code>은 어떤 소자들이 N형 소자 쌍을 이루고 어느 것이 꼬리인지 지정합니다. 표준 패키지는 이 쌍을 하나의 축에 대해 거울상 대칭으로 그리고 꼬리를 그 가운데 아래에 배치합니다.",
-  "<b>Structure</b>: <code>$CURRENT_MIRROR_P</code> says which device is the reference and which copies it. Here the mirror of P devices is the pair’s load, and the package draws it above the pair.": "<b>구조</b>: <code>$CURRENT_MIRROR_P</code>는 어느 소자가 기준이고 어느 소자가 이를 복사하는지 지정합니다. 여기서 P형 소자의 전류 거울은 차동쌍의 부하이며, 표준 패키지가 쌍 위에 그립니다."
+  "<b>Structure</b>: <code>$CURRENT_MIRROR_P</code> says which device is the reference and which copies it. Here the mirror of P devices is the pair’s load.": "<b>구조</b>: <code>$CURRENT_MIRROR_P</code>는 어느 소자가 기준이고 어느 소자가 이를 복사하는지 지정합니다. 여기서 P형 소자의 전류 거울은 차동쌍의 부하입니다."
 }

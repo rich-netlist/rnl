@@ -67,7 +67,7 @@
   "Today’s workarounds": "현재 쓰이는 임시방편들",
   "Redraw by hand": "수작업으로 다시 그리기",
   "Slow, and every netlist change means redrawing.": "시간이 오래 걸릴 뿐 아니라 넷리스트가 바뀔 때마다 도면도 다시 그려야 합니다.",
-  "Five-transistor OTA placed from connectivity alone: airwires crossing everywhere": "연결 관계만으로 배치한 5트랜지스터 OTA: 사방으로 교차하는 에어와이어",
+  "The five-transistor OTA laid out by a solver from its connections alone: every net is wired, but nothing shows which transistors form the pair or the mirror": "솔버가 연결 관계만으로 배치한 5트랜지스터 OTA: 모든 넷이 배선되어 있지만 어느 트랜지스터가 차동쌍이나 전류 거울을 이루는지는 드러나지 않음",
   "Generate automatically": "자동 회로도 생성",
   "Screenshots and exports": "스크린샷 및 이미지 내보내기",
   "You keep the picture and lose the circuit: no simulation, no further edits.": "그림은 남지만 회로를 잃어버립니다. 시뮬레이션도, 추가 편집도 불가능합니다.",

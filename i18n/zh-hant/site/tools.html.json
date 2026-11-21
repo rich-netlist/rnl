@@ -52,7 +52,7 @@
   "The web viewer is a static web page, with the RNL core compiled to WebAssembly running inside it. It opens files or a whole folder from your computer, or a netlist on the web; files dropped on the page open too.": "網頁版檢視器是一個靜態網頁，內部執行編譯為 WebAssembly 的 RNL 核心。它可以開啟電腦上的檔案或整個資料夾，也可以開啟網路上的網表；直接將檔案拖放至頁面上也能開啟。",
   "cta|Open the web viewer": "開啟網頁版檢視器",
   "Try these samples": "試試這些範例",
-  "The samples come from RNL’s conformance corpus and are published with the web viewer. Click one and the viewer opens it.": "這些範例來自 RNL 的一致性測試語料庫，隨網頁版檢視器一併發布。點選任一範例即可在檢視器中開啟。",
+  "The samples come from RNL’s conformance corpus, written for the solver and solved by it, and are published with the web viewer. Click one and the viewer opens it.": "這些範例來自 RNL 的一致性測試語料庫，為求解器撰寫並由它求解，隨網頁版檢視器一併發布。點選任一範例即可在檢視器中開啟。",
   "sample|Hierarchy": "階層結構",
   "A two-stage buffer: a drawing for each subcircuit, drawn as a block symbol one level up, and a file it includes.": "兩級緩衝器：每個子電路各有一張原理圖，在上一層繪製為方塊符號，並包含一個引入（include）的檔案。",
   "Line styles": "線條樣式",

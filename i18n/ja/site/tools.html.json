@@ -52,7 +52,7 @@
   "The web viewer is a static web page, with the RNL core compiled to WebAssembly running inside it. It opens files or a whole folder from your computer, or a netlist on the web; files dropped on the page open too.": "Webビューアは静的なWebページであり、その内部でWebAssemblyにコンパイルされたRNLコアが動作します。コンピュータ上のファイルやフォルダ全体、あるいはWeb上のネットリストを開くことができ、ページ上へのファイルのドラッグ＆ドロップにも対応しています。",
   "cta|Open the web viewer": "Webビューアを開く",
   "Try these samples": "サンプルを試す",
-  "The samples come from RNL’s conformance corpus and are published with the web viewer. Click one and the viewer opens it.": "これらのサンプルはRNLの適合性テストコーパスからの抜粋で、Webビューアとともに公開されています。クリックするとビューアで開きます。",
+  "The samples come from RNL’s conformance corpus, written for the solver and solved by it, and are published with the web viewer. Click one and the viewer opens it.": "これらのサンプルはRNLの適合性テストコーパスから取ったもので、ソルバー向けに書かれてソルバーで求解されており、Webビューアとともに公開されています。クリックするとビューアで開きます。",
   "sample|Hierarchy": "階層",
   "A two-stage buffer: a drawing for each subcircuit, drawn as a block symbol one level up, and a file it includes.": "2段バッファ：各サブサーキットの回路図と、1つ上のレベルでブロックシンボルとして描画される様子、およびインクルードされるファイル。",
   "Line styles": "線種（ラインスタイル）",

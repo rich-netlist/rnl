@@ -67,7 +67,7 @@
   "Today’s workarounds": "目前的權宜做法",
   "Redraw by hand": "手動重畫",
   "Slow, and every netlist change means redrawing.": "耗時費力，且每當網表修改就得重新畫過。",
-  "Five-transistor OTA placed from connectivity alone: airwires crossing everywhere": "僅依連接關係排出的五電晶體 OTA：飛線四處交叉",
+  "The five-transistor OTA laid out by a solver from its connections alone: every net is wired, but nothing shows which transistors form the pair or the mirror": "求解器僅依連接關係排出的五電晶體 OTA：每個網路都已連線，但看不出哪些電晶體構成差動對或電流鏡",
   "Generate automatically": "自動產生原理圖",
   "Screenshots and exports": "螢幕截圖與匯出圖片",
   "You keep the picture and lose the circuit: no simulation, no further edits.": "留下了圖片卻失去了電路：既無法執行模擬，也無法繼續編輯。",

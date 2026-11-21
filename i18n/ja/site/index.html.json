@@ -67,7 +67,7 @@
   "Today’s workarounds": "現在の場当たり的な対処法",
   "Redraw by hand": "手作業で描き直す",
   "Slow, and every netlist change means redrawing.": "時間がかかる上、ネットリストが変わるたびに描き直しになります。",
-  "Five-transistor OTA placed from connectivity alone: airwires crossing everywhere": "接続関係だけから配置した5トランジスタOTA：エアワイヤが縦横に交差している",
+  "The five-transistor OTA laid out by a solver from its connections alone: every net is wired, but nothing shows which transistors form the pair or the mirror": "ソルバーが接続関係だけから配置した5トランジスタOTA：すべてのネットは配線されているが、どのトランジスタが差動対やカレントミラーをなすのかは分からない",
   "Generate automatically": "接続から自動生成する",
   "Screenshots and exports": "スクリーンショットや画像エクスポート",
   "You keep the picture and lose the circuit: no simulation, no further edits.": "絵は残りますが回路が失われます。シミュレーションも再編集もできません。",

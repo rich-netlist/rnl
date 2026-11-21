@@ -13,5 +13,5 @@
   "1 V differential input and a 1 pF load, simulated from the netlist lines in the file.": "1 Vの差動入力と1 pFの負荷で、ファイル内のネットリスト行からシミュレーションした結果です。",
   "<b>M1</b> and <b>M2</b> are the input pair, <b>M5</b> its tail source.": "<b>M1</b>と<b>M2</b>は入力対、<b>M5</b>はそのテール電流源。",
   "<b>Structure</b>: <code>$DIFFERENTIAL_PAIR_N</code> says which devices form the pair of N devices and which is its tail. The standard package draws the pair as mirror images about one axis, with the tail under its middle.": "<b>構造</b>：<code>$DIFFERENTIAL_PAIR_N</code>はどの素子がN型の差動対を成しどれがテールかを示します。標準パッケージは対を1つの軸に関して鏡像として描き、テールを中央下に配置します。",
-  "<b>Structure</b>: <code>$CURRENT_MIRROR_P</code> says which device is the reference and which copies it. Here the mirror of P devices is the pair’s load, and the package draws it above the pair.": "<b>構造</b>：<code>$CURRENT_MIRROR_P</code>はどの素子が基準でどれがそれをコピーするかを示します。ここではP型のカレントミラーが差動対の負荷であり、標準パッケージが差動対の上に描画します。"
+  "<b>Structure</b>: <code>$CURRENT_MIRROR_P</code> says which device is the reference and which copies it. Here the mirror of P devices is the pair’s load.": "<b>構造</b>：<code>$CURRENT_MIRROR_P</code>はどの素子が基準でどれがそれをコピーするかを示します。ここではP型のカレントミラーが差動対の負荷です。"
 }

@@ -67,7 +67,7 @@
   "Today’s workarounds": "Heutige Behelfslösungen",
   "Redraw by hand": "Von Hand neu zeichnen",
   "Slow, and every netlist change means redrawing.": "Zeitaufwendig, und jede Änderung an der Netzliste erfordert erneutes Zeichnen.",
-  "Five-transistor OTA placed from connectivity alone: airwires crossing everywhere": "Allein aus den Verbindungen platzierter Fünf-Transistor-OTA: kreuz und quer verlaufende Luftlinien",
+  "The five-transistor OTA laid out by a solver from its connections alone: every net is wired, but nothing shows which transistors form the pair or the mirror": "Ein Solver hat den Fünf-Transistor-OTA allein aus den Verbindungen angeordnet: Jedes Netz ist verdrahtet, doch nichts zeigt, welche Transistoren das Paar oder den Spiegel bilden",
   "Generate automatically": "Automatisch generieren",
   "Screenshots and exports": "Screenshots und Bildexporte",
   "You keep the picture and lose the circuit: no simulation, no further edits.": "Das Bild bleibt erhalten, die Schaltung geht verloren: keine Simulation, keine weitere Bearbeitung.",

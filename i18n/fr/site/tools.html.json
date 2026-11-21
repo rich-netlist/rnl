@@ -52,7 +52,7 @@
   "The web viewer is a static web page, with the RNL core compiled to WebAssembly running inside it. It opens files or a whole folder from your computer, or a netlist on the web; files dropped on the page open too.": "La visionneuse web est une page web statique dans laquelle s’exécute le cœur RNL compilé en WebAssembly. Elle ouvre des fichiers ou tout un dossier depuis votre ordinateur, ou une netlist sur le web ; vous pouvez aussi déposer des fichiers directement sur la page.",
   "cta|Open the web viewer": "Ouvrir la visionneuse web",
   "Try these samples": "Essayez ces exemples",
-  "The samples come from RNL’s conformance corpus and are published with the web viewer. Click one and the viewer opens it.": "Ces exemples proviennent du corpus de conformité de RNL et sont publiés avec la visionneuse web. Cliquez sur l’un d’eux pour que la visionneuse l’ouvre.",
+  "The samples come from RNL’s conformance corpus, written for the solver and solved by it, and are published with the web viewer. Click one and the viewer opens it.": "Ces exemples proviennent du corpus de conformité de RNL, écrits pour le solveur et résolus par lui, et sont publiés avec la visionneuse web. Cliquez sur l’un d’eux pour que la visionneuse l’ouvre.",
   "sample|Hierarchy": "Hiérarchie",
   "A two-stage buffer: a drawing for each subcircuit, drawn as a block symbol one level up, and a file it includes.": "Un tampon à deux étages : un schéma pour chaque sous-circuit, dessiné comme un symbole de bloc au niveau supérieur, ainsi qu’un fichier inclus.",
   "Line styles": "Styles de trait",

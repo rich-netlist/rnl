@@ -52,7 +52,7 @@
   "The web viewer is a static web page, with the RNL core compiled to WebAssembly running inside it. It opens files or a whole folder from your computer, or a netlist on the web; files dropped on the page open too.": "Der Web-Viewer ist eine statische Webseite, in der der zu WebAssembly kompilierte RNL-Kern läuft. Er öffnet Dateien oder ganze Ordner von Ihrem Computer oder eine Netzliste aus dem Web; auch auf die Seite gezogene Dateien werden geöffnet.",
   "cta|Open the web viewer": "Web-Viewer öffnen",
   "Try these samples": "Beispiele ausprobieren",
-  "The samples come from RNL’s conformance corpus and are published with the web viewer. Click one and the viewer opens it.": "Die Beispiele stammen aus dem Konformitätskorpus von RNL und werden zusammen mit dem Web-Viewer veröffentlicht. Klicken Sie eines an, um es im Viewer zu öffnen.",
+  "The samples come from RNL’s conformance corpus, written for the solver and solved by it, and are published with the web viewer. Click one and the viewer opens it.": "Die Beispiele stammen aus dem Konformitätskorpus von RNL, sind für den Solver geschrieben und von ihm gelöst und werden zusammen mit dem Web-Viewer veröffentlicht. Klicken Sie eines an, um es im Viewer zu öffnen.",
   "sample|Hierarchy": "Hierarchie",
   "A two-stage buffer: a drawing for each subcircuit, drawn as a block symbol one level up, and a file it includes.": "Ein zweistufiger Puffer: eine eigene Zeichnung für jede Teilschaltung, eine Ebene höher als Blocksymbol dargestellt, sowie eine eingebundene Datei.",
   "Line styles": "Linienstile",
