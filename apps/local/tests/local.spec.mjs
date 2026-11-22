@@ -452,6 +452,27 @@ test("Export Image writes the image where the user says, as the desktop does", a
   expect(readFileSync(image, "utf8")).toContain("<svg");
 });
 
+test("Export Image of a solve's preview draws the files the solve wrote, as the desktop does", async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => window.viewer.command("solve"));
+  await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"), null, { timeout: 120000 });
+  for (const [command, name] of [["export-svg", "solved.svg"], ["export-png", "solved.png"]]) {
+    await page.evaluate((id) => { void window.viewer.command(id); }, command);
+    const dialog = page.locator("dialog.dialog");
+    // the chooser, not a message that the document was not loaded in this page
+    await expect(dialog.locator(".dialog-title")).toHaveText("Export Image");
+    await dialog.locator(".dialog-option", { hasText: "Save in this folder" }).click();
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await dialog.locator("input").fill(name);
+    await dialog.getByRole("button", { name: "Save" }).click();
+    const image = join(work, "proj", "sim", name);
+    await expect.poll(() => existsSync(image)).toBe(true);
+    await expect(dialog).toHaveCount(0);
+  }
+  expect(readFileSync(join(work, "proj", "sim", "solved.svg"), "utf8")).toContain("<svg");
+  expect(readFileSync(join(work, "proj", "sim", "solved.png")).subarray(1, 4).toString()).toBe("PNG");
+});
+
 test("Save Solved Copy As saves the solve the program kept into a folder the user chooses, as the desktop does", async ({ page }) => {
   mkdirSync(join(work, "proj", "out"));
   await open(page);

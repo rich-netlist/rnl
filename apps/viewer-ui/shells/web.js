@@ -75,9 +75,19 @@ async function browserSolver() {
 }
 const inBrowser = await browserSolver();
 let lastBuilt = null; // the Document of a build the page accepted last: what a solve is of, not a preview of one
-// the last solve in the browser: the request of the build it solved, with the texts applied over its files, and the texts
-// the solve wrote, by the paths of the request (Save Solved Copy, and Export Image of the preview)
+// the last solve, in the browser or by a solver service: the request of the build it solved, with the texts applied over
+// its files, and the texts the solve wrote, by the paths of the request (Save Solved Copy in the browser, and Export
+// Image of the preview)
 let lastSolved = null;
+/**
+ * A solve's answer, kept as the last solve: the request of the build it solved, with the files it read (`read`, the texts
+ * applied over them), and the texts it wrote, by the paths of the request (`answer.files`), which the solver in the browser,
+ * the local program's service and the development server's (`rnl preview --request`) give alike.
+ */
+function solvedBy(request, read, answer) {
+  lastSolved = { request: { ...request, files: read.files }, written: answer.files ?? {} };
+  return answer;
+}
 let solving = null; // the AbortController of the solve under way
 let solverWorker = null; // the Worker of the solver in the browser, once a call has started it
 const solverCalls = new Map(); // the calls the Worker has not answered, by id: { resolve, reject, onEvent }
@@ -1258,7 +1268,7 @@ export default {
         if (!/^application\/x-ndjson/.test(response.headers.get("Content-Type") || "")) {
           const answer = await response.json().catch(() => ({ error: `the solver service answered ${response.status}` }));
           if (!response.ok) throw answer.error || `the solver service answered ${response.status}`;
-          return answer;
+          return solvedBy(request, read, answer);
         }
         // lines of JSON: the events as they come, then the result or the error
         const reader = response.body.getReader();
@@ -1273,7 +1283,7 @@ export default {
             if (!line.trim()) continue;
             const said = JSON.parse(line);
             if (said.error) throw said.error;
-            if (said.result) return said.result;
+            if (said.result) return solvedBy(request, read, said.result);
             if (said.event) solveProgress?.(said);
           }
           if (done) throw "the solver service ended without a result";
@@ -1327,8 +1337,7 @@ export default {
           solver_config: settings?.config || "", ...(settings?.timeall ? { timeall: settings.timeall } : {}), ...(settings?.respace ? { respace: true } : {}), level: settings?.level ?? null } }, (event) => solveProgress?.(event));
         if (answer.cancelled) throw "the solve was cancelled";
         if (answer.error !== undefined) throw answer.error;
-        lastSolved = { request: { ...request, files: read.files }, written: answer.files ?? {} };
-        return answer;
+        return solvedBy(request, read, answer);
       } finally {
         if (solving === own) solving = null;
       }

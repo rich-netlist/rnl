@@ -162,12 +162,7 @@ impl Clock for Now<'_> {
 /// and each normal path with the path of the request; an error when two paths of the request are
 /// one file.
 fn workspace(request: &mut SolveRequest) -> Result<(rnl_view::Opened, BTreeMap<String, String>), String> {
-    let mut asked: BTreeMap<String, String> = BTreeMap::new();
-    for path in request.files.keys() {
-        if let Some(other) = asked.insert(normalize(path), path.clone()) {
-            return Err(format!("files: {other} and {path} are one file"));
-        }
-    }
+    let asked = rnl_cli::preview::request_paths(request.files.keys())?;
     let workspace = rnl_view::RequestFiles {
         files: std::mem::take(&mut request.files),
         pool: std::mem::take(&mut request.pool),
@@ -251,12 +246,7 @@ pub fn solve(request: &[u8], now: &dyn Fn() -> f64, progress: &dyn Fn(&str) -> b
         Ok(shown) => Answer::Solved {
             document: serde_json::to_value(&shown.document).expect("a Document serializes"),
             report: serde_json::to_value(&shown.report).expect("a report serializes"),
-            files: shown
-                .copy
-                .files
-                .into_iter()
-                .map(|f| (asked.get(&normalize(&f.path)).cloned().unwrap_or(f.path), f.text))
-                .collect(),
+            files: shown.copy.written_by(&asked),
         },
         Err(e) if e == CANCELLED => Answer::Cancelled { cancelled: true },
         Err(error) => Answer::Error { error },

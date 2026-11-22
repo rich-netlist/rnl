@@ -369,6 +369,20 @@ impl Clock for StoppableClock {
     }
 }
 
+/// The paths a request names its files by (`paths`), each by its normal path, which a solve names the file by
+/// ([`rnl_view::RequestFiles`]); an error when two of them are one file.
+pub fn request_paths<'a>(
+    paths: impl IntoIterator<Item = &'a String>,
+) -> Result<std::collections::BTreeMap<String, String>, String> {
+    let mut asked = std::collections::BTreeMap::new();
+    for path in paths {
+        if let Some(other) = asked.insert(normalize(path), path.clone()) {
+            return Err(format!("files: {other} and {path} are one file"));
+        }
+    }
+    Ok(asked)
+}
+
 /// What a copy of a solve saves: the file solved, the texts the solve wrote, and the files it read.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Copy {
@@ -383,6 +397,19 @@ pub struct Copy {
 impl Copy {
     pub fn of(run: &SolveRun) -> Copy {
         Copy { entry: run.entry.clone(), files: run.files.clone(), read: run.read.clone() }
+    }
+
+    /// The texts written, by the paths a request names their files by ([`request_paths`]), as a viewer that solves
+    /// a request is answered: it draws a solve's preview again from them (Export Image). A file the request does not
+    /// name is given by its own path.
+    pub fn written_by(
+        &self,
+        asked: &std::collections::BTreeMap<String, String>,
+    ) -> std::collections::BTreeMap<String, String> {
+        self.files
+            .iter()
+            .map(|f| (asked.get(&normalize(&f.path)).cloned().unwrap_or_else(|| f.path.clone()), f.text.clone()))
+            .collect()
     }
 
     /// A run of these files and no level, which is what writing them takes.
@@ -468,4 +495,30 @@ fn real(path: &Path) -> Option<PathBuf> {
     }
     let parent = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
     Some(std::fs::canonicalize(parent).ok()?.join(path.file_name()?))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_texts_written_are_named_by_the_paths_of_the_request() {
+        let paths = ["/w/./top.sp".to_string(), "/w/lib/../cell.inc".to_string()];
+        let asked = request_paths(&paths).unwrap();
+        let copy = Copy {
+            entry: "/w/top.sp".into(),
+            files: vec![
+                SolvedFile { path: "/w/top.sp".into(), text: "solved".into() },
+                SolvedFile { path: "/w/other.inc".into(), text: "other".into() },
+            ],
+            read: Vec::new(),
+        };
+        let written = copy.written_by(&asked);
+        assert_eq!(written.get("/w/./top.sp").map(String::as_str), Some("solved"));
+        // a file the request does not name, by its own path
+        assert_eq!(written.get("/w/other.inc").map(String::as_str), Some("other"));
+        // two paths of one file are an error
+        let twice = ["/w/top.sp".to_string(), "/w/./top.sp".to_string()];
+        assert!(request_paths(&twice).unwrap_err().contains("are one file"));
+    }
 }

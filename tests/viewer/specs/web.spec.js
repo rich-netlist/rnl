@@ -1795,6 +1795,12 @@ test("the Solve view lists the constraints of a netlist before any solve; a deve
     await expect.poll(() => page.locator(".drawing svg [data-id].usage-muted").count()).toBeGreaterThan(0);
     await row.click();
     await expect(page.locator(".drawing svg [data-id].usage-muted")).toHaveCount(0);
+    // Export Image of the preview draws again the texts the service says the solve wrote (`files`), as with the solver
+    // in the browser: no message that the document was not loaded in this page
+    const download = page.waitForEvent("download");
+    await page.evaluate(() => { void window.viewer.command("export-svg"); });
+    expect((await download).suggestedFilename()).toMatch(/\.svg$/);
+    await expect(page.locator("dialog.dialog")).toHaveCount(0);
     // Close Preview shows the netlist as read
     await page.evaluate(() => window.viewer.command("solve-close"));
     await expect(page.locator("#preview-badge")).toBeHidden();

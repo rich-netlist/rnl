@@ -7,7 +7,7 @@
 //                           (docs/solver-settings-table.md), which the page's settings dialog is drawn from
 //   POST /rnl-solver/check  {"config"}  ->  what `rnl solve --check --json` prints of those settings, with no file
 //   POST /rnl-solver/solve  {"entry", "files", "pool", "package_dirs", "search_paths", "auto_include", "library_prefix",
-//                            "library_edits", "formats", "config", "timeall", "level", "respace"}  ->  {"document", "report"}
+//                            "library_edits", "formats", "config", "timeall", "level", "respace"}  ->  {"document", "report", "files"}
 //     The files and how they are searched are those of the page's build request: `rnl preview --request` reads them
 //     as the core reads them for every viewer (the pool first, then the PATH folders, and Auto Include), so the solve
 //     finds what the build found. "formats": the format set for each file by its path, such as "spectre", as the page
@@ -19,12 +19,13 @@
 //     "level": only the level with this title, the circuit shown; none solves every level.
 //     With "stream": true the answer is lines of JSON (application/x-ndjson) instead: the events of the solve as
 //     `rnl preview --progress=json` tells them (docs/solver-progress.md), each as it came, then one line
-//     {"result": {"document", "report"}}, or {"error": message} when the solve failed after the first event.
+//     {"result": {"document", "report", "files"}}, or {"error": message} when the solve failed after the first event.
 //     A request that fails before any event is answered as without "stream": a status and {"error": message}.
 //
 // A solve writes the request into a directory of its own, runs `rnl preview --request` on it, as the desktop viewer
 // solves (decision 0010), and gives what it prints: the Document of the netlist as solved, with its constraints, and
-// the report of what became of each fact. The directory is removed afterwards.
+// the report of what became of each fact, and the texts the solve wrote by the paths of the request (`files`), which the
+// page draws the preview again from (Export Image). The directory is removed afterwards.
 // Nothing is written but there, and the `rnl` that runs is the one named when the server started. It reads no file but
 // the request (`--request`): a file the netlist names outside the files the page sent, such as an include by an
 // absolute path, is not found, as it is not in the browser.

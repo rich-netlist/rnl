@@ -5,16 +5,18 @@
 //!                           dialog is drawn from: what `rnl solver-defaults --json` prints
 //!   POST /rnl-solver/check  {"config"}  ->  what `rnl solve --check --json` prints of those settings, with no file
 //!   POST /rnl-solver/solve  {"entry", "files", "pool", "package_dirs", "search_paths", "auto_include", "library_prefix",
-//!                            "library_edits", "formats", "config", "timeall", "level", "respace", "stream"}  ->  {"document", "report"}
+//!                            "library_edits", "formats", "config", "timeall", "level", "respace", "stream"}  ->  {"document", "report", "files"}
 //!
 //! `config` is the settings that differ from the defaults, as RNL named parameters, as `--solver-config` takes them.
 //! The files are those of the page's build request, read as the core reads them for every frontend
 //! (`rnl_view::RequestFiles`): the pool first, then the PATH folders, and Auto Include.
 //! `formats` is the format set for each file, by its path, as the page read the netlist with (`rnl --format`).
+//! The answer's `files` are the texts the solve wrote, by the request's paths, which the page draws the preview again
+//! from (Export Image), as `rnl preview --request` and the WebAssembly solver give them.
 //!
 //! `level` is the title of the one level to solve (`rnl solve --level`), none for every level. With `"stream": true` the
 //! answer is lines of JSON (`application/x-ndjson`): the events of the solve as they happen (docs/solver-progress.md), then
-//! `{"result": {"document", "report"}}`, or `{"error": message}` if the solve fails after the first line was sent; a request
+//! `{"result": {"document", "report", "files"}}`, or `{"error": message}` if the solve fails after the first line was sent; a request
 //! that is wrong is answered as it is without `stream`, as a 400 with `{"error"}`. The page going away stops the solve.
 //!
 //! The page sends the files of the netlist, with what it has applied over them, and the program solves them in memory
@@ -121,6 +123,8 @@ pub struct Prepared {
     files: rnl_view::Opened,
     options: SolveOptions,
     respace: bool,
+    /// The request's paths, by the normal path the solve names each file by.
+    asked: std::collections::BTreeMap<String, String>,
 }
 
 /// Check a request and make what it solves: an error says what is wrong with it.
@@ -162,8 +166,9 @@ pub fn prepare(request: &Request) -> Result<Prepared, String> {
         formats: formats.collect(),
         ..SolveOptions::default()
     };
+    let asked = rnl_cli::preview::request_paths(workspace.files.keys())?;
     let files = workspace.open(&options.formats);
-    Ok(Prepared { entry: request.entry.clone(), files, options, respace: request.respace })
+    Ok(Prepared { entry: request.entry.clone(), files, options, respace: request.respace, asked })
 }
 
 /// Whether the page has closed its connection: asked without waiting for anything.
@@ -177,20 +182,26 @@ fn gone(peer: &TcpStream) -> bool {
     closed
 }
 
-/// The JSON text of `{document, report}` of a solve that is done.
-fn solved_json(shown: &rnl_cli::preview::Preview) -> Result<String, String> {
+/// The JSON text of `{document, report, files}` of a solve that is done: `files` the texts it wrote, by the request's paths.
+fn solved_json(
+    shown: &rnl_cli::preview::Preview,
+    asked: &std::collections::BTreeMap<String, String>,
+) -> Result<String, String> {
     #[derive(serde::Serialize)]
     struct Solved<'a> {
         document: &'a rnl_view::Document,
         report: &'a rnl_cli::preview::Report,
+        files: std::collections::BTreeMap<String, String>,
     }
-    serde_json::to_string(&Solved { document: &shown.document, report: &shown.report }).map_err(|e| e.to_string())
+    let files = shown.copy.written_by(asked);
+    serde_json::to_string(&Solved { document: &shown.document, report: &shown.report, files })
+        .map_err(|e| e.to_string())
 }
 
-/// Solve a request: the JSON text of `{document, report}`. `peer` is the connection of the page, which is watched for the
+/// Solve a request: the JSON text of `{document, report, files}`. `peer` is the connection of the page, which is watched for the
 /// page going away, as a cancel is: the solve stops at its next level.
 pub fn solve(request: &Request, peer: &TcpStream, last: &LastSolve) -> Result<String, String> {
-    let Prepared { entry, files, options, respace: spaced } = prepare(request)?;
+    let Prepared { entry, files, options, respace: spaced, asked } = prepare(request)?;
     let stop = Arc::new(AtomicBool::new(false));
     let clock = StoppableClock::new(stop.clone());
     // the page going away is a cancel: asked at each level, without waiting for anything
@@ -212,7 +223,7 @@ pub fn solve(request: &Request, peer: &TcpStream, last: &LastSolve) -> Result<St
         preview(&entry, &files, &options, &clock, &watch)?
     };
     keep(last, &shown.copy);
-    solved_json(&shown)
+    solved_json(&shown, &asked)
 }
 
 /// The last solve shown, as the desktop keeps it for Solve › Save Solved Copy As: the file solved, the texts the solve
@@ -227,7 +238,7 @@ fn keep(last: &LastSolve, copy: &Copy) {
 /// happens, then the result, or the error. A line that cannot be written is the page gone, as its closing the connection
 /// is: the solve stops at its next step.
 pub fn stream(prepared: Prepared, out: &mut TcpStream, last: &LastSolve) -> io::Result<()> {
-    let Prepared { entry, files, options, respace: spaced } = prepared;
+    let Prepared { entry, files, options, respace: spaced, asked } = prepared;
     let stop = Arc::new(AtomicBool::new(false));
     let clock = StoppableClock::new(stop.clone());
     let out = RefCell::new(out);
@@ -254,7 +265,7 @@ pub fn stream(prepared: Prepared, out: &mut TcpStream, last: &LastSolve) -> io::
     };
     let end = match shown.and_then(|shown| {
         keep(last, &shown.copy);
-        solved_json(&shown)
+        solved_json(&shown, &asked)
     }) {
         // (the document is already JSON: it is put in the line as it is)
         Ok(result) => format!("{{\"result\":{result}}}"),

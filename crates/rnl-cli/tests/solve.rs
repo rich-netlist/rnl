@@ -2258,6 +2258,10 @@ R1 a b 1k
         let v: serde_json::Value = serde_json::from_str(&stdout).unwrap();
         let files = v["document"]["files"].as_array().unwrap().clone();
         let has = |name: &str| files.iter().any(|f| f["path"].as_str().unwrap().ends_with(name));
+        // the texts the solve would write, by the request's paths, which a viewer draws the preview again from
+        let written = v["files"].as_object().unwrap();
+        assert!(written["/w/top.sp"].as_str().unwrap().contains("@RNL"), "{v}");
+        assert!(written.keys().all(|path| request(auto_include)["files"].get(path).is_some()), "{v}");
         (v["document"]["path"].as_str().unwrap().to_string(), has("cell.inc"), has("part.inc"))
     };
     // the entry by its path in the request; a bare include from a search path; the Library's subcircuit with Auto Include
