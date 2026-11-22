@@ -40,6 +40,15 @@ fn read(
     finisher: &rnl_view::RecordFinisher<'_>,
     record: &str,
 ) -> Result<(Interpretation, String), String> {
+    read_with_text(ctx, finisher, record).map(|(read, numbered, _)| (read, numbered))
+}
+
+/// [`read`], with the text of the level's file it read.
+fn read_with_text(
+    ctx: &Context<'_>,
+    finisher: &rnl_view::RecordFinisher<'_>,
+    record: &str,
+) -> Result<(Interpretation, String, String), String> {
     // Numeric references are inactive until their record has a valid check. Prepare each
     // complete candidate, including its appended PLACE statements, in the same package
     // environment as the normal reading. Keep the caller's raw record and byte spans intact.
@@ -67,7 +76,7 @@ fn read(
     {
         return Err("trial generated record has missing or stale numbering".into());
     }
-    Ok((read, numbered))
+    Ok((read, numbered, text))
 }
 
 /// Why a record does not read back when objects of the level are lost in it: an object the solve
@@ -134,11 +143,23 @@ fn lost(p: &LevelProblem, read: &Interpretation, auxiliary: &[bool]) -> Option<S
 /// [`LOST`] when it does not. A level with dots to place has this checked with the dots
 /// ([`complete_what_can_be_by`]); one without has only this, since what the record writes, such as a
 /// wire, may change what a rule selects when the document is read again.
-pub fn reads_back(ctx: &Context<'_>, written: &Written) -> Result<(), String> {
+pub fn reads_back(ctx: &Context<'_>, written: &Written) -> Result<ReadBack, String> {
     let finisher = finisher(ctx);
-    let (read, _) = read(ctx, &finisher, &written.record)?;
+    let (reading, finished, text) = read_with_text(ctx, &finisher, &written.record)?;
     let auxiliary = crate::junction_completion_problem::auxiliary(ctx.problem);
-    lost(ctx.problem, &read, &auxiliary.points).map_or(Ok(()), Err)
+    match lost(ctx.problem, &reading, &auxiliary.points) {
+        Some(why) => Err(why),
+        None => Ok(ReadBack { reading, finished, text }),
+    }
+}
+
+/// What [`reads_back`] read: the document with the record, read with its records and its
+/// problems; the record finished with the check of its numbers, as it is written; and the text of
+/// the level's file with it.
+pub struct ReadBack {
+    pub reading: Interpretation,
+    pub finished: String,
+    pub text: String,
 }
 
 fn line_mapping(

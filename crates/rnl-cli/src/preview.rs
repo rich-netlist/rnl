@@ -164,8 +164,11 @@ pub fn respace(
     Ok(shown)
 }
 
-/// The run drawn as solved, as [`preview`] gives it.
-fn as_solved(entry: &str, run: SolveRun, files: &dyn Provider, options: &SolveOptions) -> Result<Preview, String> {
+/// The run drawn as solved, as [`preview`] gives it. What the solve read already, the same texts
+/// with the same options, is taken from its readings instead of read again
+/// ([`crate::solve::Readings`]).
+fn as_solved(entry: &str, mut run: SolveRun, files: &dyn Provider, options: &SolveOptions) -> Result<Preview, String> {
+    let readings = std::mem::take(&mut run.readings);
     let mut written = MemoryProvider::new();
     for f in &run.files {
         written.insert(&f.path, &f.text);
@@ -184,18 +187,43 @@ fn as_solved(entry: &str, run: SolveRun, files: &dyn Provider, options: &SolveOp
     // those solved, at the lines where the Document shows them
     let again =
         rnl_view::interpret_with(entry, options.dialect.as_deref(), &options.formats, &both, &options.runtime())?;
-    // and with them, which is what is drawn: the facts are measured there
-    let with = Options { generated: true, problems: true, ..options.runtime() };
-    let with = rnl_view::interpret_with(entry, options.dialect.as_deref(), &options.formats, &both, &with)?;
-    let checked = check(entry, files, options);
+    // and with them, which is what is drawn: the facts are measured there. The last check that a
+    // record reads back read the same: the texts it held over the files are those the solve wrote
+    let with = match readings.written.filter(|(texts, _)| run.entry == entry && holds_the_files(texts, &run)) {
+        Some((_, read)) => read,
+        None => {
+            let with = Options { generated: true, problems: true, ..options.runtime() };
+            std::rc::Rc::new(rnl_view::interpret_with(
+                entry,
+                options.dialect.as_deref(),
+                &options.formats,
+                &both,
+                &with,
+            )?)
+        }
+    };
+    let before = readings.before.as_deref().filter(|_| run.entry == entry);
+    let checked = check(entry, files, options, before);
     let report = report(&run, &document, &again.problems, &with, options.solver.tolerance, checked);
     Ok(Preview { copy: Copy::of(&run), document, report })
 }
 
+/// Whether `texts`, held over the files by path, are the files the run wrote and no others, so that
+/// a reading over them read what the run wrote.
+fn holds_the_files(texts: &std::collections::BTreeMap<String, String>, run: &SolveRun) -> bool {
+    texts.len() == run.files.len() && run.files.iter().all(|f| texts.get(&normalize(&f.path)) == Some(&f.text))
+}
+
 /// The settings of each level of `entry`, as `rnl solve --check` gives them, with the tool's
 /// settings of `options`, given as old `--solver-options` when the options say so; none when the
-/// file cannot be read for it.
-fn check(entry: &str, files: &dyn Provider, options: &SolveOptions) -> Option<crate::solve::Checked> {
+/// file cannot be read for it. `before` is the solve's reading of the files as they were, taken
+/// when the check reads them so too.
+fn check(
+    entry: &str,
+    files: &dyn Provider,
+    options: &SolveOptions,
+    before: Option<&Interpretation>,
+) -> Option<crate::solve::Checked> {
     let given = &options.solver.settings.overrides;
     let text = given.iter().map(|s| format!("{}={}", s.key, s.value.show())).collect::<Vec<_>>().join(",");
     let text = if options.solver.settings.legacy_alias {
@@ -204,7 +232,7 @@ fn check(entry: &str, files: &dyn Provider, options: &SolveOptions) -> Option<cr
         crate::solve::ToolSettings::Config(text)
     };
     let tool: Vec<crate::solve::ToolSettings> = (!given.is_empty()).then_some(text).into_iter().collect();
-    crate::solve::check_settings(Some(Path::new(entry)), files, options, &tool).ok()
+    crate::solve::check_settings_read(Path::new(entry), files, options, &tool, before).ok()
 }
 
 /// The report of a run, located in the texts of `document`; `problems` are those of these texts
@@ -421,6 +449,7 @@ impl Copy {
             files: self.files.clone(),
             read: self.read.clone(),
             errors: 0,
+            readings: Default::default(),
         }
     }
 }
@@ -520,5 +549,53 @@ mod tests {
         // two paths of one file are an error
         let twice = ["/w/top.sp".to_string(), "/w/./top.sp".to_string()];
         assert!(request_paths(&twice).unwrap_err().contains("are one file"));
+    }
+
+    /// The preview takes the readings the solve made instead of reading the same texts again, and
+    /// draws and reports what reading them again gives: the same Document and the same report,
+    /// the settings checked among it.
+    #[test]
+    fn the_readings_a_solve_made_give_what_reading_again_gives() {
+        const NET: &str = "* preview\n\
+            * @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
+            R1 a b 1k\nR2 b 0 1k\nC1 a 0 1p\n\
+            * @RNL { #R1 @PLACE(0, 0) }\n\
+            * @RNL { {#R1 #R2} @ALIGN(\"x\") }\n.end\n";
+        let files = MemoryProvider::new().with("/w/t.sp", NET);
+        let options =
+            SolveOptions { solver: rnl_solver::SolverOptions::without_time_limit(), ..SolveOptions::default() };
+        let clock = crate::solve::WallClock::new();
+        let run = crate::solve::solve_watched(Path::new("/w/t.sp"), &files, &options, &clock, &|_| true).unwrap();
+        // the files as they were, and the document with the record written, as its check read it
+        assert!(run.readings.before.is_some());
+        let (texts, _) = run.readings.written.as_ref().expect("the record's check read it back");
+        assert!(holds_the_files(texts, &run));
+        let mut bare = run.clone();
+        bare.readings = crate::solve::Readings::default();
+        let taken = as_solved("/w/t.sp", run, &files, &options).unwrap();
+        let read = as_solved("/w/t.sp", bare, &files, &options).unwrap();
+        let json = |shown: &Preview| serde_json::to_string(&(&shown.document, &shown.report)).unwrap();
+        assert_eq!(json(&taken), json(&read));
+        assert!(taken.report.levels.iter().all(|l| l.check.is_some()), "{:?}", taken.report.levels);
+    }
+
+    /// Texts held over the files are those of a run only when they are its files, each with its
+    /// text, and no other.
+    #[test]
+    fn texts_hold_the_files_of_a_run_only_when_they_are_its_files() {
+        let mut run = Copy {
+            entry: "/w/t.sp".into(),
+            files: vec![SolvedFile { path: "/w/t.sp".into(), text: "solved".into() }],
+            read: Vec::new(),
+        }
+        .run();
+        let texts = |pairs: &[(&str, &str)]| {
+            pairs.iter().map(|(p, t)| (p.to_string(), t.to_string())).collect::<std::collections::BTreeMap<_, _>>()
+        };
+        assert!(holds_the_files(&texts(&[("/w/t.sp", "solved")]), &run));
+        assert!(!holds_the_files(&texts(&[("/w/t.sp", "as read")]), &run));
+        assert!(!holds_the_files(&texts(&[("/w/t.sp", "solved"), ("/w/moved.sp", "header moved")]), &run));
+        run.files.push(SolvedFile { path: "/w/other.sp".into(), text: "other".into() });
+        assert!(!holds_the_files(&texts(&[("/w/t.sp", "solved")]), &run));
     }
 }

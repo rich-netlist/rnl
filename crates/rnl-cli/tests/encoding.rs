@@ -19,6 +19,7 @@ fn file(path: &Path, text: &str) -> SolvedFile {
 
 fn run(files: Vec<SolvedFile>) -> SolveRun {
     SolveRun {
+        readings: Default::default(),
         entry: files[0].path.clone(),
         read: files.iter().map(|f| f.path.clone()).collect(),
         files,

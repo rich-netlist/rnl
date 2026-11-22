@@ -60,6 +60,7 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use rnl_runtime::diag::{codes, Diag, Loc, Severity};
@@ -76,6 +77,7 @@ use rnl_runtime::{Interpretation, Options};
 use rnl_solver::{Clock, Discarded, RunLimit, Solved, SolverOptions, Statement, StopReason, AUTHOR};
 
 mod check;
+pub(crate) use check::check_settings_read;
 pub use check::{
     check_lines, check_settings, named_syntax, setting_json, Checked, CheckedLevel, CheckedProblem, CheckedSetting,
     ToolSettings,
@@ -208,6 +210,31 @@ pub struct SolveRun {
     pub read: Vec<String>,
     /// The errors of the document read as a solver reads it, before anything was written back.
     pub errors: usize,
+    /// Readings the solve made that a caller can take instead of reading the same texts again,
+    /// as [`crate::preview`] does; empty when the run is not of a solve.
+    pub readings: Readings,
+}
+
+/// Readings of the document a solve made, each with what it was read from, so that a caller reads
+/// the same texts with the same options only once ([`SolveRun::readings`]). Each is the reading
+/// those texts give: one taken in place of reading again gives what reading again gives.
+#[derive(Clone, Default)]
+pub struct Readings {
+    /// The files as they were, read as a solver reads them ([`SolveOptions::runtime`]), before
+    /// anything was written back.
+    pub(crate) before: Option<Rc<Interpretation>>,
+    /// The last check that a level's record reads back: the texts held over the files then, by
+    /// path, and the document read with them, its records and its problems.
+    pub(crate) written: Option<(BTreeMap<String, String>, Rc<Interpretation>)>,
+}
+
+impl std::fmt::Debug for Readings {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Readings")
+            .field("before", &self.before.is_some())
+            .field("written", &self.written.as_ref().map(|(texts, _)| texts.keys().collect::<Vec<_>>()))
+            .finish()
+    }
 }
 
 /// Where [`write`] puts the files solved.
@@ -592,8 +619,10 @@ fn pass(
     };
     // the time of a reading of the document, on the clock the limits are read on
     let reading = clock.elapsed();
-    let mut first = read(&memory)?;
+    let mut first = Rc::new(read(&memory)?);
     let mut read_seconds = clock.elapsed() - reading;
+    // the files as they are, which a caller may take ([`Readings::before`])
+    let before = Rc::clone(&first);
     let errors = first.diagnostics().iter().filter(|d| d.severity == Severity::Error).count();
     let mut targets: Vec<(usize, String)> = Vec::new();
     let mut not_solved = Vec::new();
@@ -644,7 +673,7 @@ fn pass(
             return Err(format!("cannot write the standard-package reference into the header of {} (16.3)", main.file));
         }
         memory.insert(&path, &out);
-        first = read(&memory)?;
+        first = Rc::new(read(&memory)?);
     }
     // a header that the record of a level would come before moves before any level of its file is
     // written (2.8; 16.3 and 2.2), so that every record written into the file
@@ -676,10 +705,13 @@ fn pass(
     let mut solved_files: Vec<SolvedFile> = Vec::new();
     // the document read again when a header moved
     let mut current = if moved.is_empty() { Some(first) } else { None };
+    let mut last_read_back: Option<(BTreeMap<String, String>, Rc<Interpretation>)> = None;
     let count = targets.len();
     watch(Mark::Run { levels: count });
     for (k, (level, title)) in targets.into_iter().enumerate() {
         let progress = Progress { level: k, levels: count, title: title.clone() };
+        // a reading back of a level before is not of the files once this level is written
+        last_read_back = None;
         if !watch(Mark::Level(&progress)) {
             return Err(CANCELLED.to_string());
         }
@@ -689,7 +721,7 @@ fn pass(
             Some(r) => r,
             None => {
                 let reading = clock.elapsed();
-                let r = read(&memory)?;
+                let r = Rc::new(read(&memory)?);
                 read_seconds = clock.elapsed() - reading;
                 r
             }
@@ -842,10 +874,19 @@ fn pass(
                 tolerance: runtime.tolerance.min(options.solver.for_problem(p).0.tolerance),
                 on_interpret: None,
             };
-            if let Err(why) = crate::junction_completion_driver::reads_back(&context, &written) {
-                if why.ends_with(crate::junction_completion_driver::LOST) {
+            match crate::junction_completion_driver::reads_back(&context, &written) {
+                // the record finished there is the one written, and the reading is the document
+                // with it, both taken instead of finished and read again
+                Ok(back) => {
+                    numbered = Some((written.record.clone(), back.finished));
+                    let mut texts = memory.files.clone();
+                    texts.insert(path.clone(), back.text);
+                    last_read_back = Some((texts, Rc::new(back.reading)));
+                }
+                Err(why) if why.ends_with(crate::junction_completion_driver::LOST) => {
                     return Err(format!("the result of {title} does not read back as it was solved: {why}"));
                 }
+                Err(_) => {}
             }
         }
         watch(Mark::Stage("write"));
@@ -959,7 +1000,8 @@ fn pass(
     }
     let packages: Vec<String> = files.files.package_files().iter().map(|p| normalize(p)).collect();
     let read: Vec<String> = files.read.take().into_iter().filter(|p| !packages.contains(p)).collect();
-    Ok(SolveRun { entry, levels, not_solved, files: solved_files, read, errors })
+    let readings = Readings { before: Some(before), written: last_read_back };
+    Ok(SolveRun { entry, levels, not_solved, files: solved_files, read, errors, readings })
 }
 
 /// The text of a file as the reading `r` found it, which the positions of its records refer to; read
