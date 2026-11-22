@@ -1,0 +1,4 @@
+module amp(inp, outp);
+  inout inp, outp;
+  electrical inp, outp;
+endmodule

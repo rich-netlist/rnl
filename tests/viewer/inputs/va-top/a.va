@@ -1,0 +1,13 @@
+module top_va(x, y, g);
+  inout x, y, g;
+  electrical x, y, g, mid;
+  gain #(.k(2)) u1 (x, mid);
+  amp u2 (mid, y);
+  ghost u3 (y, g);
+  gain u4 (.a(y), .b(g));
+  analog V(y) <+ 0;
+endmodule
+module gain(a, b);
+  inout a, b;
+  electrical a, b;
+endmodule

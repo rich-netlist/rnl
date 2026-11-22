@@ -4,7 +4,9 @@
 // of the files not read too; otherwise the Document has them all. From the outline, the instances of a level are
 // listed by the subcircuit they call, in the order first called, and a name the netlist does not define is one row
 // for all its instances. The outline has the modules of Verilog-A too, which no reading draws (2.9): each is a node
-// with `module` set, the modules its instances name its children, with the line of each instance.
+// with `module` set, the modules its instances name its children, with the line of each instance. The preview of a solve
+// is a Document of the whole document, which has no modules: it has the outline of the reading the solve started from
+// (`outlineBefore`, solve.js), whose modules are nodes of its tree too, each instance that names one a child of it.
 
 import { doc } from "./state.js";
 
@@ -30,17 +32,7 @@ function build(d) {
   const outline = d.outline;
   if (outline) {
     outline.levels.forEach((l, host) => {
-      const module = l.kind === "module";
-      if (!l.circuit && !module) return;
-      nodes[host] = {
-        title: l.title,
-        file: l.file === null ? null : outline.files[l.file].path,
-        children: l.calls.flatMap((c) => c.level === null || !c.instances
-          ? [{ instance: null, master: c.master, host: null, count: c.count }]
-          : c.instances.map((instance, k) => ({ instance, master: c.master, host: c.level, count: 1,
-            ...(module ? { line: c.lines?.[k] ?? null } : {}) }))),
-        ...(module ? { module, ports: l.ports, lines: l.lines } : {}),
-      };
+      if (l.circuit || l.kind === "module") nodes[host] = outlineNode(outline, l);
     });
     return { nodes, top: 0 };
   }
@@ -51,8 +43,43 @@ function build(d) {
       children: l.children.map((c) => ({ instance: c.instance, master: c.master, host: c.level === null ? null : d.levels[c.level].host, count: 1 })),
     };
   }
+  const before = d.outlineBefore;
+  if (before) {
+    // the modules, and the instances of the levels that name one, by the calls of the level in the outline
+    before.levels.forEach((l, host) => {
+      if (l.kind === "module") nodes[host] = outlineNode(before, l);
+    });
+    for (const l of d.levels) {
+      const calls = before.levels[l.host]?.calls ?? [];
+      for (const c of nodes[l.host].children) {
+        if (c.host !== null) continue;
+        const call = calls.find((x) => x.master === c.master && x.level !== null && before.levels[x.level]?.kind === "module");
+        if (call) c.host = call.level;
+      }
+    }
+  }
   return { nodes, top: d.levels[0]?.host ?? 0 };
 }
+
+/** The node of the level `l` of `outline`: a circuit, or a module of Verilog-A. */
+function outlineNode(outline, l) {
+  const module = l.kind === "module";
+  return {
+    title: l.title,
+    file: l.file === null ? null : outline.files[l.file].path,
+    children: l.calls.flatMap((c) => c.level === null || !c.instances
+      ? [{ instance: null, master: c.master, host: null, count: c.count }]
+      : c.instances.map((instance, k) => ({ instance, master: c.master, host: c.level, count: 1,
+        ...(module ? { line: c.lines?.[k] ?? null } : {}) }))),
+    ...(module ? { module, ports: l.ports, lines: l.lines } : {}),
+  };
+}
+
+/**
+ * Whether the Document shown is the preview of a solve that has the outline of the reading it started from
+ * (`outlineBefore`), whose modules of Verilog-A it shows in place, below its own levels.
+ */
+export const previewModules = () => !!doc && !doc.outline && !!doc.outlineBefore;
 
 /** The level of the Document shown that draws the host level `host`, or -1 when another file's reading would. */
 export function localLevel(host) {

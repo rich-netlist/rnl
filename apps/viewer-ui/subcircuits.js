@@ -16,7 +16,7 @@ import { revealDefinition } from "./text.js";
 import { navigate } from "./navigation.js";
 import { currentSource } from "./open.js";
 import { fileView, sameEntry, sameSource, sourceKey } from "./visit-source.js";
-import { levelTree, localLevel } from "./level-tree.js";
+import { levelTree, localLevel, previewModules } from "./level-tree.js";
 import { $, span } from "./util.js";
 
 const bar = $("level-path");
@@ -48,7 +48,14 @@ export function candidatesOf(o) {
  */
 export function definedElsewhere(o) {
   const obj = doc && o !== null && o !== undefined ? doc.objects[o] : null;
-  if (!obj || obj.kind !== "instance" || (obj.opens !== null && obj.opens !== undefined) || !doc.outline) return null;
+  if (!obj || obj.kind !== "instance" || (obj.opens !== null && obj.opens !== undefined)) return null;
+  // the preview of a solve: a module of Verilog-A of the outline it keeps, which it shows in place (`previewModules`)
+  if (previewModules()) {
+    const child = levelTree().nodes[obj.level]?.children.find((c) => c.instance === obj.name);
+    const node = child?.host === null || child?.host === undefined ? null : levelTree().nodes[child.host];
+    return node?.module ? { file: node.file, title: node.title, module: true } : null;
+  }
+  if (!doc.outline) return null;
   const child = doc.levels.find((l) => l.host === obj.level)?.children.find((c) => c.instance === obj.name);
   if (child?.host === undefined || child.host === null) return null;
   const node = levelTree().nodes[child.host];
@@ -151,6 +158,13 @@ export function descend(o, options) {
   const elsewhere = level === null ? definedElsewhere(o) : null;
   if (level === null && !elsewhere) return chooseDefinition(o, options);
   const obj = doc.objects[o];
+  if (elsewhere && previewModules()) {
+    // a module of the preview of a solve, shown in place: the preview stays, and the way back leads to it
+    const at = doc.levels[current].host === obj.level ? current : doc.levels.findIndex((l) => l.host === obj.level);
+    if (!options?.newWindow) window.dispatchEvent(new Event("viewer-navigate"));
+    const step = { title: elsewhere.title, via: obj.name };
+    return navigate({ path: at < 0 ? [step] : [...cutTo(at), step], selection: null, reveal: true }, options);
+  }
   if (elsewhere) {
     // another file defines it: that file's view, in the context of the entry, with the parameters of the instance; a
     // module of Verilog-A is shown without them (module-view.js)
@@ -204,6 +218,10 @@ export function enterHost(host, options = {}) {
   const level = localLevel(host);
   if (level >= 0) return enterRoot(level, options);
   const node = levelTree()?.nodes[host];
+  if (node?.module && previewModules()) {
+    if (!options.newWindow) window.dispatchEvent(new Event("viewer-navigate"));
+    return navigate({ path: [{ title: node.title, via: null }], reveal: true }, options);
+  }
   if (!node || node.file === null || !doc.outline) return;
   if (!options.newWindow) window.dispatchEvent(new Event("viewer-navigate"));
   return navigate({ source: viewOfFile(node.file), path: [{ title: node.title, via: null }], reveal: true }, options);
