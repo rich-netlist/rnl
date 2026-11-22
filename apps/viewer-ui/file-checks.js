@@ -14,6 +14,7 @@ import { doc } from "./state.js";
 import { checkFiles, readsByFile } from "./file-reading.js";
 import { changes } from "./edits.js";
 import { currentSource } from "./open.js";
+import { isPreview } from "./solve.js";
 
 /** The readings kept: `fingerprint` of the document, `inputs` (path → hash of each package read), `files` (path → problems). */
 let kept = null;
@@ -79,6 +80,8 @@ function keep(into, result, documentFiles) {
 export function noteShown(d) {
   // another document, of one file or read whole: what Check All Files was reading is not needed
   if (readFileIndex(d) < 0) return stopChecking();
+  // the preview of a solve of one file: the problems of the solved texts are not those of the file
+  if (isPreview(d)) return;
   const into = keptFor(d);
   // (the list is made again as the Document is shown)
   keep(into, d, new Set(d.outline.files.map((f) => f.path)));

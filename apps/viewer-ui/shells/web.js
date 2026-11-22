@@ -1261,7 +1261,8 @@ export default {
     /**
      * Solve the netlist shown with the solver service of the server (solve.js): the files the last build read, with
      * the text applied over them, are sent to it, and it gives the Document of the netlist as solved and the report,
-     * as the desktop's Solve does, of the one level `settings.level` names or of every level. The service tells the
+     * as the desktop's Solve does, of the one level `settings.level` names or of every level; with `settings.file`, the
+     * file that level is written in, only that file read for it, and the Document that file's. The service tells the
      * events of the solve (docs/solver-progress.md) as lines of JSON as they come, each to `onSolveProgress`'s
      * handler, then the result (apps/web/solver-service.mjs); a service that does not stream gives the result alone.
      * Cancelling drops the request, and the service stops the solver.
@@ -1277,7 +1278,8 @@ export default {
           // (X-RNL: the local program, which serves the page to one browser, asks for it of every request that does anything)
           headers: { "Content-Type": "application/json", "X-RNL": "1" },
           // (the files as the build read them, with the formats set for them when the netlist was opened)
-          body: JSON.stringify({ ...read, config: settings?.config || "", timeall: settings?.timeall ?? null, respace: settings?.respace === true, level: settings?.level ?? null, stream: true }) });
+          body: JSON.stringify({ ...read, config: settings?.config || "", timeall: settings?.timeall ?? null, respace: settings?.respace === true, level: settings?.level ?? null,
+            file: settings?.file ?? null, stream: true }) });
         if (!/^application\/x-ndjson/.test(response.headers.get("Content-Type") || "")) {
           const answer = await response.json().catch(() => ({ error: `the solver service answered ${response.status}` }));
           if (!response.ok) throw answer.error || `the solver service answered ${response.status}`;
@@ -1347,7 +1349,8 @@ export default {
       own.signal.addEventListener("abort", () => stopSolver("the solve was cancelled"), { once: true });
       try {
         const answer = await callSolver(inBrowser, { request: { ...read,
-          solver_config: settings?.config || "", ...(settings?.timeall ? { timeall: settings.timeall } : {}), ...(settings?.respace ? { respace: true } : {}), level: settings?.level ?? null } }, (event) => solveProgress?.(event));
+          solver_config: settings?.config || "", ...(settings?.timeall ? { timeall: settings.timeall } : {}), ...(settings?.respace ? { respace: true } : {}), level: settings?.level ?? null,
+          file: settings?.file ?? null } }, (event) => solveProgress?.(event));
         if (answer.cancelled) throw "the solve was cancelled";
         if (answer.error !== undefined) throw answer.error;
         return solvedBy(request, read, answer);

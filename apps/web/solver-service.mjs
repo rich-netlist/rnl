@@ -7,7 +7,7 @@
 //                           (docs/solver-settings-table.md), which the page's settings dialog is drawn from
 //   POST /rnl-solver/check  {"config"}  ->  what `rnl solve --check --json` prints of those settings, with no file
 //   POST /rnl-solver/solve  {"entry", "files", "pool", "package_dirs", "search_paths", "auto_include", "library_prefix",
-//                            "library_edits", "formats", "config", "timeall", "level", "respace"}  ->  {"document", "report", "files"}
+//                            "library_edits", "formats", "config", "timeall", "level", "file", "respace"}  ->  {"document", "report", "files"}
 //     The files and how they are searched are those of the page's build request: `rnl preview --request` reads them
 //     as the core reads them for every viewer (the pool first, then the PATH folders, and Auto Include), so the solve
 //     finds what the build found. "formats": the format set for each file by its path, such as "spectre", as the page
@@ -17,6 +17,8 @@
 //     nothing searched (`rnl preview --respace`, docs/solver-respace.md); the report says its mode. Not with "timeall".
 //     "config": the settings that differ from the defaults, as RNL named parameters, as `--solver-config` takes them.
 //     "level": only the level with this title, the circuit shown; none solves every level.
+//     "file": with "level", the file of the document the level is written in, as the document names it, when the page
+//     shows that file read alone: only that file is read for the level, and the Document is that file's (`--file`).
 //     With "stream": true the answer is lines of JSON (application/x-ndjson) instead: the events of the solve as
 //     `rnl preview --progress=json` tells them (docs/solver-progress.md), each as it came, then one line
 //     {"result": {"document", "report", "files"}}, or {"error": message} when the solve failed after the first event.
@@ -113,11 +115,12 @@ function isEvent(line) {
 /**
  * The solve of a request: what `rnl preview` prints, the Document and the report, as JSON text. `work` holds the
  * directory the files are written in; `defaults` and the request's `config` are the solver's settings, as
- * `--solver-config` takes them, the server's first; `level` is the title of the one level to solve. `onEvent` is given the events of the solve, as lines of JSON, as they come.
+ * `--solver-config` takes them, the server's first; `level` is the title of the one level to solve, and `file` the file
+ * it is written in. `onEvent` is given the events of the solve, as lines of JSON, as they come.
  */
 export async function solve({ rnl, prefix = [], work, request, defaults, signal, onEvent }) {
   const { entry, files, pool = [], package_dirs = [], search_paths = [], auto_include = false, library_prefix = "", library_edits = {},
-    formats = {}, config = "", timeall = null, level = null, respace = false } = request;
+    formats = {}, config = "", timeall = null, level = null, file = null, respace = false } = request;
   if (timeall !== null && !(typeof timeall === "number" && Number.isFinite(timeall) && timeall > 0)) throw new Error("timeall must be a positive number of seconds");
   if (!insidePath(entry) || !files || typeof files !== "object" || typeof files[entry] !== "string") throw new Error("the request has no entry file");
   await mkdir(work, { recursive: true });
@@ -133,7 +136,9 @@ export async function solve({ rnl, prefix = [], work, request, defaults, signal,
       .filter(([path, name]) => typeof sent[path] === "string" && typeof name === "string" && /^[A-Za-z0-9_.-]+$/.test(name));
     const solveRequest = { entry, files: sent, pool: paths(pool), package_dirs: paths(package_dirs), search_paths: paths(search_paths),
       auto_include: auto_include === true, library_prefix: typeof library_prefix === "string" ? library_prefix : "",
-      library_edits: texts(library_edits), formats: Object.fromEntries(named) };
+      library_edits: texts(library_edits), formats: Object.fromEntries(named),
+      // (the file the level is written in, as the document names it: read by `--request` with `--level`)
+      ...(typeof file === "string" && file !== "" ? { file } : {}) };
     await writeFile(join(dir, "request.json"), JSON.stringify(solveRequest));
     const solverConfig = joinConfig(defaults, config);
     const common = ["request.json", "--request"];
