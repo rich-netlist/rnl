@@ -687,6 +687,23 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 .entry-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .entry-file, .entry-instances, .entry-status { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .entry-status:empty { display: none; }
+/* The module and entry pages lie on the drawing's background, which View › Background sets apart from the theme of the
+   window: their colours are those of the light theme on a light background and of the dark theme on a dark one. */
+.module-card, .entry-card {
+  --fg: #1d1d1f;
+  --muted: #6b6b70;
+  --line: #d9d9d4;
+  --hover: #ececea;
+  --panel: #fbfbfa;
+  color: var(--fg);
+}
+body[data-background="dark"] .module-card, body[data-background="dark"] .entry-card {
+  --fg: #e8e8ea;
+  --muted: #9a9aa2;
+  --line: #38383d;
+  --hover: #313137;
+  --panel: #232327;
+}
 
 /* Web fonts follow the generic families: keep native Latin/monospace metrics and use the
    already shipped Noto slices only for glyphs missing from the system (notably CJK on Linux). */
