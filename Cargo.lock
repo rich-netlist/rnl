@@ -505,6 +505,7 @@ name = "rnl-viewer-files"
 version = "0.6.1"
 dependencies = [
  "rnl-cli",
+ "rnl-runtime",
  "serde",
  "serde_json",
 ]

@@ -228,12 +228,10 @@ pub fn list_dir(dir: &Path) -> Result<(PathBuf, Vec<Entry>, bool), String> {
 
 pub use rnl_viewer_files::save::{Saved, SavedAs, SavedFile};
 
-/// The file at `path`, as the Document names it, of the netlist `entry`: where it is on disk; a path that is rooted is its own.
+/// The file at `path`, as the Document names it, of the netlist `entry`: where it is on this machine
+/// (rnl_viewer_files::save::located, as the desktop finds it).
 pub fn located(entry: &str, path: &str) -> PathBuf {
-    if path.starts_with('/') || Path::new(path).is_absolute() {
-        return machine_path(path);
-    }
-    machine_path(entry).parent().map_or_else(|| PathBuf::from("/"), Path::to_path_buf).join(path)
+    machine_path(&rnl_viewer_files::save::located(entry, path))
 }
 
 /// Write the files of the netlist `entry` where they were read from, each in its own encoding, and give their names
