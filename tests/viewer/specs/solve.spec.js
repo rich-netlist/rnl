@@ -281,6 +281,12 @@ test.describe("on the desktop", () => {
     await expect(dialog(page)).toContainText("The files that were opened are unchanged.");
     await dialog(page).getByRole("button", { name: "Close" }).click();
     await dialogGone(page);
+    // several solved files and nothing else are saved into a folder, in one sentence with its full stop
+    await page.evaluate(() => (window.fakeShell.saved = { to: "/copies", written: 2, copied: 0 }));
+    await page.keyboard.press("Control+Shift+S");
+    await expect(dialog(page)).toContainText("Saved 2 solved files into /copies.");
+    await dialog(page).getByRole("button", { name: "Close" }).click();
+    await dialogGone(page);
     // a netlist that reads other files is saved into a folder, with those it only read beside them: the page says so
     await page.evaluate(() => (window.fakeShell.saved = { to: "/copies", written: 2, copied: 1 }));
     await page.keyboard.press("Control+Shift+S");
@@ -293,7 +299,7 @@ test.describe("on the desktop", () => {
     await expect(dialog(page)).toContainText("The copy was not saved: a copy is never saved over a file that was read");
     await dialog(page).getByRole("button", { name: "Close" }).click();
     await dialogGone(page);
-    expect(await viewer.calls("saveSolved")).toHaveLength(3);
+    expect(await viewer.calls("saveSolved")).toHaveLength(4);
   });
 
   test("a solve that fails says why, and shows no preview", async ({ page, viewer }) => {

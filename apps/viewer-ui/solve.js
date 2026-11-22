@@ -203,8 +203,9 @@ function savedSentence(said) {
       : m("Downloaded {0}: the solved files and the files they read, in their places.", said.downloaded);
   }
   if (one) return m("Saved the solved copy as {0}.", said.to);
+  // a sentence of its own, with its full stop, for each language to end as it ends one
+  if (said.copied === 0) return m("Saved {0} solved files into {1}.", said.written, said.to);
   const files = said.written === 1 ? m("Saved 1 solved file into {0}", said.to) : m("Saved {0} solved files into {1}", said.written, said.to);
-  if (said.copied === 0) return m`${files}.`;
   return said.copied === 1 ? m("{0}, along with 1 other file copied alongside them.", files)
     : m("{0}, along with {1} other files copied alongside them.", files, said.copied);
 }
