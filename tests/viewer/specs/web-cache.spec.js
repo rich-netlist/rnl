@@ -99,3 +99,29 @@ test('the limits are checked and kept, and 0 keeps no reading', async ({ page })
   await openCache(page);
   await expect(memory).toHaveValue('0');
 });
+
+test('after a solve, or with the Solve view open, the readings are still kept and shown again from the cache', async ({ page }) => {
+  await open(page);
+  // the Solve view opened, as a solve opens it: the readings now carry the constraints of the netlist
+  await page.locator('#tab-solve').click();
+  await idle(page);
+  const descend = () => page.evaluate(() => import('./subcircuits.js').then(s => s.descend(window.viewer.doc.objects.findIndex(o => o.kind === 'instance' && o.name === 'X1'))));
+  await descend();
+  await idle(page);
+  expect(await page.evaluate(() => window.viewer.doc.file)).toBe('cells.inc');
+  await page.evaluate(() => import('./subcircuits.js').then(s => s.ascend()));
+  await idle(page);
+  // the file of the subcircuit again: its reading, with the constraints, is kept
+  await page.evaluate(() => {
+    window.loadingStages = [];
+    new MutationObserver(() => window.loadingStages.push(document.getElementById('loading').dataset.stage))
+      .observe(document.getElementById('loading'), { attributes: true, attributeFilter: ['data-stage'] });
+  });
+  const before = await stats(page);
+  await descend();
+  await idle(page);
+  expect(await page.evaluate(() => window.loadingStages)).toContain('cached');
+  expect((await stats(page)).hits).toBe(before.hits + 1);
+  // and it has the constraints the Solve view lists
+  expect(await page.evaluate(() => import('./constraints.js').then(c => c.hasConstraints(window.viewer.doc)))).toBe(true);
+});
