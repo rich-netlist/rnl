@@ -32,7 +32,6 @@ import { $ } from "./util.js";
 import { setEnabled } from "./commands.js";
 import { startLoading, nextPaint } from "./loading.js";
 import { offerMissingPackages } from "./package-offers.js";
-import { askToSolve } from "./solve-on-open.js";
 import { entrySource } from "./visit-source.js";
 import { titleName } from "./window-title.js";
 import { watchShown } from "./disk-changes.js";
@@ -113,9 +112,6 @@ export async function openSource(source, keep, edited, fresh = false, navigation
       loading = false;
       document.body.classList.remove("busy");
       if (d === doc) void offerMissingPackages(d, source, operation.signal);
-      // a file or a project opened, not read again, rebuilt, visited from another file or imported by the API:
-      // asked whether to solve it when it has components not drawn (solve-on-open.js)
-      if (d === doc && !keep && !edited && !navigation && !signal) void askToSolve(d, source, operation.signal);
       // an entry that only includes other files, with one subcircuit nothing calls: that subcircuit (entry-page.js)
       if (d === doc && !keep && !edited && !navigation && !signal) openOnlyRoot();
       window.dispatchEvent(new Event("open-finished"));
