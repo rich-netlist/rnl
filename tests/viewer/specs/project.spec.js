@@ -101,7 +101,9 @@ test('Download Project keeps unused folder files, duplicate basenames, edits and
     const input = page.locator('#folder-input').setInputFiles(folder).catch(() => {});
     const name = path.basename(folder);
     await expect(page.getByRole('button', { name: `Open ${name}/top.sp`, exact: true })).toBeVisible();
-    await input;
+    // the page has the folder once its file is listed; in WebKit the setting of a folder's files may never return,
+    // so it is not waited for long, as in web.spec.js
+    await Promise.race([input, new Promise((resolve) => setTimeout(resolve, 3000))]);
     await page.getByRole('button', { name: `Open ${name}/top.sp`, exact: true }).click();
     await ready(page);
     await page.evaluate(async (name) => {
