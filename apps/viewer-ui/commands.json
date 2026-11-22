@@ -123,7 +123,6 @@
         { "id": "solve-respace", "label": "&Respace", "with": "solve" },
         { "id": "solve-respace-all", "label": "Respace All Circuits", "with": "solve" },
         { "id": "solve-close", "label": "&Close Preview", "with": "solve" },
-        { "id": "toggle-solve-on-open", "label": "As&k to Solve on Open", "check": true, "with": "solve" },
         "-",
         { "id": "solve-save", "label": "Save Solved Cop&y As...", "keys": ["Ctrl+Shift+S"], "with": "saveSolved" },
         { "id": "solve-save-utf8", "label": "Save Solved Copy As UTF-8...", "platforms": ["desktop"], "with": "saveSolved" },

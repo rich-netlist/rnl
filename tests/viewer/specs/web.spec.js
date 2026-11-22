@@ -828,17 +828,16 @@ test("a netlist served at the root of its server is named after the server", asy
   await showsDocument(page, doc);
 });
 
-test("the web viewer, which solves in the browser, asks to solve a netlist opened with components not drawn", async ({ page }) => {
-  // on, as it is to begin with; the other tests of this file have it off (beforeEach)
-  await page.addInitScript(() => localStorage.setItem("solve-on-open", "true"));
+test("the web viewer, which solves in the browser, offers to solve a netlist opened with components not drawn, and asks nothing", async ({ page }) => {
   await start(page);
   await page.locator("#file-input").setInputFiles({ name: "bare.sp", mimeType: "text/plain", buffer: Buffer.from("* none placed\nR1 a b 1k\nC1 b 0 1p\n.end\n") });
-  const dialog = page.locator("dialog.dialog");
-  await expect(dialog).toContainText("Solve the Netlist?");
-  await expect(dialog).toContainText("2 components have no position yet, so they are not drawn.");
-  await dialog.getByRole("button", { name: "Not now" }).click();
-  await expect(dialog).toHaveCount(0);
-  expect(await page.evaluate(() => window.viewer.doc.name)).toBe("bare.sp");
+  await expect.poll(() => page.evaluate(() => window.viewer.doc?.name)).toBe("bare.sp");
+  // nothing is drawn: the page that says why has the link that solves
+  const empty = page.locator("#empty");
+  await expect(empty).toContainText("Nothing on this level has a position yet, so nothing is drawn.");
+  await expect(empty.getByRole("button", { name: "Solve (F9)" })).toBeVisible();
+  await page.waitForTimeout(300);
+  await expect(page.locator("dialog.dialog")).toHaveCount(0);
 });
 
 test("files set on the file input open as with Open, and the page asks which is the netlist", async ({ page }) => {

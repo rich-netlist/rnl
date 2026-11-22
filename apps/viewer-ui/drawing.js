@@ -22,6 +22,7 @@ import { canOpen, descend, updatePath } from "./subcircuits.js";
 import { hideParams, updateParams } from "./params.js";
 import { markUnplaced, scopeSource } from "./text.js";
 import { renderUnplaced } from "./unplaced.js";
+import { showUnplacedBar, unplacedLine } from "./unplaced-bar.js";
 import { $, clamp, svgElement } from "./util.js";
 import { paintUsages, usageAt, usagesAt } from "./usages.js";
 import { skeletonAt } from "./skeleton-lines.js";
@@ -91,6 +92,10 @@ export function showLevel(i, keptView) {
     showPointer();
     setText($("zoom"), "");
     setText($("empty"), emptyMessage(lv));
+    // nothing drawn because nothing has a position yet: the page offers the solve, not a bar
+    const line = unplacedLine(lv);
+    if (line) $("empty").append(document.createElement("br"), line);
+    showUnplacedBar(null);
     // an entry that only includes other files: the subcircuits nothing calls, in place of the message
     $("empty").hidden = showEntryPage(i);
     window.dispatchEvent(new Event("viewer-level"));
@@ -116,6 +121,7 @@ export function showLevel(i, keptView) {
   overlay.setAttribute("pointer-events", "none");
   append(el, overlay);
   $("empty").hidden = true;
+  showUnplacedBar(lv);
   svg = el;
   append(canvas, svg);
   if (keptView) {
@@ -160,6 +166,7 @@ export function clearDrawing(message) {
   view = null;
   setText($("empty"), message);
   $("empty").hidden = false;
+  showUnplacedBar(null);
   setPath([]);
   updatePath();
   hideParams();

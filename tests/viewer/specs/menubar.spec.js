@@ -449,8 +449,6 @@ test.describe("with a native menu", () => {
       ["toggle-layout", false],
       ["toggle-skeleton-symbols", false],
       ["toggle-skeleton-wires", false],
-      // off, as every test but solve-on-open.spec.js starts (playwright.config.js)
-      ["toggle-solve-on-open", false],
     ];
     expect(await viewer.calls("setCheck")).toEqual(expect.arrayContaining(marks));
     await page.keyboard.press("Control+B");
