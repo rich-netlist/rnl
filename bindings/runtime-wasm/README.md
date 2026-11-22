@@ -191,6 +191,22 @@ A request with a `formats` field and no `entry`, `{"formats": {"detect": {"/w/a.
 
 A request with a `bundled` field and no `entry`, `{"bundled": true}`, gives `{"bundled": {"<bundled>/0.4/rnl-std-all.rnl": "...", ...}}`: the bundled packages a frontend lists among its built-in ones, by path with their texts, all but those of a draft series ([`rnl_view::bundled_listed`](../../crates/rnl-view/README.md)). The web viewer's build writes them into its `libraries/bundled.json`. `core.js` and `client.js` give them as `bundled()`.
 
+### Folders included
+
+A request with a `folders` field and no `entry`, `{"folders": {"paths": ["/lib/top.sp", "/lib/sub/cell.inc", "/lib/.git/x.sp", "/alone.sp"]}}`, gives `{"folders": {"files": [...], "truncated": [...], "limit": 2000}}`: of the files of folders as a browser gives a folder chosen or dropped, those the Library lists, as every viewer lists a folder included ([`rnl_view::folder`](../../crates/rnl-view/src/folder.rs), which the desktop app and the local program walk a folder on disk with too).
+
+- Each path is `/`-separated, and a leading `/` is not a part. Its first part is the folder included: `/lib/sub/cell.inc` is a file of the folder `lib`.
+- A path of one part is a file given alone, such as one dropped beside a folder. It is kept when its suffix is one a frontend lists, and is not walked.
+- Each folder is walked on its own, with a limit of its own:
+  - nothing hidden is taken (a part that starts with a dot);
+  - folders are entered down to 8 levels below the one included;
+  - a file is taken by its suffix;
+  - no more than `limit` files are taken, those met first: a folder's files by name, then the folders in it by name, depth first.
+- `truncated` names the folders that had more files than `limit`, each listed in part.
+- `files` are the paths kept, as given, sorted part by part as paths sort.
+
+`core.js` and `client.js` give it as `folders(paths)`. The worker sends it no package files.
+
 ## JavaScript modules
 
 ES modules in [`js/`](js/), with no dependencies. They keep to the browser baseline of decision 0008, Chromium 109 and Safari 16, and run in module Workers and in Node 18 or later.

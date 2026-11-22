@@ -30,7 +30,6 @@ export function suffix(path) {
   return dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
 }
 
-
 /** The suffixes the core lists, written for a sentence: ".sp, .spi, … or .rnl". */
 export async function listedText() {
   const { entries, parts } = await listedSuffixes();

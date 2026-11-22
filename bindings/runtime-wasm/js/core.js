@@ -174,12 +174,13 @@
  *   The formats a file can be read with, and the format each file of `detect` has when none is set.
  * @property {() => Record<string, string>} bundled The bundled packages a frontend lists among its
  *   built-in ones, by path with their texts: all the core has but those of a draft series.
- * @property {(paths: string[]) => { files: string[], truncated: boolean }} folders The files of folders as a browser
- *   gives them (each path's first part the folder included, or a file given alone) that the Library lists, as every
- *   viewer lists a folder included, and whether a folder had more files than are listed.
+ * @property {(paths: string[]) => { files: string[], truncated: string[], limit: number }} folders The files of folders
+ *   as a browser gives them (each path's first part the folder included, or a file given alone) that the Library lists,
+ *   as every viewer lists a folder included; the folders that had more files than are listed, by name; and how many
+ *   files a folder brings in at most.
  * @property {(request: Request | WriteRequest | ReplaceRecordsRequest | CatalogRequest | DrawingsRequest | string) => object} respond
  *   The core's answer as it gives it: `{ document }`, `{ outline }`, `{ file }`, `{ symbols }`, `{ snapshot }`, `{ written }`, `{ replaced }`,
- *   `{ catalog }`, `{ drawings }` or `{ error }`. Throws only when the core stops.
+ *   `{ catalog }`, `{ drawings }`, `{ library }`, `{ formats }`, `{ bundled }`, `{ folders }` or `{ error }`. Throws only when the core stops.
  */
 
 const encoder = new TextEncoder();

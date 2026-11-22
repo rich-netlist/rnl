@@ -550,7 +550,7 @@ export interface Core {
   bundled(): Record<string, string>;
   /**
    * The files of folders as a browser gives them (each path's first part the folder included, or a file given alone)
-   * that the Library lists, as every viewer lists a folder included, and whether a folder had more files than are listed.
+   * that the Library lists, as every viewer lists a folder included; the folders that had more files than are listed.
    */
   folders(paths: string[]): FolderListing;
   /** The core's answer as it gives it; throws only when the core stops. */
@@ -583,10 +583,13 @@ export interface Core {
     | { error: string };
 }
 
-/** The files of folders the Library lists, sorted, and whether a folder had more files than are listed. */
+/** The files of folders the Library lists, sorted; the folders listed in part, by name; and a folder's most files. */
 export interface FolderListing {
   files: string[];
-  truncated: boolean;
+  /** The folders that had more files than are listed, by name (the first part of their paths). */
+  truncated: string[];
+  /** How many files a folder brings in at most. */
+  limit: number;
 }
 
 /** Load the core: the module by URL, as a response, as bytes, or compiled. */

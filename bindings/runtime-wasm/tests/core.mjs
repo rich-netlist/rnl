@@ -554,14 +554,16 @@ test("the formats give the suffixes a frontend lists, and a bundled request the 
 test("a folders request lists the files of folders a browser gives as every viewer lists a folder included", async () => {
   // the folder included is each path's first part; a file alone is kept when listed; nothing hidden, by the core's suffixes
   const paths = ["/lib/top.sp", "/lib/notes.txt", "/lib/.git/x.sp", "/lib/sub/parts.RNL", "/alone.va", "/alone.txt"];
-  const listed = { files: ["/alone.va", "/lib/sub/parts.RNL", "/lib/top.sp"], truncated: false };
+  const listed = { files: ["/alone.va", "/lib/sub/parts.RNL", "/lib/top.sp"], truncated: [], limit: 2000 };
   assert.deepEqual(core.folders(paths), listed);
   // more files than a folder included brings in: the first ones met, and said
-  const many = Array.from({ length: 2001 }, (_, i) => `big/f${String(i).padStart(4, "0")}.sp`);
+  // each folder has a limit of its own: big is listed in part, and said by name; small is listed whole
+  const many = [...Array.from({ length: 2001 }, (_, i) => `big/f${String(i).padStart(4, "0")}.sp`), "small/a.sp"];
   const big = core.folders(many);
-  assert.equal(big.files.length, 2000);
-  assert.equal(big.truncated, true);
+  assert.equal(big.files.length, 2001);
+  assert.deepEqual(big.truncated, ["big"]);
   assert.equal(big.files.includes("big/f2000.sp"), false);
+  assert.equal(big.files.includes("small/a.sp"), true);
   const worker = startCore();
   try {
     assert.deepEqual(await worker.folders(paths), listed);

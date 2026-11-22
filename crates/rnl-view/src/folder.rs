@@ -81,8 +81,9 @@ pub fn walk_folder<F, D>(
 /// The files of folders, as a browser gives a folder chosen or dropped: their paths, `/`-separated, whose first part is
 /// the folder included ("lib/sub/cell.inc"), or the file itself when it has no other ("top.sp", a file given alone); a
 /// leading `/` is not a part. What is listed: each folder walked as [`walk_folder`] walks it, the files given alone that
-/// are listed, sorted by their parts as paths sort; and whether a folder had more files than the walk's limit.
-pub fn folders_listing(paths: &[String], walk: Walk) -> (Vec<String>, bool) {
+/// are listed, sorted by their parts as paths sort; and the folders that had more files than the walk's limit, each of
+/// which is listed in part, by their names (the first parts of their paths).
+pub fn folders_listing(paths: &[String], walk: Walk) -> (Vec<String>, Vec<String>) {
     #[derive(Default)]
     struct Node {
         files: BTreeMap<String, String>,
@@ -115,11 +116,13 @@ pub fn folders_listing(paths: &[String], walk: Walk) -> (Vec<String>, bool) {
     }
     let listed = |(name, _): &(String, String)| crate::is_listed(name);
     let mut out = alone;
-    let mut truncated = false;
-    for root in roots.values() {
+    let mut truncated = Vec::new();
+    for (name, root) in &roots {
         let (files, more) = walk_folder(&root, walk, &entries, &listed);
         out.extend(files.into_iter().map(|(_, path)| path));
-        truncated |= more;
+        if more {
+            truncated.push(name.clone());
+        }
     }
     let parts = |p: &String| p.split('/').filter(|s| !s.is_empty()).map(str::to_owned).collect::<Vec<_>>();
     out.sort_by_key(parts);
@@ -130,7 +133,7 @@ pub fn folders_listing(paths: &[String], walk: Walk) -> (Vec<String>, bool) {
 mod tests {
     use super::*;
 
-    fn listing(paths: &[&str], walk: Walk) -> (Vec<String>, bool) {
+    fn listing(paths: &[&str], walk: Walk) -> (Vec<String>, Vec<String>) {
         folders_listing(&paths.iter().map(|p| p.to_string()).collect::<Vec<_>>(), walk)
     }
 
@@ -153,7 +156,7 @@ mod tests {
         ];
         let (files, more) = listing(&given, INCLUDE_FOLDER);
         assert_eq!(files, ["alone.sp", eight.as_str(), "lib/sub/parts.RNL", "lib/top.sp"]);
-        assert!(!more);
+        assert!(more.is_empty());
     }
 
     #[test]
@@ -162,7 +165,8 @@ mod tests {
         let (files, more) = listing(&["lib/b/1.sp", "lib/z.sp", "lib/a/1.sp", "lib/a.sp", "other/x.sp"], walk);
         // lib: a.sp and z.sp, then a/1.sp; b/1.sp is not met; other has a limit of its own. Sorted as paths sort
         assert_eq!(files, ["lib/a/1.sp", "lib/a.sp", "lib/z.sp", "other/x.sp"]);
-        assert!(more);
+        // lib had more; other, its one file
+        assert_eq!(more, ["lib"]);
     }
 
     #[test]

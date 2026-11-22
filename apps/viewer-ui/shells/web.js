@@ -641,12 +641,12 @@ async function poolItems(files, folder = false) {
  * The items of a folder chosen or dropped that join the Library, as every viewer lists a folder included: the core lists
  * them from their paths (`pathOf`, whose first part is the folder included, or a file given alone), as the desktop app
  * and the local program list a folder on disk (rnl_view::folder). A folder with more files than are listed is included
- * in part, which is said, as in the desktop viewer.
+ * in part, which is said, with its name and how many files a folder brings in.
  */
 async function listedFolders(items, pathOf) {
   const byPath = new Map(items.map((item) => [pathOf(item), item]));
-  const { files, truncated } = await (await someCore()).folders([...byPath.keys()]);
-  if (truncated) note(m`Only the first ${files.length} entries are listed.`);
+  const { files, truncated, limit } = await (await someCore()).folders([...byPath.keys()]);
+  if (truncated.length) note(m`Only the first ${limit} files of ${truncated.join(", ")} are listed.`);
   return files.map((path) => byPath.get(path));
 }
 

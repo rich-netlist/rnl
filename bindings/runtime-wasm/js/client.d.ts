@@ -103,7 +103,7 @@ export interface CoreWorker {
   bundled(): Promise<Record<string, string>>;
   /**
    * The files of folders as a browser gives them (each path's first part the folder included, or a file given alone)
-   * that the Library lists, as every viewer lists a folder included, and whether a folder had more files than are listed.
+   * that the Library lists, as every viewer lists a folder included; the folders that had more files than are listed.
    */
   folders(paths: string[]): Promise<FolderListing>;
   /** Stop the Worker; calls still waiting, and later ones, reject. */

@@ -337,12 +337,14 @@ pub struct FolderPaths {
     pub paths: Vec<String>,
 }
 
-/// The files of the folders of a [`FoldersRequest`] that the Library lists, sorted, and whether a
-/// folder had more files than are listed.
+/// The files of the folders of a [`FoldersRequest`] that the Library lists, sorted; the folders that
+/// had more files than are listed, by their names, each listed in part; and how many files a folder
+/// brings in at most.
 #[derive(Serialize, Debug)]
 pub struct FolderListing {
     pub files: Vec<String>,
-    pub truncated: bool,
+    pub truncated: Vec<String>,
+    pub limit: usize,
 }
 
 /// The answer to a request: `{"document": ...}`, `{"outline": ...}`, `{"file": ...}`, `{"symbols": ...}`,
@@ -485,12 +487,12 @@ pub fn respond(request: &[u8]) -> Response {
     if value.get("bundled").is_some() && value.get("entry").is_none() {
         return Response::Bundled(rnl_view::bundled_listed());
     }
-    if value.get("folders").is_some() {
+    if value.get("folders").is_some() && value.get("entry").is_none() {
         return match serde_json::from_value::<FoldersRequest>(value) {
             Ok(f) => {
-                let (files, truncated) =
-                    rnl_view::folder::folders_listing(&f.folders.paths, rnl_view::folder::INCLUDE_FOLDER);
-                Response::Folders(FolderListing { files, truncated })
+                let walk = rnl_view::folder::INCLUDE_FOLDER;
+                let (files, truncated) = rnl_view::folder::folders_listing(&f.folders.paths, walk);
+                Response::Folders(FolderListing { files, truncated, limit: walk.limit })
             }
             Err(e) => invalid(e),
         };
