@@ -205,7 +205,8 @@ struct Args {
     all: bool,
     /// `view`'s `--bind` and `--param`.
     bind: Option<rnl_view::Bind>,
-    /// `dump`'s and `view`'s `--file`: the file whose levels alone are built.
+    /// `dump`'s, `view`'s, `solve`'s and `preview`'s `--file`: the file whose levels alone are
+    /// built.
     only_file: Option<String>,
     /// `dump`'s `--each-file`.
     each_file: bool,
@@ -468,7 +469,7 @@ fn parse_args() -> Result<Args, Said> {
             "--png" | "--scale" | "--net-names" => &["render"],
             "--layout" => &["solver-defaults"],
             "--all" => &["groups"],
-            "--file" => &["dump", "view"],
+            "--file" => &["dump", "view", "solve", "preview"],
             "--each-file" => &["dump"],
             "--primitives" | "--no-svg" | "--status" => &["view", "snapshot"],
             "--flylines" => &["view", "snapshot", "render"],

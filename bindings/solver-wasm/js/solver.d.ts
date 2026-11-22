@@ -23,6 +23,12 @@ export interface SolveRequest {
   solver_config?: string;
   /** Only the level with this title. */
   level?: string;
+  /**
+   * With `level`, the file of the document the level is written in, as the document names it: only that file is
+   * read for the level, in the context of `entry`, and the Document answered is that file's, shaped as the reading of
+   * that file alone.
+   */
+  file?: string | null;
   /** Space each level again from its record of the solver, nothing searched. */
   respace?: boolean;
   /** The whole file's time in seconds, as `rnl solve --timeall` takes it: what the levels of a time limit share. */

@@ -85,6 +85,10 @@ solve options (the levels are read without their type="generated" records; -o or
                       with a copy of the other files they read from there, such as includes
   --in-place          write them over the files read instead
   --level TITLE       only the level with this title
+  --file F            with --level, the file F of the document that the level is written in: only
+                      that file is read for the level, in the context of FILE, as a viewer that reads
+                      the file shown alone reads it; what is written is the same, and the preview is
+                      the Document of that file (solve and preview take it)
   --solver-options S  key=value;... over the solver's defaults, for tolerance, grid, objectives, beam,
                       budget and time_limit, as rnl-solver's canonical text writes them; the hash
                       covers them. time_limit is the seconds the resolution of a level may spend on
@@ -194,6 +198,7 @@ distinction and the position reference when writing a wire back.
 - **Watching it:** `solve::solve_watched` tells a watcher of each level before it is solved, and stops at its word. `preview::StoppableClock` is past the time limit once stopped, so that the level under way stops checking its facts.
 - **Following it:** `progress::solve_progress` and `preview::preview_progress` give every step of the solve as an event: each level with its limit, the stages, the work, each better candidate, and each level's end. `rnl solve --progress=json` writes the same events, one JSON object per line, on the standard error. See [solver progress events](../../docs/solver-progress.md).
 - **Reading once:** the preview takes the readings the solve made instead of reading the same texts again (`solve::SolveRun::readings`): the document with the records written, as the solve's check that a record reads back read it, when the texts it held are the files the solve wrote; and the files as they were, for the settings checked. The write-back takes the record that check finished. What is taken is what reading again gives, so the output is the same.
+- **One file:** with `--level` and `--file F` (`SolveOptions::file`), only the file F that the level is written in is read, in the context of FILE (`rnl_runtime::Options::only_file`), as a viewer that reads the file shown alone reads it. The level read so is the one the whole document has (`rnl_runtime::per_file`), so the solve, the record and what is written are the same as without `--file`. The Document is then the reading of that file alone, as `view --file` prints it of the texts solved (`rnl_view::build_file`): its levels numbered as the whole document numbers them, the texts of the other files left out, with `file`, `children` and `inputs` beside it (`preview::Preview::shown`), and the report locates its lines in that Document. A solve request takes it as `file`.
 - **Spacing it again:** `respace::respace` and `preview::respace` start each level from where its record of the solver puts the objects, route the wires again and widen the gaps to the settings' spacing, nothing searched; a level whose record does not fit the netlist as it is now is left as it is, with the reason. See [respacing a solved drawing](../../docs/solver-respace.md).
 
 ## solve

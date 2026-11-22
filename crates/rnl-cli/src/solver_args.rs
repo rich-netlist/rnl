@@ -76,6 +76,10 @@ solve options (the levels are read without their type=\"generated\" records; -o 
   --external-arg ARG  append one literal argument to P (repeatable; no shell)
   --external-timeout S  stop P after S seconds per level (120 by default)
   --level TITLE       only the level with this title
+  --file F            with --level, the file F of the document that the level is written in: only
+                      that file is read for the level, in the context of FILE, as a viewer that reads
+                      the file shown alone reads it; what is written is the same, and the preview is
+                      the Document of that file (solve and preview take it)
   --solver-options S  key=value;... over the solver's defaults, for tolerance, grid, objectives, beam,
                       budget and time_limit, as rnl-solver's canonical text writes them; the hash
                       covers them. time_limit is the seconds the resolution of a level may spend on
@@ -300,6 +304,17 @@ pub(crate) fn problem(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
     Ok(ExitCode::SUCCESS)
 }
 
+/// `--file` of `solve` and `preview`: the name in the document of the file that the level is
+/// written in. In a request, the file is named as the document names it, and taken as it is.
+fn level_file(args: &Args, provider: &FsProvider) -> Result<Option<String>, Said> {
+    match &args.only_file {
+        Some(given) if !args.request => {
+            Ok(Some(rnl_cli::dump::file_in(&args.file, args.dialect.as_deref(), &args.formats, provider, given)?))
+        }
+        given => Ok(given.clone()),
+    }
+}
+
 /// What `rnl preview --request` reads: a solve request as the WebAssembly solver takes it, the files
 /// in it ([`rnl_view::RequestFiles`]).
 #[derive(serde::Deserialize)]
@@ -308,6 +323,9 @@ struct SolveRequest {
     dialect: Option<String>,
     #[serde(default)]
     formats: std::collections::BTreeMap<String, String>,
+    /// With `--level`, the file of the document the level is written in, as `--file` gives it.
+    #[serde(default)]
+    file: Option<String>,
     #[serde(flatten)]
     workspace: rnl_view::RequestFiles,
 }
@@ -325,6 +343,7 @@ pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
         std: args.std,
         include_std: args.include_std,
         level: args.level.clone(),
+        file: level_file(args, provider)?,
         solver,
         total_seconds: args.solver.timeall,
     };
@@ -336,6 +355,7 @@ pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
         let request: SolveRequest = serde_json::from_str(&text).map_err(|e| cannot(e.to_string()))?;
         options.formats.extend(request.formats);
         options.dialect = request.dialect.or(options.dialect);
+        options.file = request.file.or(options.file);
         asked = rnl_cli::preview::request_paths(request.workspace.files.keys()).map_err(cannot)?;
         opened = request.workspace.open(&options.formats);
         (request.entry, &opened)
@@ -348,7 +368,7 @@ pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
         } else {
             rnl_cli::preview::preview(&entry, provider, &options, &WallClock::new(), &|_| true)?
         };
-        let out = serde_json::json!({ "document": shown.document, "report": shown.report, "files": shown.copy.written_by(&asked) });
+        let out = serde_json::json!({ "document": shown.shown(), "report": shown.report, "files": shown.copy.written_by(&asked) });
         println!("{}", serde_json::to_string_pretty(&out).unwrap());
         return Ok(ExitCode::SUCCESS);
     }
@@ -372,7 +392,7 @@ pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
     };
     match shown {
         Ok(shown) => {
-            let out = serde_json::json!({ "document": shown.document, "report": shown.report, "files": shown.copy.written_by(&asked) });
+            let out = serde_json::json!({ "document": shown.shown(), "report": shown.report, "files": shown.copy.written_by(&asked) });
             println!("{}", serde_json::to_string_pretty(&out).unwrap());
             emit(done(0));
             Ok(ExitCode::SUCCESS)
@@ -406,6 +426,7 @@ fn check(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> {
         std: args.std,
         include_std: args.include_std,
         level: args.level.clone(),
+        file: level_file(args, provider)?,
         ..SolveOptions::default()
     };
     let file = (!args.file.as_os_str().is_empty()).then_some(args.file.as_path());
@@ -477,6 +498,7 @@ fn solve_with(args: &Args, provider: &FsProvider) -> Result<(ExitCode, u8, usize
         std: args.std,
         include_std: args.include_std,
         level: args.level.clone(),
+        file: level_file(args, provider)?,
         solver,
         total_seconds: args.solver.timeall,
     };

@@ -163,6 +163,8 @@ pub(crate) fn check_settings_read(
             .filter(|(s, _)| !rnl_solver::is_run_setting(&s.key))
             .map(|(s, _)| s.clone())
             .collect(),
+        // the level in its own file alone, as the solve reads it (`SolveOptions::file`)
+        only_file: options.level.as_ref().and(options.file.clone()),
         ..Options::solver()
     };
     // Options has no equality of its own; its Debug text shows every field

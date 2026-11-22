@@ -273,6 +273,7 @@ fn the_report_of_a_solve_tells_of_each_fact_and_the_document_with_its_record_kee
         std: true,
         include_std: false,
         level: None,
+        file: None,
         solver: SolverOptions::default(),
         total_seconds: None,
     };
