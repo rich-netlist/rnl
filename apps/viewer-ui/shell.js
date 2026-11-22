@@ -39,6 +39,8 @@
  * @property {() => Promise<Array<{name: string, version: string, path: string, description: string, builtin: boolean}>>} [publicPackages] Published package metadata for lookup hints.
  * @property {(pkg: {name: string, version: string}, signal?: AbortSignal) => Promise<object[]>} [includePackage] Include an exact published package.
  * @property {(kind: string) => Promise<object[]>} [include] Include files, a folder or a library package.
+ * @property {(handler: (items: object[]) => void) => void} [onInclude] Call `handler` with the Library files of a drop
+ *   with a folder among them, which join the Library as a folder included does (the web's and the desktop's).
  * @property {(items: object[], reload?: boolean, refresh?: string[], searched?: string[]) => Promise<string[]> | void} [setPool] Replace and index the search pool; reload rereads all files, refresh replaces named entries. Returns read errors.
  *   The items of PATH have `searchPath`, and `searched` is the folders PATH searches, in order (the `dirs` of each
  *   `pathPackages` answer): a shell whose core does not read the disk gives them to it as folders, not in the pool.
