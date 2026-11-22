@@ -33,11 +33,12 @@ export function suffix(path) {
 
 /**
  * Say which folders included are listed in part, as every viewer lists a folder (rnl_view::folder::Listing: `truncated`,
- * the folders by name, and `limit`, how many files a folder brings in): one sentence for every shell, Include Folder and
- * a folder dropped alike. Nothing when every folder is listed whole.
+ * the folders by name, and `limit`, how many files each folder brings in): the same sentence for every shell, Include
+ * Folder and a folder dropped alike, one for each folder, as the limit is each folder's; they are said in one note.
+ * Nothing when every folder is listed whole.
  */
 export function sayListedInPart({ truncated, limit }) {
-  if (truncated?.length) note(m`Only the first ${limit} files of ${truncated.join(", ")} are listed.`);
+  if (truncated?.length) note(truncated.map((folder) => m`Only the first ${limit} files of ${folder} are listed.`).join(" "));
 }
 
 /** The suffixes the core lists, written for a sentence: ".sp, .spi, … or .rnl". */

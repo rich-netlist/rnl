@@ -29,8 +29,11 @@ pub const INCLUDE_FOLDER: Walk = Walk { depth: Some(8), limit: 2000 };
 /// at most. The page says the folders listed in part with these, in one sentence for every viewer.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct Listing<F = String> {
+    /// The files the Library lists, sorted.
     pub files: Vec<F>,
+    /// The folders that had more files than a folder brings in, each listed in part, by their names.
     pub truncated: Vec<String>,
+    /// How many files each folder brings in at most: a limit of each folder, not of them all.
     pub limit: usize,
 }
 
