@@ -313,8 +313,10 @@ struct SolveRequest {
 }
 
 /// `rnl preview`: as `rnl solve` solves, and nothing written: the Document of the files as solved
-/// and the report, which the desktop viewer shows (decision 0010). With `--request`, FILE is a solve
-/// request and the files are its own, read as every viewer reads them, none from disk.
+/// and the report, which the desktop viewer shows (decision 0010), and the texts the solve would write
+/// by their paths (`files`), which a viewer draws the preview again from. With `--request`, FILE is a
+/// solve request and the files are its own, read as every viewer reads them, none from disk; `files`
+/// names them by the request's paths.
 pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> {
     let solver = configured(args)?;
     let mut options = SolveOptions {
@@ -327,12 +329,14 @@ pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
         total_seconds: args.solver.timeall,
     };
     let opened;
+    let mut asked = std::collections::BTreeMap::new();
     let (entry, provider): (String, &dyn rnl_runtime::source::Provider) = if args.request {
         let cannot = |e: String| Said::new(codes::CLI_CANNOT_READ, format!("cannot read {}: {e}", args.file.display()));
         let text = std::fs::read_to_string(&args.file).map_err(|e| cannot(e.to_string()))?;
         let request: SolveRequest = serde_json::from_str(&text).map_err(|e| cannot(e.to_string()))?;
         options.formats.extend(request.formats);
         options.dialect = request.dialect.or(options.dialect);
+        asked = rnl_cli::preview::request_paths(request.workspace.files.keys()).map_err(cannot)?;
         opened = request.workspace.open(&options.formats);
         (request.entry, &opened)
     } else {
@@ -344,7 +348,7 @@ pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
         } else {
             rnl_cli::preview::preview(&entry, provider, &options, &WallClock::new(), &|_| true)?
         };
-        let out = serde_json::json!({ "document": shown.document, "report": shown.report });
+        let out = serde_json::json!({ "document": shown.document, "report": shown.report, "files": shown.copy.written_by(&asked) });
         println!("{}", serde_json::to_string_pretty(&out).unwrap());
         return Ok(ExitCode::SUCCESS);
     }
@@ -368,7 +372,7 @@ pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
     };
     match shown {
         Ok(shown) => {
-            let out = serde_json::json!({ "document": shown.document, "report": shown.report });
+            let out = serde_json::json!({ "document": shown.document, "report": shown.report, "files": shown.copy.written_by(&asked) });
             println!("{}", serde_json::to_string_pretty(&out).unwrap());
             emit(done(0));
             Ok(ExitCode::SUCCESS)
