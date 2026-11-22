@@ -182,8 +182,11 @@ fn gone(peer: &TcpStream) -> bool {
     closed
 }
 
-/// The JSON text of `{document, report}` of a solve that is done.
-fn solved_json(shown: &rnl_cli::preview::Preview, asked: &std::collections::BTreeMap<String, String>) -> Result<String, String> {
+/// The JSON text of `{document, report, files}` of a solve that is done: `files` the texts it wrote, by the request's paths.
+fn solved_json(
+    shown: &rnl_cli::preview::Preview,
+    asked: &std::collections::BTreeMap<String, String>,
+) -> Result<String, String> {
     #[derive(serde::Serialize)]
     struct Solved<'a> {
         document: &'a rnl_view::Document,
@@ -191,10 +194,11 @@ fn solved_json(shown: &rnl_cli::preview::Preview, asked: &std::collections::BTre
         files: std::collections::BTreeMap<String, String>,
     }
     let files = shown.copy.written_by(asked);
-    serde_json::to_string(&Solved { document: &shown.document, report: &shown.report, files }).map_err(|e| e.to_string())
+    serde_json::to_string(&Solved { document: &shown.document, report: &shown.report, files })
+        .map_err(|e| e.to_string())
 }
 
-/// Solve a request: the JSON text of `{document, report}`. `peer` is the connection of the page, which is watched for the
+/// Solve a request: the JSON text of `{document, report, files}`. `peer` is the connection of the page, which is watched for the
 /// page going away, as a cancel is: the solve stops at its next level.
 pub fn solve(request: &Request, peer: &TcpStream, last: &LastSolve) -> Result<String, String> {
     let Prepared { entry, files, options, respace: spaced, asked } = prepare(request)?;
