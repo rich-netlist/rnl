@@ -33,6 +33,37 @@ pub struct Preview {
     /// drawn with their records of the solver (2.8).
     pub document: Document,
     pub report: Report,
+    /// When the solve read one file ([`SolveOptions::file`]): what the reading of that file alone
+    /// gives beside its Document (`rnl_view::FileResult`). `document` is then the Document of that
+    /// file, as a viewer that reads the file shown alone has it: the file's levels, numbered as the
+    /// whole document numbers them, and the texts of the other files left out.
+    pub file: Option<OfFile>,
+}
+
+/// What the reading of one file gives beside its Document (`rnl_view::FileResult`).
+#[derive(Debug, Serialize)]
+pub struct OfFile {
+    pub file: String,
+    pub children: Vec<rnl_view::FileChild>,
+    pub inputs: rnl_view::FileInputs,
+}
+
+/// A preview's Document as a viewer is given it: the Document, and with [`Preview::file`] what
+/// the reading of that file adds, in one object shaped as `rnl_view::FileResult`.
+#[derive(Serialize)]
+pub struct Shown<'a> {
+    #[serde(flatten)]
+    pub document: &'a Document,
+    #[serde(flatten)]
+    pub file: Option<&'a OfFile>,
+}
+
+impl Preview {
+    /// The Document as a viewer is given it ([`Shown`]): as the Document alone when the solve read
+    /// the whole document.
+    pub fn shown(&self) -> Shown<'_> {
+        Shown { document: &self.document, file: self.file.as_ref() }
+    }
 }
 
 /// What became of the facts, level by level, each line located in the texts of the Document.
@@ -182,7 +213,14 @@ fn as_solved(entry: &str, mut run: SolveRun, files: &dyn Provider, options: &Sol
         flylines: true,
         ..BuildOptions::default()
     };
-    let document = rnl_view::build(entry, &both, &build)?;
+    // one file read, its Document; else the whole document's
+    let (document, file) = match options.level.as_ref().and(options.file.as_ref()) {
+        Some(file) => {
+            let read = rnl_view::build_file(entry, file, &both, &build)?;
+            (read.document, Some(OfFile { file: read.file, children: read.children, inputs: read.inputs }))
+        }
+        None => (rnl_view::build(entry, &both, &build)?, None),
+    };
     // the texts as a solver reads them, without the records of the solver, so that the facts are
     // those solved, at the lines where the Document shows them
     let again =
@@ -205,7 +243,7 @@ fn as_solved(entry: &str, mut run: SolveRun, files: &dyn Provider, options: &Sol
     let before = readings.before.as_deref().filter(|_| run.entry == entry);
     let checked = check(entry, files, options, before);
     let report = report(&run, &document, &again.problems, &with, options.solver.tolerance, checked);
-    Ok(Preview { copy: Copy::of(&run), document, report })
+    Ok(Preview { copy: Copy::of(&run), document, report, file })
 }
 
 /// Whether `texts`, held over the files by path, are the files the run wrote and no others, so that
@@ -577,6 +615,58 @@ mod tests {
         let json = |shown: &Preview| serde_json::to_string(&(&shown.document, &shown.report)).unwrap();
         assert_eq!(json(&taken), json(&read));
         assert!(taken.report.levels.iter().all(|l| l.check.is_some()), "{:?}", taken.report.levels);
+    }
+
+    /// A level solved with the file it is written in read alone writes what the solve of the whole
+    /// document writes, and its preview is the reading of that file of the texts solved.
+    #[test]
+    fn a_level_solved_in_its_file_alone_writes_the_same_and_shows_that_file() {
+        const TOP: &str = "* top\n\
+            * @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
+            .include \"sub.sp\"\nX1 in out amp\nR9 out 0 1k\n.end\n";
+        const SUB: &str = "* sub\n\
+            * @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
+            .subckt amp a b\nR1 a m 1k\nR2 m b 1k\nC1 m 0 1p\n\
+            * @RNL { #R1 @PLACE(0, 0) }\n.ends\n";
+        let files = MemoryProvider::new().with("/w/top.sp", TOP).with("/w/sub.sp", SUB);
+        let whole = rnl_view::build("/w/top.sp", &files, &rnl_view::BuildOptions::default()).unwrap();
+        let file = whole.files.iter().map(|f| f.path.clone()).find(|p| p.ends_with("sub.sp")).unwrap();
+        let options = SolveOptions {
+            level: Some("amp".into()),
+            solver: rnl_solver::SolverOptions::without_time_limit(),
+            ..SolveOptions::default()
+        };
+        let one = SolveOptions { file: Some(file.clone()), ..options.clone() };
+        let clock = crate::solve::WallClock::new();
+        let texts = |run: &SolveRun| run.files.iter().map(|f| (f.path.clone(), f.text.clone())).collect::<Vec<_>>();
+        let a = crate::solve::solve_watched(Path::new("/w/top.sp"), &files, &options, &clock, &|_| true).unwrap();
+        let b = crate::solve::solve_watched(Path::new("/w/top.sp"), &files, &one, &clock, &|_| true).unwrap();
+        assert_eq!(texts(&a), texts(&b));
+        assert_eq!(a.levels.len(), 1);
+        assert_eq!(b.levels.len(), 1);
+        assert_eq!(a.levels[0].record, b.levels[0].record);
+
+        let shown = as_solved("/w/top.sp", b, &files, &one).unwrap();
+        let mut written = MemoryProvider::new();
+        for f in &shown.copy.files {
+            written.insert(&f.path, &f.text);
+        }
+        let both = Layered { layers: vec![&written, &files] };
+        let build = rnl_view::BuildOptions { constraints: true, flylines: true, ..rnl_view::BuildOptions::default() };
+        let read = rnl_view::build_file("/w/top.sp", &file, &both, &build).unwrap();
+        assert_eq!(serde_json::to_string(&shown.shown()).unwrap(), serde_json::to_string(&read).unwrap());
+        assert_eq!(shown.file.as_ref().map(|f| f.file.as_str()), Some(file.as_str()));
+        assert!(shown.document.levels.iter().all(|l| shown.report.levels.iter().any(|r| r.host == l.host)));
+        // the whole document's preview reports the same, each line in its own Document
+        let full = as_solved("/w/top.sp", a, &files, &options).unwrap();
+        assert!(full.file.is_none());
+        let lines = |p: &Preview| {
+            serde_json::to_value(&p.report.levels).unwrap().to_string().replace(
+                &format!("\"file_index\":{}", p.document.files.iter().position(|f| f.path == file).unwrap()),
+                "\"file_index\":F",
+            )
+        };
+        assert_eq!(lines(&shown), lines(&full));
     }
 
     /// Texts held over the files are those of a run only when they are its files, each with its

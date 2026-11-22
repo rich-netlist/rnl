@@ -96,6 +96,11 @@ pub struct SolveRequest {
     pub solver_config: String,
     /// Only the level with this title.
     pub level: Option<String>,
+    /// With `level`, the file of the document the level is written in, as the document names it:
+    /// only that file is read for the level, in the context of `entry`, as `rnl preview --file`
+    /// reads it, and the Document answered is that file's, shaped as the reading of that file alone.
+    #[serde(default)]
+    pub file: Option<String>,
     /// Space each level again from its record of the solver, nothing searched, as `rnl solve
     /// --respace` does (`docs/solver-respace.md`).
     #[serde(default)]
@@ -183,6 +188,7 @@ fn read_options(request: &mut SolveRequest, solver: SolverOptions) -> SolveOptio
         std: request.std,
         include_std: request.include_std,
         level: request.level.take(),
+        file: request.file.take(),
         solver,
         total_seconds: request.timeall,
     }
@@ -244,7 +250,7 @@ pub fn solve(request: &[u8], now: &dyn Fn() -> f64, progress: &dyn Fn(&str) -> b
     };
     match shown {
         Ok(shown) => Answer::Solved {
-            document: serde_json::to_value(&shown.document).expect("a Document serializes"),
+            document: serde_json::to_value(shown.shown()).expect("a Document serializes"),
             report: serde_json::to_value(&shown.report).expect("a report serializes"),
             files: shown.copy.written_by(&asked),
         },

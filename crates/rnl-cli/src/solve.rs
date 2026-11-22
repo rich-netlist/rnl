@@ -98,6 +98,13 @@ pub struct SolveOptions {
     pub include_std: bool,
     /// Only the level with this title: a subcircuit name, or the file name.
     pub level: Option<String>,
+    /// With `level`, the file of the document that the level is written in, as the document names
+    /// it (`rnl_view::SourceFile::path`): only that file's levels are read, in the context of the
+    /// file solved ([`Options::only_file`]), as a viewer that reads the file shown alone reads it.
+    /// Each level so read is the one the whole document has (`rnl_runtime::per_file`), so what is
+    /// solved and written is the same; the preview is the Document of that file
+    /// ([`crate::preview::Preview::file`]). Not read without `level`.
+    pub file: Option<String>,
     /// The solver's options; their canonical text is the second segment of the hash (17). Its
     /// time limit is the toolkit's default of 5 seconds unless set otherwise (8.5).
     pub solver: SolverOptions,
@@ -117,6 +124,7 @@ impl Default for SolveOptions {
             std: true,
             include_std: false,
             level: None,
+            file: None,
             solver: SolverOptions::default(),
             total_seconds: None,
         }
@@ -137,6 +145,7 @@ impl SolveOptions {
                 .filter(|s| !rnl_solver::is_run_setting(&s.key))
                 .cloned()
                 .collect(),
+            only_file: self.level.as_ref().and(self.file.clone()),
             ..Options::solver()
         }
     }
