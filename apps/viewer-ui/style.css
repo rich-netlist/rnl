@@ -13,12 +13,24 @@
   --netlist-background: #FFFFFF;
   --netlist-highlight: #E8590C;
   --usage-list-h: 240px;
+  /* the colours of the light and the dark theme that the pages lying on the drawing's background take too, whichever the
+     theme (.module-card, .entry-card): written here alone */
+  --light-panel: #fbfbfa;
+  --light-fg: #1d1d1f;
+  --light-muted: #6b6b70;
+  --light-line: #d9d9d4;
+  --light-hover: #ececea;
+  --dark-panel: #232327;
+  --dark-fg: #e8e8ea;
+  --dark-muted: #9a9aa2;
+  --dark-line: #38383d;
+  --dark-hover: #313137;
   --bg: #f4f4f2;
-  --panel: #fbfbfa;
-  --fg: #1d1d1f;
-  --muted: #6b6b70;
-  --line: #d9d9d4;
-  --hover: #ececea;
+  --panel: var(--light-panel);
+  --fg: var(--light-fg);
+  --muted: var(--light-muted);
+  --line: var(--light-line);
+  --hover: var(--light-hover);
   --tab: #ffffff;
   --accent: #14345c;
   --error: #c62828;
@@ -70,11 +82,11 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #1f1f22;
-    --panel: #232327;
-    --fg: #e8e8ea;
-    --muted: #9a9aa2;
-    --line: #38383d;
-    --hover: #313137;
+    --panel: var(--dark-panel);
+    --fg: var(--dark-fg);
+    --muted: var(--dark-muted);
+    --line: var(--dark-line);
+    --hover: var(--dark-hover);
     --tab: #2b2b30;
     --accent: #8fb4e6;
     --error: #ef6b6b;
@@ -690,19 +702,19 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 /* The module and entry pages lie on the drawing's background, which View › Background sets apart from the theme of the
    window: their colours are those of the light theme on a light background and of the dark theme on a dark one. */
 .module-card, .entry-card {
-  --fg: #1d1d1f;
-  --muted: #6b6b70;
-  --line: #d9d9d4;
-  --hover: #ececea;
-  --panel: #fbfbfa;
+  --fg: var(--light-fg);
+  --muted: var(--light-muted);
+  --line: var(--light-line);
+  --hover: var(--light-hover);
+  --panel: var(--light-panel);
   color: var(--fg);
 }
 body[data-background="dark"] .module-card, body[data-background="dark"] .entry-card {
-  --fg: #e8e8ea;
-  --muted: #9a9aa2;
-  --line: #38383d;
-  --hover: #313137;
-  --panel: #232327;
+  --fg: var(--dark-fg);
+  --muted: var(--dark-muted);
+  --line: var(--dark-line);
+  --hover: var(--dark-hover);
+  --panel: var(--dark-panel);
 }
 
 /* Web fonts follow the generic families: keep native Latin/monospace metrics and use the
