@@ -5,6 +5,7 @@
 import { m } from "./i18n.js";
 import { choose } from "./dialog.js";
 import { formatList, setFormatList } from "./formats.js";
+import { folderListing } from "./folder-listing.js";
 import { shell } from "./shell.js";
 
 let known = null; // { entries, parts }, once the core's formats are known
@@ -30,11 +31,18 @@ export function suffix(path) {
   return dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
 }
 
-/** Of `paths`, those the viewer lists: of a suffix the core lists. */
-export async function listedOnly(paths, pathOf = (p) => p) {
+/**
+ * The files of the folders included among `items`, and the files given alone that the viewer lists, as every viewer
+ * lists a folder (folder-listing.js: rnl_cli::walk's rules); and whether a folder had more files than are listed. A
+ * browser gives every file of a folder: the web shell takes these. `pathOf` gives an item's path, whose first part is
+ * the folder included.
+ */
+export async function folderFiles(items, pathOf) {
   const { entries, parts } = await listedSuffixes();
-  return paths.filter((p) => entries.includes(suffix(pathOf(p))) || parts.includes(suffix(pathOf(p))));
+  const listed = (path) => entries.includes(suffix(path)) || parts.includes(suffix(path));
+  return folderListing(items, pathOf, listed);
 }
+
 
 /** The suffixes the core lists, written for a sentence: ".sp, .spi, … or .rnl". */
 export async function listedText() {

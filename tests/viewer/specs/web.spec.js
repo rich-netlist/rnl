@@ -881,6 +881,8 @@ test("Include Folder adds netlists and packages, and clicking a pooled file open
     "top.sp": "* top\n.include \"lib/parts.inc\"\nX1 a 0 part\n.end\n",
     "lib/parts.inc": ".subckt part p q\nR1 p q 1k\n.ends\n",
     "notes.txt": "notes\n",
+    // nothing hidden is listed, as on the desktop (rnl_cli::walk; apps/web/folder-listing.test.mjs has the other rules)
+    ".hidden/skipped.sp": "* skipped\n.end\n",
   });
   const setting = page.locator("#folder-input").setInputFiles(dir).catch(() => {});
   const name = path.basename(dir);
@@ -889,6 +891,7 @@ test("Include Folder adds netlists and packages, and clicking a pooled file open
   await Promise.race([setting, new Promise((resolve) => setTimeout(resolve, 3000))]);
   expect(await page.evaluate(() => window.viewer.doc)).toBeNull();
   await expect(page.locator("#pool-list")).not.toContainText("notes.txt");
+  await expect(page.locator("#pool-list")).not.toContainText("skipped.sp");
   const doc = await opened(page, () => row.locator(".pool-open").click());
   expect(doc.path).toBe(`/${name}/top.sp`);
   expect(doc.files.map((f) => f.path)).toEqual(["top.sp", "lib/parts.inc"]);
