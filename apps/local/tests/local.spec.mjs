@@ -468,6 +468,9 @@ test("Export Image of a solve's preview draws the files the solve wrote, as the 
     const image = join(work, "proj", "sim", name);
     await expect.poll(() => existsSync(image)).toBe(true);
     await expect(dialog).toHaveCount(0);
+    // the program writes the file before the page has its answer, and the page exports nothing else until then: the
+    // next export waits for the page to say this one is done
+    await expect(page.locator("#note")).toHaveText(new RegExp(`^Exported .*${name.replace(".", "\\.")}\\.$`));
   }
   expect(readFileSync(join(work, "proj", "sim", "solved.svg"), "utf8")).toContain("<svg");
   expect(readFileSync(join(work, "proj", "sim", "solved.png")).subarray(1, 4).toString()).toBe("PNG");
