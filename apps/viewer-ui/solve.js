@@ -129,6 +129,7 @@ export async function solve({ all = false, respace = false } = {}) {
     const solved = await shell.solve(given, asked, changes(true));
     shown = { source, report: solved.report, all, respace };
     noteReport(solved.report);
+    keepOutline(solved.document, doc);
     showBuilt(solved.document, true);
     // the solved layout can lie outside the view of the netlist as it was
     fit();
@@ -160,6 +161,19 @@ export async function solve({ all = false, respace = false } = {}) {
     running = false;
     document.body.classList.remove("solving");
   }
+}
+
+/**
+ * Give the preview `preview` the outline of the reading `before` the solve started from, or the one the preview before
+ * kept, as `outlineBefore`: the preview is a Document of the whole document, which has no modules of Verilog-A, and the
+ * outline has them (level-tree.js). A solve changes no structure, but the files solved may have changes not read yet: the
+ * outline is kept only when each level of the preview is the level of the outline of the same host, kind and title.
+ */
+function keepOutline(preview, before) {
+  const outline = before?.outline ?? before?.outlineBefore;
+  if (!outline) return;
+  const same = preview.levels.every((l) => outline.levels[l.host]?.title === l.title && outline.levels[l.host].kind === l.kind);
+  if (same) preview.outlineBefore = outline;
 }
 
 /** Stop the solve under way (the Cancel button of the status bar). */

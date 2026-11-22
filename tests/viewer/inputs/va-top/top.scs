@@ -1,0 +1,6 @@
+// top
+simulator lang=spectre
+ahdl_include "a.va"
+ahdl_include "b.va"
+I1 (in out 0) top_va k=3
+R1 (in 0) resistor r=1k

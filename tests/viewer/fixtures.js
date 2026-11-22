@@ -54,15 +54,17 @@ export const FILES = {
   "17-line-styles": "tests/conformance/cases-0.4/from-0.2/17-line-styles.sp",
   "inverter-chain": "tests/conformance/equivalence-0.4/inverter-chain.scs",
   "T4-miller-conflicts": "tests/integration/solver/T4-miller-conflicts.sp",
+  "va-top": "tests/viewer/inputs/va-top/top.scs",
 };
 
 /**
  * The previews of a solve, as the desktop's Solve menu shows them, each NAME-preview.json, the
  * Document of the files solved and the report, which `rnl preview` prints of the fixture NAME's
  * file: one with facts discarded, conflict groups and hints by statement. Each has NAME-constraints.json too,
- * the Document of that file with the constraints of its levels (`rnl view --constraints`).
+ * the Document of that file with the constraints of its levels (`rnl view --constraints`). "va-top" is a netlist with
+ * an instance of a module of Verilog-A.
  */
-export const PREVIEWS = ["T4-miller-conflicts", "04-hierarchy"];
+export const PREVIEWS = ["T4-miller-conflicts", "04-hierarchy", "va-top"];
 /** The limits a preview of a file of 0.4 is solved within, by its name: a fixed work, so that the facts kept are the same everywhere. */
 const PREVIEW_LIMITS = { "T4-miller-conflicts": ["--solver-config", 'limit="work",work=100000000'] };
 

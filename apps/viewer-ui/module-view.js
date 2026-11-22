@@ -5,12 +5,14 @@ import { append, m, setAttr, setText } from "./i18n.js";
 // or through an instance that names it, opens the view of its file as a subcircuit of another file does
 // (subcircuits.js), and is shown there as a symbol of its ports, with a note, and its instances, each with the line it
 // is written on: a click shows the line in the text, a double click or Enter opens the module it names. A name that no
-// module has is listed as not defined. The parameters an instance gives a module are not shown.
+// module has is listed as not defined. The parameters an instance gives a module are not shown. In the preview of a solve,
+// which keeps the outline of the reading it started from (level-tree.js `previewModules`), a module is shown in place,
+// below the levels of the preview, which stays: the way back leads to it.
 
 import { doc, path, setPath } from "./state.js";
 import { clearDrawing } from "./drawing.js";
 import { updateHierarchy } from "./hierarchy.js";
-import { levelTree, setModuleShown } from "./level-tree.js";
+import { levelTree, previewModules, setModuleShown } from "./level-tree.js";
 import { navigate } from "./navigation.js";
 import { currentSource } from "./open.js";
 import { updatePath, viewOfFile } from "./subcircuits.js";
@@ -26,6 +28,8 @@ const card = $("module-card");
  */
 export function moduleOfFile(title) {
   const tree = levelTree();
+  // (the preview of a solve: the module of that title, of whichever file)
+  if (previewModules()) return tree.nodes.findIndex((n) => n?.module && n.title === title);
   if (!doc?.outline || !tree || typeof doc.file !== "string") return -1;
   const ours = tree.nodes.flatMap((n, k) => (n?.module && n.file === doc.file ? [k] : []));
   return ours.find((k) => tree.nodes[k].title === title) ?? ours[0] ?? -1;
@@ -44,7 +48,10 @@ export function showModule(route) {
   setModuleShown(host);
   const steps = route.length ? route : [{ title: node.title, via: null }];
   const last = steps.length - 1;
-  setPath(steps.map((s, k) => ({ ...s, title: k === last ? node.title : s.title, entry: s.entry || currentSource(), level: -1 })));
+  // (in a preview, the steps above the module are levels of the preview)
+  const preview = previewModules();
+  setPath(steps.map((s, k) => ({ ...s, title: k === last ? node.title : s.title, entry: s.entry || currentSource(),
+    level: preview && k < last ? s.level ?? -1 : -1 })));
   updatePath();
   setText($("level-kind"), m("Verilog-A module"));
   renderCard(node);
@@ -63,11 +70,14 @@ function enter(child, options) {
   if (!target || target.file === null) return;
   if (!options?.newWindow) window.dispatchEvent(new Event("viewer-navigate"));
   const step = { title: target.title, via: child.instance };
+  if (previewModules()) return navigate({ path: [...path, step], selection: null, reveal: true }, options);
   return navigate({ source: viewOfFile(target.file), path: [...path, step], selection: null, reveal: true }, options);
 }
 
 /** Show the module that the path `next` of the Document shown leads to, when it leads to no level of it. */
 export function showModuleOf(next) {
+  // (in a preview, below levels of the preview)
+  if (previewModules()) return next.at(-1)?.level < 0 && showModule(next);
   return next.every((s) => !sameSource(s.entry, currentSource()) || s.level < 0) && showModule(next);
 }
 
