@@ -11,7 +11,7 @@
 use std::path::{Path, PathBuf};
 
 use rnl_view::folder::{walk_folder, Entries, Entry};
-pub use rnl_view::folder::{Walk, INCLUDE_FOLDER};
+pub use rnl_view::folder::{Listing, Walk, INCLUDE_FOLDER};
 
 /// The sub-folders a PATH folder added with them brings in: all of them, up to 500.
 pub const PATH_SUBFOLDERS: Walk = Walk { depth: None, limit: 500 };
@@ -126,9 +126,10 @@ pub fn path_listing(dir: &Path, with_subfolders: bool) -> Result<PathListing, St
 }
 
 /// The netlists and packages of the folder `dir` and of those below it, up to `walk`
-/// ([`INCLUDE_FOLDER`]), sorted; and whether there were more files than its limit. Each file is
-/// named below `dir` as given. An error when `dir` is not a folder.
-pub fn folder_files(dir: &Path, walk: Walk) -> Result<(Vec<PathBuf>, bool), String> {
+/// ([`INCLUDE_FOLDER`]), sorted, as every viewer lists a folder included ([`Listing`]): with the
+/// folder's name in `truncated` when it had more files than the walk's limit. Each file is named
+/// below `dir` as given. An error when `dir` is not a folder.
+pub fn folder_files(dir: &Path, walk: Walk) -> Result<Listing<PathBuf>, String> {
     let root = root(dir)?;
     // a folder's entries, a folder each that is one, not a link to one; a file each of the others
     let held = |dir: &PathBuf| -> Entries<PathBuf, PathBuf> {
@@ -140,7 +141,9 @@ pub fn folder_files(dir: &Path, walk: Walk) -> Result<(Vec<PathBuf>, bool), Stri
     };
     let (mut out, more) = walk_folder(&dir.to_path_buf(), walk, &held, &|p: &PathBuf| listed_file(p, &root));
     out.sort();
-    Ok((out, more))
+    // (the folder by its name, as the web viewer names a folder a browser gives by the first part of its paths)
+    let name = || dir.file_name().map_or_else(|| crate::path_str(dir), |n| n.to_string_lossy().into_owned());
+    Ok(Listing { files: out, truncated: if more { vec![name()] } else { Vec::new() }, limit: walk.limit })
 }
 
 #[cfg(test)]
@@ -236,14 +239,20 @@ mod tests {
             &dir,
             &["top.sp", "sub/models.inc", "sub/parts.RNL", "sub/0.4/p.rnl", "notes.txt", ".h/x.sp", "a/b/c.sp"],
         );
-        let (files, more) = folder_files(&dir, INCLUDE_FOLDER).unwrap();
-        assert_eq!(names(&dir, &files), ["a/b/c.sp", "sub/0.4/p.rnl", "sub/models.inc", "sub/parts.RNL", "top.sp"]);
-        assert!(!more);
-        let (files, more) = folder_files(&dir, Walk { depth: Some(1), limit: 2000 }).unwrap();
-        assert_eq!(names(&dir, &files), ["sub/models.inc", "sub/parts.RNL", "top.sp"]);
-        assert!(!more);
-        let (files, more) = folder_files(&dir, Walk { depth: None, limit: 2 }).unwrap();
-        assert_eq!((files.len(), more), (2, true));
+        let listed = folder_files(&dir, INCLUDE_FOLDER).unwrap();
+        assert_eq!(
+            names(&dir, &listed.files),
+            ["a/b/c.sp", "sub/0.4/p.rnl", "sub/models.inc", "sub/parts.RNL", "top.sp"]
+        );
+        assert!(listed.truncated.is_empty());
+        assert_eq!(listed.limit, 2000);
+        let listed = folder_files(&dir, Walk { depth: Some(1), limit: 2000 }).unwrap();
+        assert_eq!(names(&dir, &listed.files), ["sub/models.inc", "sub/parts.RNL", "top.sp"]);
+        assert!(listed.truncated.is_empty());
+        // a folder with more files than the limit: named, as the page says it
+        let listed = folder_files(&dir, Walk { depth: None, limit: 2 }).unwrap();
+        let name = dir.file_name().unwrap().to_string_lossy().into_owned();
+        assert_eq!((listed.files.len(), listed.truncated, listed.limit), (2, vec![name], 2));
         assert!(folder_files(&dir.join("missing"), INCLUDE_FOLDER).is_err());
         std::fs::remove_dir_all(&dir).unwrap();
     }
@@ -257,7 +266,7 @@ mod tests {
         write(&dir, &["in.sp"]);
         std::os::unix::fs::symlink(outside.join("far.sp"), dir.join("link.sp")).unwrap();
         std::os::unix::fs::symlink(outside.join("deep"), dir.join("deep")).unwrap();
-        assert_eq!(names(&dir, &folder_files(&dir, INCLUDE_FOLDER).unwrap().0), ["in.sp"]);
+        assert_eq!(names(&dir, &folder_files(&dir, INCLUDE_FOLDER).unwrap().files), ["in.sp"]);
         let listing = path_listing(&dir, true).unwrap();
         assert_eq!((names(&dir, &listing.files), listing.dirs.len()), (vec!["in.sp".to_string()], 1));
         std::fs::remove_dir_all(&dir).unwrap();

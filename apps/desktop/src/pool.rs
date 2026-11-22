@@ -23,8 +23,8 @@ pub async fn dropped_files(paths: Vec<String>) -> Result<Vec<String>, String> {
 /// ([`rnl_cli::walk::folder_files`], [`rnl_cli::walk::INCLUDE_FOLDER`]): up to 8 levels of folders
 /// below it and 2000 files, nothing hidden, no link out of it.
 pub fn folder_files(dir: &Path) -> Result<Vec<String>, String> {
-    let (files, _) = rnl_cli::walk::folder_files(dir, rnl_cli::walk::INCLUDE_FOLDER)?;
-    Ok(files.iter().map(|p| rnl_cli::path_str(p)).collect())
+    let listed = rnl_cli::walk::folder_files(dir, rnl_cli::walk::INCLUDE_FOLDER)?;
+    Ok(listed.files.iter().map(|p| rnl_cli::path_str(p)).collect())
 }
 
 #[tauri::command]

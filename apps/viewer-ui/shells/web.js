@@ -15,8 +15,7 @@ import { libraryStamps, requestPath, textHash } from "../file-results.js";
 import { loadManifest, readManifest } from "../manifest.js";
 import { ask, choose, inform, modal } from "../dialog.js";
 import { libraryZip } from "../zip.js";
-import { chooseEntry } from "../incoming.js";
-import { note } from "../editor.js";
+import { chooseEntry, sayListedInPart } from "../incoming.js";
 import { openWebWindow, receiveWebSession } from "../window-session.js";
 import { load } from "../util.js";
 import { sourcePath } from "../source-path.js";
@@ -645,9 +644,9 @@ async function poolItems(files, folder = false) {
  */
 async function listedFolders(items, pathOf) {
   const byPath = new Map(items.map((item) => [pathOf(item), item]));
-  const { files, truncated, limit } = await (await someCore()).folders([...byPath.keys()]);
-  if (truncated.length) note(m`Only the first ${limit} files of ${truncated.join(", ")} are listed.`);
-  return files.map((path) => byPath.get(path));
+  const listed = await (await someCore()).folders([...byPath.keys()]);
+  sayListedInPart(listed);
+  return listed.files.map((path) => byPath.get(path));
 }
 
 let libraryIndex = null;

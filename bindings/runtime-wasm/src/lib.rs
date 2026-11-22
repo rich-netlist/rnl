@@ -337,16 +337,6 @@ pub struct FolderPaths {
     pub paths: Vec<String>,
 }
 
-/// The files of the folders of a [`FoldersRequest`] that the Library lists, sorted; the folders that
-/// had more files than are listed, by their names, each listed in part; and how many files a folder
-/// brings in at most.
-#[derive(Serialize, Debug)]
-pub struct FolderListing {
-    pub files: Vec<String>,
-    pub truncated: Vec<String>,
-    pub limit: usize,
-}
-
 /// The answer to a request: `{"document": ...}`, `{"outline": ...}`, `{"file": ...}`, `{"symbols": ...}`,
 /// `{"snapshot": ...}`, `{"written": ...}`,
 /// `{"replaced": ...}`, `{"catalog": ...}`, `{"drawings": ...}`, `{"formats": ...}`, `{"bundled": ...}`,
@@ -380,7 +370,7 @@ pub enum Response {
     Bundled(BTreeMap<String, String>),
     /// The files of the folders a [`FoldersRequest`] gives, as every viewer lists a folder included
     /// ([`rnl_view::folder::folders_listing`]).
-    Folders(FolderListing),
+    Folders(rnl_view::folder::Listing),
     /// Why there is none: the request is not a [`Request`], a [`WriteRequest`], a
     /// [`ReplaceRequest`], a [`CatalogRequest`] or a [`DrawingsRequest`], the entry cannot be read,
     /// an op cannot be written, the records cannot be replaced (the message begins with the kind of
@@ -490,9 +480,7 @@ pub fn respond(request: &[u8]) -> Response {
     if value.get("folders").is_some() && value.get("entry").is_none() {
         return match serde_json::from_value::<FoldersRequest>(value) {
             Ok(f) => {
-                let walk = rnl_view::folder::INCLUDE_FOLDER;
-                let (files, truncated) = rnl_view::folder::folders_listing(&f.folders.paths, walk);
-                Response::Folders(FolderListing { files, truncated, limit: walk.limit })
+                Response::Folders(rnl_view::folder::folders_listing(&f.folders.paths, rnl_view::folder::INCLUDE_FOLDER))
             }
             Err(e) => invalid(e),
         };

@@ -9,6 +9,8 @@
 
 use std::collections::BTreeMap;
 
+use serde::Serialize;
+
 /// How far a walk goes below the folder it starts in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Walk {
@@ -21,6 +23,16 @@ pub struct Walk {
 /// The files a folder included in the Library brings in: those of up to 8 levels of folders below
 /// it, up to 2000 files.
 pub const INCLUDE_FOLDER: Walk = Walk { depth: Some(8), limit: 2000 };
+
+/// What folders included list, as every viewer gives it: the files the Library lists, sorted; the folders that had
+/// more files than a folder brings in, each listed in part, by their names; and how many files a folder brings in
+/// at most. The page says the folders listed in part with these, in one sentence for every viewer.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct Listing<F = String> {
+    pub files: Vec<F>,
+    pub truncated: Vec<String>,
+    pub limit: usize,
+}
 
 /// Whether a name is hidden: it starts with a dot.
 pub fn hidden(name: &str) -> bool {
@@ -83,7 +95,7 @@ pub fn walk_folder<F, D>(
 /// leading `/` is not a part. What is listed: each folder walked as [`walk_folder`] walks it, the files given alone that
 /// are listed, sorted by their parts as paths sort; and the folders that had more files than the walk's limit, each of
 /// which is listed in part, by their names (the first parts of their paths).
-pub fn folders_listing(paths: &[String], walk: Walk) -> (Vec<String>, Vec<String>) {
+pub fn folders_listing(paths: &[String], walk: Walk) -> Listing {
     #[derive(Default)]
     struct Node {
         files: BTreeMap<String, String>,
@@ -126,7 +138,7 @@ pub fn folders_listing(paths: &[String], walk: Walk) -> (Vec<String>, Vec<String
     }
     let parts = |p: &String| p.split('/').filter(|s| !s.is_empty()).map(str::to_owned).collect::<Vec<_>>();
     out.sort_by_key(parts);
-    (out, truncated)
+    Listing { files: out, truncated, limit: walk.limit }
 }
 
 #[cfg(test)]
@@ -134,7 +146,9 @@ mod tests {
     use super::*;
 
     fn listing(paths: &[&str], walk: Walk) -> (Vec<String>, Vec<String>) {
-        folders_listing(&paths.iter().map(|p| p.to_string()).collect::<Vec<_>>(), walk)
+        let listed = folders_listing(&paths.iter().map(|p| p.to_string()).collect::<Vec<_>>(), walk);
+        assert_eq!(listed.limit, walk.limit);
+        (listed.files, listed.truncated)
     }
 
     #[test]

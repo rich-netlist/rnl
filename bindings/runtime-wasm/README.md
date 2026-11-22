@@ -204,6 +204,7 @@ A request with a `folders` field and no `entry`, `{"folders": {"paths": ["/lib/t
   - no more than `limit` files are taken, those met first: a folder's files by name, then the folders in it by name, depth first.
 - `truncated` names the folders that had more files than `limit`, each listed in part.
 - `files` are the paths kept, as given, sorted part by part as paths sort.
+- The answer is a [`rnl_view::folder::Listing`](../../crates/rnl-view/src/folder.rs). The desktop app and the local program list a folder on disk in the same shape (`rnl_cli::walk::folder_files`), and every viewer says the folders listed in part with one sentence of the page (`apps/viewer-ui/incoming.js`).
 
 `core.js` and `client.js` give it as `folders(paths)`. The worker sends it no package files.
 
