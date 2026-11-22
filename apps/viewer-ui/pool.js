@@ -155,7 +155,12 @@ export async function sourceOpened(source, doc, add, applied = false) {
   render();
 }
 
-async function update(action, rescan = false, reload = false, valid = () => true) {
+/**
+ * Change the Library with `action`, which returns false when it changed nothing, then read the file shown again with the
+ * Library as it is now, unless `reread()` says that its reading cannot change (`sameReading`). The reading again keeps
+ * the view and says one line, "Reading files…", until it is done: the page goes nowhere.
+ */
+async function update(action, rescan = false, reload = false, valid = () => true, reread = () => true) {
   if (changing || isLoading() || !valid()) return false;
   changing = true;
   if (reload) setText($("library-status"), m("Reloading library…"));
@@ -167,7 +172,7 @@ async function update(action, rescan = false, reload = false, valid = () => true
     else { await syncPool(reload); render(); }
     if (!valid()) return false;
     // Rebuild applied text without re-adding an excluded root or dropping pending edits.
-    if (currentSource()) await openSource(currentSource(), true, changes(true));
+    if (currentSource() && reread()) await openSource(currentSource(), true, changes(true), false, null, null, false, { oneLine: true });
     return true;
   } catch (e) {
     render();
@@ -364,13 +369,48 @@ function includeRow(entry) {
   return row;
 }
 
-/** Add a file the netlist shown includes to Files, by the source the shell reads it from, as Include File adds one. */
-const addInclude = (entry) => update(async () => {
-  const source = shownDoc && currentSource() ? shell.sourceForFile(currentSource(), shownDoc, entry.index) : null;
-  if (!source || source.readonly || items.some((i) => i.path === entry.path)) return false;
-  source.path = entry.path;
-  addItems([shell.poolItem?.(source) || { path: entry.path, name: source.name || entry.name, source }]);
-});
+/**
+ * Add a file the netlist shown includes to Files, by the source the shell reads it from, as Include File adds one. The
+ * file shown is read again only when its reading can change (`sameReading`).
+ */
+const addInclude = (entry) => {
+  const d = shownDoc;
+  return update(async () => {
+    const source = d && currentSource() ? shell.sourceForFile(currentSource(), d, entry.index) : null;
+    if (!source || source.readonly || items.some((i) => i.path === entry.path)) return false;
+    source.path = entry.path;
+    addItems([shell.poolItem?.(source) || { path: entry.path, name: source.name || entry.name, source }]);
+  }, false, false, () => true, () => !sameReading(d, entry.index));
+};
+
+/**
+ * Whether the reading of the document `d` is the same with its file `index`, one it reads already, in the Library. A
+ * Library file changes a reading in two ways alone: a subcircuit that no file of the document defines takes its
+ * definition from the Library (Auto Include), and an included file that is not found is searched for among its files.
+ * So the document is read again when it has a file it did not find, or when the file writes a subcircuit of a name that
+ * the document calls and does not define, such as one written inside another subcircuit; a subcircuit the file defines
+ * at its top is defined already, since the document reads the file. A name that no file defines and the file does not
+ * write, such as a device of a PDK, changes nothing. Names are compared without case, which reads again when in doubt.
+ */
+function sameReading(d, index) {
+  const file = d?.files[index];
+  if (!file) return false;
+  const outline = d.outline;
+  if ((outline ? outline.missing : d.missing ?? []).length > 0) return false;
+  const lower = (name) => name.toLowerCase();
+  let missing, written;
+  if (outline) {
+    const k = outline.files.findIndex((f) => f.path === file.path);
+    if (k < 0) return false;
+    missing = outline.levels.flatMap((l) => l.calls.filter((c) => c.level === null).map((c) => lower(c.master)));
+    written = outline.levels.filter((l) => l.file === k && l.kind !== "file").map((l) => lower(l.title));
+  } else {
+    missing = d.levels.flatMap((l) => l.children.filter((c) => c.level === null).map((c) => lower(c.master)));
+    written = d.levels.filter((l) => l.kind === "subckt" && l.lines?.[0] === index).map((l) => lower(l.title));
+  }
+  const names = new Set(missing);
+  return !written.some((name) => names.has(name));
+}
 
 function fileRow(item, kind) {
   const row = document.createElement(kind === "temporary" ? "div" : "li");

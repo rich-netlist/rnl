@@ -1,6 +1,7 @@
 // The files the netlist shown includes, listed in the Library under the file opened, which are no Library files
 // (pool.js `includeRow`): a click on the name opens the file as an include link in the text does, with the Library
-// still shown, and Add to Library adds it to Files as Include File would, after which it has a row of its own.
+// still shown, and Add to Library adds it to Files as Include File would, after which it has a row of its own. The file
+// shown is read again only when its reading can change (pool.js `sameReading`), with one line said while it is.
 import { test, expect } from "../viewer.js";
 
 const group = (page, key) => page.locator(`.lib-group[data-group=${JSON.stringify(key)}]`);
@@ -16,10 +17,31 @@ for (const platform of ["desktop", "web"]) {
     await expect(include.locator(".pool-include-name")).toHaveText(LIB.name);
     await expect(include.getByRole("button", { name: `Open ${LIB.name}`, exact: true })).toBeVisible();
 
-    // Add to Library adds the file to Files, and its grey row goes
-    await viewer.build(() => include.getByRole("button", { name: `Add ${LIB.name} to the Library`, exact: true }).click());
+    // Add to Library adds the file to Files, and its grey row goes; the netlist is not read again: the file is read
+    // already, and the netlist calls no subcircuit it does not define
+    const builds = await viewer.builds();
+    await include.getByRole("button", { name: `Add ${LIB.name} to the Library`, exact: true }).click();
     await expect(files.locator(".pool-row .pool-open")).toHaveText(["04-hierarchy", LIB.name]);
     await expect(files.locator(".pool-include")).toHaveCount(0);
+    expect(await viewer.builds()).toBe(builds);
+  });
+
+  test(`${platform}: Add to Library reads the netlist again when the file can give it a definition it lacks`, async ({ page, viewer }) => {
+    await viewer.open("04-hierarchy", { platform, pool: "1" });
+    await page.evaluate((lib) => { window.fakeShell.fileSources = { [lib.name]: lib }; }, LIB);
+    // the netlist as if it called a subcircuit rdiv that it does not define, which the file writes (as inside another
+    // subcircuit): the Library could give the definition; and every line said while the netlist is read again
+    await page.evaluate(() => {
+      for (const l of window.viewer.doc.levels) for (const c of l.children) if (c.master === "rdiv") c.level = null;
+      window.saidWhileLoading = [];
+      new MutationObserver(() => window.saidWhileLoading.push(document.getElementById("loading-stage").textContent))
+        .observe(document.getElementById("loading-stage"), { childList: true, characterData: true, subtree: true });
+    });
+    await page.locator("#tab-files").click();
+    const files = group(page, "files");
+    await viewer.build(() => files.locator(".pool-include").getByRole("button", { name: `Add ${LIB.name} to the Library`, exact: true }).click());
+    await expect(files.locator(".pool-row .pool-open")).toHaveText(["04-hierarchy", LIB.name]);
+    expect(new Set(await page.evaluate(() => window.saidWhileLoading))).toEqual(new Set(["Reading files…"]));
   });
 
   test(`${platform}: the name of an included file opens it as the include link does, with the Library still shown`, async ({ page, viewer }) => {

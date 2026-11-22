@@ -70,14 +70,15 @@ export async function openSource(source, keep, edited, fresh = false, navigation
   const progress = startLoading();
   let d;
   try {
+    // (a reading again that keeps the view, such as the Library's, says one line until it is done: `oneLine`)
     await progress.stage("reading");
     d = await readDocument(source, edited, stage => {
       if (operation.signal.aborted) throw new Error('Opening superseded');
-      progress.setStage(stage);
+      if (!options.oneLine) progress.setStage(stage);
     }, operation.signal, { fresh, bind: options.bind, ...(constraintsWanted ? { constraints: true } : {}) });
     if (operation.signal.aborted) return;
     if (options.bound) bindings.set(d, options.bound);
-    await progress.stage("displaying");
+    await progress.stage(options.oneLine ? "reading" : "displaying");
     if (operation.signal.aborted) return;
     lastSource = source;
     endPreview();
