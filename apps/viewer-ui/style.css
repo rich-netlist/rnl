@@ -972,6 +972,10 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 }
 .tree-row .twisty[aria-expanded="true"]::before { transform: rotate(90deg); }
 .tree-row .twisty.leaf::before { border: 0; }
+/* the line below the instances a group of them lists so far (hierarchy.js) */
+.tree-more { height: 24px; display: flex; align-items: center; }
+.tree-more button { padding: 0; border: 0; background: none; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; }
+.tree-more button:hover { color: var(--fg); }
 .tree-group {
   margin-top: 6px;
   padding: 4px 10px 2px;
