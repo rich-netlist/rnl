@@ -168,3 +168,69 @@ test.describe("with a subcircuit for each initial", () => {
     }
   });
 });
+
+/** Show the netlist of 04-hierarchy with `extra` more instances of rdiv on its top level, after X3, its own. */
+async function manyInstances(page, viewer, extra) {
+  await viewer.open("04-hierarchy");
+  await page.evaluate(async (n) => {
+    const { doc } = await import("./state.js");
+    const rdiv = doc.levels[0].children.find((c) => c.master === "rdiv").level;
+    const more = Array.from({ length: n }, (_, i) => ({ instance: `XD${i}`, master: "rdiv", level: rdiv, params: [] }));
+    const levels = doc.levels.map((l, k) => (k === 0 ? { ...l, children: [...l.children, ...more] } : l));
+    (await import("./open.js")).showBuilt({ ...doc, levels }, false);
+  }, extra);
+}
+
+test("many instances of one subcircuit are one row, which lists them a batch at a time", async ({ page, viewer }) => {
+  await manyInstances(page, viewer, 450);
+  await page.locator("#tab-hierarchy").click();
+  const rows = page.locator("#tree .tree-row");
+  // X3 and the 450 others call rdiv: one row, where X3 was, with their number
+  await expect(rows).toHaveText([`${TOP}top`, "X1amp", "X2amp", "451×rdiv"]);
+  const group = page.locator('#tree .tree-row[data-path="0/g2"]');
+  await group.click();
+  await expect(group).toHaveAttribute("aria-expanded", "true");
+  await expect(rows).toHaveCount(4 + 200);
+  await expect(rows.nth(4)).toHaveText("X3rdiv");
+  await expect(rows.nth(5)).toHaveAttribute("data-path", "0/3");
+  await expect(page.locator("#tree .tree-more button")).toHaveText("200 of 451 shown: scroll for more");
+  // a click lists 200 more in its place (pressed where it is: the scroll of a click would bring it into view); brought
+  // into view, the line lists the rest
+  await page.locator("#tree .tree-more button").evaluate((b) => b.click());
+  await expect(rows).toHaveCount(4 + 400);
+  await expect(rows.nth(204)).toHaveAttribute("data-path", "0/202");
+  await page.locator("#tree .tree-more").scrollIntoViewIfNeeded();
+  await expect(rows).toHaveCount(4 + 451);
+  await expect(page.locator("#tree .tree-more")).toHaveCount(0);
+  // an instance opens its level, as any row does; the group row closes and opens the group alone
+  await page.locator('#tree .tree-row[data-path="0/300"]').click();
+  await expect(page.locator("#level-name")).toHaveText("rdiv");
+  await group.click();
+  await expect(rows).toHaveText([`${TOP}top`, "X1amp", "X2amp", "451×rdiv"]);
+});
+
+test("the row of the level shown is listed in its group, and the tree is drawn only while it is shown", async ({ page, viewer }) => {
+  await manyInstances(page, viewer, 450);
+  // XD399, the 401st instance of the group, entered from the top level: its group opens, listing as far as it
+  await page.evaluate(async () => {
+    const { doc, path } = await import("./state.js");
+    const level = doc.levels[0].children.find((c) => c.instance === "XD399").level;
+    (await import("./navigation.js")).navigate({ path: [path[0], { level, via: "XD399" }], selection: null, reveal: true });
+  });
+  await expect(page.locator("#level-name")).toHaveText("rdiv");
+  await expect(page.locator("#tree .tree-row")).toHaveCount(0);
+  await page.locator("#tab-hierarchy").click();
+  const active = page.locator("#tree .tree-row.active");
+  await expect(active).toHaveAttribute("data-path", "0/402");
+  await expect(active).toHaveText("XD399rdiv");
+  await expect(page.locator('#tree .tree-row[data-path="0/g2"]')).toHaveAttribute("aria-expanded", "true");
+  // (the rows up to it are listed: brought into view below them, the line of the rest lists those too)
+  expect(await page.locator("#tree .tree-row").count()).toBeGreaterThanOrEqual(4 + 400);
+  // hidden, the hierarchy is not drawn as another level is shown: it is emptied, and drawn again when shown
+  await page.locator("#tab-netlist").click();
+  await page.evaluate(async () => (await import("./subcircuits.js")).ascend());
+  await expect(page.locator("#level-name")).toHaveText(TOP);
+  await expect(page.locator("#tree .tree-row")).toHaveCount(0);
+  await page.locator("#tab-hierarchy").click();
+  await expect(active).toHaveAttribute("data-path", "0");
+});

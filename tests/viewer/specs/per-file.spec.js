@@ -56,7 +56,8 @@ test('the entry is read alone, and the hierarchy lists the levels of every file 
   // the other files' texts are in the netlist pane, though only the entry was read
   expect(await page.evaluate(() => window.viewer.doc.files.map(f => [f.path, f.text.split('\n')[0]])))
     .toEqual([['top.sp', '* top'], ['cells.inc', '* cells'], ['leaf.inc', '* leaf']]);
-  // the index has the subcircuits of every file, with their uses
+  // the index has the subcircuits of every file, with their uses (the hierarchy is drawn while it is shown)
+  await page.locator('#tab-hierarchy').click();
   const index = page.locator('#index .index-row:not(.top)');
   await expect(index.locator('.name')).toHaveText(['cell', 'leaf', 't']);
   await expect(index.locator('.uses')).toHaveText(['1 use', '2 uses', '1 use']);
@@ -72,7 +73,8 @@ test('entering a subcircuit of another file reads that file in the context of th
   await page.evaluate((o) => import('./subcircuits.js').then(s => s.descend(o)), x1);
   await idle(page);
   expect(await shown(page)).toMatchObject({ file: 'cells.inc', entry: 'top.sp', levels: ['cell'], level: 'cell', path: ['top.sp', 'cell'] });
-  // the tree keeps the way open to the level shown, from the top level
+  // the tree keeps the way open to the level shown, from the top level (the hierarchy is drawn while it is shown)
+  await page.locator('#tab-hierarchy').click();
   await expect(page.locator('#tree .tree-row.active .inst')).toHaveText('X1');
   // and on down into the third file
   const leaf = await page.evaluate(() => window.viewer.doc.objects.findIndex(o => o.kind === 'instance' && o.name === 'X2'));
