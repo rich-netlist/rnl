@@ -312,7 +312,7 @@
   "The top level is empty; showing {0}.": "顶层为空；当前显示 {0}。",
   " instance of {0} in {1} · a double tap opens it": "：{1} 中的 {0} 元件 · 双击即可打开",
   " instance of {0} in {1} · E or Enter opens it; Shift opens a new window": "：{1} 中的 {0} 元件 · 按 E 或 Enter 打开；按住 Shift 在新窗口打开",
-  " {0} in {1}": "：{1} 中的 {0}",
+  " {0} in {1}": "：{1} 中的{0}",
   "The dropped files could not be opened: {0}": "无法打开拖放的文件：{0}",
   ", and {0} more": "，以及另外 {0} 个",
   "The folder already has files of this project: {0}.": "此文件夹中已存在本工程的文件：{0}。",
