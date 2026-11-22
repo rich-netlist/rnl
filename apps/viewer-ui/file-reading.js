@@ -4,8 +4,11 @@
 // what reads the files and starts the core (`shell.reader`, shell.js); what is kept, when it holds, Check All Files,
 // what the entry page tells of each file and File › Memory Cache are here.
 //
-// A reading with the parameters of a subcircuit bound (params.js), or with the constraints of the Solve view, is never
-// kept; neither is a solve's preview, which the shells make apart (solve.js). What the page draws itself is not kept.
+// A reading with the parameters of a subcircuit bound (params.js) is never kept; neither is a solve's preview, which
+// the shells make apart (solve.js). What the page draws itself is not kept. A reading with the constraints of the
+// Solve view, which every reading asks for once the Solve view was opened (state.js `constraintsWanted`), is kept
+// under a key of its own: the same file read with them and without them are two readings. Check All Files, the
+// preloading and the entry page read and look for them as the readings shown are made then, so that all find the same.
 //
 // While the viewer is idle, the files of the subcircuits below the file shown are read too, one at a time, and kept
 // into the room that is free, nothing else going for them (`preloadFile`, preload.js): the same in every shell, the
@@ -14,7 +17,7 @@
 import { MEMORY_LIMIT, ResultCache } from "./result-cache.js";
 import * as rules from "./file-results.js";
 import { shell } from "./shell.js";
-import { doc as shownDoc } from "./state.js";
+import { constraintsWanted, doc as shownDoc } from "./state.js";
 import { load } from "./util.js";
 import { entrySource } from "./visit-source.js";
 
@@ -43,6 +46,9 @@ async function library() {
 // what each Document given was read with: its reader and the outline, for the entry page (fileSummaries)
 const readWith = new WeakMap();
 
+/** The options a reading is kept by: the reader's, and the constraints when the reading has them (a key of its own). */
+const keyOptions = (reader, constraints) => (constraints ? { ...reader.options, constraints: true } : reader.options);
+
 /** The outline of the document `reader` reads: the one kept, while it holds, or one the core makes, which is kept. */
 async function outlineOf(reader, lib, fresh) {
   const key = reader.core ? await rules.outlineKey(reader.core, reader.entry, reader.options) : null;
@@ -65,10 +71,10 @@ async function outlineOf(reader, lib, fresh) {
  * and `stored` whether a new reading was kept. A reading `preload`ed counts as no hit or miss, and is kept only into
  * the room that is free.
  */
-async function readOne(reader, outline, file, lib, { fresh = false, keep = false, unkept = false, preload = false } = {}) {
+async function readOne(reader, outline, file, lib, { fresh = false, keep = false, unkept = false, preload = false, constraints = false } = {}) {
   const shape = rules.outlineShape(outline);
   const hash = reader.core && !unkept ? (await reader.hashes([file])).get(file) : null;
-  const key = hash ? await rules.readingKey(reader.core, reader.entry, reader.options, file, hash) : null;
+  const key = hash ? await rules.readingKey(reader.core, reader.entry, keyOptions(reader, constraints), file, hash) : null;
   if (key && !fresh) {
     const holds = async (k) => rules.readingHolds(k, await reader.hashes(rules.readingPaths(k.result)), shape, lib);
     const found = preload ? await kept().peek(key, holds) : await kept().get(key, holds);
@@ -105,7 +111,7 @@ export async function readDocument(source, edits, progress, signal, options = {}
     const lib = await library();
     const outline = await outlineOf(reader, lib, fresh);
     ({ result: doc, hit } = await readOne(reader, outline, fileOf(source, outline, reader), lib,
-      { fresh, keep: true, unkept: !!bind || !!constraints }));
+      { fresh, keep: true, unkept: !!bind, constraints: !!constraints }));
     // the loading indicator says so, in every shell
     if (hit) progress?.("cached");
     doc.outline = outline;
@@ -126,7 +132,8 @@ export async function readDocument(source, edits, progress, signal, options = {}
  * them; the drawings the core keeps stay those of the Document shown. `signal` stops before the next.
  */
 export async function checkFiles(source, edits, files, each, signal) {
-  const reader = await shell.reader(entrySource(source), edits, { signal });
+  const constraints = constraintsWanted;
+  const reader = await shell.reader(entrySource(source), edits, { signal, constraints });
   const stopped = () => { if (signal?.aborted) throw new Error("superseded"); };
   try {
     const lib = await library();
@@ -134,7 +141,7 @@ export async function checkFiles(source, edits, files, each, signal) {
     for (const file of files) {
       stopped();
       let result = null, error = null;
-      try { ({ result } = await readOne(reader, outline, file, lib)); }
+      try { ({ result } = await readOne(reader, outline, file, lib, { constraints })); }
       catch (e) { stopped(); error = e instanceof Error ? e.message : String(e); }
       stopped();
       each(file, result, error);
@@ -160,7 +167,7 @@ export async function fileSummaries(files) {
     let subckts = null;
     try { subckts = (await reader.symbols(file)).subckts; } catch { /* no symbols: the page draws a box */ }
     const hash = reader.core ? (await reader.hashes([file])).get(file) : null;
-    const key = hash ? await rules.readingKey(reader.core, reader.entry, reader.options, file, hash) : null;
+    const key = hash ? await rules.readingKey(reader.core, reader.entry, keyOptions(reader, constraintsWanted), file, hash) : null;
     const found = key ? await kept().peek(key, async (k) => rules.readingHolds(k, await reader.hashes(rules.readingPaths(k.result)), shape, lib)) : null;
     // how long the last reading took, also of one that no longer holds
     const last = found ?? (key ? await kept().peek(key) : null);
@@ -200,16 +207,17 @@ export async function preloadFile(source, doc, file) {
     stopPreload();
     const controller = new AbortController();
     const at = ++preloadNumber;
-    const reader = await shell.reader(entrySource(source), undefined, { signal: controller.signal, background: true });
+    const constraints = constraintsWanted;
+    const reader = await shell.reader(entrySource(source), undefined, { signal: controller.signal, background: true, constraints });
     if (preloadNumber !== at) { reader.finish(null, false); return "cancelled"; }
-    preloading = { doc, reader, controller, lib: null, outline: null, number: at };
+    preloading = { doc, reader, controller, lib: null, outline: null, number: at, constraints };
   } else if (preloading.number !== number) return "cancelled";
   const p = preloading;
   try {
     p.lib ??= await library();
     p.outline ??= await outlineOf(p.reader, p.lib, false);
     if (preloading !== p) return "cancelled";
-    const read = await readOne(p.reader, p.outline, file, p.lib, { preload: true });
+    const read = await readOne(p.reader, p.outline, file, p.lib, { preload: true, constraints: p.constraints });
     if (preloading !== p) return "cancelled";
     return read.hit || read.stored || read.result.missing.length ? "ready" : "full";
   } catch (e) {
