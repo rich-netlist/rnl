@@ -15,7 +15,7 @@ async function nativeDrop(page, viewer, fixture = "04-hierarchy") {
       } },
       core: { invoke: async (command, args) => {
         window.nativeInvokes.push([command, args]);
-        if (command === "dropped_files") return window.nativePaths;
+        if (command === "dropped_files") return { files: window.nativePaths, library: window.nativeLibrary === true, truncated: window.nativeTruncated ?? [], limit: 2000 };
       } },
       webview: { getCurrentWebview: () => ({ onDragDropEvent: async (handler) => {
         window.nativeDrop = handler;
@@ -24,6 +24,8 @@ async function nativeDrop(page, viewer, fixture = "04-hierarchy") {
     };
     const desktop = (await import("../shells/desktop.js")).default;
     const { openSource } = await import("../open.js");
+    window.nativeIncluded = [];
+    desktop.onInclude((items) => window.nativeIncluded.push(...items.map((item) => item.path)));
     await desktop.onOpen(async (source) => {
       window.nativeOpened.push({ ...source });
       window.fakeShell.next = "04-hierarchy";
@@ -112,6 +114,21 @@ test("Finder opens preserve absolute paths and ask before leaving unapplied edit
   await expect(area).toHaveValue(edited);
   expect(await viewer.builds()).toBe(builds);
   expect(await page.evaluate(()=>window.nativeOpened)).toEqual([{path,name:path}]);
+});
+
+test("a folder dropped joins the Library as a folder included does, as on the web, and nothing opens", async ({ page, viewer }) => {
+  await nativeDrop(page, viewer);
+  // (the app lists the folder as Include Folder does: rnl_cli::walk, tested in pool.rs)
+  const listed = ["C:\\lib\\cell.inc", "C:\\lib\\sub\\parts.rnl"];
+  await page.evaluate((listed) => { window.nativePaths = listed; window.nativeLibrary = true; window.nativeTruncated = ["lib", "more"]; }, listed);
+  await deliver(page, "drop", ["C:\\lib"]);
+  await page.evaluate(() => window.dropDone);
+  expect(await page.evaluate(() => window.nativeIncluded)).toEqual(listed);
+  expect(await page.evaluate(() => window.nativeOpened)).toEqual([]);
+  await expect(page.locator("dialog.dialog")).toHaveCount(0);
+  // a folder with more files than are listed is said by its name, as every shell says it
+  // each folder listed in part has its own sentence, as the limit is each folder's
+  await expect(page.locator("#note")).toHaveText("Only the first 2000 files of lib are listed. Only the first 2000 files of more are listed.");
 });
 
 test("unsupported files show an explanation and a busy viewer ignores drops", async ({ page, viewer }) => {

@@ -7,7 +7,7 @@ import { m, tr } from "../i18n.js";
 
 import { flushSettings, load } from "../util.js";
 import { decide, inform, modal } from "../dialog.js";
-import { chooseEntry, listedText } from "../incoming.js";
+import { chooseEntry, listedText, sayListedInPart } from "../incoming.js";
 import { sourcePath } from "../source-path.js";
 import { fileFormats } from "../formats.js";
 import { libraryStamps } from "../file-results.js";
@@ -34,6 +34,15 @@ const caseless = /^(Win|Mac)/i.test(navigator.platform || "");
 
 /** A file on disk, named by its path; null for no path. */
 const file = (path) => (path ? { name: path, path } : null);
+/** A file on disk as the Library holds it. */
+const libraryItem = (path) => ({ path, name: path, source: file(path) });
+// the page's handler for the Library files of a folder dropped (onInclude)
+let included = null;
+/** The files of a drop with a folder among them, into the Library; the folders listed in part are said, as in every shell. */
+function include(dropped) {
+  sayListedInPart(dropped);
+  included?.(dropped.files.map(libraryItem));
+}
 // a view of a file of a document (visit-source.js) keeps the file it shows and its entry's own source
 const sessionSource = source => source ? { path: source.path, name: source.name,
   text: source.path && !source.readonly ? undefined : source.text, readonly: source.readonly,
@@ -76,8 +85,17 @@ export default {
   bundledFiles: () => invoke("bundled_files"),
   // the public packages this build bundles, found without a network (public_packages.rs)
   bundledPackages: () => invoke("public_packages"),
-  include: async (kind) => (await invoke("pick_pool", { kind })).map((path) => ({ path, name: path, source: file(path) })),
-  pickPath: () => invoke("pick_pool", { kind: "path" }).then((paths) => paths[0] || null),
+  async include(kind) {
+    // the files as a folder's listing is given (rnl_view::folder::Listing), whose folder listed in part is said, as in every shell
+    const listed = await invoke("pick_pool", { kind });
+    sayListedInPart(listed);
+    return listed.files.map(libraryItem);
+  },
+  /** Call `handler` with the Library files of a folder dropped, which join the Library as a folder included does. */
+  onInclude(handler) {
+    included = handler;
+  },
+  pickPath: () => invoke("pick_pool", { kind: "path" }).then(({ files }) => files[0] || null),
   // a PATH directory's files, with those of its sub-folders when it was added with them
   pathPackages: (dir, subfolders = false) => invoke("path_packages", { dir, subfolders }),
   setPool: (items, reload = false, refresh = []) => {
@@ -108,9 +126,10 @@ export default {
     let pending = Promise.resolve();
     await tauri.event.listen('opened-files', ({payload}) => {
       pending = pending.catch(() => {}).then(async () => {
-        const paths = await invoke('dropped_files', {paths:payload});
+        const dropped = await invoke('dropped_files', {paths:payload});
+        if (dropped.library) return include(dropped);
         // the file to open, as the page chooses it in every shell (incoming.js)
-        const path = paths.length ? await chooseEntry(paths) : null;
+        const path = dropped.files.length ? await chooseEntry(dropped.files) : null;
         if (path) await handler(file(path));
       });
     });
@@ -120,13 +139,15 @@ export default {
       if (payload.type !== "drop" || blocked) return;
       openingDrop = true;
       try {
-        const paths = await invoke("dropped_files", { paths: payload.paths });
-        if (!paths.length) {
+        const dropped = await invoke("dropped_files", { paths: payload.paths });
+        // a folder among them: they join the Library, as on the web
+        if (dropped.library) return include(dropped);
+        if (!dropped.files.length) {
           await inform({ title: m("Open"), paragraphs: [m("Drop a netlist or RNL package file ({0}).", await listedText())] });
           return;
         }
         // the file to open, as the page chooses it in every shell (incoming.js)
-        const path = await chooseEntry(paths);
+        const path = await chooseEntry(dropped.files);
         if (path) await handler(file(path));
       } catch (error) {
         await inform({ title: m("Open"), paragraphs: [m`The dropped files could not be opened: ${error.message || error}`] });
