@@ -66,6 +66,14 @@ pub fn replace_records(
     let packages: Vec<String> = files.package_files().iter().map(|p| normalize(p)).collect();
     let read: Vec<String> = noting.read.take().into_iter().filter(|p| !packages.contains(p)).collect();
     let replaced = SolvedFile { path: done.path, text: done.text };
-    let run = SolveRun { entry, levels: Vec::new(), not_solved: Vec::new(), files: vec![replaced], read, errors: 0 };
+    let run = SolveRun {
+        entry,
+        levels: Vec::new(),
+        not_solved: Vec::new(),
+        files: vec![replaced],
+        read,
+        errors: 0,
+        readings: Default::default(),
+    };
     Ok(ReplaceRun { run, removed: done.removed, added: done.added })
 }

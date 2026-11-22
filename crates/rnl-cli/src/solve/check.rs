@@ -132,31 +132,56 @@ pub fn check_settings(
     options: &SolveOptions,
     tool: &[ToolSettings],
 ) -> Result<Checked, String> {
+    match file {
+        Some(file) => check_settings_read(file, files, options, tool, None),
+        None => {
+            let (settings, tool_errors) = tool_settings(tool);
+            let levels = vec![level(None, &settings, &tool_errors, None, Vec::new())];
+            Ok(Checked { ok: levels.iter().all(|l| l.errors.is_empty()), levels })
+        }
+    }
+}
+
+/// [`check_settings`] of `file`, with `before`, a reading of the files as a solve reads them
+/// ([`SolveOptions::runtime`]), when the caller has one: it is taken instead of reading the files
+/// again when the check reads them with the same options, which it does when the tool's settings
+/// are those of `options`.
+pub(crate) fn check_settings_read(
+    file: &Path,
+    files: &dyn Provider,
+    options: &SolveOptions,
+    tool: &[ToolSettings],
+    before: Option<&Interpretation>,
+) -> Result<Checked, String> {
     let (settings, tool_errors) = tool_settings(tool);
     let mut levels = Vec::new();
-    match file {
-        None => levels.push(level(None, &settings, &tool_errors, None, Vec::new())),
-        Some(file) => {
-            let runtime = Options {
-                std: options.std,
-                include_std: options.include_std,
-                solver_config: settings
-                    .iter()
-                    .filter(|(s, _)| !rnl_solver::is_run_setting(&s.key))
-                    .map(|(s, _)| s.clone())
-                    .collect(),
-                ..Options::solver()
-            };
-            let r = crate::interpret_file_with(file, options.dialect.as_deref(), &options.formats, files, &runtime)?;
-            for p in r.problems.iter().filter(|p| options.level.as_ref().is_none_or(|t| *t == p.title)) {
-                let read = reading_problems(&r, p);
-                levels.push(level(Some((&r, p)), &settings, &tool_errors, Some(p.title.clone()), read));
-            }
-            if levels.is_empty() {
-                if let Some(title) = &options.level {
-                    return Err(format!("no drawing level is titled {title}"));
-                }
-            }
+    let runtime = Options {
+        std: options.std,
+        include_std: options.include_std,
+        solver_config: settings
+            .iter()
+            .filter(|(s, _)| !rnl_solver::is_run_setting(&s.key))
+            .map(|(s, _)| s.clone())
+            .collect(),
+        ..Options::solver()
+    };
+    // Options has no equality of its own; its Debug text shows every field
+    let same = format!("{runtime:?}") == format!("{:?}", options.runtime());
+    let read;
+    let r = match before.filter(|_| same) {
+        Some(r) => r,
+        None => {
+            read = crate::interpret_file_with(file, options.dialect.as_deref(), &options.formats, files, &runtime)?;
+            &read
+        }
+    };
+    for p in r.problems.iter().filter(|p| options.level.as_ref().is_none_or(|t| *t == p.title)) {
+        let read = reading_problems(r, p);
+        levels.push(level(Some((r, p)), &settings, &tool_errors, Some(p.title.clone()), read));
+    }
+    if levels.is_empty() {
+        if let Some(title) = &options.level {
+            return Err(format!("no drawing level is titled {title}"));
         }
     }
     Ok(Checked { ok: levels.iter().all(|l| l.errors.is_empty()), levels })
