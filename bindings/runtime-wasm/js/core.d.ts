@@ -548,6 +548,11 @@ export interface Core {
   formats(request: FormatsRequest | string): FormatList;
   /** The bundled packages a frontend lists among its built-in ones, by path with their texts: all but those of a draft series. */
   bundled(): Record<string, string>;
+  /**
+   * The files of folders as a browser gives them (each path's first part the folder included, or a file given alone)
+   * that the Library lists, as every viewer lists a folder included, and whether a folder had more files than are listed.
+   */
+  folders(paths: string[]): FolderListing;
   /** The core's answer as it gives it; throws only when the core stops. */
   respond(
     request:
@@ -559,6 +564,7 @@ export interface Core {
       | LibraryRequest
       | FormatsRequest
       | { bundled: true }
+      | { folders: { paths: string[] } }
       | string,
   ):
     | { document: Document }
@@ -573,7 +579,14 @@ export interface Core {
     | { library: string[] }
     | { formats: FormatList }
     | { bundled: Record<string, string> }
+    | { folders: FolderListing }
     | { error: string };
+}
+
+/** The files of folders the Library lists, sorted, and whether a folder had more files than are listed. */
+export interface FolderListing {
+  files: string[];
+  truncated: boolean;
 }
 
 /** Load the core: the module by URL, as a response, as bytes, or compiled. */

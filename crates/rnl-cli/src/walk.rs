@@ -5,25 +5,16 @@
 //!
 //! Both walks leave out what is hidden (a name that starts with `.`), enter no folder through a
 //! link, and leave out a file whose link leads out of the folder walked. A file is listed by its
-//! suffix ([`rnl_view::is_listed`]).
+//! suffix ([`rnl_view::is_listed`]). A folder included is walked as every viewer walks one
+//! ([`rnl_view::folder::walk_folder`]): the web viewer walks the paths a browser gives with it too.
 
 use std::path::{Path, PathBuf};
 
-/// How far a walk goes below the folder it starts in.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Walk {
-    /// The most levels of folders below the first that are entered; None for all.
-    pub depth: Option<usize>,
-    /// The most items the walk gives: folders for [`path_listing`], files for [`folder_files`].
-    pub limit: usize,
-}
+use rnl_view::folder::{walk_folder, Entries, Entry};
+pub use rnl_view::folder::{Walk, INCLUDE_FOLDER};
 
 /// The sub-folders a PATH folder added with them brings in: all of them, up to 500.
 pub const PATH_SUBFOLDERS: Walk = Walk { depth: None, limit: 500 };
-
-/// The files a folder included in the Library brings in: those of up to 8 levels of folders below
-/// it, up to 2000 files.
-pub const INCLUDE_FOLDER: Walk = Walk { depth: Some(8), limit: 2000 };
 
 /// What a PATH folder lists, and how lookup searches it.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -38,7 +29,7 @@ pub struct PathListing {
 }
 
 fn hidden(name: &std::ffi::OsStr) -> bool {
-    name.to_string_lossy().starts_with('.')
+    rnl_view::folder::hidden(&name.to_string_lossy())
 }
 
 /// The folder as the file system resolves it, or the error to show.
@@ -138,22 +129,16 @@ pub fn path_listing(dir: &Path, with_subfolders: bool) -> Result<PathListing, St
 /// ([`INCLUDE_FOLDER`]), sorted; and whether there were more files than its limit. Each file is
 /// named below `dir` as given. An error when `dir` is not a folder.
 pub fn folder_files(dir: &Path, walk: Walk) -> Result<(Vec<PathBuf>, bool), String> {
-    fn below(dir: &Path, root: &Path, level: usize, walk: Walk, out: &mut Vec<PathBuf>) -> bool {
-        let (folders, files): (Vec<_>, Vec<_>) = entries(dir).into_iter().partition(real_dir);
-        for file in files.into_iter().map(|e| e.path()).filter(|p| listed_file(p, root)) {
-            if out.len() == walk.limit {
-                return true;
-            }
-            out.push(file);
-        }
-        if walk.depth.is_some_and(|d| level >= d) {
-            return false;
-        }
-        folders.into_iter().any(|f| below(&f.path(), root, level + 1, walk, out))
-    }
     let root = root(dir)?;
-    let mut out = Vec::new();
-    let more = below(dir, &root, 0, walk, &mut out);
+    // a folder's entries, a folder each that is one, not a link to one; a file each of the others
+    let held = |dir: &PathBuf| -> Entries<PathBuf, PathBuf> {
+        let entry = |e: std::fs::DirEntry| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            (name, if real_dir(&e) { Entry::Folder(e.path()) } else { Entry::File(e.path()) })
+        };
+        entries(dir).into_iter().map(entry).collect()
+    };
+    let (mut out, more) = walk_folder(&dir.to_path_buf(), walk, &held, &|p: &PathBuf| listed_file(p, &root));
     out.sort();
     Ok((out, more))
 }

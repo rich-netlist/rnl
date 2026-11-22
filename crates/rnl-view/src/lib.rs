@@ -8,6 +8,7 @@ mod catalog;
 mod constraints;
 mod document;
 mod file_result;
+pub mod folder;
 mod formats;
 pub mod hints;
 mod library;

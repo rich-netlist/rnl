@@ -7,6 +7,7 @@ import type {
   DrawingsRequest,
   FileResult,
   FileSymbols,
+  FolderListing,
   FormatList,
   FormatsRequest,
   LibraryRequest,
@@ -33,6 +34,7 @@ export type {
   FileOutline,
   FileResult,
   FileSymbols,
+  FolderListing,
   FormatInfo,
   FormatList,
   FormatsRequest,
@@ -99,6 +101,11 @@ export interface CoreWorker {
   formats(request: FormatsRequest): Promise<FormatList>;
   /** The bundled packages a frontend lists among its built-in ones, by path with their texts: all but those of a draft series. */
   bundled(): Promise<Record<string, string>>;
+  /**
+   * The files of folders as a browser gives them (each path's first part the folder included, or a file given alone)
+   * that the Library lists, as every viewer lists a folder included, and whether a folder had more files than are listed.
+   */
+  folders(paths: string[]): Promise<FolderListing>;
   /** Stop the Worker; calls still waiting, and later ones, reject. */
   terminate(): void;
 }

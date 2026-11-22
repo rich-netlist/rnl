@@ -881,7 +881,7 @@ test("Include Folder adds netlists and packages, and clicking a pooled file open
     "top.sp": "* top\n.include \"lib/parts.inc\"\nX1 a 0 part\n.end\n",
     "lib/parts.inc": ".subckt part p q\nR1 p q 1k\n.ends\n",
     "notes.txt": "notes\n",
-    // nothing hidden is listed, as on the desktop (rnl_cli::walk; apps/web/folder-listing.test.mjs has the other rules)
+    // nothing hidden is listed, as on the desktop: the core lists the folder (rnl_view::folder, whose tests have the other rules)
     ".hidden/skipped.sp": "* skipped\n.end\n",
   });
   const setting = page.locator("#folder-input").setInputFiles(dir).catch(() => {});

@@ -551,6 +551,25 @@ test("the formats give the suffixes a frontend lists, and a bundled request the 
   }
 });
 
+test("a folders request lists the files of folders a browser gives as every viewer lists a folder included", async () => {
+  // the folder included is each path's first part; a file alone is kept when listed; nothing hidden, by the core's suffixes
+  const paths = ["/lib/top.sp", "/lib/notes.txt", "/lib/.git/x.sp", "/lib/sub/parts.RNL", "/alone.va", "/alone.txt"];
+  const listed = { files: ["/alone.va", "/lib/sub/parts.RNL", "/lib/top.sp"], truncated: false };
+  assert.deepEqual(core.folders(paths), listed);
+  // more files than a folder included brings in: the first ones met, and said
+  const many = Array.from({ length: 2001 }, (_, i) => `big/f${String(i).padStart(4, "0")}.sp`);
+  const big = core.folders(many);
+  assert.equal(big.files.length, 2000);
+  assert.equal(big.truncated, true);
+  assert.equal(big.files.includes("big/f2000.sp"), false);
+  const worker = startCore();
+  try {
+    assert.deepEqual(await worker.folders(paths), listed);
+  } finally {
+    worker.terminate();
+  }
+});
+
 test("decodeText reads bytes as rnl reads a file", () => {
   const encoded = (text) => new TextEncoder().encode(text);
   // UTF-8, without a byte order mark at the start

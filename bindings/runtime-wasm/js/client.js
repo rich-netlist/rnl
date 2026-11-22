@@ -47,6 +47,9 @@ export { coreVersion, fileResultFormat } from "./version.js";
  *   The formats a file can be read with, and the format each file of `detect` has when none is set.
  * @property {() => Promise<Record<string, string>>} bundled The bundled packages a frontend lists among
  *   its built-in ones, by path with their texts: all the core has but those of a draft series.
+ * @property {(paths: string[]) => Promise<{ files: string[], truncated: boolean }>} folders The files of folders as a
+ *   browser gives them (each path's first part the folder included, or a file given alone) that the Library lists, as
+ *   every viewer lists a folder included, and whether a folder had more files than are listed.
  * @property {() => void} terminate Stop the Worker; calls still waiting, and later ones, reject.
  */
 
@@ -126,6 +129,7 @@ export function startCore(options = {}) {
     library: (request) => send(request, "library"),
     formats: (request) => send(request, "formats"),
     bundled: () => send({ bundled: true }, "bundled"),
+    folders: (paths) => send({ folders: { paths } }, "folders"),
     terminate() {
       stop(new Error("The core was stopped."));
       worker.then((w) => w.terminate(), () => {});

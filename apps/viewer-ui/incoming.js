@@ -5,7 +5,6 @@
 import { m } from "./i18n.js";
 import { choose } from "./dialog.js";
 import { formatList, setFormatList } from "./formats.js";
-import { folderListing } from "./folder-listing.js";
 import { shell } from "./shell.js";
 
 let known = null; // { entries, parts }, once the core's formats are known
@@ -29,18 +28,6 @@ export function suffix(path) {
   const name = path.slice(Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1);
   const dot = name.lastIndexOf(".");
   return dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
-}
-
-/**
- * The files of the folders included among `items`, and the files given alone that the viewer lists, as every viewer
- * lists a folder (folder-listing.js: rnl_cli::walk's rules); and whether a folder had more files than are listed. A
- * browser gives every file of a folder: the web shell takes these. `pathOf` gives an item's path, whose first part is
- * the folder included.
- */
-export async function folderFiles(items, pathOf) {
-  const { entries, parts } = await listedSuffixes();
-  const listed = (path) => entries.includes(suffix(path)) || parts.includes(suffix(path));
-  return folderListing(items, pathOf, listed);
 }
 
 

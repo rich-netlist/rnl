@@ -15,7 +15,7 @@ import { libraryStamps, requestPath, textHash } from "../file-results.js";
 import { loadManifest, readManifest } from "../manifest.js";
 import { ask, choose, inform, modal } from "../dialog.js";
 import { libraryZip } from "../zip.js";
-import { chooseEntry, folderFiles } from "../incoming.js";
+import { chooseEntry } from "../incoming.js";
 import { note } from "../editor.js";
 import { openWebWindow, receiveWebSession } from "../window-session.js";
 import { load } from "../util.js";
@@ -638,13 +638,16 @@ async function poolItems(files, folder = false) {
 }
 
 /**
- * The files of a folder chosen or dropped that join the Library, as every viewer lists a folder (incoming.js): a folder
- * with more files than are listed is included in part, which is said, as in the desktop viewer.
+ * The items of a folder chosen or dropped that join the Library, as every viewer lists a folder included: the core lists
+ * them from their paths (`pathOf`, whose first part is the folder included, or a file given alone), as the desktop app
+ * and the local program list a folder on disk (rnl_view::folder). A folder with more files than are listed is included
+ * in part, which is said, as in the desktop viewer.
  */
 async function listedFolders(items, pathOf) {
-  const { items: kept, truncated } = await folderFiles(items, pathOf);
-  if (truncated) note(m`Only the first ${kept.length} entries are listed.`);
-  return kept;
+  const byPath = new Map(items.map((item) => [pathOf(item), item]));
+  const { files, truncated } = await (await someCore()).folders([...byPath.keys()]);
+  if (truncated) note(m`Only the first ${files.length} entries are listed.`);
+  return files.map((path) => byPath.get(path));
 }
 
 let libraryIndex = null;
