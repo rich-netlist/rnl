@@ -4,7 +4,7 @@
 // for the symbols of a file, { id, written } for a write, { id, replaced } for a
 // replace-records request, { id, catalog } for a catalog request, { id, drawings } for the drawings
 // of objects the last build kept, { id, formats } for a formats request, { id, bundled } for the
-// bundled packages a frontend lists, or { id, error },
+// bundled packages a frontend lists, { id, folders } for the files of folders a browser gave, or { id, error },
 // in the order they came. The request is an object or, as client.js sends it, its JSON text. Every request gets
 // the packages this build brings (packages.js): their files under the request's own, their
 // directories after the request's; an outline, which loads no package, gets none. It runs in browsers and, for the tests, as a Node worker thread.
@@ -23,8 +23,8 @@ function withPackages(request) {
   if (packageDirs.length === 0) return request;
   const r = typeof request === "string" ? JSON.parse(request) : request;
   // the drawings of the last build need no files, nor does an outline, which loads no package
-  // unless it is the outline of one
-  if (r.drawings !== undefined || (r.outline && !(r.entry in packageFiles))) return request;
+  // unless it is the outline of one; a folders request reads no file
+  if (r.drawings !== undefined || r.folders !== undefined || (r.outline && !(r.entry in packageFiles))) return request;
   return { ...r, files: { ...packageFiles, ...r.files }, package_dirs: [...(r.package_dirs ?? []), ...packageDirs] };
 }
 

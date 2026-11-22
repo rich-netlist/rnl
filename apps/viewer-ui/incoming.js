@@ -6,6 +6,7 @@ import { m } from "./i18n.js";
 import { choose } from "./dialog.js";
 import { formatList, setFormatList } from "./formats.js";
 import { shell } from "./shell.js";
+import { note } from "./editor.js";
 
 let known = null; // { entries, parts }, once the core's formats are known
 
@@ -30,10 +31,14 @@ export function suffix(path) {
   return dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
 }
 
-/** Of `paths`, those the viewer lists: of a suffix the core lists. */
-export async function listedOnly(paths, pathOf = (p) => p) {
-  const { entries, parts } = await listedSuffixes();
-  return paths.filter((p) => entries.includes(suffix(pathOf(p))) || parts.includes(suffix(pathOf(p))));
+/**
+ * Say which folders included are listed in part, as every viewer lists a folder (rnl_view::folder::Listing: `truncated`,
+ * the folders by name, and `limit`, how many files each folder brings in): the same sentence for every shell, Include
+ * Folder and a folder dropped alike, one for each folder, as the limit is each folder's; they are said in one note.
+ * Nothing when every folder is listed whole.
+ */
+export function sayListedInPart({ truncated, limit }) {
+  if (truncated?.length) note(truncated.map((folder) => m`Only the first ${limit} files of ${folder} are listed.`).join(" "));
 }
 
 /** The suffixes the core lists, written for a sentence: ".sp, .spi, … or .rnl". */

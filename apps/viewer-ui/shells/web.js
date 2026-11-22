@@ -15,7 +15,7 @@ import { libraryStamps, requestPath, textHash } from "../file-results.js";
 import { loadManifest, readManifest } from "../manifest.js";
 import { ask, choose, inform, modal } from "../dialog.js";
 import { libraryZip } from "../zip.js";
-import { chooseEntry, listedOnly } from "../incoming.js";
+import { chooseEntry, sayListedInPart } from "../incoming.js";
 import { openWebWindow, receiveWebSession } from "../window-session.js";
 import { load } from "../util.js";
 import { sourcePath } from "../source-path.js";
@@ -629,11 +629,24 @@ async function openFiles(files) {
 
 /** Pool files retain their directory structure, but only the current pool supplies siblings; a folder's, those the viewer lists. */
 async function poolItems(files, folder = false) {
-  return (folder ? await listedOnly(files, (f) => f.name) : files).map((f) => {
+  return (folder ? await listedFolders(files, (f) => f.webkitRelativePath || f.name) : files).map((f) => {
     const path = `/${f.webkitRelativePath || f.name}`;
     const read = () => f;
     return { path, name: path.slice(1), read, source: { ...filesSource(new Map([[path, read]]), path), fromPool: true } };
   });
+}
+
+/**
+ * The items of a folder chosen or dropped that join the Library, as every viewer lists a folder included: the core lists
+ * them from their paths (`pathOf`, whose first part is the folder included, or a file given alone), as the desktop app
+ * and the local program list a folder on disk (rnl_view::folder). A folder with more files than are listed is included
+ * in part, which is said, with its name and how many files a folder brings in.
+ */
+async function listedFolders(items, pathOf) {
+  const byPath = new Map(items.map((item) => [pathOf(item), item]));
+  const listed = await (await someCore()).folders([...byPath.keys()]);
+  sayListedInPart(listed);
+  return listed.files.map((path) => byPath.get(path));
 }
 
 let libraryIndex = null;
@@ -814,7 +827,7 @@ async function dropped(entries, files) {
   if (all.size === 0) return null;
   const folders = entries.filter((entry) => entry.isDirectory);
   if (folders.length > 0 && included) {
-    included((await listedOnly([...all], ([path]) => path)).map(([path, read]) =>
+    included((await listedFolders([...all], ([path]) => path)).map(([path, read]) =>
       ({ path, name: path.slice(1), read, source: { ...filesSource(new Map([[path, read]]), path), fromPool: true } })));
     return null;
   }

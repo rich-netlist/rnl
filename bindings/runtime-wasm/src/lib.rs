@@ -323,10 +323,24 @@ pub struct FormatList {
     pub detected: BTreeMap<String, String>,
 }
 
+/// A folders request: `{"folders": {"paths": [...]}}`, the paths of the files of folders as a browser gives a
+/// folder chosen or dropped, each whose first part is the folder included, or a file given alone
+/// ([`rnl_view::folder::folders_listing`]).
+#[derive(Deserialize)]
+pub struct FoldersRequest {
+    pub folders: FolderPaths,
+}
+
+/// The paths of a [`FoldersRequest`].
+#[derive(Deserialize)]
+pub struct FolderPaths {
+    pub paths: Vec<String>,
+}
+
 /// The answer to a request: `{"document": ...}`, `{"outline": ...}`, `{"file": ...}`, `{"symbols": ...}`,
 /// `{"snapshot": ...}`, `{"written": ...}`,
-/// `{"replaced": ...}`, `{"catalog": ...}`, `{"drawings": ...}`, `{"formats": ...}`, `{"bundled": ...}` or
-/// `{"error": "..."}`.
+/// `{"replaced": ...}`, `{"catalog": ...}`, `{"drawings": ...}`, `{"formats": ...}`, `{"bundled": ...}`,
+/// `{"folders": ...}` or `{"error": "..."}`.
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Response {
@@ -354,6 +368,9 @@ pub enum Response {
     /// The bundled packages a frontend lists among its built-in ones, by path with their texts, when the
     /// request has a `bundled` field ([`rnl_view::bundled_listed`]): all but those of a draft series.
     Bundled(BTreeMap<String, String>),
+    /// The files of the folders a [`FoldersRequest`] gives, as every viewer lists a folder included
+    /// ([`rnl_view::folder::folders_listing`]).
+    Folders(rnl_view::folder::Listing),
     /// Why there is none: the request is not a [`Request`], a [`WriteRequest`], a
     /// [`ReplaceRequest`], a [`CatalogRequest`] or a [`DrawingsRequest`], the entry cannot be read,
     /// an op cannot be written, the records cannot be replaced (the message begins with the kind of
@@ -459,6 +476,14 @@ pub fn respond(request: &[u8]) -> Response {
     }
     if value.get("bundled").is_some() && value.get("entry").is_none() {
         return Response::Bundled(rnl_view::bundled_listed());
+    }
+    if value.get("folders").is_some() && value.get("entry").is_none() {
+        return match serde_json::from_value::<FoldersRequest>(value) {
+            Ok(f) => {
+                Response::Folders(rnl_view::folder::folders_listing(&f.folders.paths, rnl_view::folder::INCLUDE_FOLDER))
+            }
+            Err(e) => invalid(e),
+        };
     }
     // a build sets formats too: a request for the list has no entry
     if value.get("formats").is_some() && value.get("entry").is_none() {

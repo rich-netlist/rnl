@@ -17,7 +17,7 @@ import web, { useBundledPackages } from "./web.js";
 import { decodeText } from "../core/client.js";
 import { chooseOnServer } from "../server-files.js";
 import { inform, offer } from "../dialog.js";
-import { note } from "../editor.js";
+import { sayListedInPart } from "../incoming.js";
 import { sourcePath } from "../source-path.js";
 import { doc } from "../state.js";
 import { dirtyPaths, unappliedPaths } from "../edits.js";
@@ -216,10 +216,10 @@ export default {
       return [web.poolItem(serverSource(chosen.path))];
     }
     // the program allows the folder and lists it as the desktop's Include Folder does (rnl_cli::walk), by the core's suffixes
-    const { files, truncated } = await api("api/folder", { method: "POST", body: { dir: chosen.path } });
-    // (a folder with more files than are listed is included in part: said, with how many)
-    if (truncated) note(m`Only the first ${files.length} entries are listed.`);
-    return files.map((path) => web.poolItem(serverSource(path)));
+    const listed = await api("api/folder", { method: "POST", body: { dir: chosen.path } });
+    // (a folder with more files than are listed is included in part: said, as every shell says it)
+    sayListedInPart(listed);
+    return listed.files.map((path) => web.poolItem(serverSource(path)));
   },
   // another file of the document, opened from the Library, a diagnostic or an include: read from the machine too
   sourceForFile(source, document, index) {

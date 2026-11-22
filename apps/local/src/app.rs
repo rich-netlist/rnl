@@ -423,11 +423,10 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
                 return Err(bad("the path is not absolute"));
             }
             app.roots.allow_chosen(&dir).map_err(forbidden)?;
-            let (found, truncated) = rnl_cli::walk::folder_files(&dir, rnl_cli::walk::INCLUDE_FOLDER).map_err(bad)?;
-            Ok(Response::json(
-                200,
-                &json!({ "files": found.iter().map(|p| files::page_path(p)).collect::<Vec<_>>(), "truncated": truncated }),
-            ))
+            // (as every viewer gives a folder's listing, rnl_view::folder::Listing: the folder by its name when it had more)
+            let listed = rnl_cli::walk::folder_files(&dir, rnl_cli::walk::INCLUDE_FOLDER).map_err(bad)?;
+            let found = listed.files.iter().map(|p| files::page_path(p)).collect::<Vec<_>>();
+            Ok(Response::json(200, &json!({ "files": found, "truncated": listed.truncated, "limit": listed.limit })))
         }
         "/api/save" if method == "POST" => {
             #[derive(Deserialize)]
