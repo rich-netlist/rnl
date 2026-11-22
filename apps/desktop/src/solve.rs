@@ -13,7 +13,6 @@ use rnl_cli::progress::Event;
 use rnl_cli::solve::{check_settings, SolveOptions, ToolSettings};
 use rnl_runtime::source::MemoryProvider;
 use rnl_solver::SolverOptions;
-use rnl_view::Document;
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
@@ -51,10 +50,12 @@ struct SavedCopy {
     in_memory: bool,
 }
 
-/// What a solve gives the page: the netlist drawn as solved, and the report.
+/// What a solve gives the page: the netlist drawn as solved, and the report. A level solved in its
+/// own file (`Settings::file`) is that file's Document, shaped as the reading of that file alone
+/// (`rnl_cli::preview::Preview::shown`).
 #[derive(Serialize)]
 pub struct Solved {
-    document: Document,
+    document: serde_json::Value,
     report: Report,
 }
 
@@ -62,7 +63,9 @@ pub struct Solved {
 /// differ from the defaults, written as RNL named parameters as `rnl solve --solver-config` takes
 /// them, such as `layout="rows",beam=8`. `timeall` is the seconds that all levels of a time limit share
 /// (`rnl solve --timeall`), none for each level's own. `level` is the title of the one level to solve, the circuit
-/// shown; none solves every level (Solve > Solve All Circuits). `respace` draws each level where the record of the
+/// shown; none solves every level (Solve > Solve All Circuits). `file`, with `level`, is the file of the document the
+/// level is written in, as the document names it, when the page shows that file read alone: only that file is read for
+/// the level, and the preview is that file's (`rnl solve --file`). `respace` draws each level where the record of the
 /// solver in the file last put its objects, spaced again as `config` says, nothing searched (Solve > Respace). None
 /// given, or an empty text, are the defaults of `rnl solve`.
 #[derive(Debug, Default, Deserialize)]
@@ -74,6 +77,8 @@ pub struct Settings {
     timeall: Option<f64>,
     #[serde(default)]
     level: Option<String>,
+    #[serde(default)]
+    file: Option<String>,
     #[serde(default)]
     respace: bool,
 }
@@ -140,6 +145,7 @@ pub async fn solve_preview(
     let spaced = settings.respace;
     let options = SolveOptions {
         level: settings.level.clone().filter(|title| !title.is_empty()),
+        file: settings.file.clone().filter(|file| !file.is_empty()),
         solver: settings.solver()?,
         total_seconds: settings.total_seconds()?,
         formats: formats.unwrap_or_default(),
@@ -206,8 +212,9 @@ pub async fn solve_preview(
         }
     }
     let shown = shown?;
+    let document = serde_json::to_value(shown.shown()).map_err(|e| e.to_string())?;
     *solves.last.lock().map_err(|e| e.to_string())? = Some(SavedCopy { copy: shown.copy, in_memory });
-    Ok(Solved { document: shown.document, report: shown.report })
+    Ok(Solved { document, report: shown.report })
 }
 
 /// Stop the solve under way, if any: it gives back the word that it was cancelled.

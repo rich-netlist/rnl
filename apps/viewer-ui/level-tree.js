@@ -5,8 +5,9 @@
 // listed by the subcircuit they call, in the order first called, and a name the netlist does not define is one row
 // for all its instances. The outline has the modules of Verilog-A too, which no reading draws (2.9): each is a node
 // with `module` set, the modules its instances name its children, with the line of each instance. The preview of a solve
-// is a Document of the whole document, which has no modules: it has the outline of the reading the solve started from
-// (`outlineBefore`, solve.js), whose modules are nodes of its tree too, each instance that names one a child of it.
+// of one file is the reading of that file, with the outline of the reading it was solved from (solve.js). The preview of
+// the whole document has no modules: it has the outline of the reading the solve started from as `outlineBefore`, whose
+// modules are nodes of its tree too, each instance that names one a child of it.
 
 import { doc } from "./state.js";
 

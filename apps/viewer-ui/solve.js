@@ -7,6 +7,12 @@ import { append, m, setAttr, setText, tr } from "./i18n.js";
 // every line of it shown in the netlist when clicked; and a copy of the files solved saved where
 // the user says. The solver's options are Solve > Settings (solve-settings.js). A shell without
 // `solve`, such as an embed's, offers none of it.
+//
+// A shell that reads the file shown alone (`shell.perFile`) solves the circuit shown reading only its file, in the
+// context of its entry (`settings.file`), and the preview is that file's, as its reading is (the outline of the reading
+// put on it): the other files of the document are not solved, and are not in it. Visiting another file of the same
+// document then shows that file as it is read, the preview still on; coming back to the file solved shows the preview
+// again, not solved again, while the files read are those the solve read (`previewOnOpen`).
 
 import { inform, modal } from "./dialog.js";
 import { changes, unappliedPaths } from "./edits.js";
@@ -21,19 +27,36 @@ import { noteReport, solverSettings } from "./solve-settings.js";
 import { constraintsWanted, current, doc, setConstraintsWanted } from "./state.js";
 import { revealLine } from "./text.js";
 import { $, span } from "./util.js";
+import { sameEntry, sameSource } from "./visit-source.js";
 
 /** What a shell rejects with when the solve was cancelled (rnl_cli::solve::CANCELLED). */
 export const CANCELLED = "the solve was cancelled";
 
-let shown = null; // the preview shown: { source, report, all, respace }, or null
+// the preview shown: { source, report, all, respace, doc, files }, or null; `doc` the preview's Document, which another
+// file of the document may be shown in place of (`previewOnOpen`), and `files` what the files were when it was solved
+let shown = null;
 let running = false; // whether a solve is under way
 let cancelAsked = false; // whether Cancel was pressed since the solve began
 let progressHooked = false;
 
-/** Whether the page shows a solve, not the file as written. */
+/**
+ * Whether the page shows a solve, not the file as written: its Document, or another file of the same document visited
+ * from it, which the solve did not change.
+ */
 export function previewing() {
   return shown !== null;
 }
+
+/** Whether the Document shown is the preview of a solve itself. */
+export function previewShown() {
+  return shown !== null && doc === shown.doc;
+}
+
+/** Whether `d` is the Document of the preview of a solve. */
+export const isPreview = (d) => shown !== null && d === shown.doc;
+
+/** What the files of the document of a reading are, by the outline: each with the hash of its text, and those missing. */
+const filesOf = (d) => (d?.outline ? JSON.stringify([d.outline.files.map((f) => [f.path, f.text_hash]), d.outline.missing]) : null);
 
 /** How the preview shown was made, to make it again: `{ all, respace }`; null when none is shown. */
 export function previewKind() {
@@ -103,7 +126,8 @@ window.addEventListener("open-finished", () => {
  */
 export async function solve({ all = false, respace = false } = {}) {
   if (!shell || !shell.solve || running || modal() || isLoading()) return;
-  const source = shown ? shown.source : currentSource();
+  // (the preview shown, solved again; else the file shown, another file visited from a preview among them)
+  const source = previewShown() ? shown.source : currentSource();
   if (!source || !doc) {
     await inform({ title: m("Solve"), paragraphs: [m("Open a netlist first: File › Open File (Ctrl+O).")] });
     return;
@@ -120,16 +144,21 @@ export async function solve({ all = false, respace = false } = {}) {
     const given = source.text === undefined && source.path?.startsWith("<") ? { ...source, text: doc.files[0].text } : source;
     // the circuit shown is asked for by its title, as `rnl solve --level` takes it
     const level = all ? null : doc.levels[current]?.title ?? null;
+    // a level of the file shown read alone, of a document of several files: only that file is read for it, and the
+    // preview is that file's
+    const file = level !== null && shell.perFile && typeof doc.file === "string" && (doc.outline?.files.length ?? 0) > 1 ? doc.file : null;
     // (the whole file's time is not read by a respace)
     // (a Cancel while the settings are read, before the shell has a solve to stop, is kept until it has)
     cancelAsked = false;
     const taken = await solverSettings();
     if (cancelAsked) throw new Error(CANCELLED);
-    const asked = respace ? { ...taken, timeall: null, respace: true, level } : { ...taken, level };
+    const one = file === null ? {} : { file };
+    const asked = respace ? { ...taken, timeall: null, respace: true, level, ...one } : { ...taken, level, ...one };
     const solved = await shell.solve(given, asked, changes(true));
-    shown = { source, report: solved.report, all, respace };
+    const before = doc;
+    keepOutline(solved.document, before);
+    shown = { source, report: solved.report, all, respace, doc: solved.document, files: solved.document.outline ? filesOf(before) : null };
     noteReport(solved.report);
-    keepOutline(solved.document, doc);
     showBuilt(solved.document, true);
     // the solved layout can lie outside the view of the netlist as it was
     fit();
@@ -165,15 +194,34 @@ export async function solve({ all = false, respace = false } = {}) {
 
 /**
  * Give the preview `preview` the outline of the reading `before` the solve started from, or the one the preview before
- * kept, as `outlineBefore`: the preview is a Document of the whole document, which has no modules of Verilog-A, and the
- * outline has them (level-tree.js). A solve changes no structure, but the files solved may have changes not read yet: the
- * outline is kept only when each level of the preview is the level of the outline of the same host, kind and title.
+ * kept. The preview of one file read alone (its `file`) has it as its own `outline`, as the reading has it
+ * (file-reading.js): the hierarchy, the modules of Verilog-A and the other files are the outline's. The preview of the
+ * whole document has it as `outlineBefore`: it has every level, but no modules of Verilog-A, which the outline has
+ * (level-tree.js). A solve changes no structure, but the files solved may have changes not read yet: the outline is kept
+ * only when each level of the preview is the level of the outline of the same host, kind and title.
  */
 function keepOutline(preview, before) {
   const outline = before?.outline ?? before?.outlineBefore;
   if (!outline) return;
   const same = preview.levels.every((l) => outline.levels[l.host]?.title === l.title && outline.levels[l.host].kind === l.kind);
-  if (same) preview.outlineBefore = outline;
+  if (!same) return;
+  if (typeof preview.file === "string") preview.outline = outline;
+  else preview.outlineBefore = outline;
+}
+
+/**
+ * As `source` is opened, read as `read`: the preview to show in its place, or null. A visit (`navigation`) to another
+ * file of the document of a preview of one file keeps the preview on, the file shown as it is read; coming back to the
+ * file solved shows the preview again, while the files are what they were when it was solved. Anything else opened, a
+ * file read again, changes applied, or the files changed since, ends it (open.js).
+ */
+export function previewOnOpen(source, read, { navigation = null, edited = null, fresh = false } = {}) {
+  if (!shown) return null;
+  const visit = !!navigation && !edited && !fresh && shown.files !== null && sameEntry(source, shown.source);
+  if (visit && !sameSource(source, shown.source)) return null;
+  if (visit && filesOf(read) === shown.files) return shown.doc;
+  endPreview();
+  return null;
 }
 
 /** Stop the solve under way (the Cancel button of the status bar). */
@@ -187,6 +235,8 @@ export function cancelSolve() {
 /** Solve > Close Preview: show the netlist again, the files as read with the changes applied to them. */
 export async function closePreview() {
   if (!shown) return;
+  // another file visited from the preview is shown as it is read already
+  if (!previewShown()) return endPreview();
   const source = shown.source;
   // the layout goes back to the one the netlist has, which can lie outside the view of the solve
   if (await openSource(source, true, changes(true))) fit();
@@ -296,7 +346,9 @@ function line(cls, parts, at) {
   if (at) {
     li.classList.add("located");
     setAttr(li, "title", m("Show in the netlist"));
-    li.addEventListener("click", () => {
+    li.addEventListener("click", async () => {
+      // the line is one of the preview's texts: shown again first, when another file visited from it is shown
+      if (!previewShown() && shown && !(await openSource(shown.source, false, undefined, false, { path: [] }))) return;
       setPane("netlist");
       revealLine(at.file_index, at.line, true);
     });

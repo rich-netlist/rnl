@@ -182,6 +182,14 @@ view of it: the entry's source with `view`, the file as the document names it (`
   between two files it rests for at least 1.5 seconds and three times the time the last one took. It reads beside the
   page's own readings: on the web in a core of its own, and on the desktop on a thread apart from the one that holds
   the drawings of the reading shown (reading.rs).
+- **Solve** (F9, `solve.js`) solves the circuit shown reading only its file, in the context of the entry, as its reading
+  does: the shell gives the solver the file as the document names it (`settings.file`, `rnl solve --file`), and the
+  preview is the reading of that file as solved, with the outline of the reading it was solved from as its own, so that
+  the hierarchy, the modules of Verilog-A and the other files are the whole document's. The other files are not solved.
+  Another file visited from the preview, by a subcircuit, a module, the way up, the hierarchy or the path bar, is shown
+  as it is read, the preview still on, with its report and Save Solved Copy As; coming back to the file solved shows
+  the preview again, not solved again, while the files are what they were when it was solved. Another document opened,
+  a file read again, changes applied or Close Preview end it. Solve All Circuits solves the whole document, as before.
 - **The problems** (`file-checks.js`, `problems.js`) are those of the file shown: the reading of a file has the
   problems of the files above it too, which it reads in its context, and of the packages it uses; the list has those
   of its own file, of no file and of a package. **All Files**, a switch at the right of the problems' heading, adds

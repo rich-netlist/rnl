@@ -5,7 +5,8 @@
 //!                           dialog is drawn from: what `rnl solver-defaults --json` prints
 //!   POST /rnl-solver/check  {"config"}  ->  what `rnl solve --check --json` prints of those settings, with no file
 //!   POST /rnl-solver/solve  {"entry", "files", "pool", "package_dirs", "search_paths", "auto_include", "library_prefix",
-//!                            "library_edits", "formats", "config", "timeall", "level", "respace", "stream"}  ->  {"document", "report", "files"}
+//!                            "library_edits", "formats", "config", "timeall", "level", "file", "respace", "stream"}
+//!                           ->  {"document", "report", "files"}
 //!
 //! `config` is the settings that differ from the defaults, as RNL named parameters, as `--solver-config` takes them.
 //! The files are those of the page's build request, read as the core reads them for every frontend
@@ -14,7 +15,9 @@
 //! The answer's `files` are the texts the solve wrote, by the request's paths, which the page draws the preview again
 //! from (Export Image), as `rnl preview --request` and the WebAssembly solver give them.
 //!
-//! `level` is the title of the one level to solve (`rnl solve --level`), none for every level. With `"stream": true` the
+//! `level` is the title of the one level to solve (`rnl solve --level`), none for every level; `file`, with `level`, the file
+//! of the document it is written in, as the document names it, when the page shows that file read alone: only that file is
+//! read for the level, and the answer's Document is that file's (`rnl solve --file`). With `"stream": true` the
 //! answer is lines of JSON (`application/x-ndjson`): the events of the solve as they happen (docs/solver-progress.md), then
 //! `{"result": {"document", "report", "files"}}`, or `{"error": message}` if the solve fails after the first line was sent; a request
 //! that is wrong is answered as it is without `stream`, as a 400 with `{"error"}`. The page going away stops the solve.
@@ -74,6 +77,10 @@ pub struct Request {
     /// The title of the one level to solve: none, or empty, solves every level.
     #[serde(default)]
     pub level: Option<String>,
+    /// With `level`, the file of the document the level is written in, as the document names it: only that file is read
+    /// for the level (`rnl solve --file`), and the Document answered is that file's, as the page reads it alone.
+    #[serde(default)]
+    pub file: Option<String>,
     /// Each level as the record of the solver in the file last drew it, spaced again as the settings say, nothing
     /// searched (`rnl preview --respace`).
     #[serde(default)]
@@ -162,6 +169,7 @@ pub fn prepare(request: &Request) -> Result<Prepared, String> {
     let options = SolveOptions {
         solver,
         level,
+        file: request.file.clone().filter(|file| !file.is_empty()),
         total_seconds: request.timeall,
         formats: formats.collect(),
         ..SolveOptions::default()
@@ -189,13 +197,12 @@ fn solved_json(
 ) -> Result<String, String> {
     #[derive(serde::Serialize)]
     struct Solved<'a> {
-        document: &'a rnl_view::Document,
+        document: rnl_cli::preview::Shown<'a>,
         report: &'a rnl_cli::preview::Report,
         files: std::collections::BTreeMap<String, String>,
     }
     let files = shown.copy.written_by(asked);
-    serde_json::to_string(&Solved { document: &shown.document, report: &shown.report, files })
-        .map_err(|e| e.to_string())
+    serde_json::to_string(&Solved { document: shown.shown(), report: &shown.report, files }).map_err(|e| e.to_string())
 }
 
 /// Solve a request: the JSON text of `{document, report, files}`. `peer` is the connection of the page, which is watched for the
@@ -299,6 +306,7 @@ mod tests {
             config: String::new(),
             timeall: None,
             level: None,
+            file: None,
             respace: false,
             stream: false,
             formats: BTreeMap::new(),
@@ -329,6 +337,35 @@ mod tests {
         assert!(!nets(&r).0.iter().any(|n| n.contains('(') || n.contains(')')), "{:?}", nets(&r).0);
         r.formats.clear();
         assert_eq!(nets(&r).1.as_deref(), Some("spice"));
+    }
+
+    #[test]
+    fn a_level_solved_with_its_file_comes_back_as_the_reading_of_that_file() {
+        let (_client, server) = pair();
+        let mut r = request("/top.sp", "* top\n.include \"cells.inc\"\nX1 a b cell\nR9 b 0 1k\n.end\n");
+        r.files.insert("/cells.inc".into(), "* cells\n.subckt cell p n\nR1 p m 1k\nR2 m n 1k\n.ends\n".into());
+        r.level = Some("cell".into());
+        let solved = |r: &Request| -> serde_json::Value {
+            serde_json::from_str(&solve(r, &server, &LastSolve::default()).unwrap()).unwrap()
+        };
+        let titles = |json: &serde_json::Value| -> Vec<String> {
+            json["document"]["levels"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|l| l["title"].as_str().unwrap().to_string())
+                .collect()
+        };
+        // the whole document, as without the file
+        let whole = solved(&r);
+        assert!(whole["document"].get("file").is_none());
+        assert!(titles(&whole).len() > 1, "{:?}", titles(&whole));
+        // the file the level is written in: that file's reading, its levels alone
+        r.file = Some("cells.inc".into());
+        let one = solved(&r);
+        assert_eq!(one["document"]["file"], "cells.inc");
+        assert_eq!(titles(&one), ["cell"]);
+        assert_eq!(one["files"], whole["files"]);
     }
 
     #[test]

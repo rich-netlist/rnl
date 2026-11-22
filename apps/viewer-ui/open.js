@@ -23,7 +23,7 @@ import { renderDiagnostics } from "./problems.js";
 import { noteShown } from "./file-checks.js";
 import { startLevel, uncalledRoots } from "./roots.js";
 import { clearSelection, select } from "./selection.js";
-import { endPreview, previewing, solve } from "./solve.js";
+import { endPreview, previewOnOpen, previewing, solve } from "./solve.js";
 import { levelNamed, namedPath, restorePath, visitView } from "./subcircuits.js";
 import { showModule } from "./module-view.js";
 import { openOnlyRoot } from "./entry-page.js";
@@ -80,10 +80,12 @@ export async function openSource(source, keep, edited, fresh = false, navigation
     await progress.stage(options.oneLine ? "reading" : "displaying");
     if (operation.signal.aborted) return;
     lastSource = source;
-    endPreview();
+    // a visit from the preview of a solve back to the file solved shows the preview again (solve.js)
+    const preview = previewOnOpen(source, d, { navigation, edited, fresh });
     if (edited) adoptBuffers(d);
     else resetBuffers(d);
-    showBuilt(d, keep, navigation);
+    if (preview) shell.commitBuild?.(d);
+    showBuilt(preview ?? d, keep, navigation);
     // the Library and the manifest bar know the entry; the view of another of its files is no file opened
     await sourceOpened(entrySource(source), d, !keep && !source.view, !!edited);
     await nextPaint();
