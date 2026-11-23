@@ -61,7 +61,8 @@ tag, **never publishes**. Core release also runs as a PR check for relevant chan
    (2026-11-18) core 0.5.7 alone, with npm `legacy-0.3`; Viewer stays 0.5.3; and
    (2026-11-19) core 0.6.0, the first core of the language 0.4 alone, and Viewer 0.6.0, released
    together, with npm `latest`; and
-   (2026-11-20) core 0.6.1 and Viewer 0.6.1, released together, with npm `latest`.
+   (2026-11-20) core 0.6.1 and Viewer 0.6.1, released together, with npm `latest`; and
+   (2026-11-23) core 0.6.2 and Viewer 0.6.2, released together, with npm `latest`.
 2. Update the chosen core version and locks, rename/write `release-notes/core/X.Y.Z.md`, and
    set repository variable `CORE_NPM_DIST_TAG` to the agreed `next`, `latest` or `legacy-0.3`.
    Publication fails if this variable is absent or has another value. Do not infer a dist-tag
