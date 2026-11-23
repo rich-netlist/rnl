@@ -408,6 +408,10 @@ pub struct Completion {
     pub record: String,
     /// `record` finished with the check of its numbers, as the trial read it and as it is written
     pub numbered: String,
+    /// The document the trial that passed read, with `numbered`, its records and its problems, as
+    /// [`ReadBack::reading`]; and the text of the level's file it read, as [`ReadBack::text`]
+    pub reading: Interpretation,
+    pub text: String,
     pub trials: usize,
     pub elapsed: std::time::Duration,
 }
@@ -582,7 +586,7 @@ fn complete_within(
             };
             trial.insert_str(plan.end, &place);
         }
-        let (after, numbered) = read(ctx, &finisher, &trial)?;
+        let (after, numbered, text) = read_with_text(ctx, &finisher, &trial)?;
         let after_problem =
             after.problems.iter().find(|p| p.level == ctx.problem.level).ok_or("trial problem missing")?;
         let added = added_fact_indices(
@@ -594,7 +598,7 @@ fn complete_within(
             &auxiliary,
         )
         .map_err(str::to_owned)?;
-        match validate_interpreted_trial(TrialValidation {
+        let valid = validate_interpreted_trial(TrialValidation {
             original: ctx.original,
             original_problem: ctx.problem,
             host_file: &ctx.original.doc.levels[ctx.problem.level].file,
@@ -608,8 +612,13 @@ fn complete_within(
             added_facts: &added,
             tolerance: ctx.tolerance,
             auxiliary: &auxiliary,
-        }) {
-            Ok(()) => return Ok(Completion { record: trial, numbered, trials: attempt + 1, elapsed: start.elapsed() }),
+        });
+        match valid {
+            Ok(()) => {
+                let trials = attempt + 1;
+                let elapsed = start.elapsed();
+                return Ok(Completion { record: trial, numbered, reading: after, text, trials, elapsed });
+            }
             Err(e) => {
                 last_error = e;
                 if let Some(d) = after.diagnostics().iter().find(|d| {
@@ -641,6 +650,10 @@ pub struct Partial {
     pub record: String,
     /// `record` finished with the check of its numbers, as [`Completion::numbered`]
     pub numbered: String,
+    /// The document read with `numbered` by the trial that passed, and the text of the level's
+    /// file it read, as [`Completion::reading`] and [`Completion::text`]
+    pub reading: Interpretation,
+    pub text: String,
     pub trials: usize,
     pub elapsed: std::time::Duration,
     pub dropped: Vec<(usize, String)>,
@@ -667,10 +680,7 @@ pub fn complete_what_can_be_by(
     // takes stays bounded however many dots it has; the record without any dot is checked beyond it
     let mut trials = 0;
     let why = match complete_within(ctx, written, MAX_TRIALS, &mut trials, deadline) {
-        Ok(done) => {
-            let (record, numbered) = (done.record, done.numbered);
-            return Ok(Partial { record, numbered, trials, elapsed: start.elapsed(), dropped: Vec::new() });
-        }
+        Ok(done) => return Ok(Partial::of(done, trials, start.elapsed(), Vec::new())),
         Err(why) => why,
     };
     let bare = match complete_within(ctx, &only(written, &[]), 1, &mut 0, None) {
@@ -682,7 +692,7 @@ pub fn complete_what_can_be_by(
     // the dots one by one, in order, each beside those kept before it: a dot kept may leave no
     // place for a later one that could have been placed alone
     let mut kept: Vec<usize> = Vec::new();
-    let mut record = None;
+    let mut last = None;
     let mut dropped = Vec::new();
     for index in 0..written.junctions.len() {
         if deadline.is_some_and(Deadline::passed) {
@@ -698,13 +708,19 @@ pub fn complete_what_can_be_by(
         match complete_within(ctx, &only(written, &with), MAX_TRIALS - trials, &mut trials, deadline) {
             Ok(done) => {
                 kept = with;
-                record = Some((done.record, done.numbered));
+                last = Some(done);
             }
             Err(why) => dropped.push((index, why)),
         }
     }
-    let (record, numbered) = record.unwrap_or((bare.record, bare.numbered));
-    Ok(Partial { record, numbered, trials, elapsed: start.elapsed(), dropped })
+    Ok(Partial::of(last.unwrap_or(bare), trials, start.elapsed(), dropped))
+}
+
+impl Partial {
+    fn of(done: Completion, trials: usize, elapsed: std::time::Duration, dropped: Vec<(usize, String)>) -> Partial {
+        let Completion { record, numbered, reading, text, .. } = done;
+        Partial { record, numbered, reading, text, trials, elapsed, dropped }
+    }
 }
 
 /// The written record with only the junctions `keep`, by their index in [`Written::junctions`]:

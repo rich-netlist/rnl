@@ -862,6 +862,11 @@ fn pass(
             junction_seconds = Some(completion.elapsed.as_secs_f64());
             numbered = Some((completion.record.clone(), completion.numbered));
             written.record = completion.record;
+            // the trial that passed read the document with the record written: taken, as the check
+            // below takes its reading, instead of read again
+            let mut texts = memory.files.clone();
+            texts.insert(path.clone(), completion.text);
+            last_read_back = Some((texts, Rc::new(completion.reading)));
         } else if p.version == "0.4" && !written.record.is_empty() {
             // no dots to place: the record still has to read back as it was solved. The check
             // compares the objects of two readings and needs no report of facts, so a backend
