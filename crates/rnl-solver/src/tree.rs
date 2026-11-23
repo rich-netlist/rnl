@@ -127,6 +127,10 @@ const TRIED_KEPT: usize = 4;
 
 const RELEASES: usize = 3;
 
+/// The note of a level whose components the facts kept all fix ([`crate::fixed::free`]).
+pub(crate) const FIXED_NOTE: &str =
+    "tree: the facts kept fix the position and the orientation of every component; no arrangement is searched";
+
 /// Description, arrangement, moved leaves, and whether it turns or mirrors those leaves.
 type Move = (String, Arrangement, Vec<usize>, bool);
 
@@ -259,8 +263,14 @@ pub(crate) fn lay_out_from(tree: Tree<'_>, work: &mut Work, stop: &Stop, allowan
     }
     let start = first.clone();
     // The shared budget always bounds initialization. A local stage allowance may stop
-    // subsequent improvements, but must not manufacture an unfinished initial baseline.
-    let (arr, best, said, path, tried) = tree.search(first, best, rounds, true, work, stop, refinement);
+    // subsequent improvements, but must not manufacture an unfinished initial baseline. Where the
+    // facts kept fix every component, no arrangement places one otherwise: none is searched
+    let (arr, best, said, path, tried) = if crate::fixed::free(tree.problem, tree.s).is_none() {
+        let said = vec![FIXED_NOTE.to_string()];
+        (first, best, said, Vec::new(), Vec::new())
+    } else {
+        tree.search(first, best, rounds, true, work, stop, refinement)
+    };
     notes.extend(said);
     let mut others: Vec<Arrangement> = Vec::new();
     for a in std::iter::once(start).chain(path).chain(tried) {

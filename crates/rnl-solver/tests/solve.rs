@@ -152,3 +152,44 @@ R11 g0c1r1 g1c0r1 1k
     assert!(solved.report.errors.is_empty(), "{:?}", solved.report.errors);
     assert!(!solved.solution.placements.is_empty(), "{notes}");
 }
+
+/// A level whose facts kept fix the position and the orientation of every component is laid out as
+/// its first arrangement has it, with no arrangement searched, and its ROUTEs routed there; with one
+/// component left free, the search runs as before.
+#[test]
+fn a_level_its_facts_fix_is_routed_where_it_is_with_nothing_searched() {
+    let text = |c1: &str| {
+        format!(
+            r#"* fixed
+* @RNL(type="header") {{ @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4") }}
+R1 1 2 1k
+R2 2 3 1k
+C1 1 3 1p
+* @RNL {{
+*   #R1 @PLACE(0, 0) => @ORIENT("R90");
+*   #R2 @PLACE(12, 0) => @ORIENT("R90");
+*   {c1}
+*   {{#R1:2 #R2:1}} @ROUTE-OBJECT;
+*   {{#R1:1 #C1:1}} @ROUTE-OBJECT;
+*   {{#R2:2 #C1:2}} @ROUTE-OBJECT;
+* }}
+"#
+        )
+    };
+    let note = "no arrangement is searched";
+    let options = SolverOptions::default().with_config(r#"limit="seed""#).unwrap();
+    for (c1, searched) in [(r#"#C1 @PLACE(6, 8) => @ORIENT("R0");"#, false), (r#"#C1 @ORIENT("R0");"#, true)] {
+        let files = MemoryProvider::new().with("/w/fixed.sp", &text(c1));
+        let p = problems("/w/fixed.sp", &files).into_iter().next().unwrap();
+        let solved = solve(&p, &options);
+        let notes = solved.report.notes.join("\n");
+        assert_eq!(!notes.contains(note), searched, "{c1}: {notes}");
+        assert_eq!(solved.solution.wires.len(), 3, "{c1}: the ROUTEs are routed");
+        if !searched {
+            let at = |k: usize| solved.solution.placements.iter().find(|pl| pl.object == k).and_then(|pl| pl.at());
+            let place = |label: &str| p.objects.iter().position(|o| o.label == label).unwrap();
+            assert_eq!(at(place("#R2")), Some((12.0, 0.0)));
+            assert_eq!(at(place("#C1")), Some((6.0, 8.0)));
+        }
+    }
+}
