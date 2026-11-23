@@ -178,6 +178,11 @@ pub struct Scene {
     pub(super) resolved_trees: Vec<super::routes::RouteTree>,
     pub keytexts: HashMap<(ObjId, String), ObjId>,
     pub named_subobjects: HashMap<(ObjId, String), ObjId>,
+    /// The named sub-objects `::net`, in the order they were made.
+    pub(super) net_subobjects: Vec<ObjId>,
+    /// `Interp::subobject_inputs` when every named sub-object was last resolved: while it is the
+    /// same, resolving them all again gives each the value it has, but those of `::net`.
+    pub(super) subobjects_resolved_at: Option<u64>,
     /// The nets of each pin of an instance or of the level's ports, as `scene_pin_nets` found
     /// them. They follow from the owner's symbol, its device and its terminals' nodes alone (9.2.4,
     /// 6.4), so three writers forget them all: `device_info.insert` (a device matched, in
@@ -329,6 +334,8 @@ impl Scene {
             resolved_trees: Vec::new(),
             keytexts: HashMap::new(),
             named_subobjects: HashMap::new(),
+            net_subobjects: Vec::new(),
+            subobjects_resolved_at: None,
             pin_nets: HashMap::new(),
             wires_through: None,
             pins: HashMap::new(),
@@ -766,6 +773,7 @@ impl Interp<'_> {
             direct: None,
         });
         self.scenes[s].keytexts.insert((obj, key.to_string()), k);
+        self.subobject_inputs += 1;
         k
     }
 

@@ -286,6 +286,10 @@ pub struct Interp<'p> {
     pub(crate) late_failures: HashMap<ObjId, DiagId>,
     /// Per-input views for typed roles; original objects and written set handles are unchanged.
     pub(crate) role_inputs: HashMap<ObjId, conversions::RoleInput>,
+    /// How many times something that the resolution of a named sub-object reads has changed:
+    /// a symbol set or taken back, a text with a key made, a role's input resolved
+    /// (`Scene::subobjects_resolved_at`).
+    pub(crate) subobject_inputs: u64,
     pub(crate) units: Vec<Unit>,
     pub(crate) level_unit: Vec<UnitId>,
     pub(crate) level_scene: Vec<Option<SceneId>>,
@@ -521,6 +525,7 @@ impl<'p> Interp<'p> {
             late_failures: HashMap::new(),
             inactive_objects: HashSet::new(),
             role_inputs: HashMap::new(),
+            subobject_inputs: 0,
             units: Vec::new(),
             level_unit: vec![0; nlevels],
             level_scene: vec![None; nlevels],

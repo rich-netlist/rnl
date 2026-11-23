@@ -430,6 +430,7 @@ impl Interp<'_> {
         }
         self.scenes[s].symbol.insert(o, sym);
         self.scenes[s].pin_nets.clear();
+        self.subobject_inputs += 1;
     }
 
     /// Matching uses the owner's electrical terminal names, or a usage's role names (11.3).
