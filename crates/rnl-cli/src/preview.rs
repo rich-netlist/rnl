@@ -591,30 +591,42 @@ mod tests {
 
     /// The preview takes the readings the solve made instead of reading the same texts again, and
     /// draws and reports what reading them again gives: the same Document and the same report,
-    /// the settings checked among it.
+    /// the settings checked among it. A level with no dot to place has its record read back by the
+    /// check that it reads back; one with a dot, by the trial of the dot that passed.
     #[test]
     fn the_readings_a_solve_made_give_what_reading_again_gives() {
-        const NET: &str = "* preview\n\
-            * @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
-            R1 a b 1k\nR2 b 0 1k\nC1 a 0 1p\n\
-            * @RNL { #R1 @PLACE(0, 0) }\n\
-            * @RNL { {#R1 #R2} @ALIGN(\"x\") }\n.end\n";
-        let files = MemoryProvider::new().with("/w/t.sp", NET);
-        let options =
-            SolveOptions { solver: rnl_solver::SolverOptions::without_time_limit(), ..SolveOptions::default() };
-        let clock = crate::solve::WallClock::new();
-        let run = crate::solve::solve_watched(Path::new("/w/t.sp"), &files, &options, &clock, &|_| true).unwrap();
-        // the files as they were, and the document with the record written, as its check read it
-        assert!(run.readings.before.is_some());
-        let (texts, _) = run.readings.written.as_ref().expect("the record's check read it back");
-        assert!(holds_the_files(texts, &run));
-        let mut bare = run.clone();
-        bare.readings = crate::solve::Readings::default();
-        let taken = as_solved("/w/t.sp", run, &files, &options).unwrap();
-        let read = as_solved("/w/t.sp", bare, &files, &options).unwrap();
-        let json = |shown: &Preview| serde_json::to_string(&(&shown.document, &shown.report)).unwrap();
-        assert_eq!(json(&taken), json(&read));
-        assert!(taken.report.levels.iter().all(|l| l.check.is_some()), "{:?}", taken.report.levels);
+        const HEAD: &str = "* preview\n\
+            * @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n";
+        let no_dot = format!(
+            "{HEAD}R1 a b 1k\nR2 b 0 1k\nC1 a 0 1p\n\
+            * @RNL {{ #R1 @PLACE(0, 0) }}\n\
+            * @RNL {{ {{#R1 #R2}} @ALIGN(\"x\") }}\n.end\n"
+        );
+        let a_dot = format!(
+            "{HEAD}R1 a b 1k\nR2 b 0 1k\nR3 b 0 1k\nC1 a 0 1p\n\
+            * @RNL {{ #R1 @PLACE(0, 0); {{#R1:2 #R2:1 #R3:1}} @ROUTE-OBJECT }}\n.end\n"
+        );
+        for (net, dots) in [(no_dot, false), (a_dot, true)] {
+            let files = MemoryProvider::new().with("/w/t.sp", &net);
+            let options =
+                SolveOptions { solver: rnl_solver::SolverOptions::without_time_limit(), ..SolveOptions::default() };
+            let clock = crate::solve::WallClock::new();
+            let run = crate::solve::solve_watched(Path::new("/w/t.sp"), &files, &options, &clock, &|_| true).unwrap();
+            let placed =
+                run.levels.iter().any(|l| l.written.notes.iter().any(|n| n.contains("junction postprocessing")));
+            assert_eq!(placed, dots, "{:?}", run.levels.iter().map(|l| &l.written.notes).collect::<Vec<_>>());
+            // the files as they were, and the document with the record written, as its check read it
+            assert!(run.readings.before.is_some());
+            let (texts, _) = run.readings.written.as_ref().expect("the record's check read it back");
+            assert!(holds_the_files(texts, &run));
+            let mut bare = run.clone();
+            bare.readings = crate::solve::Readings::default();
+            let taken = as_solved("/w/t.sp", run, &files, &options).unwrap();
+            let read = as_solved("/w/t.sp", bare, &files, &options).unwrap();
+            let json = |shown: &Preview| serde_json::to_string(&(&shown.document, &shown.report)).unwrap();
+            assert_eq!(json(&taken), json(&read));
+            assert!(taken.report.levels.iter().all(|l| l.check.is_some()), "{:?}", taken.report.levels);
+        }
     }
 
     /// A level solved with the file it is written in read alone writes what the solve of the whole
