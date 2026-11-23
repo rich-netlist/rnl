@@ -434,15 +434,16 @@ impl Interp<'_> {
             let mut on: Vec<ObjId> = Vec::new();
             match kind {
                 ObjectKind::Instance | ObjectKind::Bundle | ObjectKind::Usage => {
-                    for t in self.terms_of(s, o) {
+                    for (t, pins) in self.terminal_pins(s, o) {
                         let at = self.term_nets(s, t);
                         if kind == ObjectKind::Usage {
                             on.extend(at.iter().copied());
                         }
-                        for pin in self.pins_for(s, o, t) {
+                        let drawing = self.drawing_pin(s, o, &pins);
+                        for pin in pins {
                             // Keep the terminal chosen by older exports unchanged. Only an earlier
                             // independent pin needs a different reference.
-                            let reference = if self.pin_for(s, o, t) == Some(pin) {
+                            let reference = if drawing == Some(pin) {
                                 self.point_ref(s, &ix, t)
                             } else {
                                 self.symbol_pin_ref(s, &ix, o, pin)
@@ -1036,8 +1037,8 @@ impl Interp<'_> {
             let reference = self.reference_of(s, ix, owner).then(&format!("::{}", written_name(&name)));
             return Some(PointRef::SymbolPin { object, pin, reference });
         }
-        for t in self.terms_of(s, owner) {
-            if self.pin_for(s, owner, t) == Some(pin) {
+        for (t, pins) in self.terminal_pins(s, owner) {
+            if self.drawing_pin(s, owner, &pins) == Some(pin) {
                 return self.point_ref(s, ix, t);
             }
         }
