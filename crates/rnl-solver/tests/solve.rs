@@ -153,12 +153,34 @@ R11 g0c1r1 g1c0r1 1k
     assert!(!solved.solution.placements.is_empty(), "{notes}");
 }
 
-/// A level whose facts kept fix the position and the orientation of every component is laid out as
-/// its first arrangement has it, with no arrangement searched, and its ROUTEs routed there; with one
-/// component left free, the search runs as before.
+/// A level with no ROUTE whose facts kept fix the position and the orientation of every component is
+/// laid out as its first arrangement has it, with no arrangement searched; with ROUTEs, or with one
+/// component left free, the search runs as before. With no ROUTE, each pin's net is named by a label
+/// stub, whose label the facts place too.
 #[test]
-fn a_level_its_facts_fix_takes_its_first_arrangement() {
-    let text = |c1: &str| {
+fn a_level_its_facts_fix_with_no_route_takes_its_first_arrangement() {
+    let text = |c1: &str, routes: bool| {
+        let nets = if routes {
+            ["{#R1:2 #R2:1} @ROUTE-OBJECT;", "{#R1:1 #C1:1} @ROUTE-OBJECT;", "{#R2:2 #C1:2} @ROUTE-OBJECT;"]
+                .map(String::from)
+                .to_vec()
+        } else {
+            [
+                ("R1", "p", -2, 0, 0),
+                ("R1", "n", 2, 0, 180),
+                ("R2", "p", 10, 0, 0),
+                ("R2", "n", 14, 0, 180),
+                ("C1", "p", 6, 10, 270),
+                ("C1", "n", 6, 6, 90),
+            ]
+            .into_iter()
+            .map(|(c, pin, x, y, r)| {
+                let stub = format!("%l_{c}_{pin} = $NET_LABEL_STUB @ATTACH #{c}::{pin};");
+                format!("{stub}\n*   %l_{c}_{pin}::l @PLACE({x}, {y}) => @ORIENT(\"R{r}\");")
+            })
+            .collect()
+        };
+        let routes = nets.join("\n*   ");
         format!(
             r#"* fixed
 * @RNL(type="header") {{ @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4") }}
@@ -169,23 +191,24 @@ C1 1 3 1p
 *   #R1 @PLACE(0, 0) => @ORIENT("R90");
 *   #R2 @PLACE(12, 0) => @ORIENT("R90");
 *   {c1}
-*   {{#R1:2 #R2:1}} @ROUTE-OBJECT;
-*   {{#R1:1 #C1:1}} @ROUTE-OBJECT;
-*   {{#R2:2 #C1:2}} @ROUTE-OBJECT;
+*   {routes}
 * }}
 "#
         )
     };
     let note = "no arrangement is searched";
     let options = SolverOptions::default().with_config(r#"limit="seed""#).unwrap();
-    for (c1, searched) in [(r#"#C1 @PLACE(6, 8) => @ORIENT("R0");"#, false), (r#"#C1 @ORIENT("R0");"#, true)] {
-        let files = MemoryProvider::new().with("/w/fixed.sp", &text(c1));
+    let fixed = r#"#C1 @PLACE(6, 8) => @ORIENT("R0");"#;
+    let free = r#"#C1 @ORIENT("R0");"#;
+    for (c1, routes, searched) in [(fixed, false, false), (fixed, true, true), (free, false, true)] {
+        let files = MemoryProvider::new().with("/w/fixed.sp", &text(c1, routes));
         let p = problems("/w/fixed.sp", &files).into_iter().next().unwrap();
         let solved = solve(&p, &options);
         let notes = solved.report.notes.join("\n");
-        assert_eq!(!notes.contains(note), searched, "{c1}: {notes}");
-        assert_eq!(solved.solution.wires.len(), 3, "{c1}: the ROUTEs are routed");
-        if !searched {
+        assert_eq!(!notes.contains(note), searched, "{c1} {routes}: {notes}");
+        let wires = if routes { 3 } else { 0 };
+        assert_eq!(solved.solution.wires.len(), wires, "{c1} {routes}: the ROUTEs are routed");
+        if c1 == fixed {
             let at = |k: usize| solved.solution.placements.iter().find(|pl| pl.object == k).and_then(|pl| pl.at());
             let place = |label: &str| p.objects.iter().position(|o| o.label == label).unwrap();
             assert_eq!(at(place("#R2")), Some((12.0, 0.0)));
