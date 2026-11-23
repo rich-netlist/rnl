@@ -119,22 +119,14 @@ try {
     const state = "return JSON.stringify({ body: document.body.className, note: (document.getElementById('note') || {}).textContent, status: (document.getElementById('status') || {}).textContent })";
     summary.beforeSolve = await client.script(state).catch((e) => e.message);
     console.log("before the solve:", summary.beforeSolve);
-    // a solve in the program, through its solver service. A netlist with components not drawn, as this one, is asked about
-    // when it is opened (apps/viewer-ui/solve-on-open.js): its Solve, the dialog's default button, solves, and while the
-    // dialog is up a solve asked for otherwise is not heard. Without the question (it may be turned off), Solve › Solve.
-    const asking = "var d = document.querySelector('dialog.dialog[open]'); var t = d && d.querySelector('.dialog-title'); return !!t && t.textContent.trim() === 'Solve the Netlist?'";
-    const asked = await until(client, asking, 30);
-    summary.asked = asked === true;
-    if (asked === true) {
-      summary.question = await client.script("return document.querySelector('dialog.dialog[open]').innerText").catch((e) => e.message);
-      console.log("asked:", JSON.stringify(summary.question));
-      await client.script("document.querySelector('dialog.dialog[open] button.default').click(); return true");
-      const gone = await until(client, "return !document.querySelector('dialog.dialog')", 30);
-      check("the question to solve on opening is answered with Solve", gone === true, String(gone));
-    } else {
-      console.log("not asked to solve on opening; Solve › Solve");
-      await client.script("window.wrappedJSObject.viewer.command('solve'); return true");
-    }
+    // a solve in the program, through its solver service. A netlist with components not drawn, as this one, has a bar over
+    // the drawing (apps/viewer-ui/unplaced-bar.js), or the page of a level that draws nothing, whose link solves the level
+    // shown; nothing asks on opening
+    const link = "#unplaced-bar:not([hidden]) .solve-link, .empty .solve-link";
+    const offered = await until(client, `return !!document.querySelector(${JSON.stringify(link)})`, 30);
+    check("a link offers to solve the objects not placed", offered === true, String(offered));
+    if (offered === true) await client.script(`document.querySelector(${JSON.stringify(link)}).click(); return true`);
+    else await client.script("window.wrappedJSObject.viewer.command('solve'); return true");
     const solved = await until(client, "return document.body.classList.contains('preview') && !document.body.classList.contains('solving')", 300);
     check("a solve shows its preview", solved === true, String(solved));
     summary.afterSolve = await client.script(state).catch((e) => e.message);
