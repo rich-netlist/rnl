@@ -750,9 +750,12 @@ impl Interp<'_> {
         if name == "net" {
             self.scenes[scene].net_subobjects.push(object);
         }
-        if self.scenes[scene].phase >= 7 {
+        if self.scenes[scene].phase < 5 {
+            // made after they were all resolved and not resolved itself
+            self.scenes[scene].subobjects_resolved_at = None;
+        } else if self.scenes[scene].phase >= 7 {
             self.finish_scene_subobjects(scene);
-        } else if self.scenes[scene].phase >= 5 {
+        } else {
             let settled = self.scenes[scene].subobjects_resolved_at == Some(self.subobject_inputs);
             // the tests resolve them all every time too, as before, to compare
             #[cfg(test)]
@@ -776,13 +779,18 @@ impl Interp<'_> {
     pub(crate) fn resolve_scene_subobjects(&mut self, scene: SceneId) {
         let mut objects: Vec<_> = self.scenes[scene].named_subobjects.values().copied().collect();
         objects.sort();
+        // what changes while they are resolved (the input of a role that a net reads) is a change
+        // they were not all resolved after
+        let inputs = self.subobject_inputs;
         self.resolve_subobjects(scene, &objects, &objects);
-        self.scenes[scene].subobjects_resolved_at = Some(self.subobject_inputs);
+        self.scenes[scene].subobjects_resolved_at = Some(inputs);
     }
 
     /// Resolve the named sub-objects `objects` but those of `::net`, then those of `nets`, each in
     /// the order given.
     fn resolve_subobjects(&mut self, scene: SceneId, objects: &[ObjId], nets: &[ObjId]) {
+        #[cfg(test)]
+        let all = std::ptr::eq(objects, nets);
         for &object in objects {
             #[cfg(test)]
             tests::SUBOBJECTS_RESOLVED.with(|count| count.set(count.get() + 1));
@@ -819,6 +827,11 @@ impl Interp<'_> {
             }
             let ObjData::ScenePin { owner, index } = *self.o(self.scene_value(parent)) else { continue };
             let nets = self.scene_pin_nets(scene, owner, index);
+            // the tests have it change an input, as resolving the input of a role a net reads does
+            #[cfg(test)]
+            if all && self.scenes[scene].phase >= 5 && tests::CHANGE_IN_NETS.with(|change| change.replace(false)) {
+                self.subobject_inputs += 1;
+            }
             let value = if nets.is_empty() {
                 self.scene_pin_has_empty_node(scene, owner, index)
                     .then(|| self.new_obj(ObjData::EmptyNode { direct: false }))
@@ -912,6 +925,9 @@ pub(super) mod tests {
         pub(in crate::interp) static SUBOBJECTS_RESOLVED: Cell<usize> = const { Cell::new(0) };
         /// Resolve every named sub-object each time one is made from step 5 on, as before.
         pub(in crate::interp) static RESOLVE_ALL: Cell<bool> = const { Cell::new(false) };
+        /// The next net found while all named sub-objects are resolved, from step 5 on, changes
+        /// an input of a resolution, once.
+        pub(in crate::interp) static CHANGE_IN_NETS: Cell<bool> = const { Cell::new(false) };
         /// After each named sub-object made from step 5 on: every one with what it resolves to.
         static TRACE: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
         /// How many of them resolved that one alone, and how many all.
@@ -1088,7 +1104,19 @@ pub(super) mod tests {
     /// with a key first. Returns the named sub-objects resolved, and after each one made from
     /// step 5 on, every one with what it resolves to.
     fn stubs(n: usize, marked: bool, resolve_all: bool) -> (usize, Vec<String>, (usize, usize)) {
-        let mut sink = Sink::new();
+        let rules = format!(
+            "  %supply = # @SELECT-NET(name=\"vdd\") => @SELECT-PIN;
+  %rest = # @SELECT-NET => @SELECT-PIN;
+  %supply @REMOVE-FROM %rest;
+  $STUB @ATTACH %rest;
+  {} @ATTACH %supply",
+            if marked { "$MARKED_STUB" } else { "$STUB" }
+        );
+        read_traced(row(n), &stub_records(&rules), resolve_all, Sink::new())
+    }
+
+    /// A level of `n` instances of five terminals, a chain like a row of cells.
+    fn row(n: usize) -> Level {
         let mut main = Level::new(LevelKind::File, "stubs.sp", "stubs.sp", "stubs.sp");
         main.circuit = true;
         for k in 0..n {
@@ -1103,6 +1131,11 @@ pub(super) mod tests {
                 ..Instance::default()
             });
         }
+        main
+    }
+
+    /// The records of [`stubs`] with the rules `rules`, which attach the stubs.
+    fn stub_records(rules: &str) -> String {
         let records = r#"@RNL(type="header") { @VERSION("0.4")}
 @RNL {
   $TAG_SYMBOL = @DEFINE-SYMBOL {
@@ -1132,14 +1165,20 @@ pub(super) mod tests {
     ?t %l::pin @ORIENT-RELATION("R180");
     %n = ?t::net;
   };
-  %supply = # @SELECT-NET(name="vdd") => @SELECT-PIN;
-  %rest = # @SELECT-NET => @SELECT-PIN;
-  %supply @REMOVE-FROM %rest;
-  $STUB @ATTACH %rest;
-  STUB_OF_THE_SUPPLY @ATTACH %supply
+RULES
 }"#;
-        let records = records.replace("STUB_OF_THE_SUPPLY", if marked { "$MARKED_STUB" } else { "$STUB" });
-        main.records = scan_run(&package_lines(&records), "stubs.sp", &mut sink);
+        records.replace("RULES", rules)
+    }
+
+    /// Reads the level `main` with `records`; if `resolve_all`, every named sub-object is resolved
+    /// each time one is made from step 5 on, as before. Returns what [`stubs`] returns.
+    fn read_traced(
+        mut main: Level,
+        records: &str,
+        resolve_all: bool,
+        mut sink: Sink,
+    ) -> (usize, Vec<String>, (usize, usize)) {
+        main.records = scan_run(&package_lines(records), "stubs.sp", &mut sink);
         let dialect = Dialect { name: "spice".into(), case_sensitive: false, ground_aliases: vec![] };
         SUBOBJECTS_RESOLVED.with(|count| count.set(0));
         RESOLVE_ALL.with(|all| all.set(resolve_all));
@@ -1171,6 +1210,33 @@ pub(super) mod tests {
         for (k, (now, then)) in every.iter().zip(&before).enumerate() {
             assert_eq!(now, then, "after the named sub-object {k} was made");
         }
+    }
+
+    #[test]
+    fn a_change_made_while_all_are_resolved_has_the_next_one_resolve_all() {
+        // The stub of the pin on n0 makes a text with a key, then its label's pin, which resolves
+        // them all, and the net of its pin; the stubs of the two pins on n1 follow. The level names
+        // the net of a pin (`#X1::y::net`), so that resolving them all finds a net.
+        let records = stub_records(
+            "  %m = #X1::y::net;
+  %first = # @SELECT-NET(name=\"n0\") => @SELECT-PIN;
+  %next = # @SELECT-NET(name=\"n1\") => @SELECT-PIN;
+  $MARKED_STUB @ATTACH %first;
+  $STUB @ATTACH %next",
+        );
+        let read = |change: bool| {
+            CHANGE_IN_NETS.with(|c| c.set(change));
+            let (_, trace, ways) = read_traced(row(4), &records, false, Sink::new());
+            CHANGE_IN_NETS.with(|c| c.set(false));
+            (trace, ways)
+        };
+        let (trace, ways) = read(false);
+        assert_eq!(ways, (5, 1), "the label's pin of the first stub resolves them all, the rest alone");
+        // When finding that net changes an input, as resolving the input of a role does, the next
+        // one made resolves them all again.
+        let (changed, ways) = read(true);
+        assert_eq!(ways, (4, 2), "after the change, the next one made resolves them all");
+        assert_eq!(trace, changed);
     }
 
     #[test]
