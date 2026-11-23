@@ -7,8 +7,11 @@
  * solver come from ota-looks.js, which takes them from the files. The drawings are not drawn here either: ota-looks.js
  * holds what the RNL core draws from the standard-packages file and from the file with the two packages
  * (node site/render-examples.mjs), with the parts of every device marked in it.
- * The review: picking a statement of meaning, in the file or in the checklist, lights up the devices it is about in the
- * drawing and their lines in the netlist. The look switch swaps one core drawing for the other; the circuit is the same.
+ * The review: picking a statement of meaning, in the file or in the checklist, marks in the drawing what it is about as an
+ * RNL viewer marks it (apps/viewer-ui): the frame of the usage it makes, %dp1 with its title and its roles, or, for one
+ * that makes none, a frame around its devices; a device, from its line of the netlist or in the drawing, is selected as
+ * the viewer selects it, in the colour of the selection with its box. Nothing else is dimmed. The frames and the boxes
+ * are the core's (ota-looks.js). The look switch swaps one core drawing for the other; the circuit is the same.
  */
 (function (global) {
   'use strict';
@@ -61,12 +64,17 @@
     ord: '{%amp %p_out} @顺序("从左到右")'
   };
   /*/zh-CN*/
+  /* The usage each statement of meaning makes, whose frame picking it shows; a statement that makes none frames the
+     devices it is about */
+  var USAGE = { dp: '%dp1', cm1: '%cm1', amp: '%amp', br1: '%left', br2: '%right', pin: '%p_inp', pinn: '%p_inn',
+    pout: '%p_out', pbias: '%p_bias', grp: '%amp_group' };
   var STYLES = ['bare', 'en', 'zh'];
   var FILES = { bare: 'ota5t-review-bare.sp', en: 'ota5t-review.sp', zh: 'ota5t-review-zh.sp', eda: 'ota5t-review-eda.sp' };
   var PACKAGES = '; @USE-PACKAGE(name="eda-symbol", version="0.2"); @USE-PACKAGE(name="eda-style", version="0.2")';
 
-  /* The lines of the file as the panel shows them; r is what a line is about (devices and display objects, and the notes
-     of a statement as ov:…), mode the note it makes in the drawing, dev a line of the netlist that is about one device.
+  /* The lines of the file as the panel shows them; r is what a line is about (devices and display objects, the notes of
+     a statement as ov:…, the usage a statement makes as u:%name, or frame for one that makes none), dev a line of the
+     netlist that is about one device.
      The records of the solver are the file's own (ota-looks.js): each line is about the devices and ports it names. */
   function lines(style, look) {
     var k = Math.max(0, STYLES.indexOf(style || 'en'));
@@ -76,7 +84,7 @@
       if (extra) for (var key in extra) o[key] = extra[key];
       L.push(o);
     }
-    function st(id, r) { add(id, '*   ' + (k === 2 ? TZ[id] : T[id][k]), r); }
+    function st(id, r) { add(id, '*   ' + (k === 2 ? TZ[id] : T[id][k]), r && r + (USAGE[id] ? ' u:' + USAGE[id] : ' frame')); }
     function dev(id, t) { add(id.toLowerCase(), t, id, { dev: id }); }
     function record(n, block) {
       (block || []).forEach(function (t, i) {
@@ -98,8 +106,8 @@
     dev('M4', 'M4 out  x     vdd  vdd pch W=4u L=0.5u');
     dev('M5', 'M5 tail vbias vss  vss nch W=4u L=1u');
     add('r0', '* @RNL {');
-    st('dp', 'M1 M2 M5 ov:dp');
-    st('cm1', 'M3 M4 ov:cm1');
+    st('dp', 'M1 M2 M5');
+    st('cm1', 'M3 M4');
     st('amp', 'M1 M2 M3 M4 M5');
     st('br1', 'M3 M1');
     st('br2', 'M4 M2');
@@ -141,9 +149,9 @@
   };
   var SIM = '<en>A simulator reads the lines that are not dimmed: the netlist. Every RNL line starts with <code>*</code>, so for the simulator it is a comment.</en>';
 
-  /* What picking a statement shows in the drawing besides the lit devices. The solver places the devices, so the notes
-     are placed from the drawing itself: the box of the parts of each device the core marks (data-dev), and of each net's
-     wires (data-net), in the drawing's own units (x grows to the right, y downwards). */
+  /* What picking a statement shows in the drawing besides its frame: the tail current. The solver places the devices, so
+     the note is placed from the drawing itself: the box of the parts of each device the core marks (data-dev), and of
+     each net's wires (data-net), in the drawing's own units (x grows to the right, y downwards). */
   function arrow(x0, y0, x1, y1) {
     var dx = x1 - x0, dy = y1 - y0, n = Math.sqrt(dx * dx + dy * dy), ux = dx / n, uy = dy / n, h = 7;
     var bx = x1 - ux * h * 1.4, by = y1 - uy * h * 1.4;
@@ -163,10 +171,7 @@
     return b;
   }
   function notes(svg) {
-    var N = {}, pair = box(svg, '[data-dev="M1"],[data-dev="M2"]'), mirror = box(svg, '[data-dev="M3"],[data-dev="M4"]');
-    var tail = box(svg, '[data-net="tail"]'), m5 = box(svg, '[data-dev="M5"]');
-    if (pair) N.dp = label((pair.x0 + pair.x1) / 2, (pair.y0 + pair.y1) / 2 + 4, '%dp1');
-    if (mirror) N.cm1 = label((mirror.x0 + mirror.x1) / 2, mirror.y0 - 6, '%cm1');
+    var N = {}, tail = box(svg, '[data-net="tail"]'), m5 = box(svg, '[data-dev="M5"]');
     if (tail && m5) {
       /* the tail current, beside the wire that comes down from the pair into the drain of M5 */
       var x = (tail.x0 + tail.x1) / 2 - 14, y1 = m5.y0 + 4, y0 = Math.max(tail.y0 + 4, y1 - 22);
@@ -244,23 +249,83 @@
       svg.insertAdjacentHTML('beforeend', g);
       lit(refs);
     }
-    /* light up the parts of the devices named in refs, and the notes named ov:key; dim the rest of the drawing */
+    /* Mark what refs are about as an RNL viewer marks it (apps/viewer-ui), nothing else dimmed: the notes named ov:key;
+       the frame of each usage named u:%name, as the viewer draws a selected usage (usages.js, paintUsages): a dotted
+       frame in the usage's colour over a fill of it, with its title and its roles; for a statement that makes no usage
+       (frame), a frame of the same kind around its devices, in the colour of the selection, as the viewer frames what a
+       constraint acts on (makeConstraintBox); else each device selected, as the viewer selects one (drawing.js): its
+       parts in the colour of the selection, and its box. The viewer draws these in pixels of the screen over a drawing
+       it zooms; here the drawing is fitted to its frame, so the pixels are turned into the drawing's units. */
+    var NS = 'http://www.w3.org/2000/svg', FRAME = '#4263eb', SELECT = '#e8590c', SELECT_FILL = 'rgba(232, 89, 12, 0.07)';
+    function el(name, attrs, parent) {
+      var e = document.createElementNS(NS, name);
+      for (var a in attrs) e.setAttribute(a, attrs[a]);
+      if (parent) parent.appendChild(e);
+      return e;
+    }
+    function badge(parent, text, color, x, y, width, centered, px) {
+      var g = el('g', { transform: 'translate(' + x + ' ' + y + ') scale(' + px + ')' }, parent);
+      var x0 = centered ? -width / 2 : 0;
+      el('rect', { x: x0 - 4, y: -9, width: width + 8, height: 18, rx: 3, fill: look === 'eda' ? '#000' : '#fff', 'fill-opacity': 0.75 }, g);
+      var t = el('text', { x: x0, fill: color, 'font-size': 13, 'font-family': 'system-ui, sans-serif', 'dominant-baseline': 'central',
+        textLength: width, lengthAdjust: 'spacingAndGlyphs' }, g);
+      t.textContent = text;
+    }
+    function frame(under, over, b, color, px, fill) {
+      var a = { x: b[0], y: b[1], width: b[2] - b[0], height: b[3] - b[1], rx: 10 * px };
+      el('rect', Object.assign({ fill: color, 'fill-opacity': fill }, a), under);
+      el('rect', Object.assign({ fill: 'none', stroke: color, 'stroke-width': 8 / 3 * px, 'stroke-dasharray': px + ' ' + 5 * px,
+        'stroke-linecap': 'round' }, a), over);
+    }
     function lit(list2) {
       refs = list2 && list2.length ? list2 : null;
       if (!svg) return;
-      var any = false;
-      Array.prototype.forEach.call(svg.querySelectorAll('.is-lit'), function (el) { el.classList.remove('is-lit'); });
-      Array.prototype.forEach.call(svg.querySelectorAll('.rv-note.is-on'), function (el) { el.classList.remove('is-on'); });
-      (refs || []).forEach(function (r) {
+      Array.prototype.forEach.call(svg.querySelectorAll('.is-lit'), function (e) { e.classList.remove('is-lit'); });
+      Array.prototype.forEach.call(svg.querySelectorAll('.rv-note.is-on'), function (e) { e.classList.remove('is-on'); });
+      Array.prototype.forEach.call(svg.querySelectorAll('.rv-marks'), function (e) { e.remove(); });
+      if (!refs) return;
+      var shown = LOOKS.looks[look], ctm = svg.getScreenCTM();
+      var px = ctm && ctm.a ? 1 / ctm.a : 1;   /* the drawing's units in a pixel of the screen */
+      var under = el('g', { class: 'rv-marks', 'pointer-events': 'none' });
+      svg.insertBefore(under, svg.firstChild);
+      var over = el('g', { class: 'rv-marks', 'pointer-events': 'none' }, svg);
+      var usages = [], framed = false, devs = [];
+      refs.forEach(function (r) {
         if (r.indexOf('ov:') === 0) {
           var n = svg.querySelector('.rv-note[data-note="' + r.slice(3) + '"]');
           if (n) n.classList.add('is-on');
-        } else {
-          Array.prototype.forEach.call(svg.querySelectorAll('[data-dev="' + r + '"]'), function (el) { el.classList.add('is-lit'); any = true; });
-        }
+        } else if (r.indexOf('u:') === 0) usages.push(r.slice(2));
+        else if (r === 'frame') framed = true;
+        else devs.push(r);
       });
-      svg.classList.toggle('has-lit', any);
+      if (usages.length) {
+        usages.forEach(function (id) {
+          var f = shown.frames && shown.frames[id];
+          if (!f) return;
+          frame(under, over, f.bounds, FRAME, px, 0.2);
+          badge(over, f.title, FRAME, f.at[0], f.at[1], f.width, false, px);
+          f.roles.forEach(function (role) { badge(over, role.name, FRAME, role.at[0], role.at[1], role.width, true, px); });
+        });
+      } else if (framed) {
+        var b = null, pad = 14 * px;
+        devs.forEach(function (d) {
+          ((shown.boxes && shown.boxes[d]) || []).forEach(function (q) {
+            b = b ? [Math.min(b[0], q[0]), Math.min(b[1], q[1]), Math.max(b[2], q[2]), Math.max(b[3], q[3])] : q.slice();
+          });
+        });
+        if (b) frame(under, over, [b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad], SELECT, px, 0.12);
+      } else {
+        devs.forEach(function (d) {
+          Array.prototype.forEach.call(svg.querySelectorAll('[data-dev="' + d + '"]'), function (e) { e.classList.add('is-lit'); });
+          ((shown.boxes && shown.boxes[d]) || []).forEach(function (q) {
+            el('rect', { x: q[0], y: q[1], width: q[2] - q[0], height: q[3] - q[1], fill: SELECT_FILL, stroke: SELECT, 'stroke-width': 1.5,
+              'stroke-dasharray': '5 3', 'vector-effect': 'non-scaling-stroke' }, over);
+          });
+        });
+      }
     }
+    /* the marks are drawn in pixels of the screen: drawn again when the drawing changes its size */
+    if (global.ResizeObserver) new global.ResizeObserver(function () { if (refs) lit(refs); }).observe(stage);
     /* the code panel's link to the drawing is this small view */
     var view = { highlight: lit, setMode: function () {} };
 
@@ -275,8 +340,8 @@
 
     /* Show one item: its devices in the drawing, its statements and the devices' lines in the file */
     function mark(item, quiet) {
-      var devs = item.devs.split(' ');
-      lit(devs.concat(['ov:' + item.key]));
+      var devs = item.devs.split(' '), first = data[indexOf(item.stmt[0])];
+      lit(first && first.r ? first.r.split(/\s+/).concat(['ov:' + item.key]) : devs.concat(['ov:' + item.key]));
       rows.forEach(function (r) { r.classList.remove('is-hot', 'is-dev'); });
       item.stmt.forEach(function (id) { var i = indexOf(id); if (i >= 0) rows[i].classList.add('is-hot'); });
       data.forEach(function (l, i) { if (l.dev && devs.indexOf(l.dev) >= 0) rows[i].classList.add('is-dev'); });

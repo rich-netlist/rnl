@@ -1666,14 +1666,13 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 .rv-stage.is-black { --hl: #82a6ff; background: #000; }
 .rv-stage.is-black svg [stroke="#1d1d1f"] { stroke: #dcdcdc; }
 .rv-stage.is-black svg [fill="#1d1d1f"] { fill: #dcdcdc; }
-.rv-stage.is-black svg.has-lit g[data-id]:not(.is-lit), .rv-stage.is-black svg.has-lit > rect { opacity: .42; }
 /* the drawing is as tall as the screen leaves room for: the heading of the example, the file, the drawing and the checklist are in
    view together (about 390px of that is not the drawing) */
 .rv-stage svg { display: block; width: 100%; height: auto; max-height: clamp(220px, calc(100vh - 452px), 520px); margin: 0 auto; }
-.rv-stage svg g[data-id] { transition: opacity .15s; }
-.rv-stage svg.has-lit g[data-id]:not(.is-lit), .rv-stage svg.has-lit > rect { opacity: .2; }
-.rv-stage svg .is-lit [stroke]:not([stroke="none"]) { stroke: var(--hl); }
-.rv-stage svg .is-lit [fill]:not([fill="none"]) { fill: var(--hl); }
+/* a selected device, as an RNL viewer shows one (apps/viewer-ui/style.css): its lines and texts in the colour of the
+   selection, but for the strokes over a shape's first and the white of the paper; its box and the frames are drawn by ota.js */
+.rv-stage svg .is-lit [stroke]:not([stroke="none"]):not(.inner) { stroke: #e8590c; }
+.rv-stage svg .is-lit [fill]:not([fill="none"]):not([fill="#ffffff"]):not([fill="white"]) { fill: #e8590c; }
 .rv-stage svg .rv-note { display: none; pointer-events: none; }
 .rv-stage svg .rv-note.is-on { display: inline; }
 .rv-note line { stroke: var(--hl); stroke-width: 2.4; }

@@ -16,7 +16,9 @@
 // locked public packages (default .rnl-packages, from `python scripts/packages.py download`). The result is
 // site/src/assets/ota-looks.js: the SVG of each look, in which every part that belongs to a device of the netlist
 // (its symbol, its name and model) carries data-dev="M1" and every wire data-net="x", so that the page can light up
-// what a statement of the file is about. Each look is stamped with the name of the file it was drawn from and the start
+// what a statement of the file is about. The two looks of the introduction also carry what an RNL viewer marks a
+// selection with, as the core gives it: the box of each device (boxes) and the frame of each usage the file names
+// (frames), and each is fitted to the frame of the page on its own, both in one shape. Each look is stamped with the name of the file it was drawn from and the start
 // of that file's SHA-256: site/build.py checks it, so that an example changed without drawing it again fails the build.
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -36,7 +38,11 @@ for (let i = 0; i < args.length; i++) {
 }
 const { loadCore } = await import(pathToFileURL(join(coreDir, "core.js")).href);
 const core = await loadCore(readFileSync(join(coreDir, "rnl_runtime_wasm.wasm")));
-const version = JSON.parse(readFileSync(join(coreDir, "package.json"), "utf8")).version;
+/* the core's version: the package's own, or, for a build of the repository (whose package.json has none), version.js */
+let version = JSON.parse(readFileSync(join(coreDir, "package.json"), "utf8")).version;
+if (!version) {
+  try { version = (await import(pathToFileURL(join(coreDir, "version.js")).href)).coreVersion?.split(" ")[0]; } catch { /* none */ }
+}
 
 /** The text of an example with LF line ends, as site/build.py reads it. */
 const example = (name) => readFileSync(join(root, "site", "examples", name), "utf8").replace(/\r\n/g, "\n");
@@ -54,6 +60,9 @@ function refOf(objects, ids) {
   const anon = ids.some((i) => objects[i] && objects[i].kind === "usage" && objects[i].name.startsWith("@rnl-std"));
   return net && anon ? net.name.toUpperCase() : null;
 }
+
+/* a record of the solver (type="generated"), as a whole block */
+const GENERATED = /^\* @RNL\(type="generated"[^\n]*(?:\{\}$|\{\n[\s\S]*?\n\* \}$)/gm;
 
 const looks = {};
 const outFile = join(root, "site", "src", "assets", "ota-looks.js");
@@ -91,24 +100,51 @@ for (const [look, name, withPackages] of LOOKS) {
   }
   let svg = level.svg.replace(/<g data-id="([^"]*)">/g, (m, id) => (attrs.has(id) ? `<g data-id="${id}"${attrs.get(id)}>` : m));
   svg = svg.replace(/^(<svg[^>]*?) width="[^"]*" height="[^"]*"/, "$1").replace(/<rect class="backdrop"[^>]*\/>\n?/, "");
-  looks[look] = { file: name, sha256: createHash("sha256").update(text).digest("hex").slice(0, 12), svg: svg.trim() };
-  console.log(`${look}: ${name} sha256:${looks[look].sha256}, ${attrs.size} parts`);
+  // for the two looks of the introduction, what an RNL viewer marks when something is selected (apps/viewer-ui): the
+  // box of each device, port and supply as the core gives it (a `box` hit), and the frame of each usage the file itself
+  // names (%dp1, not one a package makes), with its title and its roles
+  const round = (v) => Math.round(v * 100) / 100;
+  const marks = look === "standard" || look === "eda";
+  const boxes = {};
+  for (const h of marks ? level.hits : []) {
+    if (h.kind !== "box") continue;
+    const ref = refOf(doc.objects, h.objects || []);
+    if (ref) (boxes[ref] ||= []).push(h.points.flat().map(round));
+  }
+  const frames = {};
+  const authored = text.replace(GENERATED, "");
+  const named = (id) => new RegExp(`${id.replace(/[^\w%]/g, "\\$&")}(?![\\w])`).test(authored);
+  for (const u of marks ? level.usages || [] : []) {
+    if (!u.id.startsWith("%") || !u.frame?.bounds || !named(u.id)) continue;
+    const roles = u.roles.map((r, i) => ({ name: r.name, at: u.frame.roles?.[i], width: u.frame.role_widths?.[i] }))
+      .filter((r) => r.at).map((r) => ({ name: r.name, at: r.at.map(round), width: round(r.width) }));
+    frames[u.id] = { title: `${u.kind === "group" ? "@GROUP" : u.definition}: ${u.id}`, bounds: u.frame.bounds.map(round),
+      at: u.frame.title.map(round), width: round(u.frame.title_width), roles };
+  }
+  looks[look] = { file: name, sha256: createHash("sha256").update(text).digest("hex").slice(0, 12), svg: svg.trim(),
+    ...(marks ? { boxes, frames } : {}) };
+  console.log(`${look}: ${name} sha256:${looks[look].sha256}, ${attrs.size} parts, ${Object.keys(frames).length} frames`);
 }
 
-/* the same view box for the two looks of the introduction, so that the placements stay where they are when the look changes */
+/* The two looks of the introduction are shown in one frame: each is fitted to it as the core frames its drawing, and the
+   two are given one shape (the taller of the two, each centred in it), so that the frame keeps its size and the circuit
+   sits in the same place, filling it, whichever look is shown */
 const pair = [looks.standard, looks.eda].filter(Boolean);
-const boxes = pair.map((l) => /viewBox="([^"]*)"/.exec(l.svg)[1].split(" ").map(Number));
-const x0 = Math.min(...boxes.map((b) => b[0])), y0 = Math.min(...boxes.map((b) => b[1]));
-const x1 = Math.max(...boxes.map((b) => b[0] + b[2])), y1 = Math.max(...boxes.map((b) => b[1] + b[3]));
-const viewBox = [x0, y0, x1 - x0, y1 - y0].map((v) => Math.round(v * 100) / 100).join(" ");
-for (const l of pair) l.svg = l.svg.replace(/viewBox="[^"]*"/, `viewBox="${viewBox}"`);
+const own = pair.map((l) => /viewBox="([^"]*)"/.exec(l.svg)[1].split(" ").map(Number));
+const ratio = Math.max(...own.map((b) => b[3] / b[2]));
+pair.forEach((l, i) => {
+  const [x, y, w, h] = own[i];
+  const W = Math.max(w, h / ratio), H = W * ratio;
+  const viewBox = [x - (W - w) / 2, y - (H - h) / 2, W, H].map((v) => Math.round(v * 100) / 100).join(" ");
+  l.svg = l.svg.replace(/viewBox="[^"]*"/, `viewBox="${viewBox}"`);
+});
 
 /* the records of the solver (type="generated") of the four files of the introduction's example, block by block, as
    the code panel shows them: the solver writes them, so the page takes them from the files rather than repeating them */
 const records = {};
 for (const name of ["ota5t-review-bare.sp", "ota5t-review.sp", "ota5t-review-zh.sp", "ota5t-review-eda.sp"]) {
   const text = example(name);
-  const blocks = [...text.matchAll(/^\* @RNL\(type="generated"[^\n]*(?:\{\}$|\{\n[\s\S]*?\n\* \}$)/gm)].map((m) => m[0].split("\n"));
+  const blocks = [...text.matchAll(GENERATED)].map((m) => m[0].split("\n"));
   records[name] = { sha256: createHash("sha256").update(text).digest("hex").slice(0, 12), blocks };
 }
 

@@ -1,9 +1,10 @@
 import { test, expect } from '../../tests/viewer/node_modules/@playwright/test/index.mjs';
 
 // The example of the introduction: a five-transistor OTA that is reviewed by what it says. Picking an item of the
-// checklist, or a statement of the file, lights up the devices it is about in the drawing (the RNL core's own drawing)
-// and their lines in the netlist. The look switch swaps one core drawing for the other; the simulator view dims the
-// RNL lines.
+// checklist, or a statement of the file, marks what it is about in the drawing (the RNL core's own drawing) as an RNL
+// viewer does, the frame of its usage with the usage's title, and the devices' lines in the netlist; a device's line
+// selects the device, in the colour of the selection with its box; nothing is dimmed. The look switch swaps one core
+// drawing for the other, framed alike; the simulator view dims the RNL lines.
 test.beforeEach(async ({ page }) => {
   await page.route('https://rich-netlist.github.io/**', route => route.abort());
   await page.addInitScript(() => localStorage.setItem('rnl-intro-theme', 'light'));
@@ -28,41 +29,56 @@ for (const language of ['en', 'zh']) {
     const items = page.locator('#rv-items .rv-item');
     await expect(items).toHaveCount(3);
     const lit = page.locator('#rv-stage svg [data-dev].is-lit');
-    const devices = new Set();
-    const litDevices = async () => new Set(await lit.evaluateAll(els => els.map(el => el.getAttribute('data-dev'))));
+    const litDevices = async () => [...new Set(await lit.evaluateAll(els => els.map(el => el.getAttribute('data-dev'))))].sort();
+    const marks = page.locator('#rv-stage svg .rv-marks');
+    const title = async () => (await marks.locator('text').allTextContents())[0] || null;
     const hot = page.locator('#rv-code .cl.is-hot'), devs = page.locator('#rv-code .cl.is-dev');
+    // nothing of the drawing is dimmed, whatever is picked
+    const dimmed = async () => page.locator('#rv-stage svg [data-id]').evaluateAll(els => els.filter(el => getComputedStyle(el).opacity !== '1').length);
     await expect(lit).toHaveCount(0);
+    await expect(marks).toHaveCount(0);
 
-    // the differential pair: M1, M2 and the tail M5, in the drawing and in the netlist, and its statement
-    // hovered again from outside while it is not all shown: a layout shift can leave the pointer on the code
-    // panel, whose own hover lights a line's devices without marking their lines
+    // the differential pair: the frame of %dp1 with its title and its roles, and M1, M2 and the tail M5 in the
+    // netlist, and its statement; hovered again from outside while it is not all shown: a layout shift can leave the
+    // pointer on the code panel, whose own hover marks a line's devices without marking their lines
     await expect.poll(async () => {
-      const state = { lit: [...await litDevices()].sort(), devs: await devs.count() };
+      const state = { title: await title(), devs: await devs.count() };
       if (state.devs !== 3) { await page.mouse.move(5, 5); await items.nth(0).hover(); }
       return state;
-    }).toEqual({ lit: ['M1', 'M2', 'M5'], devs: 3 });
+    }).toEqual({ title: '$DIFFERENTIAL_PAIR_N: %dp1', devs: 3 });
+    expect(await marks.locator('text').allTextContents()).toEqual(['$DIFFERENTIAL_PAIR_N: %dp1', 'left', 'right', 'tail']);
+    await expect(lit).toHaveCount(0);
+    expect(await dimmed()).toBe(0);
     await expect(hot).toHaveCount(1);
     await expect(hot).toContainText('$DIFFERENTIAL_PAIR');
-    await expect(page.locator('#rv-stage .rv-note.is-on')).toHaveCount(1);
     // leaving clears it; a click keeps it
     await page.mouse.move(5, 5);
-    await expect(lit).toHaveCount(0);
+    await expect(marks).toHaveCount(0);
     await items.nth(1).click();
     await expect(items.nth(1)).toHaveAttribute('aria-pressed', 'true');
     await page.mouse.move(5, 5);
-    await expect.poll(async () => [...await litDevices()].sort()).toEqual(['M3', 'M4']);
+    await expect.poll(title).toBe('$CURRENT_MIRROR_P: %cm1');
     await expect(page.locator('#rv-code .cl.is-hot')).toContainText('$CURRENT_MIRROR_P');
     await items.nth(1).click();
-    await expect(lit).toHaveCount(0);
+    await expect(marks).toHaveCount(0);
 
-    // a statement of the file picks its item
+    // a statement of the file picks its item; the tail current makes no usage: a frame around M5, and its arrow
     await page.locator('#rv-code .cl', { hasText: '@CURRENT' }).first().hover();
-    await expect.poll(async () => [...await litDevices()].sort()).toEqual(['M5']);
-    // the tail current: one statement, the tail device
+    await expect.poll(async () => marks.locator('rect').count()).toBe(2);
+    expect(await title()).toBe(null);
+    await expect(page.locator('#rv-stage .rv-note.is-on')).toHaveCount(1);
     await items.nth(2).hover();
-    await expect.poll(async () => [...await litDevices()].sort()).toEqual(['M5']);
+    await expect.poll(async () => marks.locator('rect').count()).toBe(2);
     await expect(hot).toHaveCount(1);
-    devices.clear();
+    expect(await dimmed()).toBe(0);
+
+    // the line of a device selects it: its parts in the colour of the selection, and its box
+    await page.mouse.move(5, 5);
+    await page.locator('#rv-code .cl', { hasText: /M1 x\s+inp/ }).first().hover();
+    await expect.poll(litDevices).toEqual(['M1']);
+    await expect(marks.locator('rect[stroke-dasharray="5 3"]')).toHaveCount(1);
+    expect(await lit.evaluateAll(els => els.some(g => [...g.querySelectorAll('[stroke]:not([stroke="none"])')].some(e => getComputedStyle(e).stroke === 'rgb(232, 89, 12)')))).toBe(true);
+    expect(await dimmed()).toBe(0);
 
     // a device of the drawing marks its lines in the file
     await page.mouse.move(5, 5);
@@ -70,6 +86,29 @@ for (const language of ['en', 'zh']) {
     await expect(page.locator('#rv-code .cl.is-hot').first()).toContainText('M2');
   });
 }
+
+// The two looks are framed alike: the drawing keeps its size, and the circuit fills it, in the same place.
+test('review: the two looks frame the circuit alike', async ({ page }) => {
+  await open(page, '/en/index.html');
+  const framing = async () => page.locator('#rv-stage svg').evaluate((svg) => {
+    const s = svg.getBoundingClientRect();
+    let b = null;
+    for (const el of svg.querySelectorAll('[data-dev]')) {
+      const r = el.getBoundingClientRect();
+      if (!r.width && !r.height) continue;
+      b = b ? { l: Math.min(b.l, r.left), t: Math.min(b.t, r.top), r: Math.max(b.r, r.right), b: Math.max(b.b, r.bottom) } : { l: r.left, t: r.top, r: r.right, b: r.bottom };
+    }
+    return { w: s.width, h: s.height, cx: ((b.l + b.r) / 2 - s.left) / s.width, cy: ((b.t + b.b) / 2 - s.top) / s.height,
+      fw: (b.r - b.l) / s.width, fh: (b.b - b.t) / s.height };
+  });
+  const standard = await framing();
+  await page.locator('#rv-look [data-look="eda"]').click();
+  const eda = await framing();
+  expect(Math.abs(eda.w - standard.w)).toBeLessThan(1);
+  expect(Math.abs(eda.h - standard.h)).toBeLessThan(1);
+  for (const k of ['cx', 'cy']) expect(Math.abs(eda[k] - standard[k])).toBeLessThan(0.04);
+  for (const k of ['fw', 'fh']) { expect(standard[k]).toBeGreaterThan(0.7); expect(eda[k]).toBeGreaterThan(0.7); }
+});
 
 test('review: the look switch redraws the same circuit with the packages, the file shows what changed', async ({ page }) => {
   await open(page, '/en/index.html');
@@ -91,8 +130,9 @@ test('review: the look switch redraws the same circuit with the packages, the fi
   await expect(page.locator('#rv-stage')).toHaveCSS('background-color', 'rgb(0, 0, 0)');
   // the review works in this look too
   await page.locator('#rv-items .rv-item').nth(0).click();
-  await expect(page.locator('#rv-stage svg [data-dev].is-lit')).not.toHaveCount(0);
+  await expect(page.locator('#rv-stage svg .rv-marks text').first()).toHaveText('$DIFFERENTIAL_PAIR_N: %dp1');
   await page.locator('#rv-items .rv-item').nth(0).click();
+  await expect(page.locator('#rv-stage svg .rv-marks')).toHaveCount(0);
 
   await page.locator('#rv-look [data-look="standard"]').click();
   expect(await stage.innerHTML()).toBe(standard);
