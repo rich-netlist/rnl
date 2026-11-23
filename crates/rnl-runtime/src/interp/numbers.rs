@@ -91,6 +91,7 @@ pub(crate) struct Counted {
 /// The objects of the authored records of a level in the order of their numbers, as the level
 /// reads without its records of the solver (5.9), with the lines of the check.
 #[derive(Clone, Debug, Default)]
+#[cfg_attr(debug_assertions, derive(PartialEq))]
 pub(crate) struct AuthoredCount {
     pub objects: Vec<Counted>,
     pub lines: Vec<String>,

@@ -211,8 +211,29 @@ pub fn read_noting(
     files: &dyn Provider,
     options: &Options,
 ) -> Result<DocumentReading, String> {
+    read_noting_taking(entry, dialect, formats, files, options, &mut rnl_runtime::AuthoredCounts::default())
+}
+
+/// [`read_noting`], the objects of the authored records taken from `counts` when it has them, and
+/// `counts` given those the reading counts ([`rnl_runtime::interpret_taking`] says what they have
+/// to be).
+pub fn read_noting_taking(
+    entry: &str,
+    dialect: Option<&str>,
+    formats: &BTreeMap<String, String>,
+    files: &dyn Provider,
+    options: &Options,
+    counts: &mut rnl_runtime::AuthoredCounts,
+) -> Result<DocumentReading, String> {
     let ws = Workspace::with_formats(files, formats);
-    let r = interpret_in(entry, (dialect, formats), &ws, options)?;
+    let r = match package_in(entry, (dialect, formats), &ws, options)? {
+        Some(r) => r,
+        None => {
+            let mut sink = Sink::new();
+            let doc = read_host_in(entry, (dialect, formats), &ws, &mut sink)?;
+            rnl_runtime::interpret_taking(doc, &ws, options, sink, counts)
+        }
+    };
     Ok(DocumentReading {
         options: options.clone(),
         interpretation: std::rc::Rc::new(r),
@@ -658,6 +679,7 @@ pub fn finish_record_with_formats(
 pub struct RecordFinisher<'a> {
     level: rnl_runtime::solution::LevelFinisher<'a>,
     files: Workspace<'a>,
+    formats: BTreeMap<String, String>,
 }
 
 impl<'a> RecordFinisher<'a> {
@@ -673,12 +695,34 @@ impl<'a> RecordFinisher<'a> {
         RecordFinisher {
             level: rnl_runtime::solution::LevelFinisher::new(doc, options, problem),
             files: Workspace::with_formats(files, formats),
+            formats: formats.clone(),
         }
     }
 
     /// The record finished, as [`finish_record_with_formats`] gives it.
     pub fn finish(&self, record: &str) -> String {
         self.level.finish(&self.files, record)
+    }
+
+    /// A record that uses a number ([`rnl_runtime::solution::record_uses_numbers`]) finished on
+    /// the document as the solve writes it: `entry` read, with `dialect` and the formats of this
+    /// finisher, from `files`, which have `record` written into the level's file in place of its
+    /// records of the solver ([`rnl_runtime::solution::LevelFinisher::finish_read`], `counts` as
+    /// it takes them). With it, the lines of the level's record of the solver in that file, when
+    /// it has one there. [`Self::finish`] gives a record that uses no number as it is, reading
+    /// nothing.
+    pub fn finish_written(
+        &self,
+        entry: &str,
+        dialect: Option<&str>,
+        files: &dyn Provider,
+        record: &str,
+        counts: &mut rnl_runtime::AuthoredCounts,
+    ) -> Result<(String, Option<(u32, u32)>), String> {
+        let ws = Workspace::with_formats(files, &self.formats);
+        let doc = read_host_in(entry, (dialect, &self.formats), &ws, &mut Sink::new())?;
+        let lines = rnl_runtime::solution::solver_record_lines(&doc, self.level.level());
+        Ok((self.level.finish_read(doc, &ws, record, counts), lines))
     }
 }
 

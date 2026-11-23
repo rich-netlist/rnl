@@ -10,6 +10,7 @@ use rnl_runtime::{
     Interpretation, Options,
 };
 use rnl_view::DocumentReading;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 pub struct Context<'a> {
@@ -30,45 +31,113 @@ pub struct Context<'a> {
 }
 
 /// The finisher of the records of the level of `ctx`, for the trials of its dots one after another.
-fn finisher<'a>(ctx: &Context<'a>) -> rnl_view::RecordFinisher<'a> {
-    rnl_view::RecordFinisher::new(&ctx.original.doc, ctx.files, ctx.formats, ctx.runtime, ctx.problem)
+fn finisher<'a>(ctx: &Context<'a>) -> Finisher<'a> {
+    Finisher {
+        records: rnl_view::RecordFinisher::new(&ctx.original.doc, ctx.files, ctx.formats, ctx.runtime, ctx.problem),
+        counted: RefCell::new(None),
+    }
+}
+
+/// The finisher of the records of a level, finishing each on the document as written
+/// ([`rnl_view::RecordFinisher::finish_written`]), with the last objects of the authored records
+/// it counted: the text of the level's file they were counted on, the lines of the level's record
+/// of the solver in it, and the count.
+struct Finisher<'a> {
+    records: rnl_view::RecordFinisher<'a>,
+    counted: RefCell<Option<Counted>>,
+}
+
+/// A count of the objects of the authored records: the text of the level's file it was made on,
+/// the lines of the level's record of the solver in it, and the count.
+type Counted = (String, (u32, u32), rnl_runtime::AuthoredCounts);
+
+/// Whether `a` and `b`, two texts of the level's file, have the same lines but those from `lines.0`
+/// to `lines.1` (from 1), where `a` has the level's record of the solver, and as many of them; and
+/// `record`, what `b` has there, is a record of the solver over as many lines. Then the files read
+/// with them make host documents that differ in the text of that record alone, each in the same
+/// lines, and a reading without the records of the solver counts the same objects of the authored
+/// records in both (5.9): it does not read that record.
+fn same_but_the_record(a: &str, b: &str, lines: (u32, u32), record: &str) -> bool {
+    let (first, last) = (lines.0 as usize, lines.1 as usize);
+    let (a, b): (Vec<&str>, Vec<&str>) = (a.split('\n').collect(), b.split('\n').collect());
+    first >= 1
+        && first <= last
+        && last <= a.len()
+        && a.len() == b.len()
+        && record.split('\n').count() == last - first + 1
+        && rnl_runtime::solution::is_solver_record(record)
+        && a[..first - 1] == b[..first - 1]
+        && a[last..] == b[last..]
 }
 
 /// The document read with `record`, and the record as it is read: finished with the check of its
 /// numbers, as a record written is.
-fn read(
-    ctx: &Context<'_>,
-    finisher: &rnl_view::RecordFinisher<'_>,
-    record: &str,
-) -> Result<(DocumentReading, String), String> {
+fn read(ctx: &Context<'_>, finisher: &Finisher<'_>, record: &str) -> Result<(DocumentReading, String), String> {
     read_with_text(ctx, finisher, record).map(|(read, numbered, _)| (read, numbered))
 }
 
 /// [`read`], with the text of the level's file it read.
+///
+/// A record that uses a number is finished on the document with it written, without its
+/// `numbering`; the reading with it written with `numbering` takes the objects of the authored
+/// records that the finish counted. A record finished after another takes those the finish of the
+/// other counted when the texts with them written differ in the record alone
+/// ([`same_but_the_record`]). Otherwise the reading counts them.
 fn read_with_text(
     ctx: &Context<'_>,
-    finisher: &rnl_view::RecordFinisher<'_>,
+    finisher: &Finisher<'_>,
     record: &str,
 ) -> Result<(DocumentReading, String, String), String> {
     // Numeric references are inactive until their record has a valid check. Prepare each
     // complete candidate, including its appended PLACE statements, in the same package
     // environment as the normal reading. Keep the caller's raw record and byte spans intact.
-    let numbered = finisher.finish(record);
+    let written = |record: &str| {
+        rnl_runtime::writeback::replace_generated_with_header(
+            &ctx.original.doc,
+            ctx.problem.level,
+            ctx.original_text,
+            record,
+            &ctx.problem.version,
+        )
+    };
+    let mut counts = rnl_runtime::AuthoredCounts::default();
+    let finished_written = rnl_runtime::solution::record_uses_numbers(record);
+    let numbered = if finished_written {
+        let text = written(record);
+        let mut overlay = MemoryProvider::new();
+        overlay.insert(ctx.host_path, &text);
+        let layered = Layered { layers: vec![&overlay, ctx.files] };
+        if let Some((before, lines, counted)) = &*finisher.counted.borrow() {
+            if same_but_the_record(before, &text, *lines, record) {
+                counts = counted.clone();
+            }
+        }
+        let (numbered, lines) =
+            finisher.records.finish_written(ctx.entry, ctx.dialect, &layered, record, &mut counts)?;
+        let kept = lines.map(|lines| (text, lines, counts.clone()));
+        *finisher.counted.borrow_mut() = kept;
+        numbered
+    } else {
+        // as the finish gives a record that uses no number, without reading it again
+        record.to_string()
+    };
     if let Some(observe) = ctx.on_interpret {
         observe();
     }
-    let text = rnl_runtime::writeback::replace_generated_with_header(
-        &ctx.original.doc,
-        ctx.problem.level,
-        ctx.original_text,
-        &numbered,
-        &ctx.problem.version,
-    );
+    let text = written(&numbered);
+    // the reading takes the count of the finish when the record it wrote is all that differs
+    let taken = finisher
+        .counted
+        .borrow()
+        .as_ref()
+        .filter(|(before, lines, _)| finished_written && same_but_the_record(before, &text, *lines, &numbered))
+        .map(|(_, _, counted)| counted.clone());
+    let mut counts = taken.unwrap_or_default();
     let mut overlay = MemoryProvider::new();
     overlay.insert(ctx.host_path, &text);
     let layered = Layered { layers: vec![&overlay, ctx.files] };
     let opts = Options { generated: true, problems: true, ..ctx.runtime.clone() };
-    let reading = rnl_view::read_noting(ctx.entry, ctx.dialect, ctx.formats, &layered, &opts)?;
+    let reading = rnl_view::read_noting_taking(ctx.entry, ctx.dialect, ctx.formats, &layered, &opts, &mut counts)?;
     let read = &reading.interpretation;
     let file = &read.doc.levels.get(ctx.problem.level).ok_or("trial level missing")?.file;
     let numbering =

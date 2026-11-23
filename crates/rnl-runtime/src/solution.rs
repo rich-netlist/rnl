@@ -1139,12 +1139,15 @@ impl<'a> LevelFinisher<'a> {
         LevelFinisher { doc, options, p, counts: RefCell::default() }
     }
 
+    /// The level of the records finished.
+    pub fn level(&self) -> usize {
+        self.p.level
+    }
+
     /// The record finished, as [`finish_record`] gives it.
     pub fn finish(&self, files: &dyn Provider, record: &str) -> String {
         let p = self.p;
-        let ast = parse_record_features(record, true, true);
-        let uses_numbers = ast.body.as_ref().is_some_and(|b| b.members.iter().any(|m| uses_number(m)));
-        if !uses_numbers {
+        if !record_uses_numbers(record) {
             return record.to_string();
         }
         let mut doc = self.doc.clone();
@@ -1158,6 +1161,47 @@ impl<'a> LevelFinisher<'a> {
             None => record.to_string(),
         }
     }
+
+    /// A record that uses a number ([`record_uses_numbers`]) finished as [`Self::finish`] finishes
+    /// it, the document read again being `doc`: the host document read from its files with
+    /// `record` written into the level's file in place of its records of the solver, as the solve
+    /// writes it, read with `files`. The objects of the authored records are taken from `counts`
+    /// when it has them, and `counts` is given those this reading counts
+    /// ([`crate::interpret_taking`] says what they have to be). [`Self::finish`] gives a record that
+    /// uses no number as it is.
+    pub fn finish_read(
+        &self,
+        doc: HostDocument,
+        files: &dyn Provider,
+        record: &str,
+        counts: &mut AuthoredCounts,
+    ) -> String {
+        let read = interpret_numbering(doc, files, &self.options, counts);
+        match level_check(&read, self.p.level) {
+            Some(check) => with_numbering(record, check),
+            None => record.to_string(),
+        }
+    }
+}
+
+/// Whether a record of the solver uses a number (5.9): then it is finished with `numbering`.
+pub fn record_uses_numbers(record: &str) -> bool {
+    let ast = parse_record_features(record, true, true);
+    ast.body.as_ref().is_some_and(|b| b.members.iter().any(|m| uses_number(m)))
+}
+
+/// Whether `text` is a record of the solver: its head has `type="generated"`.
+pub fn is_solver_record(text: &str) -> bool {
+    crate::interp::unit::is_generated_record(&crate::syntax::parse_record(text))
+}
+
+/// The lines of the record of the solver of `level` in the level's own file in `doc`, first and
+/// last, when it has exactly one there.
+pub fn solver_record_lines(doc: &HostDocument, level: usize) -> Option<(u32, u32)> {
+    let lv = doc.levels.get(level)?;
+    let mut found = lv.records.iter().filter(|r| r.file == lv.file && record_type(r) == "generated");
+    let one = found.next()?;
+    found.next().is_none().then_some(one.lines)
 }
 
 /// A record as a host adapter would cut it out of the lines from `line` of `file` on.
