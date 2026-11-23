@@ -148,6 +148,46 @@ impl Options {
     pub fn solver() -> Options {
         Options { generated: false, problems: true, ..Options::default() }
     }
+
+    /// What of these options a reading takes, [`ReadOptions`]: all the interpreter is made from.
+    pub fn read_options(&self) -> ReadOptions {
+        ReadOptions {
+            std: self.std,
+            include_std: self.include_std,
+            std_version: self.std_version.clone(),
+            generated: self.generated,
+            problems: self.problems,
+            tolerance: self.tolerance,
+            only_file: self.only_file.clone(),
+            symbols_only: self.symbols_only,
+            junction: self.solver_config.iter().filter(|s| s.key == "junction").cloned().collect(),
+        }
+    }
+
+    /// Whether a document read with these options and with `other` gives the same
+    /// [`Interpretation`]: whether what a reading takes of them is the same ([`ReadOptions`]).
+    pub fn reads_as(&self, other: &Options) -> bool {
+        self.read_options() == other.read_options()
+    }
+}
+
+/// What of [`Options`] a reading of a document takes, and the only options the interpreter is made
+/// from, so that an option reaches a reading only through it: two options read a document alike
+/// when what they give of it is equal ([`Options::reads_as`]). Each field is that of [`Options`],
+/// but `junction`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ReadOptions {
+    pub std: bool,
+    pub include_std: bool,
+    pub std_version: Option<String>,
+    pub generated: bool,
+    pub problems: bool,
+    pub tolerance: f64,
+    pub only_file: Option<String>,
+    pub symbols_only: bool,
+    /// The tool's settings for the solver ([`Options::solver_config`]) that a reading takes: those of
+    /// `junction` (13.2). The others are the solver's alone.
+    pub junction: Vec<crate::problem::SolverSetting>,
 }
 
 /// An alias that the header record of a file imports from an alias package with @USE-ALIASES
@@ -325,7 +365,7 @@ pub struct Interp<'p> {
     symbols_only: bool,
     /// The tolerance of the checks against written coordinates (`Options::tolerance`, 11.7).
     pub(crate) tol: f64,
-    tool_solver_config: Vec<crate::problem::SolverSetting>,
+    tool_junction: Vec<crate::problem::SolverSetting>,
     /// The standard package that `include_std` adds for the files of each language version (16.3).
     pub(crate) std_units: HashMap<String, Option<UnitId>>,
     /// The version of the standard package that the reading asks for ([`Options::std_version`]),
@@ -467,7 +507,7 @@ impl<'p> Interp<'p> {
     fn blank(
         doc: HostDocument,
         provider: &'p dyn Provider,
-        options: &Options,
+        options: &ReadOptions,
         sink: Sink,
         numbers: NumberRun,
     ) -> Interp<'p> {
@@ -531,7 +571,7 @@ impl<'p> Interp<'p> {
             only_levels,
             symbols_only: options.symbols_only,
             tol: options.tolerance,
-            tool_solver_config: options.solver_config.clone(),
+            tool_junction: options.junction.clone(),
             std_units: HashMap::new(),
             missing_std: None,
             std_alias_reported: HashSet::new(),
@@ -581,7 +621,7 @@ impl<'p> Interp<'p> {
     /// Prepare the interpretation of a host document: read every level's records and headers.
     /// `sink` may already hold the host adapter's diagnostics.
     pub fn new(doc: HostDocument, provider: &'p dyn Provider, options: &Options, sink: Sink) -> Interp<'p> {
-        Interp::new_run(doc, provider, options, sink, NumberRun::default())
+        Interp::new_run(doc, provider, &options.read_options(), sink, NumberRun::default())
     }
 
     /// Prepare each host reading for the same file-version lookup.
@@ -602,7 +642,7 @@ impl<'p> Interp<'p> {
     fn new_run(
         doc: HostDocument,
         provider: &'p dyn Provider,
-        options: &Options,
+        options: &ReadOptions,
         sink: Sink,
         numbers: NumberRun,
     ) -> Interp<'p> {
@@ -627,7 +667,7 @@ impl<'p> Interp<'p> {
         let name = crate::host::file_name(path).to_string();
         let main = Level::new(LevelKind::File, &name, &name, path);
         let doc = HostDocument::new(main, crate::host::format::Format::dialect(&crate::host::package::Package));
-        let mut it = Interp::blank(doc, provider, options, Sink::new(), NumberRun::default());
+        let mut it = Interp::blank(doc, provider, &options.read_options(), Sink::new(), NumberRun::default());
         let mut u = Unit::new(UnitKind::Level, &name);
         u.level = Some(0);
         u.ok = false;
@@ -733,7 +773,9 @@ impl<'p> Interp<'p> {
     #[cfg(debug_assertions)]
     fn finish_checked(mut self, again: &impl Fn(Interp<'p>) -> Interp<'p>) -> Interpretation {
         let (doc, provider) = (self.doc.clone(), self.provider);
-        let blank = || Interp::blank(doc.clone(), provider, &Options::default(), Sink::new(), NumberRun::default());
+        let blank = || {
+            Interp::blank(doc.clone(), provider, &Options::default().read_options(), Sink::new(), NumberRun::default())
+        };
         let mut held = blank();
         Self::hand_over(&mut self, &mut held);
         let first = self.finish();
@@ -1265,7 +1307,7 @@ impl<'p> Interp<'p> {
 ///   The checks given are those of the reading before, where every number is read: the text as
 ///   written.
 pub fn interpret(doc: HostDocument, provider: &dyn Provider, options: &Options, sink: Sink) -> Interpretation {
-    interpret_counted(doc, provider, options, sink, &mut AuthoredCounts::default(), true)
+    interpret_counted(doc, provider, &options.read_options(), sink, &mut AuthoredCounts::default(), true)
 }
 
 /// The objects of the authored records of each level as the reading of a document without its
@@ -1288,7 +1330,7 @@ pub(crate) fn interpret_numbering(
     options: &Options,
     counts: &mut AuthoredCounts,
 ) -> Interpretation {
-    interpret_counted(doc, provider, options, Sink::new(), counts, false)
+    interpret_counted(doc, provider, &options.read_options(), Sink::new(), counts, false)
 }
 
 /// [`interpret`], the objects of the authored records taken from `counts` and given to it, and the
@@ -1296,7 +1338,7 @@ pub(crate) fn interpret_numbering(
 fn interpret_counted(
     doc: HostDocument,
     provider: &dyn Provider,
-    options: &Options,
+    options: &ReadOptions,
     sink: Sink,
     counts: &mut AuthoredCounts,
     recheck: bool,
@@ -1329,14 +1371,14 @@ fn interpret_counted(
 fn read(
     doc: HostDocument,
     provider: &dyn Provider,
-    options: &Options,
+    options: &ReadOptions,
     sink: Sink,
     host: &Sink,
     run: &mut NumberRun,
 ) -> Interpretation {
     let mut it = Interp::new_run(doc, provider, options, sink, run.clone());
     if it.counts_first() {
-        let without = Options { generated: false, problems: false, ..options.clone() };
+        let without = ReadOptions { generated: false, problems: false, ..options.clone() };
         let counting = NumberRun { count: true, ..NumberRun::default() };
         let first = Interp::new_run(it.doc.clone(), provider, &without, host.clone(), counting.clone())
             .run_settled(|x| Interp::new_run(x.doc, provider, &without, host.clone(), counting.clone()));
@@ -1352,7 +1394,7 @@ fn read(
 /// This reads version declarations without evaluating other RNL or loading packages.
 pub fn resolve_host_diagnostics(doc: HostDocument, default_version: &str, sink: Sink) -> (HostDocument, Sink) {
     let provider = crate::source::MemoryProvider::new();
-    let options = Options { std: false, ..Options::default() };
+    let options = Options { std: false, ..Options::default() }.read_options();
     let mut it = Interp::blank(doc, &provider, &options, sink, NumberRun::default());
     it.init_host_units();
     let main = it.level_unit[0];
@@ -1369,7 +1411,7 @@ pub fn resolve_host_diagnostics(doc: HostDocument, default_version: &str, sink: 
 /// reads the version declarations only: it evaluates no other RNL and loads no package.
 pub fn read_file_versions(doc: HostDocument, sink: Sink) -> (HostDocument, Sink, Vec<Option<String>>) {
     let provider = crate::source::MemoryProvider::new();
-    let options = Options { std: false, ..Options::default() };
+    let options = Options { std: false, ..Options::default() }.read_options();
     let mut it = Interp::blank(doc, &provider, &options, sink, NumberRun::default());
     // as Interp::new_run starts an interpretation
     it.init_host_units();

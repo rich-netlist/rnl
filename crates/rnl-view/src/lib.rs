@@ -176,7 +176,48 @@ impl Default for BuildOptions {
 /// Name the files of a workspace by rooted paths, such as `/w/top.sp`, as the desktop names them
 /// by absolute ones: see [`SourceFile::path`] for what a relative entry in a directory loses.
 pub fn build(entry: &str, files: &dyn Provider, options: &BuildOptions) -> Result<Document, String> {
-    Ok(build_with(entry, files, options, false)?.0)
+    Ok(build_in(entry, files, options, false, &[], |_, d| d)?.0)
+}
+
+/// [`build`], taking each reading it needs from `taken` where one was read with options that read
+/// the document alike ([`Options::reads_as`]) instead of reading it again. Each must be a reading
+/// of `entry` over the same texts as `files`, with the same `dialect` and `formats`
+/// ([`read_noting`]): the Document is then the one `build` gives.
+pub fn build_taking(
+    entry: &str,
+    files: &dyn Provider,
+    options: &BuildOptions,
+    taken: &[&DocumentReading],
+) -> Result<Document, String> {
+    Ok(build_in(entry, files, options, false, taken, |_, d| d)?.0)
+}
+
+/// A reading of a document, as [`read_noting`] gives it: what it was read with, the interpretation,
+/// and the files it looked for and did not find, in that order, which a Document lists
+/// ([`Document::missing`]).
+#[derive(Clone)]
+pub struct DocumentReading {
+    pub options: Options,
+    pub interpretation: std::rc::Rc<Interpretation>,
+    pub missing: Vec<String>,
+}
+
+/// [`interpret_with`], with the files the reading missed, for a build to take it
+/// ([`build_taking`]).
+pub fn read_noting(
+    entry: &str,
+    dialect: Option<&str>,
+    formats: &BTreeMap<String, String>,
+    files: &dyn Provider,
+    options: &Options,
+) -> Result<DocumentReading, String> {
+    let ws = Workspace::with_formats(files, formats);
+    let r = interpret_in(entry, (dialect, formats), &ws, options)?;
+    Ok(DocumentReading {
+        options: options.clone(),
+        interpretation: std::rc::Rc::new(r),
+        missing: ws.missing.into_inner(),
+    })
 }
 
 /// [`build`], with the drawings of the objects that each level lists without a position kept apart
@@ -196,7 +237,7 @@ fn build_with(
     options: &BuildOptions,
     lazy: bool,
 ) -> Result<(Document, Option<Drawings>), String> {
-    build_in(entry, files, options, lazy, |_, d| d)
+    build_in(entry, files, options, lazy, &[], |_, d| d)
 }
 
 /// The reading of one file of the document `entry`, `file`, as the document names it
@@ -208,7 +249,19 @@ fn build_with(
 /// document and the document misses no file: when it misses some, the result has no level, and
 /// lists them in `missing` for the frontend to read and ask again.
 pub fn build_file(entry: &str, file: &str, files: &dyn Provider, options: &BuildOptions) -> Result<FileResult, String> {
-    Ok(build_file_with(entry, file, files, options, false)?.0)
+    Ok(build_file_with(entry, file, files, options, false, &[])?.0)
+}
+
+/// [`build_file`], taking the readings it needs from `taken` as [`build_taking`] does. A reading of
+/// the file alone is one with its `only_file` set to `file`.
+pub fn build_file_taking(
+    entry: &str,
+    file: &str,
+    files: &dyn Provider,
+    options: &BuildOptions,
+    taken: &[&DocumentReading],
+) -> Result<FileResult, String> {
+    Ok(build_file_with(entry, file, files, options, false, taken)?.0)
 }
 
 /// [`build_file`], with the drawings of the objects without a position kept apart, as
@@ -219,7 +272,7 @@ pub fn build_file_drawn(
     files: &dyn Provider,
     options: &BuildOptions,
 ) -> Result<(FileResult, Drawings), String> {
-    let (result, drawings) = build_file_with(entry, file, files, options, true)?;
+    let (result, drawings) = build_file_with(entry, file, files, options, true, &[])?;
     Ok((result, drawings.expect("drawings were asked for")))
 }
 
@@ -229,11 +282,12 @@ fn build_file_with(
     files: &dyn Provider,
     options: &BuildOptions,
     lazy: bool,
+    taken: &[&DocumentReading],
 ) -> Result<(FileResult, Option<Drawings>), String> {
     let runtime = Options { only_file: Some(file.to_string()), ..options.runtime.clone() };
     let options = BuildOptions { runtime, ..options.clone() };
     let (result, drawings) =
-        build_in(entry, files, &options, lazy, |r, d| file_result::file_result(entry, file, r, d))?;
+        build_in(entry, files, &options, lazy, taken, |r, d| file_result::file_result(entry, file, r, d))?;
     // a file not read yet may be among those missing, which a frontend reads to ask again
     if !result.document.files.iter().any(|f| f.path == file) && result.document.missing.is_empty() {
         return Err(format!("{file} is not a file of {entry}"));
@@ -262,12 +316,15 @@ pub fn symbols(entry: &str, file: &str, files: &dyn Provider, options: &BuildOpt
 }
 
 /// The Document of `entry` made into what `finish` makes of it with its interpretation, and when
-/// `lazy` the drawings of the objects without a position.
+/// `lazy` the drawings of the objects without a position. A reading of `taken` made with options
+/// that read alike is taken instead of reading again, but when `lazy`, which takes the drawings out
+/// of the reading.
 fn build_in<T>(
     entry: &str,
     files: &dyn Provider,
     options: &BuildOptions,
     lazy: bool,
+    taken: &[&DocumentReading],
     finish: impl FnOnce(&Interpretation, Document) -> T,
 ) -> Result<(T, Option<Drawings>), String> {
     let ws = Workspace::with_formats(files, &options.formats);
@@ -275,22 +332,37 @@ fn build_in<T>(
         return Err(format!("cannot read {entry}"));
     }
     let reading = (options.dialect.as_deref(), &options.formats);
+    // a reading taken notes the files it missed, as reading again would
+    let read = |runtime: &Options| -> Result<Readed, String> {
+        match taken.iter().find(|t| !lazy && t.options.reads_as(runtime)) {
+            Some(t) => {
+                let mut missing = ws.missing.borrow_mut();
+                for m in &t.missing {
+                    if !missing.contains(m) {
+                        missing.push(m.clone());
+                    }
+                }
+                Ok(Readed::Taken(t.interpretation.clone()))
+            }
+            None => Ok(Readed::Read(Box::new(interpret_in(entry, reading, &ws, runtime)?))),
+        }
+    };
     // the solve status and the constraints take the problems; built in this reading too, they
     // change nothing else
     let solver_view = options.status || options.constraints;
     let runtime =
         Options { problems: options.runtime.problems || solver_view || options.hints, ..options.runtime.clone() };
-    let mut r = interpret_in(entry, reading, &ws, &runtime)?;
+    let mut r = read(&runtime)?;
     // a document without records of the solver reads the same with them and without
     let records = r.doc.levels.iter().any(|l| l.records.iter().any(|rec| record_type(rec) == "generated"));
     let other = if !solver_view || !records {
         None
     } else if runtime.generated {
-        Some(interpret_in(entry, reading, &ws, &Options { generated: false, ..runtime.clone() })?)
+        Some(read(&Options { generated: false, ..runtime.clone() })?)
     } else {
-        Some(interpret_in(entry, reading, &ws, &Options { generated: true, problems: false, ..runtime.clone() })?)
+        Some(read(&Options { generated: true, problems: false, ..runtime.clone() })?)
     };
-    let (with, without) = match &other {
+    let (with, without): (&Interpretation, &Interpretation) = match &other {
         None => (&r, &r),
         Some(o) if runtime.generated => (&r, o),
         Some(o) => (o, &r),
@@ -308,8 +380,28 @@ fn build_in<T>(
         }
     }
     drop(other);
-    let drawings = lazy.then(|| Drawings::take(&mut r.model.levels, &d, options));
+    let drawings = match &mut r {
+        Readed::Read(r) if lazy => Some(Drawings::take(&mut r.model.levels, &d, options)),
+        _ => None,
+    };
     Ok((finish(&r, d), drawings))
+}
+
+/// A reading [`build_in`] made, or one it took.
+enum Readed {
+    Read(Box<Interpretation>),
+    Taken(std::rc::Rc<Interpretation>),
+}
+
+impl std::ops::Deref for Readed {
+    type Target = Interpretation;
+
+    fn deref(&self) -> &Interpretation {
+        match self {
+            Readed::Read(r) => r,
+            Readed::Taken(r) => r,
+        }
+    }
 }
 
 /// The solve status of each drawing level, by host level ([`solve_status`]): its problem and model

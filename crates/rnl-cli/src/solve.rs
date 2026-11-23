@@ -233,8 +233,9 @@ pub struct Readings {
     /// anything was written back.
     pub(crate) before: Option<Rc<Interpretation>>,
     /// The last check that a level's record reads back: the texts held over the files then, by
-    /// path, and the document read with them, its records and its problems.
-    pub(crate) written: Option<(BTreeMap<String, String>, Rc<Interpretation>)>,
+    /// path, and the document read with them, its records and its problems, with the files it
+    /// missed.
+    pub(crate) written: Option<(BTreeMap<String, String>, rnl_view::DocumentReading)>,
 }
 
 impl std::fmt::Debug for Readings {
@@ -714,7 +715,7 @@ fn pass(
     let mut solved_files: Vec<SolvedFile> = Vec::new();
     // the document read again when a header moved
     let mut current = if moved.is_empty() { Some(first) } else { None };
-    let mut last_read_back: Option<(BTreeMap<String, String>, Rc<Interpretation>)> = None;
+    let mut last_read_back: Option<(BTreeMap<String, String>, rnl_view::DocumentReading)> = None;
     let count = targets.len();
     watch(Mark::Run { levels: count });
     for (k, (level, title)) in targets.into_iter().enumerate() {
@@ -866,7 +867,7 @@ fn pass(
             // below takes its reading, instead of read again
             let mut texts = memory.files.clone();
             texts.insert(path.clone(), completion.text);
-            last_read_back = Some((texts, Rc::new(completion.reading)));
+            last_read_back = Some((texts, completion.reading));
         } else if p.version == "0.4" && !written.record.is_empty() {
             // no dots to place: the record still has to read back as it was solved. The check
             // compares the objects of two readings and needs no report of facts, so a backend
@@ -895,7 +896,7 @@ fn pass(
                     numbered = Some((written.record.clone(), back.finished));
                     let mut texts = memory.files.clone();
                     texts.insert(path.clone(), back.text);
-                    last_read_back = Some((texts, Rc::new(back.reading)));
+                    last_read_back = Some((texts, back.reading));
                 }
                 Err(why) if why.ends_with(crate::junction_completion_driver::LOST) => {
                     return Err(format!("the result of {title} does not read back as it was solved: {why}"));

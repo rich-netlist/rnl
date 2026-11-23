@@ -213,36 +213,32 @@ fn as_solved(entry: &str, mut run: SolveRun, files: &dyn Provider, options: &Sol
         flylines: true,
         ..BuildOptions::default()
     };
-    // one file read, its Document; else the whole document's
-    let (document, file) = match options.level.as_ref().and(options.file.as_ref()) {
-        Some(file) => {
-            let read = rnl_view::build_file(entry, file, &both, &build)?;
-            (read.document, Some(OfFile { file: read.file, children: read.children, inputs: read.inputs }))
-        }
-        None => (rnl_view::build(entry, &both, &build)?, None),
-    };
     // the texts as a solver reads them, without the records of the solver, so that the facts are
     // those solved, at the lines where the Document shows them
-    let again =
-        rnl_view::interpret_with(entry, options.dialect.as_deref(), &options.formats, &both, &options.runtime())?;
+    let read =
+        |runtime: &Options| rnl_view::read_noting(entry, options.dialect.as_deref(), &options.formats, &both, runtime);
+    let again = read(&options.runtime())?;
     // and with them, which is what is drawn: the facts are measured there. The last check that a
     // record reads back read the same: the texts it held over the files are those the solve wrote
     let with = match readings.written.filter(|(texts, _)| run.entry == entry && holds_the_files(texts, &run)) {
         Some((_, read)) => read,
-        None => {
-            let with = Options { generated: true, problems: true, ..options.runtime() };
-            std::rc::Rc::new(rnl_view::interpret_with(
-                entry,
-                options.dialect.as_deref(),
-                &options.formats,
-                &both,
-                &with,
-            )?)
+        None => read(&Options { generated: true, problems: true, ..options.runtime() })?,
+    };
+    // the Document reads the texts with their records and without, as these two did where it
+    // reads them alike ([`Options::reads_as`]): it takes them instead of reading again
+    let taken = [&with, &again];
+    // one file read, its Document; else the whole document's
+    let (document, file) = match options.level.as_ref().and(options.file.as_ref()) {
+        Some(file) => {
+            let read = rnl_view::build_file_taking(entry, file, &both, &build, &taken)?;
+            (read.document, Some(OfFile { file: read.file, children: read.children, inputs: read.inputs }))
         }
+        None => (rnl_view::build_taking(entry, &both, &build, &taken)?, None),
     };
     let before = readings.before.as_deref().filter(|_| run.entry == entry);
     let checked = check(entry, files, options, before);
-    let report = report(&run, &document, &again.problems, &with, options.solver.tolerance, checked);
+    let (problems, with) = (&again.interpretation.problems, &with.interpretation);
+    let report = report(&run, &document, problems, with, options.solver.tolerance, checked);
     Ok(Preview { copy: Copy::of(&run), document, report, file })
 }
 
@@ -627,6 +623,57 @@ mod tests {
             assert_eq!(json(&taken), json(&read));
             assert!(taken.report.levels.iter().all(|l| l.check.is_some()), "{:?}", taken.report.levels);
         }
+    }
+
+    /// The preview reads the texts the solve wrote once, as a solver reads them, and the Document
+    /// takes that reading and the solve's with the records written instead of reading them again,
+    /// though the tool's settings are given, which a reading does not take but for `junction`. It
+    /// is the Document that reading again gives: the file the netlist includes and that is not there
+    /// is missing in it all the same.
+    #[test]
+    fn the_preview_reads_the_texts_solved_once() {
+        /// The files, counting how often a reading looks for the one that is not there.
+        struct Counting {
+            files: MemoryProvider,
+            absent: std::cell::Cell<usize>,
+        }
+        impl Provider for Counting {
+            fn read(&self, path: &str) -> Option<String> {
+                if path.ends_with("absent.inc") {
+                    self.absent.set(self.absent.get() + 1);
+                }
+                self.files.read(path)
+            }
+            fn path_key(&self, path: &str) -> String {
+                self.files.path_key(path)
+            }
+        }
+        const NET: &str = "* preview\n\
+            * @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
+            .include \"absent.inc\"\nR1 a b 1k\nR2 b 0 1k\nR3 b 0 1k\nC1 a 0 1p\n\
+            * @RNL { #R1 @PLACE(0, 0); {#R1:2 #R2:1 #R3:1} @ROUTE-OBJECT }\n.end\n";
+        let files = Counting { files: MemoryProvider::new().with("/w/t.sp", NET), absent: Default::default() };
+        let solver = rnl_solver::SolverOptions::without_time_limit().with_config("reroute_nets=true").unwrap();
+        let options = SolveOptions { solver, ..SolveOptions::default() };
+        assert!(!options.runtime().solver_config.is_empty(), "a tool setting is given");
+        let clock = crate::solve::WallClock::new();
+        let run = crate::solve::solve_watched(Path::new("/w/t.sp"), &files, &options, &clock, &|_| true).unwrap();
+        // how often one reading of the texts looks for the file that is not there
+        files.absent.set(0);
+        rnl_view::interpret_with("/w/t.sp", None, &options.formats, &files, &options.runtime()).unwrap();
+        let once = files.absent.get();
+        assert!(once > 0);
+        let mut bare = run.clone();
+        bare.readings = crate::solve::Readings::default();
+        files.absent.set(0);
+        let taken = as_solved("/w/t.sp", run, &files, &options).unwrap();
+        assert_eq!(files.absent.get(), once, "the texts solved are read once");
+        files.absent.set(0);
+        let read = as_solved("/w/t.sp", bare, &files, &options).unwrap();
+        assert!(files.absent.get() > once, "read again, they are read more than once");
+        let json = |shown: &Preview| serde_json::to_string(&(&shown.document, &shown.report)).unwrap();
+        assert_eq!(json(&taken), json(&read));
+        assert!(taken.document.missing.iter().any(|m| m.ends_with("absent.inc")), "{:?}", taken.document.missing);
     }
 
     /// A level solved with the file it is written in read alone writes what the solve of the whole
