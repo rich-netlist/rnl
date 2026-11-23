@@ -1,16 +1,787 @@
-/* Drawn by the RNL core undefined from the example files of site/examples with site/render-examples.mjs; do not edit.
+/* Drawn by the RNL core 0.6.2 from the example files of site/examples with site/render-examples.mjs; do not edit.
    site/build.py checks that each look and each file's records are those of the current text of its file (the sha256 below). */
 window.RNLOtaLooks = {
+ "core": "0.6.2",
  "looks": {
   "standard": {
    "file": "ota5t-review.sp",
    "sha256": "4f087ba4332d",
-   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"-135.98 -632.24 619.08 639.24\" font-family=\"Noto Sans SC, Noto Sans CJK SC, Source Han Sans SC, sans-serif\" style=\"font-kerning:none;font-variant-ligatures:none;text-spacing-trim:space-all;text-autospace:no-autospace\">\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M36.06,-233.77 L56.00,-233.77 L56.00,-252.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M25.48,-237.43 L25.48,-210.57 L29.55,-210.57 L29.55,-237.43 L25.48,-237.43 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M32.80,-241.50 L32.80,-206.50 L36.87,-206.50 L36.87,-241.50 L32.80,-241.50 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M27.51,-224.00 L14.00,-224.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M34.84,-214.23 L56.00,-214.23 L56.00,-196.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M56.81,-214.23 L43.79,-219.93 L43.79,-208.53 L56.81,-214.23 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M243.94,-233.77 L224.00,-233.77 L224.00,-252.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M254.52,-237.43 L254.52,-210.57 L250.45,-210.57 L250.45,-237.43 L254.52,-237.43 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M247.20,-241.50 L247.20,-206.50 L243.13,-206.50 L243.13,-241.50 L247.20,-241.50 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M252.49,-224.00 L266.00,-224.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M245.16,-214.23 L224.00,-214.23 L224.00,-196.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M223.19,-214.23 L236.21,-219.93 L236.21,-208.53 L223.19,-214.23 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M75.94,-354.23 L56.00,-354.23 L56.00,-336.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M86.52,-377.43 L86.52,-350.57 L82.45,-350.57 L82.45,-377.43 L86.52,-377.43 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M79.20,-381.50 L79.20,-346.50 L75.13,-346.50 L75.13,-381.50 L79.20,-381.50 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M84.49,-364.00 L98.00,-364.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M62.10,-373.97 L56.00,-373.97 L56.00,-392.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M75.13,-373.97 L62.10,-379.67 L62.10,-368.27 L75.13,-373.97 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M204.06,-354.23 L224.00,-354.23 L224.00,-336.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M193.48,-377.43 L193.48,-350.57 L197.55,-350.57 L197.55,-377.43 L193.48,-377.43 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M200.80,-381.50 L200.80,-346.50 L204.87,-346.50 L204.87,-381.50 L200.80,-381.50 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M195.51,-364.00 L182.00,-364.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M217.90,-373.97 L224.00,-373.97 L224.00,-392.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M204.87,-373.97 L217.90,-379.67 L217.90,-368.27 L204.87,-373.97 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M120.06,-135.77 L140.00,-135.77 L140.00,-154.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M109.48,-139.43 L109.48,-112.57 L113.55,-112.57 L113.55,-139.43 L109.48,-139.43 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M116.80,-143.50 L116.80,-108.50 L120.87,-108.50 L120.87,-143.50 L116.80,-143.50 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M111.51,-126.00 L98.00,-126.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M118.84,-116.23 L140.00,-116.23 L140.00,-98.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M140.81,-116.23 L127.79,-121.93 L127.79,-110.53 L140.81,-116.23 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-9\" data-dev=\"VSS\"><path d=\"M140.00,-70.00 L140.00,-56.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-9\" data-dev=\"VSS\"><path d=\"M131.05,-56.00 L148.95,-56.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"4.07\"/></g>\n<g data-id=\"item-9\" data-dev=\"VSS\"><path d=\"M134.30,-47.86 L145.70,-47.86\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"4.07\"/></g>\n<g data-id=\"item-9\" data-dev=\"VSS\"><path d=\"M136.74,-40.53 L143.26,-40.53\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"4.07\"/></g>\n<g data-id=\"item-10\" data-dev=\"VDD\"><path d=\"M56.00,-420.00 L56.00,-445.90\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-10\" data-dev=\"VDD\"><path d=\"M42.00,-449.23 L70.00,-449.23 L70.00,-444.70 L42.00,-444.70 L42.00,-449.23 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-11\" data-dev=\"VDD\"><path d=\"M224.00,-420.00 L224.00,-445.90\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-11\" data-dev=\"VDD\"><path d=\"M210.00,-449.23 L238.00,-449.23 L238.00,-444.70 L210.00,-444.70 L210.00,-449.23 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-5\" data-dev=\"P_INP\"><circle cx=\"-23.92\" cy=\"-224.00\" r=\"3.47\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-5\" data-dev=\"P_INP\"><path d=\"M-14.00,-224.00 L-20.45,-224.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-6\" data-dev=\"P_INN\"><circle cx=\"303.92\" cy=\"-224.00\" r=\"3.47\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-6\" data-dev=\"P_INN\"><path d=\"M294.00,-224.00 L300.45,-224.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-7\" data-dev=\"P_OUT\"><circle cx=\"275.92\" cy=\"-294.00\" r=\"3.47\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-7\" data-dev=\"P_OUT\"><path d=\"M266.00,-294.00 L272.45,-294.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-8\" data-dev=\"P_BIAS\"><circle cx=\"-23.92\" cy=\"-126.00\" r=\"3.47\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-8\" data-dev=\"P_BIAS\"><path d=\"M-14.00,-126.00 L-20.45,-126.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-12\"><circle cx=\"140.00\" cy=\"-168.00\" r=\"5.29\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-13\"><circle cx=\"224.00\" cy=\"-294.00\" r=\"5.29\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-14\"><circle cx=\"56.00\" cy=\"-294.00\" r=\"5.29\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-15\"><circle cx=\"140.00\" cy=\"-364.00\" r=\"5.29\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"#M1::name\" data-dev=\"M1\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"63.00\" y=\"-238.70\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"20.20\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">M1</text></g></g>\n<g data-id=\"#M2::name\" data-dev=\"M2\"><g transform=\"matrix(1.000000000 0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"196.80\" y=\"-238.70\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"20.20\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">M2</text></g></g>\n<g data-id=\"#M3::name\" data-dev=\"M3\"><g transform=\"matrix(1.000000000 0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"28.80\" y=\"-378.70\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"20.20\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">M3</text></g></g>\n<g data-id=\"#M4::name\" data-dev=\"M4\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"231.00\" y=\"-378.70\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"20.20\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">M4</text></g></g>\n<g data-id=\"#M5::name\" data-dev=\"M5\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"147.00\" y=\"-140.70\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"20.20\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">M5</text></g></g>\n<g data-id=\"%p_inp::netname\" data-dev=\"P_INP\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"-53.75\" y=\"-217.90\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"22.25\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">inp</text></g></g>\n<g data-id=\"%p_inn::netname\" data-dev=\"P_INN\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"311.50\" y=\"-217.90\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"22.20\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">inn</text></g></g>\n<g data-id=\"%p_out::netname\" data-dev=\"P_OUT\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"283.50\" y=\"-287.90\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"23.58\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">out</text></g></g>\n<g data-id=\"%p_bias::netname\" data-dev=\"P_BIAS\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"-68.04\" y=\"-119.90\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"36.54\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">vbias</text></g></g>\n<g data-id=\"wire-0\" data-net=\"vss\"><path d=\"M140.00,-98.00 L140.00,-70.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"text-14\" data-dev=\"VDD\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"42.95\" y=\"-457.63\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"26.10\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">vdd</text></g></g>\n<g data-id=\"wire-1\" data-net=\"vdd\"><path d=\"M56.00,-392.00 L56.00,-420.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"text-15\" data-dev=\"VDD\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"210.95\" y=\"-457.63\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"26.10\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">vdd</text></g></g>\n<g data-id=\"wire-2\" data-net=\"vdd\"><path d=\"M224.00,-392.00 L224.00,-420.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-3\" data-net=\"tail\"><path d=\"M140.00,-168.00 L140.00,-154.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-4\" data-net=\"tail\"><path d=\"M140.00,-168.00 L56.00,-168.00 L56.00,-196.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-5\" data-net=\"tail\"><path d=\"M140.00,-168.00 L224.00,-168.00 L224.00,-196.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-6\" data-net=\"out\"><path d=\"M224.00,-252.00 L224.00,-294.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-7\" data-net=\"out\"><path d=\"M224.00,-294.00 L224.00,-336.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-8\" data-net=\"out\"><path d=\"M224.00,-294.00 L266.00,-294.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-9\" data-net=\"x\"><path d=\"M56.00,-252.00 L56.00,-294.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-10\" data-net=\"x\"><path d=\"M56.00,-294.00 L56.00,-336.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-11\" data-net=\"x\"><path d=\"M56.00,-294.00 L140.00,-294.00 L140.00,-364.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-12\" data-net=\"x\"><path d=\"M98.00,-364.00 L140.00,-364.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-13\" data-net=\"x\"><path d=\"M140.00,-364.00 L182.00,-364.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-14\" data-net=\"inp\"><path d=\"M-14.00,-224.00 L14.00,-224.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-15\" data-net=\"inn\"><path d=\"M266.00,-224.00 L294.00,-224.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-16\" data-net=\"vbias\"><path d=\"M-14.00,-126.00 L98.00,-126.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n</svg>"
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"-103.04 -508.87 471.74 503.34\" font-family=\"Noto Sans SC, Noto Sans CJK SC, Source Han Sans SC, sans-serif\" style=\"font-kerning:none;font-variant-ligatures:none;text-spacing-trim:space-all;text-autospace:no-autospace\">\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M36.06,-233.77 L56.00,-233.77 L56.00,-252.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M25.48,-237.43 L25.48,-210.57 L29.55,-210.57 L29.55,-237.43 L25.48,-237.43 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M32.80,-241.50 L32.80,-206.50 L36.87,-206.50 L36.87,-241.50 L32.80,-241.50 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M27.51,-224.00 L14.00,-224.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M34.84,-214.23 L56.00,-214.23 L56.00,-196.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M56.81,-214.23 L43.79,-219.93 L43.79,-208.53 L56.81,-214.23 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M243.94,-233.77 L224.00,-233.77 L224.00,-252.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M254.52,-237.43 L254.52,-210.57 L250.45,-210.57 L250.45,-237.43 L254.52,-237.43 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M247.20,-241.50 L247.20,-206.50 L243.13,-206.50 L243.13,-241.50 L247.20,-241.50 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M252.49,-224.00 L266.00,-224.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M245.16,-214.23 L224.00,-214.23 L224.00,-196.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M223.19,-214.23 L236.21,-219.93 L236.21,-208.53 L223.19,-214.23 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M75.94,-354.23 L56.00,-354.23 L56.00,-336.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M86.52,-377.43 L86.52,-350.57 L82.45,-350.57 L82.45,-377.43 L86.52,-377.43 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M79.20,-381.50 L79.20,-346.50 L75.13,-346.50 L75.13,-381.50 L79.20,-381.50 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M84.49,-364.00 L98.00,-364.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M62.10,-373.97 L56.00,-373.97 L56.00,-392.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M75.13,-373.97 L62.10,-379.67 L62.10,-368.27 L75.13,-373.97 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M204.06,-354.23 L224.00,-354.23 L224.00,-336.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M193.48,-377.43 L193.48,-350.57 L197.55,-350.57 L197.55,-377.43 L193.48,-377.43 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M200.80,-381.50 L200.80,-346.50 L204.87,-346.50 L204.87,-381.50 L200.80,-381.50 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M195.51,-364.00 L182.00,-364.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M217.90,-373.97 L224.00,-373.97 L224.00,-392.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M204.87,-373.97 L217.90,-379.67 L217.90,-368.27 L204.87,-373.97 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M120.06,-135.77 L140.00,-135.77 L140.00,-154.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M109.48,-139.43 L109.48,-112.57 L113.55,-112.57 L113.55,-139.43 L109.48,-139.43 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M116.80,-143.50 L116.80,-108.50 L120.87,-108.50 L120.87,-143.50 L116.80,-143.50 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M111.51,-126.00 L98.00,-126.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M118.84,-116.23 L140.00,-116.23 L140.00,-98.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M140.81,-116.23 L127.79,-121.93 L127.79,-110.53 L140.81,-116.23 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-9\" data-dev=\"VSS\"><path d=\"M140.00,-70.00 L140.00,-56.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-9\" data-dev=\"VSS\"><path d=\"M131.05,-56.00 L148.95,-56.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"4.07\"/></g>\n<g data-id=\"item-9\" data-dev=\"VSS\"><path d=\"M134.30,-47.86 L145.70,-47.86\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"4.07\"/></g>\n<g data-id=\"item-9\" data-dev=\"VSS\"><path d=\"M136.74,-40.53 L143.26,-40.53\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"4.07\"/></g>\n<g data-id=\"item-10\" data-dev=\"VDD\"><path d=\"M56.00,-420.00 L56.00,-445.90\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-10\" data-dev=\"VDD\"><path d=\"M42.00,-449.23 L70.00,-449.23 L70.00,-444.70 L42.00,-444.70 L42.00,-449.23 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-11\" data-dev=\"VDD\"><path d=\"M224.00,-420.00 L224.00,-445.90\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-11\" data-dev=\"VDD\"><path d=\"M210.00,-449.23 L238.00,-449.23 L238.00,-444.70 L210.00,-444.70 L210.00,-449.23 Z\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-5\" data-dev=\"P_INP\"><circle cx=\"-23.92\" cy=\"-224.00\" r=\"3.47\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-5\" data-dev=\"P_INP\"><path d=\"M-14.00,-224.00 L-20.45,-224.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-6\" data-dev=\"P_INN\"><circle cx=\"303.92\" cy=\"-224.00\" r=\"3.47\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-6\" data-dev=\"P_INN\"><path d=\"M294.00,-224.00 L300.45,-224.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-7\" data-dev=\"P_OUT\"><circle cx=\"275.92\" cy=\"-294.00\" r=\"3.47\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-7\" data-dev=\"P_OUT\"><path d=\"M266.00,-294.00 L272.45,-294.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-8\" data-dev=\"P_BIAS\"><circle cx=\"-23.92\" cy=\"-126.00\" r=\"3.47\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-8\" data-dev=\"P_BIAS\"><path d=\"M-14.00,-126.00 L-20.45,-126.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"item-12\"><circle cx=\"140.00\" cy=\"-168.00\" r=\"5.29\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-13\"><circle cx=\"224.00\" cy=\"-294.00\" r=\"5.29\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-14\"><circle cx=\"56.00\" cy=\"-294.00\" r=\"5.29\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-15\"><circle cx=\"140.00\" cy=\"-364.00\" r=\"5.29\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"#M1::name\" data-dev=\"M1\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"63.00\" y=\"-238.70\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"20.20\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">M1</text></g></g>\n<g data-id=\"#M2::name\" data-dev=\"M2\"><g transform=\"matrix(1.000000000 0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"196.80\" y=\"-238.70\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"20.20\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">M2</text></g></g>\n<g data-id=\"#M3::name\" data-dev=\"M3\"><g transform=\"matrix(1.000000000 0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"28.80\" y=\"-378.70\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"20.20\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">M3</text></g></g>\n<g data-id=\"#M4::name\" data-dev=\"M4\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"231.00\" y=\"-378.70\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"20.20\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">M4</text></g></g>\n<g data-id=\"#M5::name\" data-dev=\"M5\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"147.00\" y=\"-140.70\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"20.20\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">M5</text></g></g>\n<g data-id=\"%p_inp::netname\" data-dev=\"P_INP\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"-53.75\" y=\"-217.90\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"22.25\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">inp</text></g></g>\n<g data-id=\"%p_inn::netname\" data-dev=\"P_INN\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"311.50\" y=\"-217.90\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"22.20\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">inn</text></g></g>\n<g data-id=\"%p_out::netname\" data-dev=\"P_OUT\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"283.50\" y=\"-287.90\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"23.58\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">out</text></g></g>\n<g data-id=\"%p_bias::netname\" data-dev=\"P_BIAS\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"-68.04\" y=\"-119.90\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"36.54\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">vbias</text></g></g>\n<g data-id=\"wire-0\" data-net=\"vss\"><path d=\"M140.00,-98.00 L140.00,-70.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"text-14\" data-dev=\"VDD\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"42.95\" y=\"-457.63\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"26.10\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">vdd</text></g></g>\n<g data-id=\"wire-1\" data-net=\"vdd\"><path d=\"M56.00,-392.00 L56.00,-420.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"text-15\" data-dev=\"VDD\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"210.95\" y=\"-457.63\" font-size=\"14.00\" font-weight=\"bold\" textLength=\"26.10\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#1d1d1f\" xml:space=\"preserve\">vdd</text></g></g>\n<g data-id=\"wire-2\" data-net=\"vdd\"><path d=\"M224.00,-392.00 L224.00,-420.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-3\" data-net=\"tail\"><path d=\"M140.00,-168.00 L140.00,-154.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-4\" data-net=\"tail\"><path d=\"M140.00,-168.00 L56.00,-168.00 L56.00,-196.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-5\" data-net=\"tail\"><path d=\"M140.00,-168.00 L224.00,-168.00 L224.00,-196.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-6\" data-net=\"out\"><path d=\"M224.00,-252.00 L224.00,-294.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-7\" data-net=\"out\"><path d=\"M224.00,-294.00 L224.00,-336.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-8\" data-net=\"out\"><path d=\"M224.00,-294.00 L266.00,-294.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-9\" data-net=\"x\"><path d=\"M56.00,-252.00 L56.00,-294.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-10\" data-net=\"x\"><path d=\"M56.00,-294.00 L56.00,-336.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-11\" data-net=\"x\"><path d=\"M56.00,-294.00 L140.00,-294.00 L140.00,-364.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-12\" data-net=\"x\"><path d=\"M98.00,-364.00 L140.00,-364.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-13\" data-net=\"x\"><path d=\"M140.00,-364.00 L182.00,-364.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-14\" data-net=\"inp\"><path d=\"M-14.00,-224.00 L14.00,-224.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-15\" data-net=\"inn\"><path d=\"M266.00,-224.00 L294.00,-224.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n<g data-id=\"wire-16\" data-net=\"vbias\"><path d=\"M-14.00,-126.00 L98.00,-126.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"2.24\"/></g>\n</svg>",
+   "boxes": {
+    "M1": [
+     [
+      14,
+      -252,
+      75.6,
+      -196
+     ]
+    ],
+    "M2": [
+     [
+      204.4,
+      -252,
+      266,
+      -196
+     ]
+    ],
+    "M3": [
+     [
+      36.4,
+      -392,
+      98,
+      -336
+     ]
+    ],
+    "M4": [
+     [
+      182,
+      -392,
+      243.6,
+      -336
+     ]
+    ],
+    "M5": [
+     [
+      98,
+      -154,
+      159.6,
+      -98
+     ]
+    ],
+    "P_INP": [
+     [
+      -33.6,
+      -233.8,
+      -14,
+      -214.2
+     ]
+    ],
+    "P_INN": [
+     [
+      294,
+      -233.8,
+      313.6,
+      -214.2
+     ]
+    ],
+    "P_OUT": [
+     [
+      266,
+      -303.8,
+      285.6,
+      -284.2
+     ]
+    ],
+    "P_BIAS": [
+     [
+      -33.6,
+      -135.8,
+      -14,
+      -116.2
+     ]
+    ],
+    "VSS": [
+     [
+      123.2,
+      -70,
+      156.8,
+      -32.2
+     ]
+    ],
+    "VDD": [
+     [
+      39.2,
+      -450.8,
+      72.8,
+      -420
+     ],
+     [
+      207.2,
+      -450.8,
+      240.8,
+      -420
+     ]
+    ]
+   },
+   "frames": {
+    "%dp1": {
+     "title": "$DIFFERENTIAL_PAIR_N: %dp1",
+     "bounds": [
+      2,
+      -266.94,
+      278,
+      -86
+     ],
+     "at": [
+      10,
+      -266.94
+     ],
+     "width": 187.81,
+     "roles": [
+      {
+       "name": "left",
+       "at": [
+        48.6,
+        -225.47
+       ],
+       "width": 20.02
+      },
+      {
+       "name": "right",
+       "at": [
+        231.4,
+        -225.47
+       ],
+       "width": 28.74
+      },
+      {
+       "name": "tail",
+       "at": [
+        132.6,
+        -127.47
+       ],
+       "width": 19.49
+      }
+     ]
+    },
+    "%cm1": {
+     "title": "$CURRENT_MIRROR_P: %cm1",
+     "bounds": [
+      16.8,
+      -406.94,
+      263.2,
+      -324
+     ],
+     "at": [
+      24.8,
+      -406.94
+     ],
+     "width": 182.16,
+     "roles": [
+      {
+       "name": "ref",
+       "at": [
+        63.4,
+        -365.47
+       ],
+       "width": 16.47
+      },
+      {
+       "name": "out",
+       "at": [
+        216.6,
+        -365.47
+       ],
+       "width": 20.67
+      }
+     ]
+    },
+    "%amp": {
+     "title": "$TRANSCONDUCTOR_Z_AMPLIFIER: %amp",
+     "bounds": [
+      2,
+      -406.94,
+      278,
+      -86
+     ],
+     "at": [
+      10,
+      -406.94
+     ],
+     "width": 260.69,
+     "roles": [
+      {
+       "name": "transconductor",
+       "at": [
+        140,
+        -176.47
+       ],
+       "width": 94.12
+      },
+      {
+       "name": "load",
+       "at": [
+        140,
+        -365.47
+       ],
+       "width": 26.95
+      }
+     ]
+    },
+    "%left": {
+     "title": "$BRANCH: %left",
+     "bounds": [
+      2,
+      -406.94,
+      110,
+      -184
+     ],
+     "at": [
+      10,
+      -406.94
+     ],
+     "width": 97.59,
+     "roles": [
+      {
+       "name": "members",
+       "at": [
+        56,
+        -295.47
+       ],
+       "width": 57.64
+      }
+     ]
+    },
+    "%right": {
+     "title": "$BRANCH: %right",
+     "bounds": [
+      170,
+      -406.94,
+      278,
+      -184
+     ],
+     "at": [
+      178,
+      -406.94
+     ],
+     "width": 106.31,
+     "roles": [
+      {
+       "name": "members",
+       "at": [
+        224,
+        -295.47
+       ],
+       "width": 57.64
+      }
+     ]
+    },
+    "%p_inp": {
+     "title": "$IO_PORT: %p_inp",
+     "bounds": [
+      -45.6,
+      -245.8,
+      -2,
+      -202.2
+     ],
+     "at": [
+      -37.6,
+      -245.8
+     ],
+     "width": 115.25,
+     "roles": [
+      {
+       "name": "p",
+       "at": [
+        -23.8,
+        -224
+       ],
+       "width": 8.06
+      }
+     ]
+    },
+    "%p_inn": {
+     "title": "$IO_PORT: %p_inn",
+     "bounds": [
+      282,
+      -245.8,
+      325.6,
+      -202.2
+     ],
+     "at": [
+      290,
+      -245.8
+     ],
+     "width": 115.12,
+     "roles": [
+      {
+       "name": "p",
+       "at": [
+        303.8,
+        -224
+       ],
+       "width": 8.06
+      }
+     ]
+    },
+    "%p_out": {
+     "title": "$IO_PORT: %p_out",
+     "bounds": [
+      254,
+      -315.8,
+      297.6,
+      -272.2
+     ],
+     "at": [
+      262,
+      -315.8
+     ],
+     "width": 116.35,
+     "roles": [
+      {
+       "name": "p",
+       "at": [
+        275.8,
+        -294
+       ],
+       "width": 8.06
+      }
+     ]
+    },
+    "%p_bias": {
+     "title": "$IO_PORT: %p_bias",
+     "bounds": [
+      -45.6,
+      -147.8,
+      -2,
+      -104.2
+     ],
+     "at": [
+      -37.6,
+      -147.8
+     ],
+     "width": 120.69,
+     "roles": [
+      {
+       "name": "p",
+       "at": [
+        -23.8,
+        -126
+       ],
+       "width": 8.06
+      }
+     ]
+    },
+    "%amp_group": {
+     "title": "@GROUP: %amp_group",
+     "bounds": [
+      -80.04,
+      -406.94,
+      345.7,
+      -86
+     ],
+     "at": [
+      -72.04,
+      -406.94
+     ],
+     "width": 146.15,
+     "roles": [
+      {
+       "name": "members",
+       "at": [
+        132.83,
+        -246.47
+       ],
+       "width": 57.64
+      }
+     ]
+    }
+   }
   },
   "eda": {
    "file": "ota5t-review-eda.sp",
    "sha256": "3976ee3566d3",
-   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"-135.98 -632.24 619.08 639.24\" font-family=\"Noto Sans SC, Noto Sans CJK SC, Source Han Sans SC, sans-serif\" style=\"font-kerning:none;font-variant-ligatures:none;text-spacing-trim:space-all;text-autospace:no-autospace\">\n<g data-id=\"wire-0\" data-net=\"vss\"><path d=\"M182.00,-112.00 L182.00,-84.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-1\" data-net=\"vdd\"><path d=\"M70.00,-476.00 L70.00,-504.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-2\" data-net=\"vdd\"><path d=\"M294.00,-476.00 L294.00,-504.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-3\" data-net=\"tail\"><path d=\"M182.00,-210.00 L182.00,-196.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-4\" data-net=\"tail\"><path d=\"M182.00,-210.00 L70.00,-210.00 L70.00,-238.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-5\" data-net=\"tail\"><path d=\"M182.00,-210.00 L294.00,-210.00 L294.00,-238.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-6\" data-net=\"out\"><path d=\"M294.00,-322.00 L294.00,-364.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-7\" data-net=\"out\"><path d=\"M294.00,-364.00 L294.00,-392.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-8\" data-net=\"out\"><path d=\"M294.00,-364.00 L350.00,-364.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-9\" data-net=\"x\"><path d=\"M70.00,-322.00 L70.00,-364.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-10\" data-net=\"x\"><path d=\"M70.00,-364.00 L70.00,-392.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-11\" data-net=\"x\"><path d=\"M70.00,-364.00 L182.00,-364.00 L182.00,-434.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-12\" data-net=\"x\"><path d=\"M126.00,-434.00 L182.00,-434.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-13\" data-net=\"x\"><path d=\"M182.00,-434.00 L238.00,-434.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-14\" data-net=\"inp\"><path d=\"M-14.00,-280.00 L14.00,-280.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-15\" data-net=\"inn\"><path d=\"M350.00,-280.00 L378.00,-280.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-16\" data-net=\"vbias\"><path d=\"M-14.00,-154.00 L126.00,-154.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M42.00,-301.00 L70.00,-301.00 L70.00,-322.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M42.00,-259.00 L42.00,-301.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M56.00,-266.00 L70.00,-259.00 L56.00,-252.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M14.00,-280.00 L35.00,-280.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M35.00,-301.00 L35.00,-259.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M42.00,-280.00 L70.00,-280.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M42.00,-259.00 L70.00,-259.00 L70.00,-238.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M322.00,-301.00 L294.00,-301.00 L294.00,-322.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M322.00,-259.00 L322.00,-301.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M308.00,-266.00 L294.00,-259.00 L308.00,-252.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M350.00,-280.00 L329.00,-280.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M329.00,-301.00 L329.00,-259.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M322.00,-280.00 L294.00,-280.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M322.00,-259.00 L294.00,-259.00 L294.00,-238.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M105.00,-455.00 L105.00,-413.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M98.00,-413.00 L70.00,-413.00 L70.00,-392.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M98.00,-455.00 L70.00,-455.00 L70.00,-476.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M126.00,-434.00 L105.00,-434.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M74.20,-462.00 L88.20,-455.00 L74.20,-448.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M98.00,-434.00 L70.00,-434.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M98.00,-413.00 L98.00,-455.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M259.00,-455.00 L259.00,-413.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M266.00,-413.00 L294.00,-413.00 L294.00,-392.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M266.00,-455.00 L294.00,-455.00 L294.00,-476.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M238.00,-434.00 L259.00,-434.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M289.80,-462.00 L275.80,-455.00 L289.80,-448.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M266.00,-434.00 L294.00,-434.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M266.00,-413.00 L266.00,-455.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M154.00,-175.00 L182.00,-175.00 L182.00,-196.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M154.00,-133.00 L154.00,-175.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M168.00,-140.00 L182.00,-133.00 L168.00,-126.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M126.00,-154.00 L147.00,-154.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M147.00,-175.00 L147.00,-133.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M154.00,-154.00 L182.00,-154.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M154.00,-133.00 L182.00,-133.00 L182.00,-112.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-12\" data-dev=\"VDD\"><path d=\"M70.00,-434.00 L56.00,-434.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-13\" data-dev=\"VDD\"><path d=\"M294.00,-434.00 L308.00,-434.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-14\" data-dev=\"VSS\"><path d=\"M70.00,-280.00 L84.00,-280.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-15\" data-dev=\"VSS\"><path d=\"M294.00,-280.00 L280.00,-280.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-16\" data-dev=\"VSS\"><path d=\"M182.00,-154.00 L196.00,-154.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"#M1::name\" data-dev=\"M1\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"77.00\" y=\"-308.00\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"16.87\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">M1</text></g></g>\n<g data-id=\"#M1::model\" data-dev=\"M1\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"77.00\" y=\"-254.80\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">nch</text></g></g>\n<g data-id=\"#M2::name\" data-dev=\"M2\"><g transform=\"matrix(1.000000000 0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"270.13\" y=\"-308.00\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"16.87\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">M2</text></g></g>\n<g data-id=\"#M2::model\" data-dev=\"M2\"><g transform=\"matrix(1.000000000 0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"261.69\" y=\"-254.80\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">nch</text></g></g>\n<g data-id=\"#M3::name\" data-dev=\"M3\"><g transform=\"matrix(1.000000000 0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"46.13\" y=\"-462.00\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"16.87\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">M3</text></g></g>\n<g data-id=\"#M3::model\" data-dev=\"M3\"><g transform=\"matrix(1.000000000 0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"37.69\" y=\"-408.80\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">pch</text></g></g>\n<g data-id=\"#M4::name\" data-dev=\"M4\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"301.00\" y=\"-462.00\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"16.87\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">M4</text></g></g>\n<g data-id=\"#M4::model\" data-dev=\"M4\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"301.00\" y=\"-408.80\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">pch</text></g></g>\n<g data-id=\"#M5::name\" data-dev=\"M5\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"189.00\" y=\"-182.00\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"16.87\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">M5</text></g></g>\n<g data-id=\"#M5::model\" data-dev=\"M5\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"189.00\" y=\"-128.80\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">nch</text></g></g>\n<g data-id=\"item-9\" data-dev=\"VSS\"><path d=\"M168.00,-42.00 L196.00,-42.00 L182.00,-28.00 L168.00,-42.00 Z\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-9\" data-dev=\"VSS\"><path d=\"M182.00,-84.00 L182.00,-42.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-10\" data-dev=\"VDD\"><path d=\"M70.00,-504.00 L70.00,-560.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-10\" data-dev=\"VDD\"><path d=\"M35.00,-560.00 L105.00,-560.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-11\" data-dev=\"VDD\"><path d=\"M294.00,-504.00 L294.00,-560.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-11\" data-dev=\"VDD\"><path d=\"M259.00,-560.00 L329.00,-560.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-5\" data-dev=\"P_INP\"><path d=\"M-14.00,-280.00 L-26.60,-267.40 L-40.60,-267.40 L-53.20,-280.00 L-40.60,-292.60 L-26.60,-292.60 L-14.00,-280.00 Z\" fill=\"#ff0000\" stroke=\"none\"/></g>\n<g data-id=\"item-6\" data-dev=\"P_INN\"><path d=\"M378.00,-280.00 L390.60,-267.40 L404.60,-267.40 L417.20,-280.00 L404.60,-292.60 L390.60,-292.60 L378.00,-280.00 Z\" fill=\"#ff0000\" stroke=\"none\"/></g>\n<g data-id=\"item-7\" data-dev=\"P_OUT\"><path d=\"M350.00,-364.00 L362.60,-351.40 L376.60,-351.40 L389.20,-364.00 L376.60,-376.60 L362.60,-376.60 L350.00,-364.00 Z\" fill=\"#ff0000\" stroke=\"none\"/></g>\n<g data-id=\"item-8\" data-dev=\"P_BIAS\"><path d=\"M-14.00,-154.00 L-26.60,-141.40 L-40.60,-141.40 L-53.20,-154.00 L-40.60,-166.60 L-26.60,-166.60 L-14.00,-154.00 Z\" fill=\"#ff0000\" stroke=\"none\"/></g>\n<g data-id=\"item-17\"><circle cx=\"182.00\" cy=\"-210.00\" r=\"5.29\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-18\"><circle cx=\"294.00\" cy=\"-364.00\" r=\"5.29\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-19\"><circle cx=\"70.00\" cy=\"-364.00\" r=\"5.29\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-20\"><circle cx=\"182.00\" cy=\"-434.00\" r=\"5.29\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"%p_inp::netname\" data-dev=\"P_INP\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"-84.11\" y=\"-273.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">inp</text></g></g>\n<g data-id=\"%p_inn::netname\" data-dev=\"P_INN\"><g transform=\"matrix(1.000000000 0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"422.80\" y=\"-273.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">inn</text></g></g>\n<g data-id=\"%p_out::netname\" data-dev=\"P_OUT\"><g transform=\"matrix(1.000000000 0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"394.80\" y=\"-357.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">out</text></g></g>\n<g data-id=\"%p_bias::netname\" data-dev=\"P_BIAS\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"-100.98\" y=\"-147.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"42.18\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">vbias</text></g></g>\n<g data-id=\"text-14\" data-dev=\"VDD\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"57.35\" y=\"-581.00\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">vdd</text></g></g>\n<g data-id=\"text-15\" data-dev=\"VDD\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"281.35\" y=\"-581.00\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">vdd</text></g></g>\n<g data-id=\"text-16\" data-dev=\"VDD\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"26.49\" y=\"-427.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">vdd</text></g></g>\n<g data-id=\"text-17\" data-dev=\"VDD\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"312.20\" y=\"-427.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">vdd</text></g></g>\n<g data-id=\"text-18\" data-dev=\"VSS\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"88.20\" y=\"-273.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">vss</text></g></g>\n<g data-id=\"text-19\" data-dev=\"VSS\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"250.49\" y=\"-273.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">vss</text></g></g>\n<g data-id=\"text-20\" data-dev=\"VSS\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"200.20\" y=\"-147.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">vss</text></g></g>\n<rect x=\"64.40\" y=\"-327.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"8.40\" y=\"-285.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-243.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-285.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-327.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"344.40\" y=\"-285.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-243.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-285.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-397.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"120.40\" y=\"-439.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-481.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-439.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-397.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"232.40\" y=\"-439.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-481.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-439.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"176.40\" y=\"-201.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"120.40\" y=\"-159.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"176.40\" y=\"-117.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"176.40\" y=\"-159.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"176.40\" y=\"-89.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-509.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-509.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-327.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"8.40\" y=\"-285.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-243.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-285.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-327.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"344.40\" y=\"-285.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-243.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-285.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-397.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"120.40\" y=\"-439.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-481.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-439.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-397.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"232.40\" y=\"-439.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-481.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-439.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"176.40\" y=\"-201.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"120.40\" y=\"-159.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"176.40\" y=\"-117.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"176.40\" y=\"-159.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n</svg>"
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"-135.98 -642.89 619.08 660.55\" font-family=\"Noto Sans SC, Noto Sans CJK SC, Source Han Sans SC, sans-serif\" style=\"font-kerning:none;font-variant-ligatures:none;text-spacing-trim:space-all;text-autospace:no-autospace\">\n<g data-id=\"wire-0\" data-net=\"vss\"><path d=\"M182.00,-112.00 L182.00,-84.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-1\" data-net=\"vdd\"><path d=\"M70.00,-476.00 L70.00,-504.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-2\" data-net=\"vdd\"><path d=\"M294.00,-476.00 L294.00,-504.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-3\" data-net=\"tail\"><path d=\"M182.00,-210.00 L182.00,-196.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-4\" data-net=\"tail\"><path d=\"M182.00,-210.00 L70.00,-210.00 L70.00,-238.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-5\" data-net=\"tail\"><path d=\"M182.00,-210.00 L294.00,-210.00 L294.00,-238.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-6\" data-net=\"out\"><path d=\"M294.00,-322.00 L294.00,-364.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-7\" data-net=\"out\"><path d=\"M294.00,-364.00 L294.00,-392.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-8\" data-net=\"out\"><path d=\"M294.00,-364.00 L350.00,-364.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-9\" data-net=\"x\"><path d=\"M70.00,-322.00 L70.00,-364.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-10\" data-net=\"x\"><path d=\"M70.00,-364.00 L70.00,-392.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-11\" data-net=\"x\"><path d=\"M70.00,-364.00 L182.00,-364.00 L182.00,-434.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-12\" data-net=\"x\"><path d=\"M126.00,-434.00 L182.00,-434.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-13\" data-net=\"x\"><path d=\"M182.00,-434.00 L238.00,-434.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-14\" data-net=\"inp\"><path d=\"M-14.00,-280.00 L14.00,-280.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-15\" data-net=\"inn\"><path d=\"M350.00,-280.00 L378.00,-280.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"wire-16\" data-net=\"vbias\"><path d=\"M-14.00,-154.00 L126.00,-154.00\" fill=\"none\" stroke=\"#1d1d1f\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M42.00,-301.00 L70.00,-301.00 L70.00,-322.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M42.00,-259.00 L42.00,-301.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M56.00,-266.00 L70.00,-259.00 L56.00,-252.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M14.00,-280.00 L35.00,-280.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M35.00,-301.00 L35.00,-259.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M42.00,-280.00 L70.00,-280.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-0\" data-dev=\"M1\"><path d=\"M42.00,-259.00 L70.00,-259.00 L70.00,-238.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M322.00,-301.00 L294.00,-301.00 L294.00,-322.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M322.00,-259.00 L322.00,-301.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M308.00,-266.00 L294.00,-259.00 L308.00,-252.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M350.00,-280.00 L329.00,-280.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M329.00,-301.00 L329.00,-259.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M322.00,-280.00 L294.00,-280.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-1\" data-dev=\"M2\"><path d=\"M322.00,-259.00 L294.00,-259.00 L294.00,-238.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M105.00,-455.00 L105.00,-413.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M98.00,-413.00 L70.00,-413.00 L70.00,-392.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M98.00,-455.00 L70.00,-455.00 L70.00,-476.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M126.00,-434.00 L105.00,-434.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M74.20,-462.00 L88.20,-455.00 L74.20,-448.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M98.00,-434.00 L70.00,-434.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-2\" data-dev=\"M3\"><path d=\"M98.00,-413.00 L98.00,-455.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M259.00,-455.00 L259.00,-413.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M266.00,-413.00 L294.00,-413.00 L294.00,-392.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M266.00,-455.00 L294.00,-455.00 L294.00,-476.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M238.00,-434.00 L259.00,-434.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M289.80,-462.00 L275.80,-455.00 L289.80,-448.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M266.00,-434.00 L294.00,-434.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-3\" data-dev=\"M4\"><path d=\"M266.00,-413.00 L266.00,-455.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M154.00,-175.00 L182.00,-175.00 L182.00,-196.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M154.00,-133.00 L154.00,-175.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M168.00,-140.00 L182.00,-133.00 L168.00,-126.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M126.00,-154.00 L147.00,-154.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M147.00,-175.00 L147.00,-133.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M154.00,-154.00 L182.00,-154.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-4\" data-dev=\"M5\"><path d=\"M154.00,-133.00 L182.00,-133.00 L182.00,-112.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-12\" data-dev=\"VDD\"><path d=\"M70.00,-434.00 L56.00,-434.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-13\" data-dev=\"VDD\"><path d=\"M294.00,-434.00 L308.00,-434.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-14\" data-dev=\"VSS\"><path d=\"M70.00,-280.00 L84.00,-280.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-15\" data-dev=\"VSS\"><path d=\"M294.00,-280.00 L280.00,-280.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-16\" data-dev=\"VSS\"><path d=\"M182.00,-154.00 L196.00,-154.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"#M1::name\" data-dev=\"M1\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"77.00\" y=\"-308.00\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"16.87\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">M1</text></g></g>\n<g data-id=\"#M1::model\" data-dev=\"M1\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"77.00\" y=\"-254.80\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">nch</text></g></g>\n<g data-id=\"#M2::name\" data-dev=\"M2\"><g transform=\"matrix(1.000000000 0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"270.13\" y=\"-308.00\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"16.87\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">M2</text></g></g>\n<g data-id=\"#M2::model\" data-dev=\"M2\"><g transform=\"matrix(1.000000000 0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"261.69\" y=\"-254.80\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">nch</text></g></g>\n<g data-id=\"#M3::name\" data-dev=\"M3\"><g transform=\"matrix(1.000000000 0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"46.13\" y=\"-462.00\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"16.87\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">M3</text></g></g>\n<g data-id=\"#M3::model\" data-dev=\"M3\"><g transform=\"matrix(1.000000000 0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"37.69\" y=\"-408.80\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">pch</text></g></g>\n<g data-id=\"#M4::name\" data-dev=\"M4\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"301.00\" y=\"-462.00\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"16.87\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">M4</text></g></g>\n<g data-id=\"#M4::model\" data-dev=\"M4\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"301.00\" y=\"-408.80\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">pch</text></g></g>\n<g data-id=\"#M5::name\" data-dev=\"M5\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"189.00\" y=\"-182.00\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"16.87\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">M5</text></g></g>\n<g data-id=\"#M5::model\" data-dev=\"M5\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"189.00\" y=\"-128.80\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">nch</text></g></g>\n<g data-id=\"item-9\" data-dev=\"VSS\"><path d=\"M168.00,-42.00 L196.00,-42.00 L182.00,-28.00 L168.00,-42.00 Z\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-9\" data-dev=\"VSS\"><path d=\"M182.00,-84.00 L182.00,-42.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-10\" data-dev=\"VDD\"><path d=\"M70.00,-504.00 L70.00,-560.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-10\" data-dev=\"VDD\"><path d=\"M35.00,-560.00 L105.00,-560.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-11\" data-dev=\"VDD\"><path d=\"M294.00,-504.00 L294.00,-560.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-11\" data-dev=\"VDD\"><path d=\"M259.00,-560.00 L329.00,-560.00\" fill=\"none\" stroke=\"#00cc66\" stroke-width=\"1.20\" vector-effect=\"non-scaling-stroke\"/></g>\n<g data-id=\"item-5\" data-dev=\"P_INP\"><path d=\"M-14.00,-280.00 L-26.60,-267.40 L-40.60,-267.40 L-53.20,-280.00 L-40.60,-292.60 L-26.60,-292.60 L-14.00,-280.00 Z\" fill=\"#ff0000\" stroke=\"none\"/></g>\n<g data-id=\"item-6\" data-dev=\"P_INN\"><path d=\"M378.00,-280.00 L390.60,-267.40 L404.60,-267.40 L417.20,-280.00 L404.60,-292.60 L390.60,-292.60 L378.00,-280.00 Z\" fill=\"#ff0000\" stroke=\"none\"/></g>\n<g data-id=\"item-7\" data-dev=\"P_OUT\"><path d=\"M350.00,-364.00 L362.60,-351.40 L376.60,-351.40 L389.20,-364.00 L376.60,-376.60 L362.60,-376.60 L350.00,-364.00 Z\" fill=\"#ff0000\" stroke=\"none\"/></g>\n<g data-id=\"item-8\" data-dev=\"P_BIAS\"><path d=\"M-14.00,-154.00 L-26.60,-141.40 L-40.60,-141.40 L-53.20,-154.00 L-40.60,-166.60 L-26.60,-166.60 L-14.00,-154.00 Z\" fill=\"#ff0000\" stroke=\"none\"/></g>\n<g data-id=\"item-17\"><circle cx=\"182.00\" cy=\"-210.00\" r=\"5.29\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-18\"><circle cx=\"294.00\" cy=\"-364.00\" r=\"5.29\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-19\"><circle cx=\"70.00\" cy=\"-364.00\" r=\"5.29\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"item-20\"><circle cx=\"182.00\" cy=\"-434.00\" r=\"5.29\" fill=\"#1d1d1f\" stroke=\"none\"/></g>\n<g data-id=\"%p_inp::netname\" data-dev=\"P_INP\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"-84.11\" y=\"-273.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">inp</text></g></g>\n<g data-id=\"%p_inn::netname\" data-dev=\"P_INN\"><g transform=\"matrix(1.000000000 0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"422.80\" y=\"-273.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">inn</text></g></g>\n<g data-id=\"%p_out::netname\" data-dev=\"P_OUT\"><g transform=\"matrix(1.000000000 0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"394.80\" y=\"-357.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">out</text></g></g>\n<g data-id=\"%p_bias::netname\" data-dev=\"P_BIAS\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"-100.98\" y=\"-147.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"42.18\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">vbias</text></g></g>\n<g data-id=\"text-14\" data-dev=\"VDD\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"57.35\" y=\"-581.00\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">vdd</text></g></g>\n<g data-id=\"text-15\" data-dev=\"VDD\"><g transform=\"matrix(1.000000000 -0.000000000 -0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"281.35\" y=\"-581.00\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">vdd</text></g></g>\n<g data-id=\"text-16\" data-dev=\"VDD\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"26.49\" y=\"-427.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">vdd</text></g></g>\n<g data-id=\"text-17\" data-dev=\"VDD\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"312.20\" y=\"-427.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">vdd</text></g></g>\n<g data-id=\"text-18\" data-dev=\"VSS\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"88.20\" y=\"-273.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">vss</text></g></g>\n<g data-id=\"text-19\" data-dev=\"VSS\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"250.49\" y=\"-273.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">vss</text></g></g>\n<g data-id=\"text-20\" data-dev=\"VSS\"><g transform=\"matrix(1.000000000 -0.000000000 0.000000000 1.000000000 0.000000000 -0.000000000)\"><text x=\"200.20\" y=\"-147.90\" font-size=\"14.00\" font-family=\"Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace\" font-weight=\"bold\" textLength=\"25.31\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#ff0000\" xml:space=\"preserve\">vss</text></g></g>\n<rect x=\"64.40\" y=\"-327.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"8.40\" y=\"-285.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-243.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-285.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-327.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"344.40\" y=\"-285.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-243.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-285.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-397.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"120.40\" y=\"-439.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-481.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-439.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-397.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"232.40\" y=\"-439.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-481.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-439.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"176.40\" y=\"-201.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"120.40\" y=\"-159.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"176.40\" y=\"-117.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"176.40\" y=\"-159.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"176.40\" y=\"-89.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-509.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-509.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-327.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"8.40\" y=\"-285.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-243.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-285.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-327.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"344.40\" y=\"-285.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-243.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-285.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-397.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"120.40\" y=\"-439.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-481.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"64.40\" y=\"-439.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-397.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"232.40\" y=\"-439.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-481.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"288.40\" y=\"-439.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"176.40\" y=\"-201.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"120.40\" y=\"-159.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"176.40\" y=\"-117.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n<rect x=\"176.40\" y=\"-159.60\" width=\"11.20\" height=\"11.20\" fill=\"#ff0000\" stroke=\"none\"/>\n</svg>",
+   "boxes": {
+    "M1": [
+     [
+      14,
+      -322,
+      70,
+      -238
+     ]
+    ],
+    "M2": [
+     [
+      294,
+      -322,
+      350,
+      -238
+     ]
+    ],
+    "M3": [
+     [
+      70,
+      -476,
+      126,
+      -392
+     ]
+    ],
+    "M4": [
+     [
+      238,
+      -476,
+      294,
+      -392
+     ]
+    ],
+    "M5": [
+     [
+      126,
+      -196,
+      182,
+      -112
+     ]
+    ],
+    "P_INP": [
+     [
+      -53.2,
+      -294,
+      -14,
+      -266
+     ]
+    ],
+    "P_INN": [
+     [
+      378,
+      -294,
+      417.2,
+      -266
+     ]
+    ],
+    "P_OUT": [
+     [
+      350,
+      -378,
+      389.2,
+      -350
+     ]
+    ],
+    "P_BIAS": [
+     [
+      -53.2,
+      -168,
+      -14,
+      -140
+     ]
+    ],
+    "VSS": [
+     [
+      168,
+      -84,
+      196,
+      -28
+     ],
+     [
+      70,
+      -280,
+      84,
+      -280
+     ],
+     [
+      280,
+      -280,
+      294,
+      -280
+     ],
+     [
+      182,
+      -154,
+      196,
+      -154
+     ]
+    ],
+    "VDD": [
+     [
+      35,
+      -574,
+      105,
+      -504
+     ],
+     [
+      259,
+      -574,
+      329,
+      -504
+     ],
+     [
+      56,
+      -434,
+      70,
+      -434
+     ],
+     [
+      294,
+      -434,
+      308,
+      -434
+     ]
+    ]
+   },
+   "frames": {
+    "%dp1": {
+     "title": "$DIFFERENTIAL_PAIR_N: %dp1",
+     "bounds": [
+      2,
+      -336.24,
+      362,
+      -100
+     ],
+     "at": [
+      10,
+      -336.24
+     ],
+     "width": 187.81,
+     "roles": [
+      {
+       "name": "left",
+       "at": [
+        58.15,
+        -281.12
+       ],
+       "width": 20.02
+      },
+      {
+       "name": "right",
+       "at": [
+        305.85,
+        -281.12
+       ],
+       "width": 28.74
+      },
+      {
+       "name": "tail",
+       "at": [
+        170.15,
+        -155.12
+       ],
+       "width": 19.49
+      }
+     ]
+    },
+    "%cm1": {
+     "title": "$CURRENT_MIRROR_P: %cm1",
+     "bounds": [
+      25.69,
+      -490.24,
+      338.31,
+      -380
+     ],
+     "at": [
+      33.69,
+      -490.24
+     ],
+     "width": 182.16,
+     "roles": [
+      {
+       "name": "ref",
+       "at": [
+        81.85,
+        -435.12
+       ],
+       "width": 16.47
+      },
+      {
+       "name": "out",
+       "at": [
+        282.15,
+        -435.12
+       ],
+       "width": 20.67
+      }
+     ]
+    },
+    "%amp": {
+     "title": "$TRANSCONDUCTOR_Z_AMPLIFIER: %amp",
+     "bounds": [
+      2,
+      -490.24,
+      362,
+      -100
+     ],
+     "at": [
+      10,
+      -490.24
+     ],
+     "width": 260.69,
+     "roles": [
+      {
+       "name": "transconductor",
+       "at": [
+        182,
+        -218.12
+       ],
+       "width": 94.12
+      },
+      {
+       "name": "load",
+       "at": [
+        182,
+        -435.12
+       ],
+       "width": 26.95
+      }
+     ]
+    },
+    "%left": {
+     "title": "$BRANCH: %left",
+     "bounds": [
+      2,
+      -490.24,
+      138,
+      -226
+     ],
+     "at": [
+      10,
+      -490.24
+     ],
+     "width": 97.59,
+     "roles": [
+      {
+       "name": "members",
+       "at": [
+        70,
+        -358.12
+       ],
+       "width": 57.64
+      }
+     ]
+    },
+    "%right": {
+     "title": "$BRANCH: %right",
+     "bounds": [
+      226,
+      -490.24,
+      362,
+      -226
+     ],
+     "at": [
+      234,
+      -490.24
+     ],
+     "width": 106.31,
+     "roles": [
+      {
+       "name": "members",
+       "at": [
+        294,
+        -358.12
+       ],
+       "width": 57.64
+      }
+     ]
+    },
+    "%p_inp": {
+     "title": "$IO_PORT: %p_inp",
+     "bounds": [
+      -65.2,
+      -306,
+      -2,
+      -254
+     ],
+     "at": [
+      -57.2,
+      -306
+     ],
+     "width": 115.25,
+     "roles": [
+      {
+       "name": "p",
+       "at": [
+        -33.6,
+        -280
+       ],
+       "width": 8.06
+      }
+     ]
+    },
+    "%p_inn": {
+     "title": "$IO_PORT: %p_inn",
+     "bounds": [
+      366,
+      -306,
+      429.2,
+      -254
+     ],
+     "at": [
+      374,
+      -306
+     ],
+     "width": 115.12,
+     "roles": [
+      {
+       "name": "p",
+       "at": [
+        397.6,
+        -280
+       ],
+       "width": 8.06
+      }
+     ]
+    },
+    "%p_out": {
+     "title": "$IO_PORT: %p_out",
+     "bounds": [
+      338,
+      -390,
+      401.2,
+      -338
+     ],
+     "at": [
+      346,
+      -390
+     ],
+     "width": 116.35,
+     "roles": [
+      {
+       "name": "p",
+       "at": [
+        369.6,
+        -364
+       ],
+       "width": 8.06
+      }
+     ]
+    },
+    "%p_bias": {
+     "title": "$IO_PORT: %p_bias",
+     "bounds": [
+      -65.2,
+      -180,
+      -2,
+      -128
+     ],
+     "at": [
+      -57.2,
+      -180
+     ],
+     "width": 120.69,
+     "roles": [
+      {
+       "name": "p",
+       "at": [
+        -33.6,
+        -154
+       ],
+       "width": 8.06
+      }
+     ]
+    },
+    "%amp_group": {
+     "title": "@GROUP: %amp_group",
+     "bounds": [
+      -112.98,
+      -490.24,
+      460.11,
+      -100
+     ],
+     "at": [
+      -104.98,
+      -490.24
+     ],
+     "width": 146.15,
+     "roles": [
+      {
+       "name": "members",
+       "at": [
+        173.56,
+        -295.12
+       ],
+       "width": 57.64
+      }
+     ]
+    }
+   }
   },
   "plain": {
    "file": "ota5t-plain.sp",
