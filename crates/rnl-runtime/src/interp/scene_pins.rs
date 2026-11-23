@@ -290,6 +290,7 @@ impl Interp<'_> {
                 }
             }
             self.scenes[scene].symbol.remove(&usage);
+            self.subobject_inputs += 1;
             if let Some(order) = self.symbol_order.get_mut(&scene) {
                 order.retain(|owner| *owner != usage);
             }
@@ -746,10 +747,27 @@ impl Interp<'_> {
             off,
         });
         self.scenes[scene].named_subobjects.insert(key, object);
+        if name == "net" {
+            self.scenes[scene].net_subobjects.push(object);
+        }
         if self.scenes[scene].phase >= 7 {
             self.finish_scene_subobjects(scene);
         } else if self.scenes[scene].phase >= 5 {
-            self.resolve_scene_subobjects(scene);
+            let settled = self.scenes[scene].subobjects_resolved_at == Some(self.subobject_inputs);
+            // the tests resolve them all every time too, as before, to compare
+            #[cfg(test)]
+            let settled = settled && !tests::RESOLVE_ALL.with(std::cell::Cell::get);
+            if settled {
+                // Nothing that a resolution reads has changed since all were resolved, so
+                // resolving them all again gives each the value it has, but the nets, which are
+                // found again each time: resolve this one and the nets, in the same order.
+                let nets = self.scenes[scene].net_subobjects.clone();
+                self.resolve_subobjects(scene, &[object], &nets);
+            } else {
+                self.resolve_scene_subobjects(scene);
+            }
+            #[cfg(test)]
+            tests::trace(self, scene, settled);
         }
         object
     }
@@ -758,7 +776,16 @@ impl Interp<'_> {
     pub(crate) fn resolve_scene_subobjects(&mut self, scene: SceneId) {
         let mut objects: Vec<_> = self.scenes[scene].named_subobjects.values().copied().collect();
         objects.sort();
-        for &object in &objects {
+        self.resolve_subobjects(scene, &objects, &objects);
+        self.scenes[scene].subobjects_resolved_at = Some(self.subobject_inputs);
+    }
+
+    /// Resolve the named sub-objects `objects` but those of `::net`, then those of `nets`, each in
+    /// the order given.
+    fn resolve_subobjects(&mut self, scene: SceneId, objects: &[ObjId], nets: &[ObjId]) {
+        for &object in objects {
+            #[cfg(test)]
+            tests::SUBOBJECTS_RESOLVED.with(|count| count.set(count.get() + 1));
             if self.is_failed(object) {
                 continue;
             }
@@ -785,7 +812,7 @@ impl Interp<'_> {
         }
         // Resolve named pins first, including pins of later-created usages. Net references
         // can then follow role bindings independently of the order of the references.
-        for object in objects {
+        for &object in nets {
             let ObjData::NamedSubobject { parent, name, .. } = self.o(object).clone() else { continue };
             if name != "net" || self.is_failed(object) {
                 continue;
@@ -881,6 +908,33 @@ pub(super) mod tests {
         pub(in crate::interp) static OWNER_TERMS_TAKEN: Cell<usize> = const { Cell::new(0) };
         /// How many times the nets of a pin of an instance were found, on this thread.
         pub(in crate::interp) static PIN_NETS_FOUND: Cell<usize> = const { Cell::new(0) };
+        /// How many times a named sub-object other than `::net` was resolved, on this thread.
+        pub(in crate::interp) static SUBOBJECTS_RESOLVED: Cell<usize> = const { Cell::new(0) };
+        /// Resolve every named sub-object each time one is made from step 5 on, as before.
+        pub(in crate::interp) static RESOLVE_ALL: Cell<bool> = const { Cell::new(false) };
+        /// After each named sub-object made from step 5 on: every one with what it resolves to.
+        static TRACE: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+        /// How many of them resolved that one alone, and how many all.
+        static ALONE_AND_ALL: Cell<(usize, usize)> = const { Cell::new((0, 0)) };
+    }
+
+    pub(in crate::interp) fn trace(it: &crate::interp::Interp, scene: crate::interp::SceneId, alone: bool) {
+        let mut all: Vec<_> = it.scenes[scene].named_subobjects.values().copied().collect();
+        all.sort();
+        let line: Vec<String> = all
+            .iter()
+            .map(|&o| match it.o(o) {
+                crate::interp::obj::ObjData::NamedSubobject { name, resolved, .. } => {
+                    format!("{o:?} {name} {resolved:?}")
+                }
+                _ => String::new(),
+            })
+            .collect();
+        TRACE.with(|t| t.borrow_mut().push(line.join(", ")));
+        ALONE_AND_ALL.with(|c| {
+            let (a, b) = c.get();
+            c.set(if alone { (a + 1, b) } else { (a, b + 1) });
+        });
     }
 
     /// The lookups of pins' nets that reading a level of `n` instances of five terminals takes,
@@ -1023,5 +1077,107 @@ pub(super) mod tests {
         // Four rules look the pins up four times as often; their nets are found again only after a
         // symbol is set, a device matched or the bundles resolved.
         assert!(four <= one * 3 / 2, "{one} for one rule, {four} for four");
+    }
+
+    /// Reads a level of `n` instances of five terminals, a chain like a row of cells, where every
+    /// pin gets a label on a stub, as the standard fill does: the stub makes the label and names
+    /// its pin (`%l::pin`) once the level's usages are made, and names the net of its pin
+    /// (`?t::net`). The instances have a symbol, and the level names some of their pins
+    /// (`#X1::y`) and the pin of a label it writes (`%top::pin`), which resolve before the stubs
+    /// are made. The stubs of the pins on `vdd` come last; if `marked`, they give their pin a text
+    /// with a key first. Returns the named sub-objects resolved, and after each one made from
+    /// step 5 on, every one with what it resolves to.
+    fn stubs(n: usize, marked: bool, resolve_all: bool) -> (usize, Vec<String>, (usize, usize)) {
+        let mut sink = Sink::new();
+        let mut main = Level::new(LevelKind::File, "stubs.sp", "stubs.sp", "stubs.sp");
+        main.circuit = true;
+        for k in 0..n {
+            main.instances.push(Instance {
+                name: format!("X{}", k + 1),
+                letter: Some('X'),
+                nodes: vec![format!("n{k}"), format!("n{}", k + 1), format!("n{}", k + 2), "vdd".into(), "vss".into()],
+                file: "stubs.sp".into(),
+                line: k as u32 + 1,
+                order: k,
+                default_terminals: Some(["a", "b", "y", "vdd", "vss"].map(String::from).to_vec()),
+                ..Instance::default()
+            });
+        }
+        let records = r#"@RNL(type="header") { @VERSION("0.4")}
+@RNL {
+  $TAG_SYMBOL = @DEFINE-SYMBOL {
+    %pin = (0, 0) @PIN(terminal="p", direction="right");
+    @LINE {(0, 0) (-1, 0)};
+  };
+  $TAG = @DEFINE(roles=[["p", ["net", "pin"]]]) {};
+  # @SELECT-USAGE $TAG => @SET-SYMBOL $TAG_SYMBOL;
+  $CELL_SYMBOL = @DEFINE-SYMBOL {
+    %a = (0, 0) @PIN(terminal="a", direction="left");
+    %b = (0, 2) @PIN(terminal="b", direction="left");
+    %y = (4, 1) @PIN(terminal="y", direction="right");
+    %vdd = (2, 3) @PIN(terminal="vdd", direction="up");
+    %vss = (2, -1) @PIN(terminal="vss", direction="down");
+  };
+  # @SELECT-INSTANCE => @SET-SYMBOL $CELL_SYMBOL;
+  %top = $TAG @ATTACH #X1:y;
+  {#X1::y #X2::a %top::pin} @ALIGN("y");
+  $STUB = @DEFINE(roles=[["t", "pin"]]) {
+    %l = $TAG @ATTACH ?t;
+    ?t %l::pin @ORIENT-RELATION("R180");
+    %n = ?t::net;
+  };
+  $MARKED_STUB = @DEFINE(roles=[["t", "pin"]]) {
+    ?t @TEXT("m", key="mark");
+    %l = $TAG @ATTACH ?t;
+    ?t %l::pin @ORIENT-RELATION("R180");
+    %n = ?t::net;
+  };
+  %supply = # @SELECT-NET(name="vdd") => @SELECT-PIN;
+  %rest = # @SELECT-NET => @SELECT-PIN;
+  %supply @REMOVE-FROM %rest;
+  $STUB @ATTACH %rest;
+  STUB_OF_THE_SUPPLY @ATTACH %supply
+}"#;
+        let records = records.replace("STUB_OF_THE_SUPPLY", if marked { "$MARKED_STUB" } else { "$STUB" });
+        main.records = scan_run(&package_lines(&records), "stubs.sp", &mut sink);
+        let dialect = Dialect { name: "spice".into(), case_sensitive: false, ground_aliases: vec![] };
+        SUBOBJECTS_RESOLVED.with(|count| count.set(0));
+        RESOLVE_ALL.with(|all| all.set(resolve_all));
+        TRACE.with(|t| t.borrow_mut().clear());
+        ALONE_AND_ALL.with(|c| c.set((0, 0)));
+        let read = interpret(
+            HostDocument::new(main, dialect),
+            &MemoryProvider::new(),
+            &Options { std: false, ..Options::default() },
+            sink,
+        );
+        RESOLVE_ALL.with(|all| all.set(false));
+        let errors: Vec<_> = read.sink.all().iter().filter(|d| d.severity == Severity::Error).collect();
+        assert!(errors.is_empty(), "{errors:?}");
+        (SUBOBJECTS_RESOLVED.with(Cell::get), TRACE.with(|t| t.take()), ALONE_AND_ALL.with(Cell::get))
+    }
+
+    #[test]
+    fn a_named_subobject_made_by_a_stub_resolves_as_when_all_are_resolved_again() {
+        let (_, every, (alone, all)) = stubs(12, true, false);
+        let (_, before, (_, all_before)) = stubs(12, true, true);
+        // both ways are taken: alone while nothing has changed, all after a text with a key
+        assert!(alone > 0 && all >= 12, "{alone} resolved alone, {all} with all");
+        // the pins of the instances named by the level are resolved, and the nets
+        let last = every.last().unwrap();
+        assert!(last.contains(" y Some(") && last.contains(" pin Some(") && last.contains(" net Some("), "{last}");
+        assert_eq!(all_before, alone + all);
+        assert_eq!(every.len(), before.len());
+        for (k, (now, then)) in every.iter().zip(&before).enumerate() {
+            assert_eq!(now, then, "after the named sub-object {k} was made");
+        }
+    }
+
+    #[test]
+    fn a_named_subobject_made_by_a_stub_is_resolved_alone() {
+        let (small, large) = (stubs(60, false, false).0, stubs(120, false, false).0);
+        // Twice the instances, twice the stubs: resolving the one made doubles, resolving all
+        // each time, as before, would grow four times.
+        assert!(large <= small * 5 / 2, "{small} resolved for 60 instances, {large} for 120");
     }
 }

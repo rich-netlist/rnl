@@ -216,6 +216,7 @@ impl Interp<'_> {
             }
         });
         self.role_inputs.get_mut(&input).unwrap().resolved = Some(value);
+        self.subobject_inputs += 1;
     }
 
     fn convert_role_member(&mut self, object: ObjId, view: &RoleInput) -> R<ObjId> {
