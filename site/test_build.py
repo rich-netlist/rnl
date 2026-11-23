@@ -189,6 +189,7 @@ class ReleaseDownloads(unittest.TestCase):
                         # the local viewer for older Linux is in the Linux downloads, and #linux-local lands there or
                         # on the line that says there are none yet
                         self.assertEqual("-linux-x86_64.tar.gz\"" in html, linux)
+                        self.assertEqual("-linux-x86_64-with-packages.tar.gz\"" in html, linux)
                         self.assertEqual("-linux-x86_64-with-firefox.tar.gz\"" in html, linux)
                         self.assertEqual(html.count('id="linux-local"'), 1)
                         if linux:
