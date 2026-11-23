@@ -51,6 +51,7 @@ mod config;
 mod coords;
 mod driver;
 pub mod experimental;
+mod fixed;
 mod group_tree;
 mod holds;
 mod lines;

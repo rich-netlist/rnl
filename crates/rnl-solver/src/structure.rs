@@ -1250,7 +1250,7 @@ fn add_labels(labels: &mut BTreeMap<usize, Vec<[Q; 4]>>, owner: usize, boxes: Ve
 }
 
 /// A box turned by an orientation about the origin (11.2).
-fn turned_box(b: &[Q; 4], o: Orient) -> Option<[Q; 4]> {
+pub(crate) fn turned_box(b: &[Q; 4], o: Orient) -> Option<[Q; 4]> {
     let corners = [(b[0].clone(), b[1].clone()), (b[2].clone(), b[3].clone())];
     let xs = [turned(o, &corners[0], 0), turned(o, &corners[1], 0)];
     let ys = [turned(o, &corners[0], 1), turned(o, &corners[1], 1)];
