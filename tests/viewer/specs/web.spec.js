@@ -25,11 +25,6 @@ const locked = (name) => {
 };
 test.beforeEach(async ({ page }) => {
   await page.route("https://rich-netlist.github.io/rnl-packages/**", route => route.abort());
-  // Solve > Ask to Solve on Open off on every origin, the solver servers' too, whose ports the storage
-  // that every page starts with (playwright.config.js) cannot know
-  await page.addInitScript(() => {
-    try { if (localStorage.getItem("solve-on-open") === null) localStorage.setItem("solve-on-open", "false"); } catch { /* no storage */ }
-  });
 });
 
 test("the preload hints name the scripts the page loads and the files it reads when it starts", async ({ page }) => {

@@ -195,8 +195,6 @@ try {
     const version = bundled?.version ?? "0.2";
     const language = bundled ? /@VERSION\("([^"]+)"\)/.exec(fs.readFileSync(bundled.path, "utf8"))?.[1] ?? "0.3" : "0.4";
     fs.writeFileSync(top, ["* a file that uses a public package", `* @RNL(type="header") { @VERSION("${language}"); @USE-PACKAGE(name="eda-style", version="${version}") }`, "R1 a 0 1k", ".end", ""].join("\n"));
-    // R1 has no position: Solve > Ask to Solve on Open off, so that opening it asks nothing
-    await execute("return import('./util.js').then((u) => u.save('solve-on-open', false));");
     await execute(`return import('./open.js').then((o) => o.openSource({ path: ${JSON.stringify(top)}, name: 'use-eda-style.sp' }, false));`);
     const missing = await execute("return window.viewer.doc.diagnostics.some((d) => d.message.includes('eda-style') && d.message.includes('cannot be found'));");
     const names = info.packages.map((p) => `${p.name} ${p.version}`);
