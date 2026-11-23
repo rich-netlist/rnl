@@ -157,7 +157,7 @@ R11 g0c1r1 g1c0r1 1k
 /// its first arrangement has it, with no arrangement searched, and its ROUTEs routed there; with one
 /// component left free, the search runs as before.
 #[test]
-fn a_level_its_facts_fix_is_routed_where_it_is_with_nothing_searched() {
+fn a_level_its_facts_fix_takes_its_first_arrangement() {
     let text = |c1: &str| {
         format!(
             r#"* fixed

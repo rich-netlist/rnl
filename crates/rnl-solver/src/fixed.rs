@@ -1,6 +1,6 @@
 //! Whether the facts kept fix the placement of a level: the position and the orientation of every
-//! component. Then no arrangement can place it otherwise, and the search for one is skipped: the
-//! first arrangement is the drawing, routed and spaced as it is.
+//! component. Then no arrangement can place it otherwise, and the group-tree start searches for
+//! none: it takes the first. The line search still runs, as it routes too.
 
 use std::collections::BTreeSet;
 

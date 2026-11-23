@@ -183,12 +183,6 @@ pub(crate) fn lay_out(
     if problem.routes.is_empty() || s.components().next().is_none() {
         return fallback(laid, notes, "nothing to route".to_string(), work);
     }
-    // the line search moves components to route better: where the facts kept fix them all, the
-    // ROUTEs are routed where the group-tree layout put them, and nothing is searched
-    if crate::fixed::free(problem, s).is_none() {
-        let why = "the facts kept fix every component, so the ROUTEs are routed where they are".to_string();
-        return fallback(laid, notes, why, work);
-    }
     let Some(arrangement) = laid.arrangement.clone() else {
         return fallback(laid, notes, "the group-tree layout gave no tables".to_string(), work);
     };
