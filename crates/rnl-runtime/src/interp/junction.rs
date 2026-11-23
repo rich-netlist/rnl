@@ -12,7 +12,7 @@ impl Interp<'_> {
         settings: &[SolverSetting],
     ) -> (JunctionConfig, Option<ObjId>) {
         let (mut file, object) = self.junction_for(scene, settings);
-        let setting = self.tool_solver_config.iter().rev().find(|s| s.key == "junction").cloned();
+        let setting = self.tool_junction.last().cloned();
         let Some(setting) = setting else { return (file, object) };
         let (mut tool, tool_object) = self.junction_for(scene, &[setting]);
         if tool.invalid.is_some() {

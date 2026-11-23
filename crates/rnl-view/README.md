@@ -121,6 +121,16 @@ A file is named as the document names it: relative to the entry's directory when
 
 The WebAssembly core gives them for a request with `file` or `symbols` set to the file.
 
+## Taking readings
+
+```rust
+pub fn read_noting(entry: &str, dialect: Option<&str>, formats: &BTreeMap<String, String>, files: &dyn Provider, options: &Options) -> Result<DocumentReading, String>
+pub fn build_taking(entry: &str, files: &dyn Provider, options: &BuildOptions, taken: &[&DocumentReading]) -> Result<Document, String>
+pub fn build_file_taking(entry: &str, file: &str, files: &dyn Provider, options: &BuildOptions, taken: &[&DocumentReading]) -> Result<FileResult, String>
+```
+
+A tool that has read the document already, as a solve has, gives `build` or `build_file` its readings instead of having them read the same texts again. `read_noting` is `interpret_with` with the options it read with and the files it looked for and did not find, which a Document lists in `missing`. `build_taking` and `build_file_taking` take a reading from `taken` wherever they would read with options that read the document alike, `Options::reads_as`: whose `ReadOptions`, what a reading takes of them, are equal, so that the tool's settings for the solver other than `junction` do not count (see [rnl-runtime](../rnl-runtime/README.md)). Each reading taken must be of `entry` over the same texts as `files`, with the same `dialect` and `formats`; the Document is then the one `build` or `build_file` gives. A build whose drawings are kept apart (`build_drawn`) reads again.
+
 ## Drawings
 
 A level's drawing comes in the outputs the frontend asks for. A level has an `svg` field only when the SVG was asked for, and a `primitives` field only when the primitives were; its `scale` is always there.

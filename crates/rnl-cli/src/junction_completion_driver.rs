@@ -9,6 +9,7 @@ use rnl_runtime::{
     source::{Layered, MemoryProvider, Provider},
     Interpretation, Options,
 };
+use rnl_view::DocumentReading;
 use std::collections::BTreeMap;
 
 pub struct Context<'a> {
@@ -39,7 +40,7 @@ fn read(
     ctx: &Context<'_>,
     finisher: &rnl_view::RecordFinisher<'_>,
     record: &str,
-) -> Result<(Interpretation, String), String> {
+) -> Result<(DocumentReading, String), String> {
     read_with_text(ctx, finisher, record).map(|(read, numbered, _)| (read, numbered))
 }
 
@@ -48,7 +49,7 @@ fn read_with_text(
     ctx: &Context<'_>,
     finisher: &rnl_view::RecordFinisher<'_>,
     record: &str,
-) -> Result<(Interpretation, String, String), String> {
+) -> Result<(DocumentReading, String, String), String> {
     // Numeric references are inactive until their record has a valid check. Prepare each
     // complete candidate, including its appended PLACE statements, in the same package
     // environment as the normal reading. Keep the caller's raw record and byte spans intact.
@@ -67,7 +68,8 @@ fn read_with_text(
     overlay.insert(ctx.host_path, &text);
     let layered = Layered { layers: vec![&overlay, ctx.files] };
     let opts = Options { generated: true, problems: true, ..ctx.runtime.clone() };
-    let read = rnl_view::interpret_with(ctx.entry, ctx.dialect, ctx.formats, &layered, &opts)?;
+    let reading = rnl_view::read_noting(ctx.entry, ctx.dialect, ctx.formats, &layered, &opts)?;
+    let read = &reading.interpretation;
     let file = &read.doc.levels.get(ctx.problem.level).ok_or("trial level missing")?.file;
     let numbering =
         read.numbering.iter().find(|level| level.level == ctx.problem.level).ok_or("trial numbering unavailable")?;
@@ -76,7 +78,7 @@ fn read_with_text(
     {
         return Err("trial generated record has missing or stale numbering".into());
     }
-    Ok((read, numbered, text))
+    Ok((reading, numbered, text))
 }
 
 /// Why a record does not read back when objects of the level are lost in it: an object the solve
@@ -147,17 +149,17 @@ pub fn reads_back(ctx: &Context<'_>, written: &Written) -> Result<ReadBack, Stri
     let finisher = finisher(ctx);
     let (reading, finished, text) = read_with_text(ctx, &finisher, &written.record)?;
     let auxiliary = crate::junction_completion_problem::auxiliary(ctx.problem);
-    match lost(ctx.problem, &reading, &auxiliary.points) {
+    match lost(ctx.problem, &reading.interpretation, &auxiliary.points) {
         Some(why) => Err(why),
         None => Ok(ReadBack { reading, finished, text }),
     }
 }
 
 /// What [`reads_back`] read: the document with the record, read with its records and its
-/// problems; the record finished with the check of its numbers, as it is written; and the text of
-/// the level's file with it.
+/// problems, with the files it missed; the record finished with the check of its numbers, as it is
+/// written; and the text of the level's file with it.
 pub struct ReadBack {
-    pub reading: Interpretation,
+    pub reading: DocumentReading,
     pub finished: String,
     pub text: String,
 }
@@ -410,7 +412,7 @@ pub struct Completion {
     pub numbered: String,
     /// The document the trial that passed read, with `numbered`, its records and its problems, as
     /// [`ReadBack::reading`]; and the text of the level's file it read, as [`ReadBack::text`]
-    pub reading: Interpretation,
+    pub reading: DocumentReading,
     pub text: String,
     pub trials: usize,
     pub elapsed: std::time::Duration,
@@ -465,6 +467,7 @@ fn complete_within(
     let record = &written.record;
     let finisher = finisher(ctx);
     let (before, _) = read(ctx, &finisher, record)?;
+    let before = before.interpretation;
     // what only helps the solve, once for every trial below
     let auxiliary = crate::junction_completion_problem::auxiliary(ctx.problem);
     if let Some(why) = lost(ctx.problem, &before, &auxiliary.points) {
@@ -586,7 +589,8 @@ fn complete_within(
             };
             trial.insert_str(plan.end, &place);
         }
-        let (after, numbered, text) = read_with_text(ctx, &finisher, &trial)?;
+        let (reading, numbered, text) = read_with_text(ctx, &finisher, &trial)?;
+        let after = reading.interpretation.clone();
         let after_problem =
             after.problems.iter().find(|p| p.level == ctx.problem.level).ok_or("trial problem missing")?;
         let added = added_fact_indices(
@@ -617,7 +621,7 @@ fn complete_within(
             Ok(()) => {
                 let trials = attempt + 1;
                 let elapsed = start.elapsed();
-                return Ok(Completion { record: trial, numbered, reading: after, text, trials, elapsed });
+                return Ok(Completion { record: trial, numbered, reading, text, trials, elapsed });
             }
             Err(e) => {
                 last_error = e;
@@ -652,7 +656,7 @@ pub struct Partial {
     pub numbered: String,
     /// The document read with `numbered` by the trial that passed, and the text of the level's
     /// file it read, as [`Completion::reading`] and [`Completion::text`]
-    pub reading: Interpretation,
+    pub reading: DocumentReading,
     pub text: String,
     pub trials: usize,
     pub elapsed: std::time::Duration,
