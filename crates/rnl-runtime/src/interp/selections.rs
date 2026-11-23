@@ -345,9 +345,10 @@ impl Interp<'_> {
         if !matches!(self.o(owner), ObjData::Inst { .. } | ObjData::Bundle { .. }) {
             return Vec::new();
         }
-        self.terms_of(scene, owner)
+        self.terminal_pins(scene, owner)
             .into_iter()
-            .filter(|terminal| self.pins_for(scene, owner, *terminal).contains(&index))
+            .filter(|(_, pins)| pins.contains(&index))
+            .map(|(terminal, _)| terminal)
             .collect()
     }
 

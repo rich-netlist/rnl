@@ -2071,12 +2071,30 @@ impl Interp<'_> {
     /// The index of the pin of `owner`'s symbol that draws terminal `t`.
     pub(crate) fn pin_for(&mut self, s: SceneId, owner: ObjId, t: ObjId) -> Option<usize> {
         let pins = self.pins_for(s, owner, t);
+        self.drawing_pin(s, owner, &pins)
+    }
+
+    /// [`Self::pin_for`] of a terminal of `owner` whose [`Self::pins_for`] are `pins`.
+    pub(crate) fn drawing_pin(&self, s: SceneId, owner: ObjId, pins: &[usize]) -> Option<usize> {
         let sym = *self.scenes[s].symbol.get(&owner)?;
         if self.symbol(sym).independent_pins {
             pins.last().copied()
         } else {
             pins.first().copied()
         }
+    }
+
+    /// Each terminal of `owner` ([`Self::terms_of`]) with its [`Self::pins_for`], the terminals
+    /// taken once for them all.
+    pub(crate) fn terminal_pins(&mut self, s: SceneId, owner: ObjId) -> Vec<(ObjId, Vec<usize>)> {
+        let terms = self.owner_terms(s, owner);
+        let objects: Vec<_> = terms.iter().map(|(idx, name)| self.term_obj(s, owner, *idx, name.clone())).collect();
+        let sym = self.scenes[s].symbol.get(&owner).copied();
+        objects
+            .into_iter()
+            .zip(&terms)
+            .map(|(t, (index, _))| (t, sym.map_or_else(Vec::new, |sym| self.pins_bound(sym, owner, &terms, *index))))
+            .collect()
     }
 
     /// All pins bound to a terminal, in declaration order (9.2.4); of a symbol whose pins are not

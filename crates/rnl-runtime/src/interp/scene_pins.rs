@@ -56,9 +56,10 @@ impl Interp<'_> {
         if matches!(self.o(owner), ObjData::Usage(_)) {
             return Vec::new();
         }
-        self.terms_of(scene, owner)
+        self.terminal_pins(scene, owner)
             .into_iter()
-            .filter(|terminal| self.pins_for(scene, owner, *terminal).contains(&index))
+            .filter(|(_, pins)| pins.contains(&index))
+            .map(|(terminal, _)| terminal)
             .collect()
     }
 
@@ -145,7 +146,12 @@ impl Interp<'_> {
                 // that nothing the cache does not hear of has moved them (`Scene::pin_nets`).
                 #[cfg(debug_assertions)]
                 {
+                    // the tests count what a release build takes, not this check
+                    #[cfg(test)]
+                    let taken = tests::OWNER_TERMS_TAKEN.with(std::cell::Cell::get);
                     let fresh = self.owner_pin_nets(scene, owner, index, symbol);
+                    #[cfg(test)]
+                    tests::OWNER_TERMS_TAKEN.with(|count| count.set(taken));
                     debug_assert_eq!(found, fresh, "the nets of pin {index} of {owner:?}, kept, are out of date");
                 }
                 nets = found;
