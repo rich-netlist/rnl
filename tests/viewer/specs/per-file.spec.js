@@ -2,7 +2,7 @@
 // file shown alone, in the context of its entry, with the outline of the whole document. The hierarchy lists the
 // levels of every file from the outline; entering a subcircuit another file defines shows that file's reading, with
 // the same entry, and the path bar and the tree follow the way back.
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../viewer.js';
 
 test.skip(!process.env.RNL_WEB_URL, 'the web site is not built');
 

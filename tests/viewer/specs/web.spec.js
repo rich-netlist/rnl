@@ -1,4 +1,4 @@
-import { dialogGone, showSource } from "../viewer.js";
+import { dialogGone, expect, showSource, test } from "../viewer.js";
 // Smoke tests of the web viewer (apps/web): the site that build.mjs makes with the samples, served by
 // serve.mjs, with the web shell and the real core as WebAssembly in its Worker. It opens netlists by
 // URL, files set on its file inputs, a folder and dropped files, and each Document is the one
@@ -10,7 +10,6 @@ import http from "node:http";
 import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
-import { expect, test } from "@playwright/test";
 import { PICK, root, UNCALLED } from "../fixtures.js";
 import { packageLocks, publicPackageDir, publicPackagesAvailable, publicPackageText } from "../../../scripts/packages.mjs";
 import { zh } from "../zh.js";

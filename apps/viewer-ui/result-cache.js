@@ -3,7 +3,8 @@
 // the same. A result is kept under a key (`cacheKey`) with the inputs it records, and on the way out it is given only
 // when the caller's `valid(inputs)` says they still hold; one that does not is dropped. It is kept in memory for the
 // page alone, within a limit in bytes, and the least recently used results go first; a limit of 0 keeps nothing.
-// A value is kept as it is given, and given as it is kept: never copied.
+// A value is kept as it is given, and given as it is kept: never copied. The page tests set `rnlFreezeKept` on the page
+// (tests/viewer/viewer.js): each value is then frozen through as it is kept, so that a later write into it fails.
 // Nothing is written to the browser's storage: `removeOldStore` deletes the store of results that earlier versions of
 // the page kept in the site's IndexedDB. Nothing here knows what a result holds: it is any value JSON writes.
 
@@ -14,6 +15,17 @@ const MIB = 1024 * 1024;
 export const MEMORY_LIMIT = 256 * MIB;
 /** A result larger than this share of a limit is not kept there: it would push out everything else. */
 const LARGEST_SHARE = 4;
+
+/** Freeze `value` and every object in it (the page tests). */
+function freeze(value) {
+  const stack = [value];
+  while (stack.length) {
+    const v = stack.pop();
+    if (v === null || typeof v !== "object" || Object.isFrozen(v)) continue;
+    Object.freeze(v);
+    for (const k of Object.keys(v)) stack.push(v[k]);
+  }
+}
 
 /**
  * About how many bytes `value` takes as JSON text, at two bytes a character, as the limits count: the lengths of its
@@ -113,6 +125,7 @@ export class ResultCache {
    * going for it (a reading preloaded). Whether it was kept.
    */
   async put(key, value, inputs = [], { counted = true, evict = true } = {}) {
+    if (globalThis.rnlFreezeKept === true) freeze(value);
     const size = sizeOf(value);
     const free = this.memoryLimit - this.memoryUsed + (this.memory.get(key)?.size ?? 0);
     if (this.fits(size) && (evict || size <= free)) {

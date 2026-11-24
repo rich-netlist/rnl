@@ -319,7 +319,18 @@ class Viewer {
 }
 
 /** Playwright's test, with `viewer`, the page with the fake shell. */
+/**
+ * Have the pages of `context` freeze what they keep of each reading (result-cache.js `rnlFreezeKept`), so that a later
+ * write into it fails the test. Every test of the pages has it on the context it is given; a test that makes a context
+ * of its own calls this for it.
+ */
+export const freezeKept = (context) => context.addInitScript(() => { globalThis.rnlFreezeKept = true; });
+
 export const test = base.extend({
+  context: async ({ context }, use) => {
+    await freezeKept(context);
+    await use(context);
+  },
   /** The settings the user is taken to have kept (`test.use({ keptSettings: { "usages-shown": true } })`); none to begin with. */
   keptSettings: [{}, { option: true }],
   viewer: async ({ page, keptSettings }, use) => {

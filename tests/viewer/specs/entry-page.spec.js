@@ -2,7 +2,7 @@
 // files has an empty top level, and the card in place of its drawing lists the subcircuits nothing calls, with their
 // symbols, files and instances, and whether their files' readings are kept; a click opens one. With one alone, the
 // entry opens it at once.
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../viewer.js';
 
 test.skip(!process.env.RNL_WEB_URL, 'the web site is not built');
 

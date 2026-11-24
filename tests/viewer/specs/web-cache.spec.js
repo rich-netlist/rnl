@@ -1,7 +1,7 @@
 // File › Memory Cache in the web viewer (memory-cache.js, file-reading.js `memoryCache`): the readings of each file kept
 // in memory for the page, with its limit, 0 keeping none, and Clear Cache empties it. Nothing is kept in the browser's
 // storage.
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../viewer.js';
 
 test.skip(!process.env.RNL_WEB_URL, 'the web site is not built');
 
@@ -16,13 +16,12 @@ R1 p n 1k
 .ends
 `;
 
-async function open(page, { before } = {}) {
+async function open(page) {
   await page.route('https://rich-netlist.github.io/rnl-packages/**', route => route.abort());
   // no preloading, which reads files while the page is idle: what is kept is what the test reads
   await page.addInitScript(() => localStorage.setItem('file-preload', 'false'));
   await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
   await expect(page.locator('#menubar')).toBeVisible();
-  await before?.();
   await page.locator('#file-input').setInputFiles([
     { name: 'top.sp', mimeType: 'text/plain', buffer: Buffer.from(TOP) },
     { name: 'cells.inc', mimeType: 'text/plain', buffer: Buffer.from(CELLS) },
@@ -145,22 +144,10 @@ test('a reading is kept and given again as it is, never copied nor written to', 
       return stringify.call(this, value, ...rest);
     };
   });
-  // what is kept is frozen through and through: a write into it anywhere fails
-  await open(page, { before: () => page.evaluate(async () => {
-    const { ResultCache } = await import('./result-cache.js');
-    const put = ResultCache.prototype.put;
-    ResultCache.prototype.put = function (key, value, ...rest) {
-      const stack = [value];
-      while (stack.length) {
-        const v = stack.pop();
-        if (v && typeof v === 'object' && !Object.isFrozen(v)) {
-          Object.freeze(v);
-          for (const k of Object.keys(v)) stack.push(v[k]);
-        }
-      }
-      return put.call(this, key, value, ...rest);
-    };
-  }) });
+  // what is kept is frozen through and through, as in every test of the pages (viewer.js `freezeKept`): a write into it
+  // anywhere fails
+  await open(page);
+  expect(await page.evaluate(() => globalThis.rnlFreezeKept)).toBe(true);
   const descend = () => page.evaluate(() => import('./subcircuits.js').then(s => s.descend(window.viewer.doc.objects.findIndex(o => o.kind === 'instance' && o.name === 'X1'))));
   // read, then shown again from what is kept: the page draws, lists and selects in both
   await descend();

@@ -1,6 +1,6 @@
 // File > Export Image (apps/viewer-ui/export-image.js) on the web: the core's SVG of the whole level
 // shown, with the usages and current directions the page shows, and a PNG the page makes of it.
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../viewer.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { zhMenu } from '../zh.js';
