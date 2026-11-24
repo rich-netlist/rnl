@@ -49,12 +49,18 @@ debug = "line-tables-only"
 [profile.dev.package."*"]
 debug = false
 
-# The WebAssembly binding, small rather than fast, since a document takes milliseconds either way:
+# The WebAssembly binding, fast rather than small: the readings of a large document take seconds,
+# and opt-level 3 makes them about 15% faster than "s" (bindings/runtime-wasm/README.md):
 # `cargo build --profile wasm --target wasm32-unknown-unknown -p rnl-runtime-wasm`. The CLI keeps
 # the release profile.
 [profile.wasm]
 inherits = "release"
-opt-level = "s"
+opt-level = 3
 lto = true
 codegen-units = 1
 strip = true
+
+# The solver's module (bindings/solver-wasm), which a page loads only to solve: small rather than fast.
+[profile.wasm-solver]
+inherits = "wasm"
+opt-level = "s"
