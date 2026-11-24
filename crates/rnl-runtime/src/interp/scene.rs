@@ -230,6 +230,9 @@ pub struct Scene {
     /// order of the members ([`Interp::bundle_member_nets`]): a bundle's members, their terminals
     /// and the nets their nodes name do not change once the scene's devices are prepared (11.8).
     pub bundle_nets: HashMap<(ObjId, u32), Rc<[ObjId]>>,
+    /// The scene's instances, each bundle once in place of its members ([`Interp::inst_like`]):
+    /// they change only when the bundles are resolved.
+    pub inst_like: Option<Rc<[ObjId]>>,
     pub symbol: HashMap<ObjId, ObjId>,
     /// The dollar name written in the winning assignment, after aliases (10.1).
     pub symbol_names: HashMap<ObjId, String>,
@@ -364,6 +367,7 @@ impl Scene {
             items_cache: HashMap::new(),
             pos_cache: HashMap::new(),
             bundle_nets: HashMap::new(),
+            inst_like: None,
             symbol: HashMap::new(),
             symbol_names: HashMap::new(),
             bad_symbol_selections: HashSet::new(),
@@ -1613,7 +1617,12 @@ impl Interp<'_> {
                     .into_iter()
                     .filter(|o| self.inst_match(*o, &params, false) && self.selection_symbol_matches(s, *o, &params))
                     .collect();
-                dedup(out)
+                // the instances of the scene are each there once already
+                if pool.is_none() {
+                    out
+                } else {
+                    dedup(out)
+                }
             }
             "SELECT-TERMINAL" => {
                 let terms: Vec<ObjId> = match &pool {
@@ -1981,9 +1990,21 @@ impl Interp<'_> {
         out
     }
 
+    /// The scene's instances, a bundle once in place of its members, in the order of the first of
+    /// them. Taken once per scene ([`Scene::inst_like`]); in debug builds, taken again on each later
+    /// call and checked.
     pub(crate) fn inst_like(&mut self, s: SceneId) -> Vec<ObjId> {
-        let insts = self.scenes[s].insts.clone();
-        dedup(insts.into_iter().map(|i| self.bundle_of(i)).collect())
+        if let Some(objects) = &self.scenes[s].inst_like {
+            debug_assert_eq!(**objects, *self.inst_like_now(s), "the instances of the scene changed");
+            return objects.to_vec();
+        }
+        let objects = self.inst_like_now(s);
+        self.scenes[s].inst_like = Some(objects.as_slice().into());
+        objects
+    }
+
+    fn inst_like_now(&self, s: SceneId) -> Vec<ObjId> {
+        dedup(self.scenes[s].insts.iter().map(|&i| self.bundle_of(i)).collect())
     }
 
     pub(crate) fn bundle_of(&self, o: ObjId) -> ObjId {
