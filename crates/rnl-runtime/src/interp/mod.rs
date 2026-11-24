@@ -322,6 +322,10 @@ pub struct Interp<'p> {
     pub(crate) packages: HashMap<(String, String), UnitId>,
     pub(crate) pkg_files: HashMap<String, Vec<(String, String, String)>>,
     pub(crate) pkg_headers: HashMap<String, Option<(String, String)>>,
+    /// The package files named by path= (16.2), by the path read: None when it cannot be read,
+    /// else the PACKAGE its header declares, by name and version, if any. The provider gives the
+    /// same text for a path throughout a reading, which names the same file from many headers.
+    pub(crate) path_headers: HashMap<String, Option<Option<(String, String)>>>,
     /// The language version each package file of the package directories is written in (16.1).
     pub(crate) pkg_languages: HashMap<String, String>,
     pub(crate) memo: HashMap<(MemberKey, Option<SceneId>), Memo>,
@@ -551,6 +555,7 @@ impl<'p> Interp<'p> {
             packages: HashMap::new(),
             pkg_files: HashMap::new(),
             pkg_headers: HashMap::new(),
+            path_headers: HashMap::new(),
             pkg_languages: HashMap::new(),
             memo: HashMap::new(),
             bindings: Default::default(),
