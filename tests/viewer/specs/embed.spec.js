@@ -3,7 +3,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, test, freezeKept } from "../viewer.js";
 import { packageLocks, publicPackagesAvailable, publicPackageText } from "../../../scripts/packages.mjs";
 import { zh } from "../zh.js";
 
@@ -420,6 +420,7 @@ test("iframe resizing preserves the drawing centre and outer arrow keys scroll t
 
 test("Chinese browser language labels controls", async ({ browser }) => {
   const context = await browser.newContext({ locale: "zh-CN" });
+  await freezeKept(context);
   const page = await context.newPage();
   const frame = await start(page);
   await expect(frame.locator("#embed-fit")).toHaveAttribute("aria-label", zh("Fit to window"));

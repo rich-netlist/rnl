@@ -2,7 +2,7 @@
 // usages.js, constraint-box.js), with the web viewer and the core it is built with: around the objects the constraint
 // acts on, its title and the order of the objects at its upper left and beside each, with no solve and with a solve's
 // preview. It is a hint of the page: it is not in an exported image, and a level other than the one shown has none.
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../viewer.js';
 
 test.skip(!process.env.RNL_WEB_URL, 'the web site is not built');
 

@@ -1,7 +1,7 @@
 // The problems of a document read one file at a time (file-checks.js, problems.js): the list has those of the file
 // shown, though its reading has those of the files above it too; All Files adds those of the other files read, and
 // says how many were; Edit > Check All Files reads the rest.
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../viewer.js';
 
 test.skip(!process.env.RNL_WEB_URL, 'the web site is not built');
 

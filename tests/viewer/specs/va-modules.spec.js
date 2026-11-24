@@ -2,7 +2,7 @@
 // (level-tree.js, module-view.js): the hierarchy lists the modules, marked so, with the modules their instances name;
 // an instance of a module, in the netlist or in a module, opens it as its ports, with its instances, each with its line
 // in the text, and a name no module has is not defined.
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../viewer.js';
 
 test.skip(!process.env.RNL_WEB_URL, 'the web site is not built');
 

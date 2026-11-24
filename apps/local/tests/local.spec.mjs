@@ -2,7 +2,8 @@
 // disk is told, Solve runs in the program, the chooser lists the machine's files, and nothing is served to anyone without the
 // session. The program is the one built (RNL_LOCAL_BIN, else the debug build), with the web viewer in it or RNL_LOCAL_SITE.
 
-import { test, expect } from "../../../tests/viewer/node_modules/@playwright/test/index.mjs";
+// the page tests' own fixture, which has the page freeze what it keeps (viewer.js `freezeKept`)
+import { test, expect } from "../../../tests/viewer/viewer.js";
 import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";

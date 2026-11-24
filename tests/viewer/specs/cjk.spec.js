@@ -1,4 +1,4 @@
-import { test, expect } from '../viewer.js';
+import { test, expect, freezeKept } from '../viewer.js';
 import { cjkEvidence, assertCjk } from '../../../apps/desktop/tests/cjk.mjs';
 
 test('Chinese UI and source use real glyphs; mixed text keeps native selection and editor positions', async ({page,viewer},info) => {
@@ -104,6 +104,7 @@ test('record web font transfer before and after the fallback on a Chinese sample
   const result={};
   for(const enabled of [false,true]) {
     const context=await browser.newContext();
+    await freezeKept(context);
     const page=await context.newPage();
     await page.route('**/style.css',async route=>{
       const response=await route.fetch();

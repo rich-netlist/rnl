@@ -1,6 +1,6 @@
 // A manifest's display settings (apps/viewer-ui/display.js): written into a project when the user
 // asks, offered when it is opened, each with a box, and applied for the page only.
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../viewer.js';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';

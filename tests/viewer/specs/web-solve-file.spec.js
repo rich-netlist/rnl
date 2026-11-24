@@ -4,7 +4,7 @@
 // is shown as it is read, the preview still on; coming back to the file solved shows the preview again, not solved again.
 // The solver is the one in the browser (apps/web/solver-worker.js).
 import fs from 'node:fs';
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../viewer.js';
 
 test.skip(!process.env.RNL_WEB_URL, 'the web site is not built');
 

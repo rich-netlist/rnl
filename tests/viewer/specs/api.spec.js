@@ -1,7 +1,7 @@
 // Real cross-origin opener and real Worker, using only verified local public packages.
 import fs from "node:fs";
 import http from "node:http";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../viewer.js";
 
 const base = process.env.RNL_WEB_URL;
 const token = "test-launch-token-123456";

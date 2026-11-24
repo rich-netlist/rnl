@@ -1,8 +1,7 @@
 // Projects on the web (apps/viewer-ui/project.js): Download Project, Open Project, and the manifest of
 // links, Download / Load Manifest. Download Project replaced Download Library; its archive keeps
 // what that one kept, the Library's own files and the edits, with a manifest, rnl-project.json.
-import { test, expect } from '@playwright/test';
-import { dialogGone } from '../viewer.js';
+import { test, expect, dialogGone } from '../viewer.js';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
