@@ -7,7 +7,7 @@
 
 import { doc } from "./state.js";
 import { m } from "./i18n.js";
-import { levelTree, localLevel } from "./level-tree.js";
+import { levelTree, localLevel, outlineTree } from "./level-tree.js";
 
 let cached = { doc: null, roots: [] };
 
@@ -22,6 +22,22 @@ export function uncalledRoots() {
   if (!doc) return [];
   if (cached.doc !== doc) cached = { doc, roots: compute(levelTree()) };
   return cached.roots;
+}
+
+/**
+ * The subcircuit an entry read alone opens on, by its outline, when its entry page would list it alone and leave at
+ * once for it (entry-page.js `openOnlyRoot`): the entry's own file holds no record besides its header, its level has no
+ * instance, and the one subcircuit nothing calls, a module of Verilog-A aside, is written in another file. Its `host`
+ * level, `title` and `file`, as the outline names them; null otherwise.
+ */
+export function onlyRootOf(outline) {
+  const top = outline?.levels[0];
+  if (!top || top.file !== 0 || top.instances !== 0 || outline.files[0]?.records !== 0) return null;
+  const tree = outlineTree(outline);
+  const roots = compute(tree).filter((h) => !tree.nodes[h].module);
+  const level = roots.length === 1 ? outline.levels[roots[0]] : null;
+  if (!level || level.file === null || level.file === 0) return null;
+  return { host: roots[0], title: level.title, file: outline.files[level.file].path };
 }
 
 function compute(tree) {

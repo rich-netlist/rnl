@@ -29,14 +29,8 @@ export function levelTree() {
 }
 
 function build(d) {
+  if (d.outline) return outlineTree(d.outline);
   const nodes = [];
-  const outline = d.outline;
-  if (outline) {
-    outline.levels.forEach((l, host) => {
-      if (l.circuit || l.kind === "module") nodes[host] = outlineNode(outline, l);
-    });
-    return { nodes, top: 0 };
-  }
   for (const l of d.levels) {
     nodes[l.host] = {
       title: l.title,
@@ -60,6 +54,15 @@ function build(d) {
     }
   }
   return { nodes, top: d.levels[0]?.host ?? 0 };
+}
+
+/** The tree of the document an outline is of, as `levelTree` gives it: its circuits and its modules of Verilog-A. */
+export function outlineTree(outline) {
+  const nodes = [];
+  outline.levels.forEach((l, host) => {
+    if (l.circuit || l.kind === "module") nodes[host] = outlineNode(outline, l);
+  });
+  return { nodes, top: 0 };
 }
 
 /** The node of the level `l` of `outline`: a circuit, or a module of Verilog-A. */

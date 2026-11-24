@@ -16,6 +16,7 @@
 
 import { MEMORY_LIMIT, ResultCache } from "./result-cache.js";
 import * as rules from "./file-results.js";
+import { onlyRootOf } from "./roots.js";
 import { shell } from "./shell.js";
 import { constraintsWanted, doc as shownDoc } from "./state.js";
 import { load } from "./util.js";
@@ -108,11 +109,13 @@ const fileOf = (source, outline, reader) => source.view ?? outline.files[0]?.pat
  * Read the source to show, with `edits` over the files, as `shell.build` does: in a shell that reads the file shown
  * alone (`shell.reader`), the file the source shows (its `view`, or the entry's own), with the outline of the whole
  * document as `outline`; in another, the whole document, as the shell builds it. `options` are those of `shell.build`:
- * `fresh` reads every file again, and keeps what it reads; `bind` and `constraints` are read and not kept.
+ * `fresh` reads every file again, and keeps what it reads; `bind` and `constraints` are read and not kept. With
+ * `onlyRoot`, a source of the entry's own file whose entry page would leave at once for its one root (roots.js
+ * `onlyRootOf`) is read as that root's file instead, and `onlyRoot` is given the root before it is read.
  */
 export async function readDocument(source, edits, progress, signal, options = {}) {
   if (!shell.reader) return shell.build(source, edits, progress, undefined, signal, options);
-  const { fresh = false, bind, constraints } = options;
+  const { fresh = false, bind, constraints, onlyRoot } = options;
   const reader = await shell.reader(entrySource(source), edits, { progress, signal, bind, constraints });
   let doc = null;
   let hit = false;
@@ -120,7 +123,10 @@ export async function readDocument(source, edits, progress, signal, options = {}
   try {
     const lib = await library(reader.entry);
     const outline = await outlineOf(reader, lib, fresh);
-    ({ result: doc, hit } = await readOne(reader, outline, fileOf(source, outline, reader), lib,
+    // the entry's file draws nothing and its page would only open the one root: the root's file, read in its place
+    const root = onlyRoot && !source.view ? onlyRootOf(outline) : null;
+    if (root) onlyRoot(root);
+    ({ result: doc, hit } = await readOne(reader, outline, root?.file ?? fileOf(source, outline, reader), lib,
       { fresh, keep: true, unkept: !!bind, constraints: !!constraints }));
     // the loading indicator says so, in every shell
     if (hit) progress?.("cached");
