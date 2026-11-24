@@ -3,6 +3,7 @@
 // the same. A result is kept under a key (`cacheKey`) with the inputs it records, and on the way out it is given only
 // when the caller's `valid(inputs)` says they still hold; one that does not is dropped. It is kept in memory for the
 // page alone, within a limit in bytes, and the least recently used results go first; a limit of 0 keeps nothing.
+// A value is kept as it is given, and given as it is kept: never copied.
 // Nothing is written to the browser's storage: `removeOldStore` deletes the store of results that earlier versions of
 // the page kept in the site's IndexedDB. Nothing here knows what a result holds: it is any value JSON writes.
 
@@ -13,6 +14,35 @@ const MIB = 1024 * 1024;
 export const MEMORY_LIMIT = 256 * MIB;
 /** A result larger than this share of a limit is not kept there: it would push out everything else. */
 const LARGEST_SHARE = 4;
+
+/**
+ * About how many bytes `value` takes as JSON text, at two bytes a character, as the limits count: the lengths of its
+ * strings, numbers, names and punctuation, escapes aside. Unlike `JSON.stringify(value).length`, it makes no text.
+ */
+export function sizeOf(value) {
+  let size = 0;
+  const stack = [value];
+  while (stack.length) {
+    const v = stack.pop();
+    if (typeof v === "string") size += v.length + 2;
+    else if (typeof v === "number") {
+      size += Number.isInteger(v) && v >= 0 && v < 1e6 ? (v < 10 ? 1 : v < 100 ? 2 : v < 1000 ? 3 : v < 1e4 ? 4 : v < 1e5 ? 5 : 6) : String(v).length;
+    } else if (typeof v === "boolean") size += 5;
+    else if (v === null || typeof v !== "object") size += 4;
+    else if (Array.isArray(v)) {
+      size += 1 + Math.max(v.length, 1);
+      for (let k = 0; k < v.length; k++) stack.push(v[k]);
+    } else {
+      size += 1;
+      for (const key in v) {
+        if (v[key] === undefined) continue;
+        size += key.length + 4;
+        stack.push(v[key]);
+      }
+    }
+  }
+  return size * 2;
+}
 
 /** `value` as JSON with the keys of every object sorted, so that the same value is the same text however it was built. */
 function canonical(value) {
@@ -41,7 +71,8 @@ export function removeOldStore(name = "results") {
 }
 
 /**
- * The results kept for a page, in memory, within `memoryLimit` bytes (their JSON text, counted at two bytes a character).
+ * The results kept for a page, in memory, within `memoryLimit` bytes (their JSON text, counted at two bytes a character,
+ * as `sizeOf` estimates it). A value is kept as it is given, not copied: what holds it must not change it.
  * A result kept with `counted: false`, such as the outline of a document, takes its room like any other but is not
  * among the entries, hits and misses the stats tell.
  */
@@ -82,7 +113,7 @@ export class ResultCache {
    * going for it (a reading preloaded). Whether it was kept.
    */
   async put(key, value, inputs = [], { counted = true, evict = true } = {}) {
-    const size = JSON.stringify(value).length * 2;
+    const size = sizeOf(value);
     const free = this.memoryLimit - this.memoryUsed + (this.memory.get(key)?.size ?? 0);
     if (this.fits(size) && (evict || size <= free)) {
       this.remember(key, { value, inputs, size, counted });

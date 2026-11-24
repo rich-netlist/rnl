@@ -16,12 +16,13 @@ R1 p n 1k
 .ends
 `;
 
-async function open(page) {
+async function open(page, { before } = {}) {
   await page.route('https://rich-netlist.github.io/rnl-packages/**', route => route.abort());
   // no preloading, which reads files while the page is idle: what is kept is what the test reads
   await page.addInitScript(() => localStorage.setItem('file-preload', 'false'));
   await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
   await expect(page.locator('#menubar')).toBeVisible();
+  await before?.();
   await page.locator('#file-input').setInputFiles([
     { name: 'top.sp', mimeType: 'text/plain', buffer: Buffer.from(TOP) },
     { name: 'cells.inc', mimeType: 'text/plain', buffer: Buffer.from(CELLS) },
@@ -124,4 +125,63 @@ test('after a solve, or with the Solve view open, the readings are still kept an
   expect((await stats(page)).hits).toBe(before.hits + 1);
   // and it has the constraints the Solve view lists
   expect(await page.evaluate(() => import('./constraints.js').then(c => c.hasConstraints(window.viewer.doc)))).toBe(true);
+});
+
+test('a reading is kept and given again as it is, never copied nor written to', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  // the copies of a reading the page makes, and the texts it makes of what it keeps
+  await page.addInitScript(() => {
+    window.copies = 0;
+    window.sized = 0;
+    const clone = window.structuredClone;
+    window.structuredClone = (value, options) => {
+      if (value && typeof value === 'object' && 'levels' in value && 'files' in value) window.copies++;
+      return clone(value, options);
+    };
+    const stringify = JSON.stringify;
+    JSON.stringify = function (value, ...rest) {
+      if (value && typeof value === 'object' && 'result' in value && 'shape' in value) window.sized++;
+      return stringify.call(this, value, ...rest);
+    };
+  });
+  // what is kept is frozen through and through: a write into it anywhere fails
+  await open(page, { before: () => page.evaluate(async () => {
+    const { ResultCache } = await import('./result-cache.js');
+    const put = ResultCache.prototype.put;
+    ResultCache.prototype.put = function (key, value, ...rest) {
+      const stack = [value];
+      while (stack.length) {
+        const v = stack.pop();
+        if (v && typeof v === 'object' && !Object.isFrozen(v)) {
+          Object.freeze(v);
+          for (const k of Object.keys(v)) stack.push(v[k]);
+        }
+      }
+      return put.call(this, key, value, ...rest);
+    };
+  }) });
+  const descend = () => page.evaluate(() => import('./subcircuits.js').then(s => s.descend(window.viewer.doc.objects.findIndex(o => o.kind === 'instance' && o.name === 'X1'))));
+  // read, then shown again from what is kept: the page draws, lists and selects in both
+  await descend();
+  await idle(page);
+  await page.evaluate(() => import('./subcircuits.js').then(s => s.ascend()));
+  await idle(page);
+  await descend();
+  await idle(page);
+  expect(await stats(page)).toMatchObject({ entries: 2, hits: 2 });
+  expect(await page.evaluate(() => window.viewer.doc.file)).toBe('cells.inc');
+  await page.evaluate(() => import('./selection.js').then(s => s.select(window.viewer.doc.objects.findIndex(o => o.kind === 'instance' && o.name === 'R1'))));
+  await page.locator('#tab-hierarchy').click();
+  await page.locator('#tab-unplaced').click();
+  await page.locator('#tab-solve').click();
+  await idle(page);
+  await page.locator('#tab-netlist').click();
+  // the texts of the other files, which the reading leaves out, are in the netlist pane
+  expect(await page.evaluate(() => window.viewer.doc.files.map(f => f.text.split('\n')[0]))).toEqual(['* top', '* cells']);
+  await page.evaluate(() => import('./subcircuits.js').then(s => s.ascend()));
+  await idle(page);
+  expect(await page.evaluate(() => window.viewer.doc.file)).toBe('top.sp');
+  expect(errors).toEqual([]);
+  expect(await page.evaluate(() => [window.copies, window.sized])).toEqual([0, 0]);
 });

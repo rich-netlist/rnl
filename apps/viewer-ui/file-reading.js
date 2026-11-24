@@ -49,6 +49,13 @@ const readWith = new WeakMap();
 /** The options a reading is kept by: the reader's, and the constraints when the reading has them (a key of its own). */
 const keyOptions = (reader, constraints) => (constraints ? { ...reader.options, constraints: true } : reader.options);
 
+/**
+ * A reading kept, or to keep, as the Document the page shows: the reading itself is shared, never copied, and the page
+ * writes nothing into it but what it writes here, into its own: the outline (`readDocument`) and the texts of the
+ * files the reading leaves out (`reader.texts`). The tests freeze what is kept, so that a write anywhere else fails.
+ */
+const shown = (result) => ({ ...result, files: result.files.map((f) => ({ ...f })) });
+
 /** The outline of the document `reader` reads: the one kept, while it holds, or one the core makes, which is kept. */
 async function outlineOf(reader, lib, fresh) {
   const key = reader.core ? await rules.outlineKey(reader.core, reader.entry, reader.options) : null;
@@ -78,17 +85,17 @@ async function readOne(reader, outline, file, lib, { fresh = false, keep = false
   if (key && !fresh) {
     const holds = async (k) => rules.readingHolds(k, await reader.hashes(rules.readingPaths(k.result)), shape, lib);
     const found = preload ? await kept().peek(key, holds) : await kept().get(key, holds);
-    if (found) return { result: preload ? found.result : structuredClone(found.result), hit: true, stored: false };
+    if (found) return { result: preload ? found.result : shown(found.result), hit: true, stored: false };
   }
   const started = performance.now();
   const result = await reader.readFile(file, keep);
   // kept when the document has every file it asks for, with how long it took to read (the entry page tells it)
   let stored = false;
   if (key && result.missing.length === 0) {
-    const value = { result: preload ? result : structuredClone(result), shape, library: lib.all, took: performance.now() - started };
+    const value = { result, shape, library: lib.all, took: performance.now() - started };
     stored = await kept().put(key, value, value, { evict: !preload });
   }
-  return { result, hit: false, stored };
+  return { result: preload ? result : shown(result), hit: false, stored };
 }
 
 /** The file a source shows: its view, or the entry's own file, the outline's first. */
