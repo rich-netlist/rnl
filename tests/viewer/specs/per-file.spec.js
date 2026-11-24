@@ -28,16 +28,17 @@ R1 a b 1k
 .ends
 `;
 
-async function open(page, { preload = false } = {}) {
+async function open(page, { preload = false, top = TOP, more = [] } = {}) {
   await page.route('https://rich-netlist.github.io/rnl-packages/**', route => route.abort());
   // preloading reads files while the page is idle: off, but in its own test, so that what is kept is what the test reads
   await page.addInitScript((on) => localStorage.setItem('file-preload', String(on)), preload);
   await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
   await expect(page.locator('#menubar')).toBeVisible();
   await page.locator('#file-input').setInputFiles([
-    { name: 'top.sp', mimeType: 'text/plain', buffer: Buffer.from(TOP) },
+    { name: 'top.sp', mimeType: 'text/plain', buffer: Buffer.from(top) },
     { name: 'cells.inc', mimeType: 'text/plain', buffer: Buffer.from(CELLS) },
     { name: 'leaf.inc', mimeType: 'text/plain', buffer: Buffer.from(LEAF) },
+    ...more.map(([name, text]) => ({ name, mimeType: 'text/plain', buffer: Buffer.from(text) })),
   ]);
   await idle(page);
 }
@@ -169,4 +170,28 @@ test('an included file opens from the Library in the context of the entry, and A
   await files.locator('.pool-include').getByRole('button', { name: 'Add leaf.inc to the Library', exact: true }).click();
   await expect(files.locator('.pool-row .pool-open')).toHaveText(['top.sp', 'leaf.inc']);
   await expect(files.locator('.pool-include .pool-include-name')).toHaveText(['cells.inc']);
+});
+
+test('a package file a header names by its path is read once for each reader after the first: no reading is made twice', async ({ page }) => {
+  // the files each request to the core reads alone (FileResult), in the order asked
+  await page.addInitScript(() => {
+    window.fileReadings = [];
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (message, ...rest) {
+      const file = typeof message?.request === 'string' ? JSON.parse(message.request).file : undefined;
+      if (typeof file === 'string') window.fileReadings.push(file);
+      return post.call(this, message, ...rest);
+    };
+  });
+  const header = '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="acme", version="1.0", path="acme.rnl") }\n';
+  const acme = '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme", version="1.0") }\n@RNL { $acme = @DEFINE-STYLE(linewidth=1) {} }\n';
+  await open(page, { top: TOP.replace('* top\n', `* top\n${header}`), more: [['acme.rnl', acme]] });
+  // the first reader of the entry learns of the package from the core's answer, and asks again with it
+  const readings = () => page.evaluate(() => window.fileReadings);
+  expect(await readings()).toEqual(['top.sp', 'top.sp']);
+  // the next reader gives it with its first request
+  await descendNamed(page, 'X1');
+  expect(await shown(page)).toMatchObject({ file: 'cells.inc', level: 'cell' });
+  expect(await readings()).toEqual(['top.sp', 'top.sp', 'cells.inc']);
+  expect(await page.evaluate(() => window.viewer.doc.diagnostics.filter(d => /acme/.test(d.message)).map(d => d.message))).toEqual([]);
 });

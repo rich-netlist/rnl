@@ -174,6 +174,11 @@ const primed = new WeakSet();
 const stamped = new WeakMap();
 /** The options of a request that change a reading, as the key of one kept has them (file-reading.js). */
 const READING_OPTIONS = ["svg", "primitives", "flylines", "hints", "lazy_unplaced", "auto_include", "library_prefix", "formats", "dialect"];
+// The files the core asked for that readers of an entry found, by the entry's path. A reader reads them before its first
+// request, so that a reading is not made twice: once without them, which the core answers by naming them, and once with
+// them (the package files a header names by `path`, which no outline lists). Only the paths are kept: each reader reads
+// the files itself, as they are now.
+const askedFor = new Map();
 let lastUrl = ""; // the URL opened last, which Open URL offers again
 // The files of the document shown that a server served, by their workspace paths, and its origin: the
 // format chosen for one of them is kept by its address, as the page can read it again; a file chosen
@@ -1161,6 +1166,21 @@ export default {
         }
         return reads.get(path);
       };
+      // the files earlier readers of the entry were asked for, read before the first request (`askedFor`), and those
+      // this one is asked for, kept for the next
+      if (!askedFor.has(entry.path)) askedFor.set(entry.path, new Set());
+      const asked = askedFor.get(entry.path);
+      let before = null;
+      const readBefore = () => (before ??= Promise.all([...asked].map(textOf)));
+      // (an error reading a file the core asks for fails the reading, as it did)
+      const readAsked = async (path) => {
+        const t = texts[path] !== undefined ? texts[path] : await read(path);
+        if (typeof t === "string") {
+          texts[path] = t;
+          asked.add(path);
+        }
+        return t;
+      };
       const hashes = new Map();
       let worker = null, starting = null, failed = false;
       const abort = () => worker?.terminate();
@@ -1201,12 +1221,14 @@ export default {
           return out;
         },
         outline: () => failing(async () => {
-          const got = await collectOutline({ outline: asking("outline") }, { ...request, files: texts }, read);
+          await readBefore();
+          const got = await collectOutline({ outline: asking("outline") }, { ...request, files: texts }, readAsked);
           Object.assign(texts, got.files);
           return got.outline;
         }),
         readFile: (file) => failing(async () => {
-          const got = await collectFile({ buildFile: asking("buildFile") }, { ...request, file, files: texts }, read);
+          await readBefore();
+          const got = await collectFile({ buildFile: asking("buildFile") }, { ...request, file, files: texts }, readAsked);
           Object.assign(texts, got.files);
           return got.result;
         }),
