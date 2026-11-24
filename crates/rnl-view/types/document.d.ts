@@ -1184,6 +1184,12 @@ export type OutlineFile = {
    * change of the file's netlist alone leaves it as it is.
    */
   records_hash: string,
+  /**
+   * How many records it holds besides its header records (`type="header"`, 2.8), each once,
+   * though the netlist reads the file more than once: 0 for a file whose RNL is a header
+   * record alone, or that has none.
+   */
+  records: number,
 };
 
 /**
