@@ -35,12 +35,15 @@ const kept = () => (cache ??= new ResultCache({ memoryLimit: cacheLimit() }));
 
 // the Library's stamps the cache holds readings of (file-results.js libraryStamps), null before the first reading
 let stamps = null;
-/** The Library's stamps now; the cache is emptied when it really changed since the last reading. */
-async function library() {
+/**
+ * The Library's stamps now, for the readings of the document `entry` (file-results.js libraryFor); the cache is emptied
+ * when it really changed since the last reading.
+ */
+async function library(entry) {
   const now = (await shell.libraryStamps?.()) ?? { user: "", all: "" };
   if (rules.libraryChanged(stamps, now)) await kept().clear({ counts: false });
   stamps = now;
-  return now;
+  return rules.libraryFor(now, entry);
 }
 
 // what each Document given was read with: its reader and the outline, for the entry page (fileSummaries)
@@ -115,7 +118,7 @@ export async function readDocument(source, edits, progress, signal, options = {}
   let hit = false;
   let done = false;
   try {
-    const lib = await library();
+    const lib = await library(reader.entry);
     const outline = await outlineOf(reader, lib, fresh);
     ({ result: doc, hit } = await readOne(reader, outline, fileOf(source, outline, reader), lib,
       { fresh, keep: true, unkept: !!bind, constraints: !!constraints }));
@@ -143,7 +146,7 @@ export async function checkFiles(source, edits, files, each, signal) {
   const reader = await shell.reader(entrySource(source), edits, { signal, constraints });
   const stopped = () => { if (signal?.aborted) throw new Error("superseded"); };
   try {
-    const lib = await library();
+    const lib = await library(reader.entry);
     const outline = await outlineOf(reader, lib, false);
     for (const file of files) {
       stopped();
@@ -167,7 +170,7 @@ export async function fileSummaries(files) {
   const read = shownDoc && readWith.get(shownDoc);
   if (!read) return {};
   const { reader, outline } = read;
-  const lib = stamps ?? { user: "", all: "" };
+  const lib = stamps ? await rules.libraryFor(stamps, reader.entry) : { user: "", all: "" };
   const shape = rules.outlineShape(outline);
   const out = {};
   for (const file of files) {
@@ -221,7 +224,7 @@ export async function preloadFile(source, doc, file) {
   } else if (preloading.number !== number) return "cancelled";
   const p = preloading;
   try {
-    p.lib ??= await library();
+    p.lib ??= await library(p.reader.entry);
     p.outline ??= await outlineOf(p.reader, p.lib, false);
     if (preloading !== p) return "cancelled";
     const read = await readOne(p.reader, p.outline, file, p.lib, { preload: true, constraints: p.constraints });
