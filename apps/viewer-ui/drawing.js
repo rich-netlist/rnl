@@ -23,7 +23,7 @@ import { hideParams, updateParams } from "./params.js";
 import { markUnplaced, scopeSource } from "./text.js";
 import { renderUnplaced } from "./unplaced.js";
 import { showUnplacedBar, unplacedLine } from "./unplaced-bar.js";
-import { oldVersion, showOldVersion } from "./old-version.js";
+import { oldVersion, setOldShown, showOldVersion } from "./old-version.js";
 import { currentSource } from "./open.js";
 import { $, clamp, svgElement } from "./util.js";
 import { paintUsages, usageAt, usagesAt } from "./usages.js";
@@ -69,9 +69,14 @@ export function showLevel(i, keptView) {
   setCurrent(i);
   notice("");
   const lv = doc.levels[i];
+  // a file of an earlier version of the language, none of whose RNL is read: the page says which viewer reads it, and
+  // nothing offers to solve it (no status of what a solver would place, no Solve: commands.js)
+  const old = oldVersion(doc, i, currentSource());
+  setOldShown(!!old);
+  const status = lv.status && !old ? m`Not drawn without a solver: ${lv.status}` : "";
   setText($("level-kind"), i === 0 ? m("top level") : lv.kind === "subckt" ? m("subcircuit") : m("file level"));
-  setText($("status"), lv.status ? m`Not drawn without a solver: ${lv.status}` : "");
-  setAttr($("status"), "title", lv.status ? m`Not drawn without a solver: ${lv.status}` : "");
+  setText($("status"), status);
+  setAttr($("status"), "title", status);
   if (svg) svg.remove();
   svg = null;
   overlay = null;
@@ -87,8 +92,6 @@ export function showLevel(i, keptView) {
   badgeAt = null;
   positionBadge();
   scale = lv.scale;
-  // a file of an earlier version of the language, none of whose RNL is read: the page says which viewer reads it
-  const old = oldVersion(doc, i, currentSource());
   if (lv.empty || old) {
     paintUsages(null, null, groups);
     view = null;
@@ -165,6 +168,7 @@ export function notice(text) {
 
 export function clearDrawing(message) {
   hideModule();
+  setOldShown(false);
   paintUsages(null, null, groups);
   cancelGesture();
   notice("");

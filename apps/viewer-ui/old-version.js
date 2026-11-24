@@ -155,6 +155,16 @@ function sentence(text, link) {
   return span;
 }
 
+let oldShown = false; // whether the level shown is written in a file of an earlier version
+
+/** Whether the level shown is written in a file of an earlier version, which Solve and Respace do not solve (commands.js). */
+export const oldLevelShown = () => oldShown;
+
+/** The level shown is (`on`) or is not written in a file of an earlier version (drawing.js). */
+export function setOldShown(on) {
+  oldShown = on;
+}
+
 const shown = new WeakMap(); // the element of a notice -> what it says, to say it again in another language
 
 /** Fill `el` with the notice of `old` (from `oldVersion`): the version, and where the old viewer is. */

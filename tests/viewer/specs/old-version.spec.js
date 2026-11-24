@@ -23,6 +23,24 @@ async function shot(page, name, browserName) {
   await page.screenshot({ path: path.join(shots, `${name}.png`) });
 }
 
+/** Whether the page offers the command `id` now. */
+const enabled = (page, id) => page.evaluate(async (id) => (await import("./commands.js")).isEnabled(id), id);
+
+/**
+ * Nothing offers to solve the level shown: no status of what a solver would place, Solve and Respace not enabled, and F9
+ * does nothing, with no dialog. (Solve All Circuits stays: the other files of a document may be of 0.4.)
+ */
+async function nothingSolves(page, viewer) {
+  await expect(page.locator("#status")).toHaveText("");
+  expect(await enabled(page, "solve")).toBe(false);
+  expect(await enabled(page, "solve-respace")).toBe(false);
+  await page.keyboard.press("F9");
+  await page.waitForTimeout(300);
+  await expect(page.locator("dialog.dialog")).toHaveCount(0);
+  await expect(notice(page)).toBeVisible();
+  if (viewer) expect(await viewer.calls("solve")).toEqual([]);
+}
+
 /** Enter the subcircuit rdiv by its instance X1, written in the library of 0.3 that the netlist of 0.4 includes. */
 async function enterRdiv(page, viewer) {
   const at = await viewer.where("X1");
@@ -43,6 +61,7 @@ test.describe("the page, with the fake shell", () => {
     // in place of the page that says nothing has a position yet: no Solve link, no bar over the drawing
     await expect(page.locator("#empty .solve-link")).toHaveCount(0);
     await expect(page.locator("#unplaced-bar")).toBeHidden();
+    await nothingSolves(page, viewer);
     await shot(page, "desktop", browserName);
     await link.click();
     expect(await viewer.calls("browse")).toEqual([[OLD_RELEASE]]);
@@ -65,8 +84,14 @@ test.describe("the page, with the fake shell", () => {
     await viewer.open("old-mixed", { platform: "desktop" });
     expect(await page.evaluate(() => window.viewer.doc.levels[window.viewer.level].empty)).toBe(false);
     await expect(notice(page)).toHaveCount(0);
+    expect(await enabled(page, "solve")).toBe(true);
     await enterRdiv(page, viewer);
     await expect(notice(page)).toContainText("Unsupported old file format (RNL 0.3).");
+    await nothingSolves(page, viewer);
+    // back up to the level of 0.4: Solve again
+    await page.keyboard.press("Backspace");
+    await expect.poll(() => page.evaluate(() => window.viewer.doc.levels[window.viewer.level]?.title)).toBe("mixed-top.sp");
+    expect(await enabled(page, "solve")).toBe(true);
   });
 
   test("the notice is said again in the language chosen", async ({ page, viewer }) => {
@@ -128,6 +153,11 @@ test.describe("the web viewer", () => {
     const href = oldViewer({ url: `${base()}/old/rc-0.3.sp`, grid: "dots" });
     await expect(link).toHaveAttribute("href", href);
     expect(await link.getAttribute("target")).toBeNull();
+    await nothingSolves(page, null);
+    // the page's own Solve menu has Solve and Respace off
+    await page.locator("#menubar .menu-title", { hasText: "Solve" }).click();
+    await expect(page.locator('#menubar .menu-item[data-id="solve"]')).toBeDisabled();
+    await page.keyboard.press("Escape");
     await shot(page, "web-url", browserName);
     await link.click();
     await expect(page).toHaveURL(href);

@@ -19,6 +19,7 @@ import { downloads, shell } from "./shell.js";
 import { closePreview, saveSolved, solve } from "./solve.js";
 import { settings } from "./solve-settings.js";
 import { doc, selected } from "./state.js";
+import { oldLevelShown } from "./old-version.js";
 import { findInSource } from "./text.js";
 import { checkAll } from "./problems.js";
 import { canCheckAll } from "./file-checks.js";
@@ -252,11 +253,18 @@ export function isChecked(id) {
   return checks.get(id) === true;
 }
 
-export const isEnabled = (id) => id === "check-all-files" ? canCheckAll() : id === "panel-hide" ? !$("app").classList.contains("sidebar-hidden") : id === "find-text" ? !!doc && !editing : id === "edit-params" ? canEditParams() : id !== "descend-new-window" || canOpen(selected);
+// Solve and Respace act on the level shown: not on one written in a file of an earlier version, which the core does not read
+const SOLVES_SHOWN = new Set(["solve", "solve-respace"]);
+export const isEnabled = (id) => SOLVES_SHOWN.has(id) ? !oldLevelShown() : id === "check-all-files" ? canCheckAll() : id === "panel-hide" ? !$("app").classList.contains("sidebar-hidden") : id === "find-text" ? !!doc && !editing : id === "edit-params" ? canEditParams() : id !== "descend-new-window" || canOpen(selected);
 export function setEnabled(id, on) {
   enabled.set(id, on);
   shell?.setEnabled?.(id, on);
 }
+
+// the platform's menu follows the level shown (the page's own menu asks isEnabled when it opens)
+window.addEventListener("viewer-level", () => {
+  for (const id of SOLVES_SHOWN) setEnabled(id, !oldLevelShown());
+});
 
 /**
  * Whether this shell offers a command: one that names `platforms` only on those ("web", or "desktop", which the local
