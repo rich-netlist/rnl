@@ -108,6 +108,12 @@ pub(crate) struct NumberRun {
     /// This reading, without the records of the solver, counts the objects of the authored
     /// records for another (`Interpretation::counted`).
     pub count: bool,
+    /// This reading, which counts (`count`), stops where nothing it gives can change: after the
+    /// statements of the last phase it resolves no style, layer or routed tree, and it builds no
+    /// drawing. None of those makes or names an object, reads a set for a plan, or edits one; the
+    /// one thing they could change, the plan of a constraint made when a set that holds it is first
+    /// read, is left only when no constraint waits to be made.
+    pub cut: bool,
     /// This reading, without the records of the solver, gives the objects of the authored records
     /// it counts to a reading with them (`Interpretation::counted`), before its problems are built.
     pub give: bool,

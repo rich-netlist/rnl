@@ -195,6 +195,12 @@ impl Interp<'_> {
         Ok((self.install_constraints(s, None, expansion, ctx, segment.start, args), false))
     }
 
+    /// Whether a constraint of scene `s` waits to be made, when a set that holds it is first read
+    /// at the constraint phase or later.
+    pub(super) fn constraint_pending_in(&self, s: SceneId) -> bool {
+        self.pending_constraints.values().any(|p| p.scene == s)
+    }
+
     pub(super) fn materialize_constraints(&mut self, s: SceneId) {
         let mut pending: Vec<_> =
             self.pending_constraints.iter().filter_map(|(&o, p)| (p.scene == s).then_some(o)).collect();

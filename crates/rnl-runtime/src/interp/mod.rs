@@ -1227,11 +1227,16 @@ impl<'p> Interp<'p> {
         } else {
             None
         };
-        if !self.numbers.count {
+        // a reading that counts the objects of the authored records for another gives those alone,
+        // and draws nothing, once no constraint waits to be made (5.9, `NumberRun::cut`)
+        let mut model = if self.cuts() && self.pending_constraints.is_empty() {
+            Model::default()
+        } else {
             self.check_auto_wire_geometry();
-        }
-        let mut model = self.build_model();
-        self.hint_crowded_nodes(&model);
+            let model = self.build_model();
+            self.hint_crowded_nodes(&model);
+            model
+        };
         // the objects of the authored records for another reading (5.9): a reading that counts
         // them gives those alone; one without the records of the solver that gives them counts
         // them as that one does, before its problems are built
@@ -1301,6 +1306,12 @@ impl<'p> Interp<'p> {
             given: AuthoredCounts::default(),
             doc: self.doc,
         }
+    }
+
+    /// Whether this reading counts the objects of the authored records for another and stops
+    /// where nothing it gives can change (`NumberRun::cut`).
+    fn cuts(&self) -> bool {
+        self.numbers.count && self.numbers.cut
     }
 
     /// Does this reading count the objects of the authored records for another (5.9)?
@@ -1536,9 +1547,7 @@ fn read(
     if it.counts_first() {
         COUNTINGS.with(|n| n.set(n.get() + 1));
         let without = ReadOptions { generated: false, problems: false, ..options.clone() };
-        let counting = NumberRun { count: true, ..NumberRun::default() };
-        let first = Interp::new_run(it.doc.clone(), provider, &without, host.clone(), counting.clone())
-            .run_settled(|x| Interp::new_run(x.doc, provider, &without, host.clone(), counting.clone()));
+        let first = counting_reading(&it.doc, provider, &without, host);
         if run.give {
             run.counted_packages = first.package_files.clone();
         }
@@ -1547,6 +1556,29 @@ fn read(
     }
     let again = run.clone();
     it.run_settled(|x| Interp::new_run(x.doc, provider, options, host.clone(), again.clone()))
+}
+
+/// The reading of `doc` without the records of the solver, read with `without`, that counts the
+/// objects of the authored records for a reading with them (5.9). It stops where nothing it gives
+/// can change: it resolves no style, layer or routed tree, and builds no drawing
+/// (`NumberRun::cut`). A debug build reads to the end too, and both have to count the same and read
+/// the same package files.
+fn counting_reading(doc: &HostDocument, provider: &dyn Provider, without: &ReadOptions, host: &Sink) -> Interpretation {
+    let reading = |cut: bool| {
+        let counting = NumberRun { count: true, cut, ..NumberRun::default() };
+        Interp::new_run(doc.clone(), provider, without, host.clone(), counting.clone())
+            .run_settled(|x| Interp::new_run(x.doc, provider, without, host.clone(), counting.clone()))
+    };
+    let first = reading(true);
+    #[cfg(debug_assertions)]
+    {
+        let whole = reading(false);
+        assert!(
+            first.counted == whole.counted && first.package_files == whole.package_files,
+            "a reading that counts and stops early counts otherwise than one read to the end"
+        );
+    }
+    first
 }
 
 /// Whether every package file of `counted`, by its path and text, was read, `read`, with the same

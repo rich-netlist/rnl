@@ -132,6 +132,11 @@ impl Interp<'_> {
         self.resolve_geometry(s);
         self.scenes[s].phase = 8;
         self.run_tasks(s, 8);
+        // a reading that counts the objects of the authored records stops here: what follows
+        // only reads the scene, once no constraint of it waits to be made (5.9, `NumberRun::cut`)
+        if self.cuts() && !self.constraint_pending_in(s) {
+            return;
+        }
         self.resolve_styles(s);
         self.resolve_layers(s);
         if !self.scenes[s].routing_requests.is_empty() {
