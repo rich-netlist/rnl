@@ -2098,11 +2098,8 @@ impl Interp<'_> {
         let terms = self.owner_terms(s, owner);
         let objects: Vec<_> = terms.iter().map(|(idx, name)| self.term_obj(s, owner, *idx, name.clone())).collect();
         let sym = self.scenes[s].symbol.get(&owner).copied();
-        objects
-            .into_iter()
-            .zip(&terms)
-            .map(|(t, (index, _))| (t, sym.map_or_else(Vec::new, |sym| self.pins_bound(sym, owner, &terms, *index))))
-            .collect()
+        let pins = sym.map_or_else(|| vec![Vec::new(); terms.len()], |sym| self.pins_by_terminal(sym, owner, &terms));
+        objects.into_iter().zip(pins).collect()
     }
 
     /// All pins bound to a terminal, in declaration order (9.2.4); of a symbol whose pins are not
@@ -2126,6 +2123,42 @@ impl Interp<'_> {
         let cs = self.host_case(owner);
         let independent = self.symbol(sym).independent_pins;
         let by_number = !independent || !matches!(self.o(owner), ObjData::Usage(_));
+        // the names of the terminal, taken once rather than for each key of each pin
+        let names: Vec<&str> =
+            terms.iter().filter(|(idx, _)| *idx == index).filter_map(|(_, tn)| tn.as_deref()).collect();
+        let mut bound = Vec::new();
+        for (k, pin) in self.symbol(sym).pins.iter().enumerate() {
+            let matches = pin.terms.iter().any(|key| match key {
+                TermKey::Num(n) => by_number && *n == index,
+                TermKey::Name(name) => names.iter().any(|tn| {
+                    #[cfg(test)]
+                    super::scene_pins::tests::TERMINAL_NAMES_COMPARED.with(|count| count.set(count.get() + 1));
+                    if cs {
+                        *tn == name.as_str()
+                    } else {
+                        tn.eq_ignore_ascii_case(name)
+                    }
+                }),
+            });
+            if matches {
+                bound.push(k);
+                if !independent {
+                    break;
+                }
+            }
+        }
+        #[cfg(debug_assertions)]
+        debug_assert_eq!(bound, self.pins_bound_scan(sym, owner, terms, index));
+        bound
+    }
+
+    /// [`Self::pins_bound`] as it scanned every terminal for each key of each pin: what the
+    /// faster ways of binding are checked against in debug builds.
+    #[cfg(debug_assertions)]
+    fn pins_bound_scan(&self, sym: ObjId, owner: ObjId, terms: &[(u32, Option<String>)], index: u32) -> Vec<usize> {
+        let cs = self.host_case(owner);
+        let independent = self.symbol(sym).independent_pins;
+        let by_number = !independent || !matches!(self.o(owner), ObjData::Usage(_));
         let mut bound = Vec::new();
         for (k, pin) in self.symbol(sym).pins.iter().enumerate() {
             let matches = pin.terms.iter().any(|key| match key {
@@ -2141,6 +2174,62 @@ impl Interp<'_> {
                     break;
                 }
             }
+        }
+        bound
+    }
+
+    /// [`Self::pins_bound`] of each of `terms`, in their order, taken in one pass over the symbol's
+    /// pins: the terminals are found by number and by name through an index, so that an owner with
+    /// many terminals does not scan them all for each pin (9.2.4).
+    pub(crate) fn pins_by_terminal(
+        &self,
+        sym: ObjId,
+        owner: ObjId,
+        terms: &[(u32, Option<String>)],
+    ) -> Vec<Vec<usize>> {
+        let cs = self.host_case(owner);
+        let symbol = self.symbol(sym);
+        let independent = symbol.independent_pins;
+        let by_number = !independent || !matches!(self.o(owner), ObjData::Usage(_));
+        let fold = |name: &str| if cs { name.to_string() } else { name.to_ascii_lowercase() };
+        // the terminals of each number, and the numbers of each name
+        let mut at_number: HashMap<u32, Vec<usize>> = HashMap::new();
+        let mut numbers: HashMap<String, Vec<u32>> = HashMap::new();
+        for (at, (number, name)) in terms.iter().enumerate() {
+            at_number.entry(*number).or_default().push(at);
+            if let Some(name) = name {
+                numbers.entry(fold(name)).or_default().push(*number);
+            }
+        }
+        let mut bound = vec![Vec::new(); terms.len()];
+        let mut hit: Vec<usize> = Vec::new();
+        for (k, pin) in symbol.pins.iter().enumerate() {
+            hit.clear();
+            for key in &pin.terms {
+                match key {
+                    TermKey::Num(n) if by_number => hit.extend(at_number.get(n).into_iter().flatten()),
+                    TermKey::Num(_) => {}
+                    TermKey::Name(name) => {
+                        #[cfg(test)]
+                        super::scene_pins::tests::TERMINAL_NAMES_COMPARED.with(|count| count.set(count.get() + 1));
+                        for number in numbers.get(&fold(name)).into_iter().flatten() {
+                            hit.extend(at_number.get(number).into_iter().flatten());
+                        }
+                    }
+                }
+            }
+            hit.sort_unstable();
+            hit.dedup();
+            for &at in &hit {
+                // of a symbol whose pins are not independent, a terminal takes its first pin only
+                if independent || bound[at].is_empty() {
+                    bound[at].push(k);
+                }
+            }
+        }
+        #[cfg(debug_assertions)]
+        for (at, (number, _)) in terms.iter().enumerate() {
+            debug_assert_eq!(bound[at], self.pins_bound_scan(sym, owner, terms, *number));
         }
         bound
     }
