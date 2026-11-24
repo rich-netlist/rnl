@@ -113,8 +113,8 @@ console.log(`${out}`);
 console.log(`rnl_runtime_wasm.wasm: ${size(bytes.length)}, ${size(gzipSync(bytes, { level: 9 }).length)} gzip-compressed`);
 const solverFiles = ["solver.js", "solver.d.ts"];
 if (solver) {
-  cargo(["build", "--profile", "wasm", "--target", "wasm32-unknown-unknown", "-p", "rnl-solver-wasm"], { stdio: "inherit" });
-  const built = join(metadata.target_directory, "wasm32-unknown-unknown", "wasm", "rnl_solver_wasm.wasm");
+  cargo(["build", "--profile", "wasm-solver", "--target", "wasm32-unknown-unknown", "-p", "rnl-solver-wasm"], { stdio: "inherit" });
+  const built = join(metadata.target_directory, "wasm32-unknown-unknown", "wasm-solver", "rnl_solver_wasm.wasm");
   copyFileSync(built, join(out, "rnl_solver_wasm.wasm"));
   for (const name of solverFiles) copyFileSync(join(here, "..", "solver-wasm", "js", name), join(out, name));
   // the package names the solver only when it holds it

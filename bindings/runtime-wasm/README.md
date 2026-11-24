@@ -40,13 +40,22 @@ A frontend built with Vite needs three settings for it, as Analog Canvas found:
 
 Vite may say that `node:worker_threads` and `node:fs/promises` were left out for the browser: the modules import them only when they run in Node.
 
-The `wasm` profile is the release profile with `opt-level = "s"`, LTO, one codegen unit and no symbols; the CLI keeps the release profile. A document takes milliseconds either way, so the profile favours size; `opt-level = "z"` would save another 63 KB compressed, but builds take a third longer. Measured with Rust 1.97 and Node 24 on Windows 11, building each of the 24 files of the conformance corpus once from memory:
+The `wasm` profile is the release profile with `opt-level = 3`, LTO, one codegen unit and no symbols; the CLI keeps the release profile. A small document takes milliseconds whatever the settings, but the readings of a large one take seconds, so the profile favours speed. The solver's module, which a page loads only to solve, is built with the `wasm-solver` profile, the same with `opt-level = "s"`, which favours size.
+
+On a large document (about 26k instances, its entry with one subcircuit nothing calls, written in another file), opened in the web viewer in headless Chromium, with Rust 1.97 on Windows 11, median of 6 runs. The first two columns are the core's own time; the others, the time until the drawing is shown:
+
+| Settings | Size (bytes) | gzip, level 9 | Outline | Reading of the largest level's file | Open the entry, up to that level's drawing | Open that level's file |
+| --- | --- | --- | --- | --- | --- | --- |
+| `opt-level = "s"` | 4,577,652 | 1,379,912 | 238 ms | 2,858 ms | 3,648 ms | 2,771 ms |
+| `opt-level = 3`: the `wasm` profile | 5,801,200 | 1,858,456 | 203 ms | 2,360 ms | 3,128 ms | 2,436 ms |
+
+Measured earlier on a smaller core with Rust 1.97 and Node 24 on Windows 11, building each of the 24 files of the conformance corpus once from memory, where `opt-level = "z"` saved another 63 KB compressed but took a third longer to build:
 
 | Settings | Size (bytes) | gzip, level 9 | The 24 files |
 | --- | --- | --- | --- |
 | `--release` (`opt-level = 3`) | 1,817,885 | 548,195 | 63 ms |
 | `opt-level = 3`, LTO, one unit, no symbols | 1,433,823 | 502,843 | 61 ms |
-| `opt-level = "s"`, LTO, one unit, no symbols: the `wasm` profile | 1,198,139 | 406,793 | 72 ms |
+| `opt-level = "s"`, LTO, one unit, no symbols | 1,198,139 | 406,793 | 72 ms |
 | `opt-level = "z"`, LTO, one unit, no symbols | 1,016,022 | 343,232 | 98 ms |
 
 The module uses the WebAssembly features the target enables by default: bulk memory, sign extension, non-trapping float-to-int conversion, multiple values, reference types and mutable globals. Chromium 109, Safari 16 and Node 18 have them all.
