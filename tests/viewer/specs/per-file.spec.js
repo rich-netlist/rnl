@@ -195,3 +195,24 @@ test('a package file a header names by its path is read once for each reader aft
   expect(await readings()).toEqual(['top.sp', 'top.sp', 'cells.inc']);
   expect(await page.evaluate(() => window.viewer.doc.diagnostics.filter(d => /acme/.test(d.message)).map(d => d.message))).toEqual([]);
 });
+
+test('the outline kept holds for the next reader of the entry, also when the entry calls a subcircuit no file defines', async ({ page }) => {
+  // the outlines the page asks its cores for, from the start
+  await page.addInitScript(() => {
+    window.outlineRequests = 0;
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (message, ...rest) {
+      if (typeof message?.request === 'string' && JSON.parse(message.request).outline === true) window.outlineRequests++;
+      return post.call(this, message, ...rest);
+    };
+  });
+  // (a subcircuit no file defines, such as a device of a PDK: a file of the Library may come to define it)
+  await open(page, { top: TOP.replace('X2 a b t\n', 'X2 a b t\nX3 a b pdkcell\n') });
+  // (one for each time the core asks for the files the entry includes)
+  const opened = await page.evaluate(() => window.outlineRequests);
+  expect(opened).toBeGreaterThan(0);
+  // the entry joined the Library by being opened: the outline kept still holds for the reader of the next file
+  await descendNamed(page, 'X1');
+  expect(await shown(page)).toMatchObject({ file: 'cells.inc', level: 'cell' });
+  expect(await page.evaluate(() => window.outlineRequests)).toBe(opened);
+});

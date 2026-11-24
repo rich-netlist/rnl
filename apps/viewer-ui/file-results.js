@@ -10,7 +10,9 @@
 //   - for a reading that depends on the Library (`inputs.library`), the Library is the same (`libraryStamps`).
 // The outline of a document is kept too, by its entry and the options, while the hash of each file it read is the same,
 // the files it found missing are still missing and, when it names a subcircuit no file defines, the Library is the same.
-// A real change of the Library empties the cache (`libraryChanged`). Nothing else is looked at: the netlist is not read.
+// The entry of a document that joined the Library by being opened is not looked at for its own readings and outline
+// (`libraryFor`): its text is among what they read. A real change of the Library empties the cache (`libraryChanged`).
+// Nothing else is looked at: the netlist is not read.
 
 import { cacheKey } from "./result-cache.js";
 
@@ -69,7 +71,29 @@ export async function libraryStamps(items, hashOf) {
   return {
     user: await textHash(JSON.stringify(listed.filter(([, , opened]) => !opened).map(([p, h]) => [p, h]))),
     all: await textHash(JSON.stringify(listed.map(([p, h]) => [p, h]))),
+    listed,
   };
+}
+
+// the stamps of the Library for the readings of each entry, made once for each stamps
+const forEntry = new WeakMap();
+
+/**
+ * The stamps of the Library `stamps` (`libraryStamps`) for the readings and the outline of the document `entry`: `all`
+ * without the entry itself when it joined the Library by being opened, as opening it makes it join after its first
+ * reading. Its text is among what they read, and they hold or not by it already.
+ */
+export function libraryFor(stamps, entry) {
+  const at = (path) => path.replaceAll("\\", "/");
+  const own = stamps.listed?.find(([path, , opened]) => opened && at(path) === at(entry));
+  if (!own) return Promise.resolve(stamps);
+  if (!forEntry.has(stamps)) forEntry.set(stamps, new Map());
+  const made = forEntry.get(stamps);
+  if (!made.has(entry)) {
+    made.set(entry, textHash(JSON.stringify(stamps.listed.filter((l) => l !== own).map(([p, h]) => [p, h])))
+      .then((all) => ({ ...stamps, all })));
+  }
+  return made.get(entry);
 }
 
 /**
