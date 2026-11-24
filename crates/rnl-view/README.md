@@ -121,6 +121,26 @@ A file is named as the document names it: relative to the entry's directory when
 
 The WebAssembly core gives them for a request with `file` or `symbols` set to the file.
 
+## The reading cache
+
+```rust
+pub fn outline_cached(entry: &str, files: &dyn Provider, options: &BuildOptions, cache: &mut ReadingCache) -> Result<Outline, String>
+pub fn build_file_cached(entry: &str, file: &str, files: &dyn Provider, options: &BuildOptions, cache: &mut ReadingCache) -> Result<FileResult, String>
+pub fn build_file_drawn_cached(entry: &str, file: &str, files: &dyn Provider, options: &BuildOptions, cache: &mut ReadingCache) -> Result<(FileResult, Drawings), String>
+```
+
+A frontend that reads the outline of the document it shows and then its files one by one reads the same host document each time. A `ReadingCache`, which the frontend holds in memory, keeps the host document read last.
+
+- **What it keeps:** the host document, with the diagnostics of reading it, and every question the reading asked of `files`, in order, with its answer. The questions are the texts of the files, the files a name may be included from, the package files, the keys of paths and the libraries of Auto Include.
+- **When it reuses it:** a later call with the same entry, `dialect` and `formats` asks the questions again, in the same order. When every answer is the same, the reading would be the same, so the host document kept is taken. Otherwise the document is read, and kept in place of the old one.
+- **Missing files:** the files the frontend does not have are asked for again, so they are missing as they were.
+- **What a call gives:** the same as `outline`, `build_file` or `build_file_drawn`.
+- **Calls without the cache:** they neither take from it nor change it.
+- **Holding and clearing:** it holds one document, and `ReadingCache::clear` drops it. Nothing is written anywhere.
+- **Debug builds:** a document taken is read again and checked.
+
+The WebAssembly core holds one for the requests with `cache` (see [runtime-wasm](../../bindings/runtime-wasm/README.md)).
+
 ## Taking readings
 
 ```rust

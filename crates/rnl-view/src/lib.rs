@@ -20,6 +20,7 @@ mod pin_attachments;
 #[cfg(test)]
 mod pin_objects;
 mod primitive;
+mod reading_cache;
 pub use overlays::{CurrentArrow, OverlayOptions, OverlayStyle, UsageFrame, UsageMode};
 mod snapshot;
 #[cfg(test)]
@@ -65,6 +66,7 @@ pub use primitive::{
     Bar, Cap, Color, HAlign, Join, Layer, Primitive, Run, RunStyle, Segment, Shape, Stroke, Text, TextRun, Unit, VAlign,
 };
 /// Texts held in memory, for a frontend that builds one, such as a netlist from the clipboard.
+pub use reading_cache::ReadingCache;
 pub use rnl_runtime::source::MemoryProvider;
 pub use snapshot::{
     FileRef, GroupView, HostInstance, HostLevel, HostNet, HostTerminal, LevelModel, LevelSnapshot, ObjectView,
@@ -176,7 +178,7 @@ impl Default for BuildOptions {
 /// Name the files of a workspace by rooted paths, such as `/w/top.sp`, as the desktop names them
 /// by absolute ones: see [`SourceFile::path`] for what a relative entry in a directory loses.
 pub fn build(entry: &str, files: &dyn Provider, options: &BuildOptions) -> Result<Document, String> {
-    Ok(build_in(entry, files, options, false, &[], |_, d| d)?.0)
+    Ok(build_in(entry, files, options, false, &[], None, |_, d| d)?.0)
 }
 
 /// [`build`], taking each reading it needs from `taken` where one was read with options that read
@@ -189,7 +191,7 @@ pub fn build_taking(
     options: &BuildOptions,
     taken: &[&DocumentReading],
 ) -> Result<Document, String> {
-    Ok(build_in(entry, files, options, false, taken, |_, d| d)?.0)
+    Ok(build_in(entry, files, options, false, taken, None, |_, d| d)?.0)
 }
 
 /// A reading of a document, as [`read_noting`] gives it: what it was read with, the interpretation,
@@ -274,7 +276,7 @@ fn build_with(
     options: &BuildOptions,
     lazy: bool,
 ) -> Result<(Document, Option<Drawings>), String> {
-    build_in(entry, files, options, lazy, &[], |_, d| d)
+    build_in(entry, files, options, lazy, &[], None, |_, d| d)
 }
 
 /// The reading of one file of the document `entry`, `file`, as the document names it
@@ -286,7 +288,43 @@ fn build_with(
 /// document and the document misses no file: when it misses some, the result has no level, and
 /// lists them in `missing` for the frontend to read and ask again.
 pub fn build_file(entry: &str, file: &str, files: &dyn Provider, options: &BuildOptions) -> Result<FileResult, String> {
-    Ok(build_file_with(entry, file, files, options, false, &[])?.0)
+    Ok(build_file_with(entry, file, files, options, false, &[], None)?.0)
+}
+
+/// [`build_file`], taking the host document from `cache` when it would be read the same, and keeping
+/// it there for the calls that follow on the document ([`ReadingCache`]). The result is the one
+/// [`build_file`] gives.
+pub fn build_file_cached(
+    entry: &str,
+    file: &str,
+    files: &dyn Provider,
+    options: &BuildOptions,
+    cache: &mut ReadingCache,
+) -> Result<FileResult, String> {
+    with_cache(cache, |cache| Ok(build_file_with(entry, file, files, options, false, &[], Some(cache))?.0))
+}
+
+/// [`build_file_drawn`], taking the host document from `cache` as [`build_file_cached`] does.
+pub fn build_file_drawn_cached(
+    entry: &str,
+    file: &str,
+    files: &dyn Provider,
+    options: &BuildOptions,
+    cache: &mut ReadingCache,
+) -> Result<(FileResult, Drawings), String> {
+    with_cache(cache, |cache| {
+        let (result, drawings) = build_file_with(entry, file, files, options, true, &[], Some(cache))?;
+        Ok((result, drawings.expect("drawings were asked for")))
+    })
+}
+
+/// `call` with `cache` lent as a cell, which the workspace of a reading holds; it is given back
+/// after, whatever `call` gives.
+fn with_cache<T>(cache: &mut ReadingCache, call: impl FnOnce(&RefCell<ReadingCache>) -> T) -> T {
+    let cell = RefCell::new(std::mem::take(cache));
+    let out = call(&cell);
+    *cache = cell.into_inner();
+    out
 }
 
 /// [`build_file`], taking the readings it needs from `taken` as [`build_taking`] does. A reading of
@@ -298,7 +336,7 @@ pub fn build_file_taking(
     options: &BuildOptions,
     taken: &[&DocumentReading],
 ) -> Result<FileResult, String> {
-    Ok(build_file_with(entry, file, files, options, false, taken)?.0)
+    Ok(build_file_with(entry, file, files, options, false, taken, None)?.0)
 }
 
 /// [`build_file`], with the drawings of the objects without a position kept apart, as
@@ -309,7 +347,7 @@ pub fn build_file_drawn(
     files: &dyn Provider,
     options: &BuildOptions,
 ) -> Result<(FileResult, Drawings), String> {
-    let (result, drawings) = build_file_with(entry, file, files, options, true, &[])?;
+    let (result, drawings) = build_file_with(entry, file, files, options, true, &[], None)?;
     Ok((result, drawings.expect("drawings were asked for")))
 }
 
@@ -320,11 +358,12 @@ fn build_file_with(
     options: &BuildOptions,
     lazy: bool,
     taken: &[&DocumentReading],
+    cache: Option<&RefCell<ReadingCache>>,
 ) -> Result<(FileResult, Option<Drawings>), String> {
     let runtime = Options { only_file: Some(file.to_string()), ..options.runtime.clone() };
     let options = BuildOptions { runtime, ..options.clone() };
     let (result, drawings) =
-        build_in(entry, files, &options, lazy, taken, |r, d| file_result::file_result(entry, file, r, d))?;
+        build_in(entry, files, &options, lazy, taken, cache, |r, d| file_result::file_result(entry, file, r, d))?;
     // a file not read yet may be among those missing, which a frontend reads to ask again
     if !result.document.files.iter().any(|f| f.path == file) && result.document.missing.is_empty() {
         return Err(format!("{file} is not a file of {entry}"));
@@ -362,9 +401,10 @@ fn build_in<T>(
     options: &BuildOptions,
     lazy: bool,
     taken: &[&DocumentReading],
+    cache: Option<&RefCell<ReadingCache>>,
     finish: impl FnOnce(&Interpretation, Document) -> T,
 ) -> Result<(T, Option<Drawings>), String> {
-    let ws = Workspace::with_formats(files, &options.formats);
+    let ws = Workspace::with_formats(files, &options.formats).cached(cache);
     if ws.read(&slashed(entry)).is_none() {
         return Err(format!("cannot read {entry}"));
     }
@@ -514,7 +554,28 @@ pub fn snapshot(entry: &str, files: &dyn Provider, options: &BuildOptions, parts
 /// name by path are read as the reading reads them, so that those `files` does not have are among
 /// its missing files. Fails as [`build`] does.
 pub fn outline(entry: &str, files: &dyn Provider, options: &BuildOptions) -> Result<Outline, String> {
-    let ws = Workspace::with_formats(files, &options.formats);
+    outline_in(entry, files, options, None)
+}
+
+/// [`outline`], taking the host document from `cache` when it would be read the same, and keeping
+/// it there for the calls that follow on the document ([`ReadingCache`]). The outline is the one
+/// [`outline`] gives.
+pub fn outline_cached(
+    entry: &str,
+    files: &dyn Provider,
+    options: &BuildOptions,
+    cache: &mut ReadingCache,
+) -> Result<Outline, String> {
+    with_cache(cache, |cache| outline_in(entry, files, options, Some(cache)))
+}
+
+fn outline_in(
+    entry: &str,
+    files: &dyn Provider,
+    options: &BuildOptions,
+    cache: Option<&RefCell<ReadingCache>>,
+) -> Result<Outline, String> {
+    let ws = Workspace::with_formats(files, &options.formats).cached(cache);
     let path = slashed(entry);
     let Some(text) = ws.read(&path) else { return Err(format!("cannot read {entry}")) };
     let reading = (options.dialect.as_deref(), &options.formats);
@@ -585,12 +646,33 @@ pub fn read_host_with(
 }
 
 /// [`read_host`] in a workspace, which has the bundled packages already.
-fn read_host_in(entry: &str, (dialect, set): Formats, ws: &Workspace, sink: &mut Sink) -> Result<HostDocument, String> {
+fn read_host_in(entry: &str, reading: Formats, ws: &Workspace, sink: &mut Sink) -> Result<HostDocument, String> {
+    match ws.cache {
+        Some(cache) => {
+            let (dialect, formats) = reading;
+            let key = reading_cache::HostKey {
+                entry: slashed(entry),
+                dialect: dialect.map(str::to_string),
+                formats: formats.clone(),
+            };
+            reading_cache::read_host(cache, key, ws, sink, |files, sink| read_host_from(entry, reading, files, sink))
+        }
+        None => read_host_from(entry, reading, ws, sink),
+    }
+}
+
+/// [`read_host_in`] from `files`, a workspace or what notes the questions a reading asks of one.
+fn read_host_from(
+    entry: &str,
+    (dialect, set): Formats,
+    files: &dyn Provider,
+    sink: &mut Sink,
+) -> Result<HostDocument, String> {
     let path = slashed(entry);
-    let main = entry_format_in(entry, (dialect, set), ws)?;
-    let set = formats::set_formats(set, ws)?;
-    let doc = library::resolve(&path, ws, sink, |extra, sink| {
-        formats::with(main, &set, ws, |f| Reading::read(&path, ws, sink, f, extra, true))
+    let main = entry_format_in(entry, (dialect, set), files)?;
+    let set = formats::set_formats(set, files)?;
+    let doc = library::resolve(&path, files, sink, |extra, sink| {
+        formats::with(main, &set, files, |f| Reading::read(&path, files, sink, f, extra, true))
     });
     doc.ok_or_else(|| format!("cannot read {entry}"))
 }
@@ -608,7 +690,7 @@ pub fn entry_format(
 }
 
 /// The format of `entry` and its default, by index ([`formats::main_format`]).
-fn entry_format_in(entry: &str, (dialect, set): Formats, ws: &Workspace) -> Result<(usize, usize), String> {
+fn entry_format_in(entry: &str, (dialect, set): Formats, ws: &dyn Provider) -> Result<(usize, usize), String> {
     let path = slashed(entry);
     let text = ws.read(&path).ok_or_else(|| format!("cannot read {entry}"))?;
     let set = formats::set_formats(set, ws)?;
@@ -837,6 +919,16 @@ struct Workspace<'a> {
     packages: Vec<String>,
     /// The keys of the paths set to another format: no package, whatever their suffix.
     others: Vec<String>,
+    /// The reading cache of the frontend, when the call has one: its host document is read
+    /// through it ([`read_host_in`]).
+    cache: Option<&'a RefCell<ReadingCache>>,
+}
+
+impl<'a> Workspace<'a> {
+    /// The workspace, reading its host document through `cache` when there is one.
+    fn cached(self, cache: Option<&'a RefCell<ReadingCache>>) -> Workspace<'a> {
+        Workspace { cache, ..self }
+    }
 }
 
 impl Workspace<'_> {
@@ -856,7 +948,7 @@ impl Workspace<'_> {
                 others.push(files.path_key(&path));
             }
         }
-        Workspace { files, bundled: bundled(), missing: RefCell::new(Vec::new()), packages, others }
+        Workspace { files, bundled: bundled(), missing: RefCell::new(Vec::new()), packages, others, cache: None }
     }
 
     /// Whether a package file of the frontend's package directories or pool stays one: not when

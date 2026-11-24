@@ -162,6 +162,15 @@ export interface Request {
    * instead of a Document. The fields that say how to draw are ignored.
    */
   symbols?: string;
+  /**
+   * Read the outline or the file through the module's reading cache. The host document that the
+   * last such request read is taken when every file it read reads the same, and kept for the next.
+   * The answer is the same as without. A request without it neither takes from the cache nor
+   * changes it; false when not given.
+   */
+  cache?: boolean;
+  /** Drop what the module's reading cache holds before the request is answered; false when not given. */
+  forget?: boolean;
 }
 
 export type Point = [number, number];

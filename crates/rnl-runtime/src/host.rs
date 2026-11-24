@@ -31,7 +31,7 @@ pub enum LevelKind {
 }
 
 /// One element of the netlist.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Instance {
     pub name: String,
     /// The SPICE element letter, upper case; None in dialects whose names carry no letter.
@@ -81,7 +81,7 @@ pub struct Seg {
 }
 
 /// One `@RNL(…) {…}` record cut out of the carrier lines (2.2–2.4).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Record {
     /// From `@RNL` to the matching `}`; carrier prefixes removed, lines joined by "\n".
     pub text: String,
@@ -102,7 +102,7 @@ impl Record {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Level {
     /// The explicit include directive that loaded this file level; absent for auto-includes.
     pub include_site: Option<Loc>,
@@ -213,7 +213,7 @@ impl Level {
 }
 
 /// The dialect rules the runtime needs (3.6, 6.3, 6.12).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Dialect {
     pub name: String,
     /// Names of instances, nets and subcircuits compare by case.
@@ -222,7 +222,7 @@ pub struct Dialect {
     pub ground_aliases: Vec<String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct HostDocument {
     /// levels[0] is the main file level.
     pub levels: Vec<Level>,
