@@ -48,7 +48,7 @@ for (const language of ['en', 'zh']) {
     }).toEqual({ title: '$DIFFERENTIAL_PAIR_N: %dp1', devs: 3 });
     expect(await marks.locator('text').allTextContents()).toEqual(['$DIFFERENTIAL_PAIR_N: %dp1', 'left', 'right', 'tail']);
     await expect(lit).toHaveCount(0);
-    expect(await dimmed()).toBe(0);
+    await expect.poll(dimmed).toBe(0);
     await expect(hot).toHaveCount(1);
     await expect(hot).toContainText('$DIFFERENTIAL_PAIR');
     // leaving clears it; a click keeps it
@@ -70,15 +70,16 @@ for (const language of ['en', 'zh']) {
     await items.nth(2).hover();
     await expect.poll(async () => marks.locator('rect').count()).toBe(2);
     await expect(hot).toHaveCount(1);
-    expect(await dimmed()).toBe(0);
+    await expect.poll(dimmed).toBe(0);
 
     // the line of a device selects it: its parts in the colour of the selection, and its box
     await page.mouse.move(5, 5);
     await page.locator('#rv-code .cl', { hasText: /M1 x\s+inp/ }).first().hover();
     await expect.poll(litDevices).toEqual(['M1']);
     await expect(marks.locator('rect[stroke-dasharray="5 3"]')).toHaveCount(1);
-    expect(await lit.evaluateAll(els => els.some(g => [...g.querySelectorAll('[stroke]:not([stroke="none"])')].some(e => getComputedStyle(e).stroke === 'rgb(232, 89, 12)')))).toBe(true);
-    expect(await dimmed()).toBe(0);
+    // the colour is read until it is there: WebKit can report the stroke from before the selection for a moment
+    await expect.poll(() => lit.evaluateAll(els => els.some(g => [...g.querySelectorAll('[stroke]:not([stroke="none"])')].some(e => getComputedStyle(e).stroke === 'rgb(232, 89, 12)')))).toBe(true);
+    await expect.poll(dimmed).toBe(0);
 
     // a device of the drawing marks its lines in the file
     await page.mouse.move(5, 5);
@@ -242,7 +243,7 @@ for (const theme of ['light', 'dark']) {
       const hot = page.locator('#rv-code .cl.is-hot').first();
       // the lines fade to their colour (a transition): wait for it
       await expect.poll(() => hot.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(chip.bg);
-      expect(await hot.evaluate(el => getComputedStyle(el).boxShadow)).toContain(chip.color);
+      await expect.poll(() => hot.evaluate(el => getComputedStyle(el).boxShadow)).toContain(chip.color);
     });
   }
 }
