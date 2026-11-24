@@ -26,7 +26,7 @@ import { clearSelection, select } from "./selection.js";
 import { endPreview, previewOnOpen, previewing, solve } from "./solve.js";
 import { levelNamed, namedPath, restorePath, visitView } from "./subcircuits.js";
 import { showModule } from "./module-view.js";
-import { openOnlyRoot } from "./entry-page.js";
+import { openOnlyRoot, setOpensOnlyRoot } from "./entry-page.js";
 import { clearSource, fileShown, fileViews, renderFiles, revealDefinition, showFile } from "./text.js";
 import { $ } from "./util.js";
 import { setEnabled } from "./commands.js";
@@ -85,6 +85,8 @@ export async function openSource(source, keep, edited, fresh = false, navigation
     if (edited) adoptBuffers(d);
     else resetBuffers(d);
     if (preview) shell.commitBuild?.(d);
+    // an entry page of one root shown now is left at once (the `finally` below)
+    setOpensOnlyRoot(!keep && !edited && !navigation && !signal);
     showBuilt(preview ?? d, keep, navigation);
     // the Library and the manifest bar know the entry; the view of another of its files is no file opened
     await sourceOpened(entrySource(source), d, !keep && !source.view, !!edited);
@@ -108,6 +110,7 @@ export async function openSource(source, keep, edited, fresh = false, navigation
     setProblems(true);
     await sourceOpened(entrySource(source), null, false);
   } finally {
+    setOpensOnlyRoot(false);
     if (d) shell.discardBuild?.(d);
     progress.finish();
     if (!operation.signal.aborted) {

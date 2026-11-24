@@ -71,6 +71,32 @@ test('an entry that only includes a subcircuit nothing calls opens it at once', 
   await expect(page.locator('#level-path .crumb .name, #level-path #level-name')).toHaveText(['alpha']);
 });
 
+/** Count the requests for the symbols of a file (`FileSymbols`) that the page sends its cores, from the start. */
+const countSymbols = (page) => page.addInitScript(() => {
+  window.symbolRequests = 0;
+  const post = Worker.prototype.postMessage;
+  Worker.prototype.postMessage = function (message, ...rest) {
+    if (typeof message?.request === 'string' && typeof JSON.parse(message.request).symbols === 'string') window.symbolRequests++;
+    return post.call(this, message, ...rest);
+  };
+});
+const symbolRequests = (page) => page.evaluate(() => window.symbolRequests);
+
+test('an entry page left at once for its one root reads no symbols; one that stays reads them', async ({ page }) => {
+  await countSymbols(page);
+  await open(page, { 'top.sp': '* top\n.include "a.inc"\n.end\n', 'a.inc': A });
+  await expect.poll(() => shown(page)).toEqual({ file: 'a.inc', level: 'alpha' });
+  await idle(page);
+  expect(await symbolRequests(page)).toBe(0);
+  // the entry shown again, which stays: its root's row has the symbol the core tells
+  await page.locator('#tab-hierarchy').click();
+  await page.locator('#index .index-row.top').click();
+  await idle(page);
+  expect(await shown(page)).toEqual({ file: 'top.sp', level: 'top.sp' });
+  await expect(roots(page).locator('.entry-status')).toHaveText(['Kept: opens at once']);
+  expect(await symbolRequests(page)).toBe(1);
+});
+
 test('an entry with something to draw, or a subcircuit of its own nothing calls, has no entry page', async ({ page }) => {
   await open(page, { 'top.sp': '* top\n.include "a.inc"\n.subckt own p\nR1 p 0 1k\n.ends\n.end\n', 'a.inc': A });
   // the subcircuit of its own file opens, as before
