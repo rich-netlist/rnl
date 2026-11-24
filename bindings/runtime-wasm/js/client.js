@@ -65,6 +65,8 @@ export function startCore(options = {}) {
   const waiting = new Map(); // by request id: the part of the answer wanted, the promise's resolve and reject
   let next = 0;
   let stopped = null; // why the Worker no longer answers
+  // the texts of the files the Worker holds, by path, as the last request with files sent them (`message`)
+  let held = new Map();
 
   function stop(error) {
     stopped ??= error;
@@ -91,12 +93,41 @@ export function startCore(options = {}) {
   const worker = spawn(options.worker, receive, stop);
   worker.catch(stop);
 
+  /**
+   * The message of a request, as the request is now, made when it is sent: the message, and what to call once it was
+   * sent. The message has its JSON text, as `requestText` makes it. A request with `files`
+   * gives the Worker only the texts that are not those it holds, with the paths of all of them in their order: the
+   * Worker keeps the texts, and builds the request with them, the same files in the same order (worker.js). The texts
+   * of a large document are then not written out and sent again for each request.
+   */
+  function message(request) {
+    const files = request?.files;
+    if (!files || typeof files !== "object" || Array.isArray(files)) {
+      const text = requestText(request);
+      return () => [{ request: text }, () => {}];
+    }
+    // (a file whose text is undefined is left out, as JSON leaves it out)
+    const paths = Object.keys(files).filter((path) => files[path] !== undefined);
+    const texts = paths.map((path) => files[path]);
+    const rest = { ...request };
+    // (made when it is sent, after those sent before it: what the Worker holds is what they left; and what it holds
+    // then is told once it was sent)
+    return () => {
+      const given = {};
+      paths.forEach((path, k) => {
+        if (!held.has(path) || held.get(path) !== texts[k]) Object.defineProperty(given, path, { value: texts[k], enumerable: true });
+      });
+      const text = requestText({ ...rest, files: given });
+      return [{ request: text, paths }, () => (held = new Map(paths.map((path, k) => [path, texts[k]])))];
+    };
+  }
+
   /** Send a request, and promise the part of the answer wanted. */
   function send(request, part) {
     if (stopped) return Promise.reject(stopped);
-    let text;
+    let made;
     try {
-      text = requestText(request);
+      made = message(request);
     } catch (e) {
       return Promise.reject(e);
     }
@@ -106,7 +137,9 @@ export function startCore(options = {}) {
       worker.then(
         (w) => {
           try {
-            w.postMessage({ id, request: text });
+            const [data, sent] = made();
+            w.postMessage({ id, ...data });
+            sent();
           } catch (e) {
             waiting.delete(id);
             reject(e);
