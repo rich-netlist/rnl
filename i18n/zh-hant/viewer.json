@@ -831,5 +831,13 @@
   "Readings in memory: {0} ({1} MiB) · {2} hits, {3} misses": "記憶體中的讀取結果：{0} 個（{1} MiB）· 命中 {2} 次，未命中 {3} 次",
   "Keep the readings in memory": "在記憶體中保存讀取結果",
   "Preload the files below the file shown while idle": "閒置時預先載入目前顯示檔案下層的檔案",
-  "Keep the reading of each file in memory while the viewer is open, so that a file shown again is not read again. The least recently used go first. Preloading reads the files of the subcircuits below the file shown while the viewer is idle, into the room that is free.": "在檢視器開啟期間，將每個檔案的讀取結果保存在記憶體中，再次顯示某個檔案時不必重新讀取。優先移除最久未使用的結果。預先載入會在檢視器閒置時，把目前顯示檔案下層各子電路所在的檔案讀入尚有餘量的空間。"
+  "Keep the reading of each file in memory while the viewer is open, so that a file shown again is not read again. The least recently used go first. Preloading reads the files of the subcircuits below the file shown while the viewer is idle, into the room that is free.": "在檢視器開啟期間，將每個檔案的讀取結果保存在記憶體中，再次顯示某個檔案時不必重新讀取。優先移除最久未使用的結果。預先載入會在檢視器閒置時，把目前顯示檔案下層各子電路所在的檔案讀入尚有餘量的空間。",
+  "Unsupported old file format (RNL {0}).": "不支援的舊檔案格式（RNL {0}）。",
+  "RNL Viewer 0.5.3 opens it: download it from {0}.": "RNL Viewer 0.5.3 可以開啟它：請從{0}下載。",
+  "its release page": "它的發布頁面",
+  "Or try {0} in a browser: open the file there with File › Open.": "或在瀏覽器中試用{0}：在那裡透過「檔案 › 開啟檔案」開啟該檔案。",
+  "the old web viewer": "舊版網頁版檢視器",
+  "You can try {0}: open the file there with File › Open, since a file from this computer cannot be passed to it by a link.": "可以試用{0}：在那裡透過「檔案 › 開啟檔案」開啟該檔案，因為這台電腦上的檔案無法透過連結傳給它。",
+  "the old viewer": "舊版檢視器",
+  "You can try opening it in {0}.": "可以嘗試在{0}中開啟它。"
 }
