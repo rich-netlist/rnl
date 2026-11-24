@@ -910,6 +910,8 @@ export default {
   coreInPage: true,
   // the page's opens read the file shown alone, in the context of its entry (per-file loading); an embed reads its document whole
   perFile: !embed,
+  // a file of an earlier version of the language: the site's old web viewer, on the same circuit (old-version.js)
+  oldViewer: "page",
   // the core's parse formats, the one it detects for a Library file the document shown does not read,
   // and the key a choice is kept by: the address of a file a server served, else its path
   formats: async () => (await (await someCore()).formats({ formats: {} })).list,

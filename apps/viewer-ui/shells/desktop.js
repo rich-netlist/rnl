@@ -61,6 +61,8 @@ let projectFolder = null;
 export default {
   platform: "desktop",
   perFile: true,
+  // a file of an earlier version of the language: the release of the old viewer, to download (old-version.js)
+  oldViewer: "release",
   sourceForFile(source, document, index) {
     const f = document.files[index], path = sourcePath(document, f);
     return path.startsWith('<') ? { path, name: f.name, text: f.text, readonly: true } : file(path);

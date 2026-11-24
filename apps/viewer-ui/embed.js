@@ -9,6 +9,7 @@ import { setHoverNames, setHoverRoles } from "./hover.js";
 import { toggleLayout } from "./layout-frame.js";
 import { setNetLabels } from "./net-labels.js";
 import { adoptSource, beginOpenOperation, showBuilt } from "./open.js";
+import { oldDocument, showOldVersion } from "./old-version.js";
 import { setOrigins } from "./origins.js";
 import { shell } from "./shell.js";
 import { prepareViewer } from "./shells/web.js";
@@ -29,6 +30,8 @@ let opening = false;
 let reportedLevel = null;
 let link;
 let crumbs;
+// the notice of the netlist the open refuses, when it is refused only for being of an earlier version (old-version.js)
+let refusedOld = null;
 
 function send(type, fields = {}) {
   api?.send(type, fields);
@@ -39,6 +42,9 @@ function error(reason) {
   setDoc(null);
   resetBuffers(null);
   clearDrawing(message);
+  // a file of an earlier version: which viewer reads it, in place of the core's error
+  if (refusedOld) showOldVersion($("empty"), refusedOld);
+  refusedOld = null;
   crumbs.hidden = true;
   link.hidden = true;
   reportedLevel = null;
@@ -91,6 +97,7 @@ function updateLevel() {
 /** Each open has an identity. Late reads, builds and errors never replace a newer request. */
 async function open(source, packages, isCurrent, initial, message, signal) {
   opening = signal;
+  refusedOld = null;
   document.body.classList.add("busy");
   const progress = startLoading();
   link.hidden = true;
@@ -103,7 +110,11 @@ async function open(source, packages, isCurrent, initial, message, signal) {
     await progress.stage("displaying");
     if (!isCurrent()) return;
     const errors = built.diagnostics.filter((item) => item.severity === "error");
-    if (built.failed || errors.length) throw new Error(built.failed || errors[0].message);
+    if (built.failed || errors.length) {
+      // the reply to the host stays the error; the canvas says which viewer reads such a file
+      if (!built.failed) refusedOld = oldDocument(built, source);
+      throw new Error(built.failed || errors[0].message);
+    }
     resetBuffers(built);
     adoptSource(source);
     showBuilt(built, false);

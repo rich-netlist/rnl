@@ -23,6 +23,8 @@ import { hideParams, updateParams } from "./params.js";
 import { markUnplaced, scopeSource } from "./text.js";
 import { renderUnplaced } from "./unplaced.js";
 import { showUnplacedBar, unplacedLine } from "./unplaced-bar.js";
+import { oldVersion, showOldVersion } from "./old-version.js";
+import { currentSource } from "./open.js";
 import { $, clamp, svgElement } from "./util.js";
 import { paintUsages, usageAt, usagesAt } from "./usages.js";
 import { skeletonAt } from "./skeleton-lines.js";
@@ -85,17 +87,25 @@ export function showLevel(i, keptView) {
   badgeAt = null;
   positionBadge();
   scale = lv.scale;
-  if (lv.empty) {
+  // a file of an earlier version of the language, none of whose RNL is read: the page says which viewer reads it
+  const old = oldVersion(doc, i, currentSource());
+  if (lv.empty || old) {
     paintUsages(null, null, groups);
     view = null;
     paintGrid(null);
     showPointer();
     setText($("zoom"), "");
+    showUnplacedBar(null);
+    if (old) {
+      showOldVersion($("empty"), old);
+      $("empty").hidden = false;
+      window.dispatchEvent(new Event("viewer-level"));
+      return;
+    }
     setText($("empty"), emptyMessage(lv));
     // nothing drawn because nothing has a position yet: the page offers the solve, not a bar
     const line = unplacedLine(lv);
     if (line) $("empty").append(document.createElement("br"), line);
-    showUnplacedBar(null);
     // an entry that only includes other files: the subcircuits nothing calls, in place of the message
     $("empty").hidden = showEntryPage(i);
     window.dispatchEvent(new Event("viewer-level"));
