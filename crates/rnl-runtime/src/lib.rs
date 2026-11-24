@@ -25,5 +25,8 @@ pub mod source;
 pub mod syntax;
 pub mod words;
 
-pub use interp::{check_package, interpret, ImportedAlias, Interpretation, Options, ReadOptions};
+pub use interp::{
+    check_package, countings, interpret, interpret_taking, AuthoredCounts, ImportedAlias, Interpretation, Options,
+    ReadOptions,
+};
 pub mod writeback;

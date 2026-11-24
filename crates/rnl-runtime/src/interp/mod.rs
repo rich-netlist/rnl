@@ -1315,6 +1315,22 @@ pub fn interpret(doc: HostDocument, provider: &dyn Provider, options: &Options, 
     interpret_counted(doc, provider, &options.read_options(), sink, &mut AuthoredCounts::default(), true)
 }
 
+/// [`interpret`], the objects of the authored records taken from `counts` when it has them, instead
+/// of counted by reading the document without its records of the solver first (5.9), and `counts`
+/// given those this reading counts. `counts` has to be what that reading of `doc` would count: that
+/// of a document that differs from `doc` only in the text of records of the solver, each in the
+/// same lines, the same files read with the same options. A debug build counts again and checks
+/// that they are the same.
+pub fn interpret_taking(
+    doc: HostDocument,
+    provider: &dyn Provider,
+    options: &Options,
+    sink: Sink,
+    counts: &mut AuthoredCounts,
+) -> Interpretation {
+    interpret_counted(doc, provider, &options.read_options(), sink, counts, true)
+}
+
 /// The objects of the authored records of each level as the reading of a document without its
 /// records of the solver counted them (5.9), which a reading of the document with its records of
 /// the solver takes. A reading of the same document with other records of the solver in a level,
@@ -1349,6 +1365,10 @@ fn interpret_counted(
     recheck: bool,
 ) -> Interpretation {
     let host = sink.clone();
+    #[cfg(debug_assertions)]
+    if let Some(taken) = &counts.0 {
+        check_taken(&doc, provider, options, &host, taken);
+    }
     let mut run = NumberRun { authored: counts.0.clone(), ..NumberRun::default() };
     let mut out = read(doc, provider, options, sink, &host, &mut run);
     counts.0 = run.authored.clone();
@@ -1383,6 +1403,7 @@ fn read(
 ) -> Interpretation {
     let mut it = Interp::new_run(doc, provider, options, sink, run.clone());
     if it.counts_first() {
+        COUNTINGS.with(|n| n.set(n.get() + 1));
         let without = ReadOptions { generated: false, problems: false, ..options.clone() };
         let counting = NumberRun { count: true, ..NumberRun::default() };
         let first = Interp::new_run(it.doc.clone(), provider, &without, host.clone(), counting.clone())
@@ -1392,6 +1413,42 @@ fn read(
     }
     let again = run.clone();
     it.run_settled(|x| Interp::new_run(x.doc, provider, options, host.clone(), again.clone()))
+}
+
+/// A debug build's check of the objects of the authored records taken from a reading of another
+/// document, `taken`: when a reading of `doc` counts them, it counts them again and they have to
+/// be the same.
+#[cfg(debug_assertions)]
+fn check_taken(
+    doc: &HostDocument,
+    provider: &dyn Provider,
+    options: &ReadOptions,
+    host: &Sink,
+    taken: &HashMap<LevelId, AuthoredCount>,
+) {
+    let it = Interp::new_run(doc.clone(), provider, options, host.clone(), NumberRun::default());
+    if !it.needs_count() {
+        return;
+    }
+    let without = ReadOptions { generated: false, problems: false, ..options.clone() };
+    let counting = NumberRun { count: true, ..NumberRun::default() };
+    let counted = Interp::new_run(doc.clone(), provider, &without, host.clone(), counting.clone())
+        .run_settled(|x| Interp::new_run(x.doc, provider, &without, host.clone(), counting.clone()))
+        .counted;
+    assert!(*taken == counted, "the objects of the authored records taken are not those of the document read");
+}
+
+thread_local! {
+    /// The readings without the records of the solver made on this thread to count the objects of
+    /// the authored records for another, a debug build's counts again to check one taken left out.
+    static COUNTINGS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// How many readings of a document without its records of the solver this thread has made to
+/// count the objects of the authored records for a reading with them (5.9), for tests.
+#[doc(hidden)]
+pub fn countings() -> usize {
+    COUNTINGS.with(std::cell::Cell::get)
 }
 
 /// Resolve the host reader's diagnostics with each file or section's language version.

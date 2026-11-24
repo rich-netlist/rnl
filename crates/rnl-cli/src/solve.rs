@@ -1626,4 +1626,33 @@ mod tests {
         let wide = "* \u{3a9}\n";
         assert!(encode_as(Some(latin1), wide).unwrap_err().contains("Latin-1"));
     }
+
+    /// A record of the solver that uses a number is finished on the document with it written, and
+    /// the reading of the document with it written with its `numbering` takes the objects of the
+    /// authored records that the finish counted (5.9), instead of counting them again by reading the
+    /// document without its records of the solver. So does the trial of a dot, whose text differs
+    /// from the one counted in that record alone, and the reading of the trial.
+    #[test]
+    fn the_reading_of_a_record_written_takes_the_count_of_its_finish() {
+        // a dot on the net b, which the solve places and checks by reading its trial; the usage of
+        // $PARALLEL_HORIZONTAL has no name, so the record places it by its number
+        const NET: &str = "* counted\n\
+            * @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
+            R1 a b 1k\nR2 b 0 1k\nR3 b 0 1k\nC1 a 0 1p\nR4 a 0 1k\nC2 a 0 1p\n\
+            * @RNL { #R1 @PLACE(0, 0); {#R4 #C2} @AS $PARALLEL_HORIZONTAL; {#R1:2 #R2:1 #R3:1} @ROUTE-OBJECT }\n\
+            .end\n";
+        let files = MemoryProvider::new().with("/w/t.sp", NET);
+        let options =
+            SolveOptions { solver: rnl_solver::SolverOptions::without_time_limit(), ..SolveOptions::default() };
+        let before = rnl_runtime::countings();
+        let run = solve(Path::new("/w/t.sp"), &files, &options).unwrap();
+        let counted = rnl_runtime::countings() - before;
+        let text = &run.files[0].text;
+        assert!(text.contains("$JUNCTION"), "the dot is placed");
+        assert!(text.contains("numbering="), "the record uses a number");
+        // the finish of the record counts; the reading of it written, the finish of the trial and
+        // the reading of the trial take that count. Before, the reading of the record written and
+        // the reading of the trial each counted again (3)
+        assert_eq!(counted, 1);
+    }
 }
