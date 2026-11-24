@@ -1155,7 +1155,7 @@ impl<'a> LevelFinisher<'a> {
         let file = level.file.clone();
         level.records.retain(|r| r.file != file || record_type(r) != "generated");
         level.records.push(placed(record, &file, level.end_line.max(1)));
-        let read = interpret_numbering(doc, files, &self.options, &mut self.counts.borrow_mut());
+        let read = interpret_numbering(doc, files, &self.options, &mut self.counts.borrow_mut(), true);
         match level_check(&read, p.level) {
             Some(check) => with_numbering(record, check),
             None => record.to_string(),
@@ -1176,7 +1176,7 @@ impl<'a> LevelFinisher<'a> {
         record: &str,
         counts: &mut AuthoredCounts,
     ) -> String {
-        let read = interpret_numbering(doc, files, &self.options, counts);
+        let read = interpret_numbering(doc, files, &self.options, counts, false);
         match level_check(&read, self.p.level) {
             Some(check) => with_numbering(record, check),
             None => record.to_string(),

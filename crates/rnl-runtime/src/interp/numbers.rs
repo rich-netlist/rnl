@@ -108,6 +108,12 @@ pub(crate) struct NumberRun {
     /// This reading, without the records of the solver, counts the objects of the authored
     /// records for another (`Interpretation::counted`).
     pub count: bool,
+    /// This reading, without the records of the solver, gives the objects of the authored records
+    /// it counts to a reading with them (`Interpretation::counted`), before its problems are built.
+    pub give: bool,
+    /// The package files that the reading without the records of the solver that counted for this
+    /// one read, with their texts, when this one gives what it counted.
+    pub counted_packages: Vec<(String, String)>,
     /// The objects of the authored records of each level as the reading without the records of
     /// the solver counted them: this reading gives their numbers to the objects made as they were.
     pub authored: Option<Rc<HashMap<LevelId, AuthoredCount>>>,

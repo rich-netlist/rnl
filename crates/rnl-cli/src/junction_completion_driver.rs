@@ -100,7 +100,10 @@ fn read_with_text(
             &ctx.problem.version,
         )
     };
-    let mut counts = rnl_runtime::AuthoredCounts::default();
+    // the objects of the authored records of the reading that the problem was read from, which a
+    // reading of the document with the record written takes when they were counted of what it
+    // would count of (`rnl_runtime::interpret_taking`)
+    let mut counts = ctx.original.authored_counts();
     let finished_written = rnl_runtime::solution::record_uses_numbers(record);
     let numbered = if finished_written {
         let text = written(record);
@@ -132,7 +135,7 @@ fn read_with_text(
         .as_ref()
         .filter(|(before, lines, _)| finished_written && same_but_the_record(before, &text, *lines, &numbered))
         .map(|(_, _, counted)| counted.clone());
-    let mut counts = taken.unwrap_or_default();
+    let mut counts = taken.unwrap_or_else(|| ctx.original.authored_counts());
     let mut overlay = MemoryProvider::new();
     overlay.insert(ctx.host_path, &text);
     let layered = Layered { layers: vec![&overlay, ctx.files] };

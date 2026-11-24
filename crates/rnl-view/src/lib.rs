@@ -211,7 +211,7 @@ pub fn read_noting(
     files: &dyn Provider,
     options: &Options,
 ) -> Result<DocumentReading, String> {
-    read_noting_taking(entry, dialect, formats, files, options, &mut rnl_runtime::AuthoredCounts::default())
+    read_noting_in(entry, dialect, formats, files, options, None)
 }
 
 /// [`read_noting`], the objects of the authored records taken from `counts` when it has them, and
@@ -225,13 +225,29 @@ pub fn read_noting_taking(
     options: &Options,
     counts: &mut rnl_runtime::AuthoredCounts,
 ) -> Result<DocumentReading, String> {
+    read_noting_in(entry, dialect, formats, files, options, Some(counts))
+}
+
+/// [`read_noting`], taking and giving the objects of the authored records with `counts` when it is
+/// given ([`read_noting_taking`]).
+fn read_noting_in(
+    entry: &str,
+    dialect: Option<&str>,
+    formats: &BTreeMap<String, String>,
+    files: &dyn Provider,
+    options: &Options,
+    counts: Option<&mut rnl_runtime::AuthoredCounts>,
+) -> Result<DocumentReading, String> {
     let ws = Workspace::with_formats(files, formats);
     let r = match package_in(entry, (dialect, formats), &ws, options)? {
         Some(r) => r,
         None => {
             let mut sink = Sink::new();
             let doc = read_host_in(entry, (dialect, formats), &ws, &mut sink)?;
-            rnl_runtime::interpret_taking(doc, &ws, options, sink, counts)
+            match counts {
+                Some(counts) => rnl_runtime::interpret_taking(doc, &ws, options, sink, counts),
+                None => rnl_runtime::interpret(doc, &ws, options, sink),
+            }
         }
     };
     Ok(DocumentReading {
@@ -373,15 +389,25 @@ fn build_in<T>(
     let solver_view = options.status || options.constraints;
     let runtime =
         Options { problems: options.runtime.problems || solver_view || options.hints, ..options.runtime.clone() };
-    let mut r = read(&runtime)?;
-    // a document without records of the solver reads the same with them and without
-    let records = r.doc.levels.iter().any(|l| l.records.iter().any(|rec| record_type(rec) == "generated"));
-    let other = if !solver_view || !records {
-        None
-    } else if runtime.generated {
-        Some(read(&Options { generated: false, ..runtime.clone() })?)
+    let without = Options { generated: false, ..runtime.clone() };
+    let taking = |o: &Options| !lazy && taken.iter().any(|t| t.options.reads_as(o));
+    let (mut r, other) = if solver_view && runtime.generated && !taking(&runtime) && !taking(&without) {
+        // both read here: the reading without the records of the solver first, whose objects of
+        // the authored records the reading with them takes instead of counting them (5.9)
+        let (r, other) = read_both(entry, reading, &ws, &runtime, &without)?;
+        (Readed::Read(Box::new(r)), other.map(|o| Readed::Read(Box::new(o))))
     } else {
-        Some(read(&Options { generated: true, problems: false, ..runtime.clone() })?)
+        let r = read(&runtime)?;
+        // a document without records of the solver reads the same with them and without
+        let records = r.doc.levels.iter().any(|l| l.records.iter().any(|rec| record_type(rec) == "generated"));
+        let other = if !solver_view || !records {
+            None
+        } else if runtime.generated {
+            Some(read(&without)?)
+        } else {
+            Some(read(&Options { generated: true, problems: false, ..runtime.clone() })?)
+        };
+        (r, other)
     };
     let (with, without): (&Interpretation, &Interpretation) = match &other {
         None => (&r, &r),
@@ -406,6 +432,31 @@ fn build_in<T>(
         _ => None,
     };
     Ok((finish(&r, d), drawings))
+}
+
+/// The readings of `entry` that [`build_in`] makes with the solve status or the constraints: with
+/// the records of the solver, `with`, and, when the document has records of the solver, without
+/// them, `without`, which is made first, its objects of the authored records taken by the other
+/// ([`rnl_runtime::interpret_taking`]). The host document is read once for both.
+fn read_both(
+    entry: &str,
+    reading: Formats,
+    ws: &Workspace,
+    with: &Options,
+    without: &Options,
+) -> Result<(Interpretation, Option<Interpretation>), String> {
+    if let Some(r) = package_in(entry, reading, ws, with)? {
+        return Ok((r, None));
+    }
+    let mut sink = Sink::new();
+    let doc = read_host_in(entry, reading, ws, &mut sink)?;
+    if !doc.levels.iter().any(|l| l.records.iter().any(|rec| record_type(rec) == "generated")) {
+        return Ok((rnl_runtime::interpret(doc, ws, with, sink), None));
+    }
+    let mut counts = rnl_runtime::AuthoredCounts::default();
+    let other = rnl_runtime::interpret_taking(doc.clone(), ws, without, sink.clone(), &mut counts);
+    let r = rnl_runtime::interpret_taking(doc, ws, with, sink, &mut counts);
+    Ok((r, Some(other)))
 }
 
 /// A reading [`build_in`] made, or one it took.
@@ -614,6 +665,25 @@ pub fn read_previous(
     options: &Options,
 ) -> Result<(Interpretation, Vec<Option<Previous>>), String> {
     read_previous_with(entry, dialect, &NONE_SET, files, options)
+}
+
+/// [`interpret_with`], the objects of the authored records taken from `counts` and given to it as
+/// [`rnl_runtime::interpret_taking`] takes and gives them (5.9).
+pub fn interpret_with_taking(
+    entry: &str,
+    dialect: Option<&str>,
+    formats: &BTreeMap<String, String>,
+    files: &dyn Provider,
+    options: &Options,
+    counts: &mut rnl_runtime::AuthoredCounts,
+) -> Result<Interpretation, String> {
+    let ws = Workspace::with_formats(files, formats);
+    if let Some(r) = package_in(entry, (dialect, formats), &ws, options)? {
+        return Ok(r);
+    }
+    let mut sink = Sink::new();
+    let doc = read_host_in(entry, (dialect, formats), &ws, &mut sink)?;
+    Ok(rnl_runtime::interpret_taking(doc, &ws, options, sink, counts))
 }
 
 /// [`read_previous`], with the formats set for files by path ([`BuildOptions::formats`]).
