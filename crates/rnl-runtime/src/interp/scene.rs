@@ -226,6 +226,10 @@ pub struct Scene {
     pub symbol_label_owners: HashSet<ObjId>,
     pub items_cache: HashMap<(ObjId, usize), Vec<InputMember>>,
     pub pos_cache: HashMap<ObjId, ObjId>,
+    /// The nets of the members at each terminal of a bundle, by bundle and terminal number, in the
+    /// order of the members ([`Interp::bundle_member_nets`]): a bundle's members, their terminals
+    /// and the nets their nodes name do not change once the scene's devices are prepared (11.8).
+    pub bundle_nets: HashMap<(ObjId, u32), Rc<[ObjId]>>,
     pub symbol: HashMap<ObjId, ObjId>,
     /// The dollar name written in the winning assignment, after aliases (10.1).
     pub symbol_names: HashMap<ObjId, String>,
@@ -359,6 +363,7 @@ impl Scene {
             symbol_label_owners: HashSet::new(),
             items_cache: HashMap::new(),
             pos_cache: HashMap::new(),
+            bundle_nets: HashMap::new(),
             symbol: HashMap::new(),
             symbol_names: HashMap::new(),
             bad_symbol_selections: HashSet::new(),
@@ -646,14 +651,7 @@ impl Interp<'_> {
                 return Ok(self.net_obj(s, &p));
             }
             ObjData::Bundle { .. } => {
-                let mut nets = Vec::new();
-                for (m, member_index) in self.bundle_member_terminals(s, owner, index) {
-                    // A heterogeneous bundle is still valid (11.8). A shorter member has no
-                    // corresponding terminal, so it contributes no net to this bundle pin.
-                    if let Some(node) = self.inst_of(m).nodes.get(member_index as usize - 1).cloned() {
-                        nets.push(self.inst_net(s, m, &node));
-                    }
-                }
+                let nets = self.bundle_member_nets(s, owner, index);
                 let Some(&first) = nets.first() else {
                     let l = self.label(t);
                     return self.fail(ctx, codes::NET_TERMINAL_ON_NO_NET, format!("{l} is on no net (6.5)"), off);
@@ -662,7 +660,7 @@ impl Interp<'_> {
                     return Ok(first);
                 }
                 return Ok(self.new_obj(ObjData::Set(Box::new(SetData::plain(
-                    nets.into_iter().map(|n| (n, true)).collect(),
+                    nets.iter().map(|&n| (n, true)).collect(),
                     false,
                 )))));
             }
@@ -686,14 +684,7 @@ impl Interp<'_> {
         let ObjData::Term { owner, index, .. } = self.o(t).clone() else { return Vec::new() };
         match self.o(owner).clone() {
             ObjData::Bundle { site, .. } => {
-                let mut nets: Vec<_> = self
-                    .bundle_member_terminals(s, owner, index)
-                    .into_iter()
-                    .filter_map(|(member, member_index)| {
-                        let node = self.inst_of(member).nodes.get(member_index as usize - 1).cloned()?;
-                        Some(self.inst_net(s, member, &node))
-                    })
-                    .collect();
+                let mut nets = self.bundle_member_nets(s, owner, index).to_vec();
                 if site.is_some() && nets.first().is_some_and(|first| nets.iter().all(|net| net == first)) {
                     nets.truncate(1);
                 }
@@ -710,6 +701,31 @@ impl Interp<'_> {
             }
             _ => Vec::new(),
         }
+    }
+
+    /// The nets of the members of `bundle` at its terminal numbered `index`, in the order of the
+    /// members; a shorter member, which has no such terminal, gives none (11.8). Taken once per
+    /// scene ([`Scene::bundle_nets`]); in debug builds, taken again on each later call and checked.
+    pub(crate) fn bundle_member_nets(&mut self, s: SceneId, bundle: ObjId, index: u32) -> Rc<[ObjId]> {
+        if let Some(nets) = self.scenes[s].bundle_nets.get(&(bundle, index)).cloned() {
+            debug_assert_eq!(*nets, *self.bundle_member_nets_now(s, bundle, index), "bundle nets changed");
+            return nets;
+        }
+        let nets: Rc<[ObjId]> = self.bundle_member_nets_now(s, bundle, index).into();
+        self.scenes[s].bundle_nets.insert((bundle, index), nets.clone());
+        nets
+    }
+
+    fn bundle_member_nets_now(&mut self, s: SceneId, bundle: ObjId, index: u32) -> Vec<ObjId> {
+        let mut nets = Vec::new();
+        for (member, member_index) in self.bundle_member_terminals(s, bundle, index) {
+            // A heterogeneous bundle is still valid (11.8). A shorter member has no corresponding
+            // terminal, so it contributes no net to this bundle pin.
+            if let Some(node) = self.inst_of(member).nodes.get(member_index as usize - 1).cloned() {
+                nets.push(self.inst_net(s, member, &node));
+            }
+        }
+        nets
     }
 
     /// A bundle terminal denotes the same name in each member (11.8).
