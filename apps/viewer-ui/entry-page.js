@@ -3,7 +3,7 @@ import { append, m, setAttr, setText } from "./i18n.js";
 // and the subcircuits that nothing calls are in the other files (roots.js). In place of the empty drawing, a card says
 // so and lists those subcircuits, each with its symbol, the file that defines it, its instances, and whether its file's
 // reading is kept, else how long it took the last time (file-reading.js `fileSummaries`); a click opens it, as the index does.
-// With one alone, a file opened opens it at once, and the card shows meanwhile.
+// With one alone, a file opened opens it at once, and the card shows meanwhile, with no symbols: they are not read for it.
 
 import { current, doc } from "./state.js";
 import { fileSummaries, readsByFile } from "./file-reading.js";
@@ -15,6 +15,13 @@ import { colourDrawing } from "./background.js";
 import { $, span } from "./util.js";
 
 const card = $("entry-card");
+// whether the open under way opens the one root of its entry page at once (open.js `openOnlyRoot`)
+let opensOnlyRoot = false;
+
+/** Say whether the open under way opens the one root of the entry page it shows at once (open.js). */
+export function setOpensOnlyRoot(on) {
+  opensOnlyRoot = on;
+}
 
 /**
  * The host levels the entry page lists for the level `level` of the Document shown: the subcircuits nothing calls, of
@@ -49,7 +56,8 @@ export function showEntryPage(level) {
   }
   append(card, heading, note, list);
   card.hidden = false;
-  void summarize(roots, items);
+  // (a root opened at once needs no symbol, nor the core to read its file for one)
+  if (!(roots.length === 1 && opensOnlyRoot)) void summarize(roots, items);
   return true;
 }
 
