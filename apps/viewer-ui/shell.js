@@ -64,6 +64,10 @@
  * @property {(id: string, enabled: boolean) => void} [setEnabled] Update a native command enabled state.
  * @property {boolean} [coreInPage] Whether the core runs in the page, as WebAssembly (the web's and the local program's
  *   shells): it is given the texts of the built-in files, which the desktop's core reads itself.
+ * @property {"page" | "release" | "release-and-page"} [oldViewer] Where the page of a level written in an earlier
+ *   version of the language, 0.2 or 0.3, sends the user (old-version.js): "page", the site's old web viewer, on the same
+ *   circuit (the web); "release", the release of RNL Viewer 0.5.3, to download (the desktop); "release-and-page", both,
+ *   the file opened there by hand (the local program). "page" when not given.
  * @property {boolean} [perFile] Whether the page reads the file of a source alone, in the context of its entry, with
  *   `reader` (file-reading.js; see the README's Reading the file shown alone); the page then names the file by the
  *   source's `view` (visit-source.js).

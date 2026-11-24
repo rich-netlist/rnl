@@ -26,6 +26,7 @@ import { progressBegin, progressEnd, progressEvent } from "./solve-progress.js";
 import { noteReport, solverSettings } from "./solve-settings.js";
 import { constraintsWanted, current, doc, setConstraintsWanted } from "./state.js";
 import { revealLine } from "./text.js";
+import { oldLevelShown } from "./old-version.js";
 import { $, span } from "./util.js";
 import { sameEntry, sameSource } from "./visit-source.js";
 
@@ -126,6 +127,9 @@ window.addEventListener("open-finished", () => {
  */
 export async function solve({ all = false, respace = false } = {}) {
   if (!shell || !shell.solve || running || modal() || isLoading()) return;
+  // a level written in a file of an earlier version is not read by the core: nothing to solve, and nothing to say but the
+  // page's notice (old-version.js)
+  if (!all && oldLevelShown() && !previewShown()) return;
   // (the preview shown, solved again; else the file shown, another file visited from a preview among them)
   const source = previewShown() ? shown.source : currentSource();
   if (!source || !doc) {

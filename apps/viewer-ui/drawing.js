@@ -23,6 +23,8 @@ import { hideParams, updateParams } from "./params.js";
 import { markUnplaced, scopeSource } from "./text.js";
 import { renderUnplaced } from "./unplaced.js";
 import { showUnplacedBar, unplacedLine } from "./unplaced-bar.js";
+import { oldVersion, setOldShown, showOldVersion } from "./old-version.js";
+import { currentSource } from "./open.js";
 import { $, clamp, svgElement } from "./util.js";
 import { paintUsages, usageAt, usagesAt } from "./usages.js";
 import { skeletonAt } from "./skeleton-lines.js";
@@ -67,9 +69,14 @@ export function showLevel(i, keptView) {
   setCurrent(i);
   notice("");
   const lv = doc.levels[i];
+  // a file of an earlier version of the language, none of whose RNL is read: the page says which viewer reads it, and
+  // nothing offers to solve it (no status of what a solver would place, no Solve: commands.js)
+  const old = oldVersion(doc, i, currentSource());
+  setOldShown(!!old);
+  const status = lv.status && !old ? m`Not drawn without a solver: ${lv.status}` : "";
   setText($("level-kind"), i === 0 ? m("top level") : lv.kind === "subckt" ? m("subcircuit") : m("file level"));
-  setText($("status"), lv.status ? m`Not drawn without a solver: ${lv.status}` : "");
-  setAttr($("status"), "title", lv.status ? m`Not drawn without a solver: ${lv.status}` : "");
+  setText($("status"), status);
+  setAttr($("status"), "title", status);
   if (svg) svg.remove();
   svg = null;
   overlay = null;
@@ -85,17 +92,23 @@ export function showLevel(i, keptView) {
   badgeAt = null;
   positionBadge();
   scale = lv.scale;
-  if (lv.empty) {
+  if (lv.empty || old) {
     paintUsages(null, null, groups);
     view = null;
     paintGrid(null);
     showPointer();
     setText($("zoom"), "");
+    showUnplacedBar(null);
+    if (old) {
+      showOldVersion($("empty"), old);
+      $("empty").hidden = false;
+      window.dispatchEvent(new Event("viewer-level"));
+      return;
+    }
     setText($("empty"), emptyMessage(lv));
     // nothing drawn because nothing has a position yet: the page offers the solve, not a bar
     const line = unplacedLine(lv);
     if (line) $("empty").append(document.createElement("br"), line);
-    showUnplacedBar(null);
     // an entry that only includes other files: the subcircuits nothing calls, in place of the message
     $("empty").hidden = showEntryPage(i);
     window.dispatchEvent(new Event("viewer-level"));
@@ -155,6 +168,7 @@ export function notice(text) {
 
 export function clearDrawing(message) {
   hideModule();
+  setOldShown(false);
   paintUsages(null, null, groups);
   cancelGesture();
   notice("");

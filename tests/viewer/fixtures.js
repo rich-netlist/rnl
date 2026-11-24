@@ -55,6 +55,10 @@ export const FILES = {
   "inverter-chain": "tests/conformance/equivalence-0.4/inverter-chain.scs",
   "T4-miller-conflicts": "tests/integration/solver/T4-miller-conflicts.sp",
   "va-top": "tests/viewer/inputs/va-top/top.scs",
+  // files of earlier versions of the language, which the core does not read (old-version.js)
+  "old-rc-0.3": "tests/viewer/inputs/old-version/rc-0.3.sp",
+  "old-rc-0.2": "tests/viewer/inputs/old-version/rc-0.2.sp",
+  "old-mixed": "tests/viewer/inputs/old-version/mixed-top.sp",
 };
 
 /**

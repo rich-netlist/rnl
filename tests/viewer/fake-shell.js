@@ -433,6 +433,8 @@ export default {
   } : {}),
   platform,
   nativeMenu: platform === "desktop",
+  // where a file of an earlier version is sent: the desktop's release page, or as `old-viewer=` says (the local program's)
+  oldViewer: params.get("old-viewer") ?? (platform === "desktop" ? "release" : "page"),
   // the desktop draws the menu bar the page plans (native-menu.js)
   ...(platform === "desktop" ? { setMenu: async (plan) => { fake.calls.push(["setMenu", plan]); } } : {}),
   formats: async () => { fake.calls.push(["formats"]); return FORMATS; },

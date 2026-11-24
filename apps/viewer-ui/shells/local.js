@@ -167,6 +167,9 @@ let solved = null;
 export default {
   ...shared,
   platform: "desktop",
+  // a file of an earlier version of the language: the release of the old viewer, which has no local program, and the old
+  // web viewer, where the file is opened by hand (old-version.js)
+  oldViewer: "release-and-page",
   /** The file named on the command line, the first of them; else none. */
   initial() {
     return Promise.resolve(session.initial.length > 0 ? serverSource(session.initial[0]) : null);
