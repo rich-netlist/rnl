@@ -334,8 +334,17 @@ pub fn read_previous(
         let none = r.problems.iter().map(|_| None).collect();
         return (r, none);
     }
-    let r = crate::interpret(doc.clone(), files, &without, sink.clone());
-    let with = crate::interpret(doc, files, &Options { generated: true, problems: true, ..options.clone() }, sink);
+    // the reading with them takes the objects of the authored records that the reading without them
+    // counted (5.9)
+    let mut counts = crate::AuthoredCounts::default();
+    let r = crate::interpret_taking(doc.clone(), files, &without, sink.clone(), &mut counts);
+    let with = crate::interpret_taking(
+        doc,
+        files,
+        &Options { generated: true, problems: true, ..options.clone() },
+        sink,
+        &mut counts,
+    );
     let previous = r.problems.iter().map(|p| previous(p, &with)).collect();
     (r, previous)
 }

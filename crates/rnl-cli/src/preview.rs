@@ -214,15 +214,25 @@ fn as_solved(entry: &str, mut run: SolveRun, files: &dyn Provider, options: &Sol
         ..BuildOptions::default()
     };
     // the texts as a solver reads them, without the records of the solver, so that the facts are
-    // those solved, at the lines where the Document shows them
-    let read =
-        |runtime: &Options| rnl_view::read_noting(entry, options.dialect.as_deref(), &options.formats, &both, runtime);
-    let again = read(&options.runtime())?;
-    // and with them, which is what is drawn: the facts are measured there. The last check that a
-    // record reads back read the same: the texts it held over the files are those the solve wrote
-    let with = match readings.written.filter(|(texts, _)| run.entry == entry && holds_the_files(texts, &run)) {
-        Some((_, read)) => read,
-        None => read(&Options { generated: true, problems: true, ..options.runtime() })?,
+    // those solved, at the lines where the Document shows them; and with them, which is what is
+    // drawn: the facts are measured there. The last check that a record reads back read the same:
+    // the texts it held over the files are those the solve wrote. Else the reading with them is
+    // made here, and takes the objects of the authored records that the one without them counted
+    // (5.9)
+    let written = readings.written.filter(|(texts, _)| run.entry == entry && holds_the_files(texts, &run));
+    let read = |runtime: &Options, counts: &mut rnl_runtime::AuthoredCounts| {
+        rnl_view::read_noting_taking(entry, options.dialect.as_deref(), &options.formats, &both, runtime, counts)
+    };
+    let mut counts = rnl_runtime::AuthoredCounts::default();
+    let (again, with) = match written {
+        Some((_, with)) => (
+            rnl_view::read_noting(entry, options.dialect.as_deref(), &options.formats, &both, &options.runtime())?,
+            with,
+        ),
+        None => {
+            let again = read(&options.runtime(), &mut counts)?;
+            (again, read(&Options { generated: true, problems: true, ..options.runtime() }, &mut counts)?)
+        }
     };
     // the Document reads the texts with their records and without, as these two did where it
     // reads them alike ([`Options::reads_as`]): it takes them instead of reading again

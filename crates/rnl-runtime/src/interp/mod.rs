@@ -267,12 +267,22 @@ pub struct Interpretation {
     /// What the last record of the solver of each level gives, read with the records of the solver
     /// and with [`Options::problems`] (see [`crate::previous::previous`]).
     pub(crate) results: Vec<RecordResult>,
+    /// The objects of the authored records that a reading of [`interpret_taking`] gave.
+    pub(crate) given: AuthoredCounts,
 }
 
 impl Interpretation {
     /// The diagnostics a user sees (7.6).
     pub fn diagnostics(&self) -> Vec<&crate::diag::Diag> {
         self.sink.shown(&self.checking_package)
+    }
+
+    /// The objects of the authored records that this reading gave, made by [`interpret_taking`]: for
+    /// a reading after it of the same document, such as with the records of the solver, or with
+    /// another record of the solver written into a level, to take (5.9). None for a reading of
+    /// [`interpret`].
+    pub fn authored_counts(&self) -> AuthoredCounts {
+        self.given.clone()
     }
 }
 
@@ -1222,19 +1232,22 @@ impl<'p> Interp<'p> {
         }
         let mut model = self.build_model();
         self.hint_crowded_nodes(&model);
+        // the objects of the authored records for another reading (5.9): a reading that counts
+        // them gives those alone; one without the records of the solver that gives them counts
+        // them as that one does, before its problems are built
+        let counting = self.numbers.count;
+        let giving = self.numbers.give && !self.read_generated && self.package_main.is_none();
+        let counted: HashMap<LevelId, AuthoredCount> = if counting || giving {
+            (0..self.scenes.len()).map(|s| (self.scenes[s].level, self.counted_authored(s))).collect()
+        } else {
+            HashMap::new()
+        };
         let (mut problems, results) =
             if self.want_problems && self.package_main.is_none() { self.build_problems() } else { Default::default() };
         // the levels above the file were built for the rules they hold, and are not given
         model.levels.retain(|l| self.gives(l.level));
         problems.retain(|p| self.gives(p.level));
-        // the numbers and their checks (5.9); a reading that counts the objects of the authored
-        // records for another gives those alone
-        let counting = self.numbers.count;
-        let counted: HashMap<LevelId, AuthoredCount> = if counting {
-            (0..self.scenes.len()).map(|s| (self.scenes[s].level, self.counted_authored(s))).collect()
-        } else {
-            HashMap::new()
-        };
+        // the numbers and their checks (5.9)
         let numbering: Vec<LevelNumbering> = if !counting && self.package_main.is_none() {
             let mut all: Vec<LevelNumbering> = (0..self.scenes.len()).map(|s| self.level_numbering(s)).collect();
             all.retain(|n| self.gives(n.level));
@@ -1285,6 +1298,7 @@ impl<'p> Interp<'p> {
             own,
             forward,
             results,
+            given: AuthoredCounts::default(),
             doc: self.doc,
         }
     }
@@ -1312,15 +1326,23 @@ impl<'p> Interp<'p> {
 ///   The checks given are those of the reading before, where every number is read: the text as
 ///   written.
 pub fn interpret(doc: HostDocument, provider: &dyn Provider, options: &Options, sink: Sink) -> Interpretation {
-    interpret_counted(doc, provider, &options.read_options(), sink, &mut AuthoredCounts::default(), true)
+    interpret_counted(doc, provider, &options.read_options(), sink, &mut AuthoredCounts::default(), Counts::None, true)
 }
 
-/// [`interpret`], the objects of the authored records taken from `counts` when it has them, instead
-/// of counted by reading the document without its records of the solver first (5.9), and `counts`
-/// given those this reading counts. `counts` has to be what that reading of `doc` would count: that
-/// of a document that differs from `doc` only in the text of records of the solver, each in the
-/// same lines, the same files read with the same options. A debug build counts again and checks
-/// that they are the same.
+/// [`interpret`], the objects of the authored records taken from `counts` instead of counted by
+/// reading the document without its records of the solver first, when they were counted of what
+/// that reading of `doc` would count of (5.9), and `counts` given the objects this reading counts:
+///
+/// - read without the records of the solver ([`Options::generated`] false), its own, counted
+///   before its problems are built, as the reading that counts them would count them;
+/// - read with them, those it took, else those that the reading without them that it made first
+///   counted.
+///
+/// So a reading with the records of the solver takes the objects of the reading without them made
+/// before it, or of another reading with them, of the same document but for the text of its
+/// records of the solver. `counts` hold what they were counted of ([`AuthoredCounts`]); when this
+/// reading would count something else, it counts. A debug build counts again whenever they are
+/// taken and checks that they are the same.
 pub fn interpret_taking(
     doc: HostDocument,
     provider: &dyn Provider,
@@ -1328,50 +1350,156 @@ pub fn interpret_taking(
     sink: Sink,
     counts: &mut AuthoredCounts,
 ) -> Interpretation {
-    interpret_counted(doc, provider, &options.read_options(), sink, counts, true)
+    interpret_counted(doc, provider, &options.read_options(), sink, counts, Counts::Checked, true)
 }
 
 /// The objects of the authored records of each level as the reading of a document without its
 /// records of the solver counted them (5.9), which a reading of the document with its records of
-/// the solver takes. A reading of the same document with other records of the solver in a level,
-/// the same files read, would count the same: [`interpret_numbering`] takes them from the reading
-/// before instead.
+/// the solver takes, with what they were counted of:
+///
+/// - the options of the reading but [`Options::generated`] and [`Options::problems`];
+/// - each record of the host document but those of the solver, with its level, its place among all
+///   its records, its file, its line and column, its lines and its text; the dialect and the
+///   formats of the files;
+/// - the texts of the host files, the lines of the records of the solver left out: lines that
+///   hold such a record and nothing else, but the comment marker before it;
+/// - the package files read, with their texts.
+///
+/// That is all that the count depends on: the reading that counts skips the records of the solver
+/// (2.8), and each object counted is known by the record that made it, by its place among the
+/// records, and by the file, line and column where that record starts (5.9). A document with a
+/// record of the solver on a line that holds something else has no such digest, and its objects are
+/// never taken. A reading takes them when its own document, options and packages read give the
+/// same ([`interpret_taking`]).
 #[derive(Clone, Default)]
-pub struct AuthoredCounts(Option<Rc<HashMap<LevelId, AuthoredCount>>>);
+pub struct AuthoredCounts(Option<Rc<Given>>);
+
+/// The objects counted, with what they were counted of, when that is known.
+struct Given {
+    counts: Rc<HashMap<LevelId, AuthoredCount>>,
+    of: Option<CountedOf>,
+}
+
+/// What a count of the objects of the authored records was made of ([`AuthoredCounts`]).
+#[derive(Clone, PartialEq)]
+struct CountedOf {
+    options: ReadOptions,
+    doc: DocKey,
+    packages: Vec<(String, String)>,
+}
+
+/// A record of a host document as a count of the objects of the authored records depends on it:
+/// its level, its place among all the records, its file, the line and column where it starts, its
+/// lines and its text.
+type RecordKey = (usize, usize, String, u32, u32, (u32, u32), String);
+
+/// What a count of the objects of the authored records depends on in a host document
+/// ([`AuthoredCounts`]), kept as it is.
+#[derive(Clone, PartialEq)]
+struct DocKey {
+    /// The dialect and the formats of the files.
+    formats: String,
+    /// Every record but those of the solver.
+    records: Vec<RecordKey>,
+    /// The texts of the host files by name, without the lines of the records of the solver; shared
+    /// with the key a count was given with when they are the same.
+    texts: Vec<(String, Rc<str>)>,
+}
+
+/// How a reading takes and gives the objects of the authored records.
+#[derive(Clone, Copy, PartialEq)]
+enum Counts {
+    /// Neither: [`interpret`].
+    None,
+    /// Takes them when they were counted of what it would count of, and gives them.
+    Checked,
+    /// Takes them whatever they were counted of, and gives them: [`interpret_numbering`] for the
+    /// records of the solver of one level finished one after another in the document of the
+    /// problem, as [`crate::solution::LevelFinisher::finish`] reads them.
+    Trusted,
+}
 
 /// [`interpret`] for the checks of the numbers of the levels (5.9), [`Interpretation::numbering`]:
-/// the objects of the authored records as `counts` has them, when it has them, and `counts` given
-/// those this reading counts. The reading again that a record of the solver without `numbering`, or
-/// whose `numbering` is out of date, takes is not made: the checks are those of the reading before
-/// it, which this gives. So the rest of the interpretation is not that of [`interpret`] where such a
-/// record is read.
+/// the objects of the authored records taken from `counts`, and `counts` given those this reading
+/// counts: when `trusted`, whatever they were counted of, else as [`interpret_taking`] takes them.
+/// The reading again that a record of the solver without `numbering`, or whose `numbering` is out
+/// of date, takes is not made: the checks are those of the reading before it, which this gives. So
+/// the rest of the interpretation is not that of [`interpret`] where such a record is read.
 pub(crate) fn interpret_numbering(
     doc: HostDocument,
     provider: &dyn Provider,
     options: &Options,
     counts: &mut AuthoredCounts,
+    trusted: bool,
 ) -> Interpretation {
-    interpret_counted(doc, provider, &options.read_options(), Sink::new(), counts, false)
+    let how = if trusted { Counts::Trusted } else { Counts::Checked };
+    interpret_counted(doc, provider, &options.read_options(), Sink::new(), counts, how, false)
 }
 
-/// [`interpret`], the objects of the authored records taken from `counts` and given to it, and the
-/// reading again for the records of the solver whose numbers do not hold made when `recheck`.
+/// The options that a count of the objects of the authored records is made with.
+fn counting_options(options: &ReadOptions) -> ReadOptions {
+    ReadOptions { generated: false, problems: false, ..options.clone() }
+}
+
+/// [`interpret`], the objects of the authored records taken from `counts` and given to it as `how`
+/// says, and the reading again for the records of the solver whose numbers do not hold made when
+/// `recheck`.
 fn interpret_counted(
     doc: HostDocument,
     provider: &dyn Provider,
     options: &ReadOptions,
     sink: Sink,
     counts: &mut AuthoredCounts,
+    how: Counts,
     recheck: bool,
 ) -> Interpretation {
     let host = sink.clone();
+    // a reading without the records of the solver takes nothing: it counts as it reads. The key of
+    // the document as given, made to check a count, is also that of the count this reading gives
+    let give = how != Counts::None;
+    let records_of_the_solver = || doc.levels.iter().any(|l| l.records.iter().any(|r| r.text.contains("generated")));
+    let like = counts.0.as_ref().and_then(|given| given.of.as_ref()).map(|of| &of.doc);
+    let key = (give && (!options.generated || records_of_the_solver())).then(|| doc_key(&doc, like)).flatten();
+    let mut taken = match (&counts.0, how) {
+        (Some(given), Counts::Trusted) if options.generated => Some(given.clone()),
+        (Some(given), Counts::Checked) if options.generated => given
+            .of
+            .as_ref()
+            .filter(|of| of.options == counting_options(options) && key.as_ref() == Some(&of.doc))
+            .map(|_| given.clone()),
+        _ => None,
+    };
     #[cfg(debug_assertions)]
-    if let Some(taken) = &counts.0 {
-        check_taken(&doc, provider, options, &host, taken);
+    if let Some(given) = &taken {
+        check_taken(&doc, provider, options, &host, &given.counts);
     }
-    let mut run = NumberRun { authored: counts.0.clone(), ..NumberRun::default() };
+    let mut run = NumberRun { authored: taken.as_ref().map(|t| t.counts.clone()), give, ..NumberRun::default() };
     let mut out = read(doc, provider, options, sink, &host, &mut run);
-    counts.0 = run.authored.clone();
+    // a package file read otherwise than when they were counted: counted again
+    let packages_hold = |given: &Given, out: &Interpretation| {
+        given.of.as_ref().is_none_or(|of| package_files_hold(&of.packages, &out.package_files))
+    };
+    if taken.as_ref().is_some_and(|t| how == Counts::Checked && !packages_hold(t, &out)) {
+        taken = None;
+        run = NumberRun { give, ..NumberRun::default() };
+        out = read(out.doc, provider, options, host.clone(), &host, &mut run);
+    }
+    if give {
+        let of = |packages: Vec<(String, String)>| {
+            key.map(|doc| CountedOf { options: counting_options(options), doc, packages })
+        };
+        counts.0 = match taken {
+            Some(given) => Some(given),
+            None if !options.generated => Some(Rc::new(Given {
+                of: of(out.package_files.clone()),
+                counts: Rc::new(std::mem::take(&mut out.counted)),
+            })),
+            None => run
+                .authored
+                .clone()
+                .map(|counted| Rc::new(Given { of: of(std::mem::take(&mut run.counted_packages)), counts: counted })),
+        };
+    }
     for _ in 0..3 {
         let same = run.own.as_ref().is_some_and(|own| **own == out.own);
         if !out.forward && (run.own.is_none() || same) {
@@ -1387,6 +1515,9 @@ fn interpret_counted(
         out = read(out.doc, provider, options, host.clone(), &host, &mut again);
         out.numbering = numbering;
         out.recheck = NumberRun::default();
+    }
+    if give {
+        out.given = counts.clone();
     }
     out
 }
@@ -1408,11 +1539,94 @@ fn read(
         let counting = NumberRun { count: true, ..NumberRun::default() };
         let first = Interp::new_run(it.doc.clone(), provider, &without, host.clone(), counting.clone())
             .run_settled(|x| Interp::new_run(x.doc, provider, &without, host.clone(), counting.clone()));
+        if run.give {
+            run.counted_packages = first.package_files.clone();
+        }
         run.authored = Some(Rc::new(first.counted));
         it.numbers.authored = run.authored.clone();
     }
     let again = run.clone();
     it.run_settled(|x| Interp::new_run(x.doc, provider, options, host.clone(), again.clone()))
+}
+
+/// Whether every package file of `counted`, by its path and text, was read, `read`, with the same
+/// text.
+fn package_files_hold(counted: &[(String, String)], read: &[(String, String)]) -> bool {
+    let read: HashMap<&str, &str> = read.iter().map(|(path, text)| (path.as_str(), text.as_str())).collect();
+    counted.iter().all(|(path, text)| read.get(path.as_str()) == Some(&text.as_str()))
+}
+
+/// What the count of the objects of the authored records of `doc` depends on in the host document
+/// ([`AuthoredCounts`]), with the texts of `like` where they are the same; None when a record of
+/// the solver is on a line that holds anything else but a comment marker before it.
+fn doc_key(doc: &HostDocument, like: Option<&DocKey>) -> Option<DocKey> {
+    let mut dialects: Vec<String> = doc.file_dialects.iter().map(|(f, x)| format!("{f}={x:?}")).collect();
+    dialects.sort();
+    let formats = format!("{:?}|{:?}|{}", doc.dialect, doc.file_formats, dialects.join(","));
+    let texts: HashMap<&str, &str> = doc.sources.iter().map(|(file, text)| (file.as_str(), text.as_str())).collect();
+    let mut left_out: HashMap<&str, Vec<(u32, u32)>> = HashMap::new();
+    let mut records = Vec::new();
+    let mut place = 0usize;
+    for (level, lv) in doc.levels.iter().enumerate() {
+        for r in &lv.records {
+            if r.text.contains("generated") && unit::is_generated_record(&crate::syntax::parse_record(&r.text)) {
+                if !alone_on_its_lines(r, texts.get(r.file.as_str())?) {
+                    return None;
+                }
+                left_out.entry(r.file.as_str()).or_default().push(r.lines);
+            } else {
+                let at = r.loc(0);
+                records.push((level, place, r.file.clone(), at.line, at.col, r.lines, r.text.clone()));
+            }
+            place += 1;
+        }
+    }
+    let texts = doc
+        .sources
+        .iter()
+        .enumerate()
+        .map(|(k, (file, text))| {
+            let kept: std::borrow::Cow<str> = match left_out.get(file.as_str()) {
+                None => text.into(),
+                Some(spans) => text
+                    .split_inclusive('\n')
+                    .enumerate()
+                    .filter(|(k, _)| {
+                        let no = *k as u32 + 1;
+                        !spans.iter().any(|&(first, last)| first <= no && no <= last)
+                    })
+                    .map(|(_, line)| line)
+                    .collect::<String>()
+                    .into(),
+            };
+            let same = like.and_then(|l| l.texts.get(k)).filter(|(f, t)| f == file && **t == *kept);
+            (file.clone(), same.map_or_else(|| Rc::from(kept.as_ref()), |(_, t)| t.clone()))
+        })
+        .collect();
+    Some(DocKey { formats, records, texts })
+}
+
+/// Whether record `r` is alone on its lines of `text`, the text of its file: each of them holds a
+/// part of it and before that nothing but a comment marker, which no letter or digit is in.
+fn alone_on_its_lines(r: &crate::host::Record, text: &str) -> bool {
+    let chars: Vec<char> = r.text.chars().collect();
+    let (first, last) = r.lines;
+    if last < first || r.segs.len() != (last - first + 1) as usize {
+        return false;
+    }
+    let lines: Vec<&str> = text.split('\n').skip(first as usize - 1).take(r.segs.len()).collect();
+    lines.len() == r.segs.len()
+        && r.segs.iter().zip(&lines).enumerate().all(|(k, (seg, line))| {
+            let end = r.segs.get(k + 1).map_or(chars.len(), |next| next.off.saturating_sub(1));
+            let Ok(col) = usize::try_from(seg.col) else { return false };
+            let line: Vec<char> = line.trim_end_matches('\r').chars().collect();
+            seg.line == first + k as u32
+                && seg.off <= end
+                && end <= chars.len()
+                && col <= line.len()
+                && !line[..col].iter().any(|c| c.is_alphanumeric())
+                && line[col..].starts_with(&chars[seg.off..end])
+        })
 }
 
 /// A debug build's check of the objects of the authored records taken from a reading of another

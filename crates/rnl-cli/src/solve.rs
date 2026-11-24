@@ -623,9 +623,19 @@ fn pass(
     let runtime = options.runtime();
     let files = Noting::new(files);
     let mut memory = MemoryProvider::new();
+    // each reading gives the objects of the authored records it counts, for the readings of the
+    // level with its record of the solver written to take (5.9)
     let read = |memory: &MemoryProvider| -> Result<Interpretation, String> {
         let both = Layered { layers: vec![memory, &files] };
-        rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, &both, &runtime)
+        let mut counts = rnl_runtime::AuthoredCounts::default();
+        rnl_view::interpret_with_taking(
+            &entry,
+            options.dialect.as_deref(),
+            &options.formats,
+            &both,
+            &runtime,
+            &mut counts,
+        )
     };
     // the time of a reading of the document, on the clock the limits are read on
     let reading = clock.elapsed();
@@ -1631,7 +1641,8 @@ mod tests {
     /// the reading of the document with it written with its `numbering` takes the objects of the
     /// authored records that the finish counted (5.9), instead of counting them again by reading the
     /// document without its records of the solver. So does the trial of a dot, whose text differs
-    /// from the one counted in that record alone, and the reading of the trial.
+    /// from the one counted in that record alone, and the reading of the trial. The finish takes
+    /// them from the reading that the problem was read from, without the records of the solver.
     #[test]
     fn the_reading_of_a_record_written_takes_the_count_of_its_finish() {
         // a dot on the net b, which the solve places and checks by reading its trial; the usage of
@@ -1650,9 +1661,91 @@ mod tests {
         let text = &run.files[0].text;
         assert!(text.contains("$JUNCTION"), "the dot is placed");
         assert!(text.contains("numbering="), "the record uses a number");
-        // the finish of the record counts; the reading of it written, the finish of the trial and
-        // the reading of the trial take that count. Before, the reading of the record written and
-        // the reading of the trial each counted again (3)
+        // the finish of the record takes the count of the reading that the problem was read from;
+        // the reading of it written, the finish of the trial and the reading of the trial take it
+        // too. Before, the finish counted (1)
+        assert_eq!(counted, 0);
+    }
+
+    /// A level whose authored records the record of the solver comes after, nothing after it: the
+    /// document as the problem was read from it, without records of the solver.
+    const ALONE: &str = "* alone\n\
+        * @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
+        R1 a b 1k\nR2 b 0 1k\nC1 a 0 1p\n\
+        * @RNL { #R1 @PLACE(0, 0); {#R1 #R2} @ALIGN(\"x\") }\n\
+        .end\n";
+
+    /// The reading of a record of the solver that uses no number, written, takes the objects of the
+    /// authored records that the reading the problem was read from counted (5.9): the two documents
+    /// differ in the record alone, which comes after every other.
+    #[test]
+    fn the_reading_of_a_record_written_takes_the_count_of_the_problem() {
+        let files = MemoryProvider::new().with("/w/t.sp", ALONE);
+        let options =
+            SolveOptions { solver: rnl_solver::SolverOptions::without_time_limit(), ..SolveOptions::default() };
+        let before = rnl_runtime::countings();
+        let run = solve(Path::new("/w/t.sp"), &files, &options).unwrap();
+        let counted = rnl_runtime::countings() - before;
+        let text = &run.files[0].text;
+        assert!(text.contains("type=\"generated\""), "{text}");
+        assert!(!text.contains("numbering="), "the record uses no number: {text}");
+        // before, the reading of the record written counted (1)
+        assert_eq!(counted, 0);
+    }
+
+    /// The objects of the authored records are counted again when the record of the solver moves
+    /// another record: here the record of the subcircuit's level, written at its end, moves the
+    /// authored record of the file's level after it down, whose objects are known by its line (5.9).
+    #[test]
+    fn a_record_that_moves_another_is_read_with_the_objects_counted_again() {
+        const NET: &str = "* moved\n\
+            * @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
+            .subckt sub a b\nR1 a b 1k\nR2 a b 1k\n\
+            * @RNL { #R1 @PLACE(0, 0) }\n\
+            .ends sub\n\
+            X1 n1 n2 sub\nR9 n1 n2 1k\n\
+            * @RNL { #R9 @PLACE(0, 0); (5, 5) @TEXT(\"x\") }\n\
+            .end\n";
+        let files = MemoryProvider::new().with("/w/t.sp", NET);
+        let options = SolveOptions {
+            solver: rnl_solver::SolverOptions::without_time_limit(),
+            level: Some("sub".into()),
+            ..SolveOptions::default()
+        };
+        let before = rnl_runtime::countings();
+        let run = solve(Path::new("/w/t.sp"), &files, &options).unwrap();
+        let counted = rnl_runtime::countings() - before;
+        let text = &run.files[0].text;
+        let record = text.find("type=\"generated\"").expect("the level is solved");
+        assert!(record < text.find(".ends").unwrap(), "{text}");
+        // the reading of the record written counts: the record of the file's level is on another line
         assert_eq!(counted, 1);
+    }
+
+    /// A viewer's reading of a solved document with the constraints, and a solver's two readings of
+    /// it, read it without the records of the solver first, and the reading with them takes the
+    /// objects of the authored records that one counted (5.9).
+    #[test]
+    fn the_readings_with_and_without_the_records_count_once() {
+        let files = MemoryProvider::new().with("/w/t.sp", ALONE);
+        let options =
+            SolveOptions { solver: rnl_solver::SolverOptions::without_time_limit(), ..SolveOptions::default() };
+        let run = solve(Path::new("/w/t.sp"), &files, &options).unwrap();
+        let solved = MemoryProvider::new().with("/w/t.sp", &run.files[0].text);
+        let before = rnl_runtime::countings();
+        let constraints =
+            rnl_view::BuildOptions { constraints: true, hints: true, ..rnl_view::BuildOptions::default() };
+        let document = rnl_view::build("/w/t.sp", &solved, &constraints).unwrap();
+        assert!(document.levels[0].constraints.is_some());
+        let (_, previous) =
+            rnl_view::read_previous("/w/t.sp", None, &solved, &rnl_runtime::Options::default()).unwrap();
+        assert!(previous[0].is_some());
+        // before, each counted (2)
+        assert_eq!(rnl_runtime::countings() - before, 0);
+        // a viewer's reading with the hints alone makes no reading without them: it counts, as before
+        let hints = rnl_view::BuildOptions { hints: true, ..rnl_view::BuildOptions::default() };
+        let before = rnl_runtime::countings();
+        rnl_view::build("/w/t.sp", &solved, &hints).unwrap();
+        assert_eq!(rnl_runtime::countings() - before, 1);
     }
 }
