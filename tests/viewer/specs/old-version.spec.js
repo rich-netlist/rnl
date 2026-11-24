@@ -101,10 +101,10 @@ test.describe("the page, with the fake shell", () => {
       const i18n = await import("./i18n.js");
       await i18n.setLanguage(i18n.uiLanguages().find((l) => l.lang === "zh").code);
     });
-    // its two lines again, the link in the second (the texts are English until they are translated)
+    // its two lines again, in Chinese, the link in the second
     await expect(notice(page).locator("br")).toHaveCount(1);
     await expect(notice(page).getByRole("link")).toHaveAttribute("href", OLD_RELEASE);
-    await expect(notice(page)).toContainText("(RNL 0.3)");
+    await expect(notice(page)).toContainText("不支持的旧文件格式（RNL 0.3）");
   });
 });
 
