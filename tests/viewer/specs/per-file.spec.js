@@ -172,7 +172,7 @@ test('an included file opens from the Library in the context of the entry, and A
   await expect(files.locator('.pool-include .pool-include-name')).toHaveText(['cells.inc']);
 });
 
-test('a package file a header names by its path is read once for each reader after the first: no reading is made twice', async ({ page }) => {
+test('a package file a header names by its path is given with the first request of each reader: no reader, the first included, reads twice', async ({ page }) => {
   // the files each request to the core reads alone (FileResult), in the order asked
   await page.addInitScript(() => {
     window.fileReadings = [];
@@ -186,13 +186,14 @@ test('a package file a header names by its path is read once for each reader aft
   const header = '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="acme", version="1.0", path="acme.rnl") }\n';
   const acme = '@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="acme", version="1.0") }\n@RNL { $acme = @DEFINE-STYLE(linewidth=1) {} }\n';
   await open(page, { top: TOP.replace('* top\n', `* top\n${header}`), more: [['acme.rnl', acme]] });
-  // the first reader of the entry learns of the package from the core's answer, and asks again with it
+  // the outline lists the package among the files missing, so the first reader of the entry gives it
+  // with its first request
   const readings = () => page.evaluate(() => window.fileReadings);
-  expect(await readings()).toEqual(['top.sp', 'top.sp']);
-  // the next reader gives it with its first request
+  expect(await readings()).toEqual(['top.sp']);
+  // and so does the next reader
   await descendNamed(page, 'X1');
   expect(await shown(page)).toMatchObject({ file: 'cells.inc', level: 'cell' });
-  expect(await readings()).toEqual(['top.sp', 'top.sp', 'cells.inc']);
+  expect(await readings()).toEqual(['top.sp', 'cells.inc']);
   expect(await page.evaluate(() => window.viewer.doc.diagnostics.filter(d => /acme/.test(d.message)).map(d => d.message))).toEqual([]);
 });
 

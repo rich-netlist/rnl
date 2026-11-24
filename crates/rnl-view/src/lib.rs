@@ -510,7 +510,9 @@ pub fn snapshot(entry: &str, files: &dyn Provider, options: &BuildOptions, parts
 /// the levels and the subcircuits each calls, the language version and packages of each file, and
 /// the diagnostics of reading the netlist ([`Outline`]). `files` and the `dialect` and `formats` of
 /// `options` are read as [`build`] reads them; its other options do not change it. A package file
-/// ([`entry_format`]) is not read: its outline is the file alone. Fails as [`build`] does.
+/// ([`entry_format`]) is not read: its outline is the file alone. The package files that records
+/// name by path are read as the reading reads them, so that those `files` does not have are among
+/// its missing files. Fails as [`build`] does.
 pub fn outline(entry: &str, files: &dyn Provider, options: &BuildOptions) -> Result<Outline, String> {
     let ws = Workspace::with_formats(files, &options.formats);
     let path = slashed(entry);
@@ -523,6 +525,7 @@ pub fn outline(entry: &str, files: &dyn Provider, options: &BuildOptions) -> Res
     }
     let mut sink = Sink::new();
     let doc = read_host_in(entry, reading, &ws, &mut sink)?;
+    outline::read_named_packages(&doc, &ws);
     Ok(outline::outline(entry, doc, sink, ws.missing.into_inner()))
 }
 

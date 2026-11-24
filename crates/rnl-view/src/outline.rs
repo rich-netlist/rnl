@@ -2,13 +2,14 @@
 //! shows the tree of its levels, the files and how they include each other from it, and keys what
 //! it keeps of each file by it, without building the Document.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use rnl_runtime::diag::{Diag, Sink};
 use rnl_runtime::host::{dialect_key, file_name, package, HostDocument, LevelKind};
-use rnl_runtime::interp::unit::header_packages;
+use rnl_runtime::interp::unit::{header_packages, is_package_named, package_paths, PackagePath};
 use rnl_runtime::numbering::{hex, sha256};
-use rnl_runtime::source::{dirname, relative_to};
+use rnl_runtime::records::{package_lines, scan_package_run};
+use rnl_runtime::source::{dirname, join, relative_to, Provider};
 use rnl_runtime::syntax::{parse_record, Value};
 use serde::Serialize;
 
@@ -45,7 +46,8 @@ pub struct Outline {
     /// among them.
     pub diagnostics: Vec<Diagnostic>,
     /// The files the core asked for and did not get, as [`crate::Document::missing`]: a frontend
-    /// that can read them adds them and asks again.
+    /// that can read them adds them and asks again. Among them are the package files that records
+    /// name by `path=`, read as the reading reads them, so that the reading that follows has them.
     pub missing: Vec<String>,
 }
 
@@ -269,6 +271,56 @@ pub(crate) fn outline(entry: &str, doc: HostDocument, sink: Sink, missing: Vec<S
     }
 }
 
+/// Read the package files that the records of `doc` name by path, as the reading reads them first
+/// (16.2, 16.5): joined to the directory of the file that holds the record. Of each that is the
+/// package it names, the packages its header record names by path are read in turn, joined to its
+/// own directory. A file `files` does not have is then among the missing files of the outline,
+/// before any RNL is interpreted. Only records that write USE-PACKAGE or USE-ALIASES are parsed.
+pub(crate) fn read_named_packages(doc: &HostDocument, files: &dyn Provider) {
+    let mut named: Vec<(String, PackagePath)> = Vec::new();
+    for (k, lv) in doc.levels.iter().enumerate() {
+        let mut dir = None;
+        for rec in lv.records.iter().filter(|r| r.text.contains("USE-PACKAGE") || r.text.contains("USE-ALIASES")) {
+            let dir = dir.get_or_insert_with(|| file_dir(doc, k));
+            named.extend(package_paths(&rec.text).into_iter().map(|p| (dir.clone(), p)));
+        }
+    }
+    let mut seen: HashSet<(String, String, Option<String>)> = HashSet::new();
+    let mut at = 0;
+    while at < named.len() {
+        let (dir, package) = named[at].clone();
+        at += 1;
+        let target = join(&dir, &package.path);
+        if !seen.insert((target.clone(), package.name.clone(), package.version.clone())) {
+            continue;
+        }
+        let Some(text) = files.read(&target) else { continue };
+        if !is_package_named(&text, &package) {
+            continue;
+        }
+        // a package file names the packages it refers to in its header record, its first (16.2)
+        let records = scan_package_run(&package_lines(&text), &target, &mut Sink::new());
+        if let Some(head) = records.first().filter(|r| is_header(&r.text)) {
+            let dir = dirname(&target);
+            named.extend(package_paths(&head.text).into_iter().map(|p| (dir.clone(), p)));
+        }
+    }
+}
+
+/// The directory of the file a level's records are read in, as the reading joins a path to it: of
+/// the file level that holds the level, or of the main file.
+fn file_dir(doc: &HostDocument, level: usize) -> String {
+    let mut at = Some(level);
+    while let Some(k) = at {
+        let lv = &doc.levels[k];
+        if lv.kind == LevelKind::File {
+            return dirname(&lv.path);
+        }
+        at = lv.parent;
+    }
+    dirname(&doc.levels[0].path)
+}
+
 /// The outline of a package file, which is checked on its own and has no netlist: the file alone.
 pub(crate) fn package_outline(entry: &str, path: &str, text: &str, format: &str, default: &str) -> Outline {
     let records =
@@ -407,8 +459,9 @@ mod tests {
             };
             assert!(d.diagnostics.iter().any(|y| same(&y)), "{x:?}");
         }
-        // a Document asks for more: the package files it reads by path
-        assert!(o.missing.iter().all(|m| d.missing.contains(m)), "{:?} {:?}", o.missing, d.missing);
+        // the outline asks for what the Document asks for: the package files read by path too
+        let set = |m: &[String]| m.iter().cloned().collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(set(&o.missing), set(&d.missing), "{}", o.path);
     }
 
     #[test]
@@ -556,6 +609,40 @@ X2 m out inv
         let s = outline("/w/top.sp", &files.with("/w/top.sp", &solved), &BuildOptions::default()).unwrap();
         assert_eq!(s.files[0].records, 1);
         assert_eq!(serde_json::to_value(&o.files[0]).unwrap()["records"], 0);
+    }
+
+    #[test]
+    fn the_package_files_named_by_path_are_missing_until_given() {
+        // the entry names a package by path, and so does a file it includes from below it
+        let top = "* top\n.include \"sub/cells.inc\"\nX1 a b inv\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"acme\", path=\"pkg/acme.rnl\")}\n.end\n";
+        // a path relative to the including file's directory; one with a body or a malformed version
+        // is not read
+        let cells = "* cells\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"deep\", version=\"1.0\", path=\"../lib/deep.rnl\"); @USE-PACKAGE(name=\"inline\", path=\"no/inline.rnl\") {}; @USE-PACKAGE(name=\"bad\", version=\"1\", path=\"no/bad.rnl\")}\n.subckt inv in out\nR1 in out 1k\n.ends\n";
+        let package = |name: &str, header: &str| {
+            format!("@RNL(type=\"header\") {{ @VERSION(\"0.4\"); @PACKAGE(name=\"{name}\", version=\"1.0\"){header}}}\n@RNL {{ $MARK_{name} = @DEFINE(roles=[\"p\"]) {{}} }}\n")
+        };
+        let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/sub/cells.inc", cells);
+        let read = |files: &MemoryProvider| {
+            let o = outline("/w/top.sp", files, &BuildOptions::default()).unwrap();
+            let d = build("/w/top.sp", files, &BuildOptions::default()).unwrap();
+            agree(&o, &d);
+            o.missing
+        };
+        assert_eq!(read(&files), ["/w/pkg/acme.rnl", "/w/lib/deep.rnl"]);
+
+        // a package given names one more by path, from its own directory
+        let acme = package("acme", "; @USE-PACKAGE(name=\"base\", path=\"base/base.rnl\")");
+        let files = files.with("/w/pkg/acme.rnl", &acme);
+        assert_eq!(read(&files), ["/w/lib/deep.rnl", "/w/pkg/base/base.rnl"]);
+        // a file of another package is not that package: what it names is not read
+        let other =
+            files.clone().with("/w/lib/deep.rnl", &package("other", "; @USE-PACKAGE(name=\"x\", path=\"x.rnl\")"));
+        assert_eq!(read(&other), ["/w/pkg/base/base.rnl"]);
+
+        // with all given, nothing is missing
+        let files =
+            files.with("/w/lib/deep.rnl", &package("deep", "")).with("/w/pkg/base/base.rnl", &package("base", ""));
+        assert!(read(&files).is_empty());
     }
 
     #[test]

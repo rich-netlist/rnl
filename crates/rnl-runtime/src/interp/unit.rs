@@ -65,6 +65,57 @@ pub fn header_packages(text: &str) -> Vec<String> {
     names
 }
 
+/// A package that a record names by path (16.2, 16.5), as [`package_paths`] gives it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PackagePath {
+    /// The `name` it is named by.
+    pub name: String,
+    /// The `version` it is named with, if any.
+    pub version: Option<String>,
+    /// The `path` as written; the reading joins it to the directory of the file that holds the
+    /// record.
+    pub path: String,
+}
+
+/// The packages a record names by path, in the order written, without reporting diagnostics: each
+/// USE-PACKAGE, and in a header record each USE-ALIASES too, written with `name` and `path`,
+/// without a body and with no malformed version. These are the files the reading reads first for
+/// them, before it looks a package up by name (16.2, 16.5). A USE-PACKAGE written in a level
+/// counts when it is written with its own keyword: an alias of the keyword is known only once the
+/// file is interpreted (16.5).
+pub fn package_paths(text: &str) -> Vec<PackagePath> {
+    let ast = syntax::parse_record(text);
+    let Some(body) = ast.body.as_ref().filter(|_| ast.error.is_none()) else { return Vec::new() };
+    let header = ast.header.as_ref().and_then(|h| h.get("type")) == Some(&Value::Str("header".into()));
+    let mut out = Vec::new();
+    for member in &body.members {
+        if member.error.is_some() || member.segments.len() != 1 || member.bind().is_some() {
+            continue;
+        }
+        let segment = &member.segments[0];
+        let Some(call) = segment.call.as_ref() else { continue };
+        let kw = call.kw.as_str();
+        if !(kw == "USE-PACKAGE" || (header && kw == "USE-ALIASES")) || !segment.args.is_empty() {
+            continue;
+        }
+        let Ok(params) = params_by_name(kw, call.params.as_ref(), header, str::to_string) else { continue };
+        let version = str_val(params.get("version"));
+        if version.as_deref().is_some_and(|v| !valid_package_version(v)) {
+            continue;
+        }
+        if let (Some(name), Some(path)) = (str_val(params.get("name")), str_val(params.get("path"))) {
+            out.push(PackagePath { name, version, path });
+        }
+    }
+    out
+}
+
+/// Whether a file read for a package named by path is that package, so that the reading reads
+/// it (16.2): its PACKAGE declares the name, and a version the reference accepts.
+pub fn is_package_named(text: &str, named: &PackagePath) -> bool {
+    scan_package_decl(text).is_some_and(|(n, v)| n == named.name && version_ok(named.version.as_deref(), &v))
+}
+
 /// The versions of the language this implementation reads (16.1): 0.4 only. A file of 0.2 or 0.3
 /// is a file of a version it does not read, none of whose RNL is interpreted; the cores of 0.5.x
 /// read those versions, and their `rnl upgrade` writes such a file in 0.4 ([`unsupported_version`]).
