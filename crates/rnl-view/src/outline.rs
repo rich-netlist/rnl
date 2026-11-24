@@ -9,6 +9,7 @@ use rnl_runtime::host::{dialect_key, file_name, package, HostDocument, LevelKind
 use rnl_runtime::interp::unit::header_packages;
 use rnl_runtime::numbering::{hex, sha256};
 use rnl_runtime::source::{dirname, relative_to};
+use rnl_runtime::syntax::{parse_record, Value};
 use serde::Serialize;
 
 use crate::document::diagnostic;
@@ -71,6 +72,10 @@ pub struct OutlineFile {
     /// texts as the runtime reads them, each ended by a line feed, as `text_hash` is made. A
     /// change of the file's netlist alone leaves it as it is.
     pub records_hash: String,
+    /// How many records it holds besides its header records (`type="header"`, 2.8), each once,
+    /// though the netlist reads the file more than once: 0 for a file whose RNL is a header
+    /// record alone, or that has none.
+    pub records: usize,
 }
 
 /// A level of an [`Outline`]: a reading of a file, or a subcircuit.
@@ -157,6 +162,7 @@ pub(crate) fn outline(entry: &str, doc: HostDocument, sink: Sink, missing: Vec<S
                 levels: Vec::new(),
                 text_hash: hash(text),
                 records_hash: String::new(),
+                records: 0,
             }
         })
         .collect();
@@ -238,6 +244,7 @@ pub(crate) fn outline(entry: &str, doc: HostDocument, sink: Sink, missing: Vec<S
         recs.sort_by_key(|(line, _)| *line);
         let text: String = recs.iter().map(|(_, t)| format!("{t}\n")).collect();
         files[f].records_hash = hash(&text);
+        files[f].records = recs.iter().filter(|(_, t)| !is_header(t)).count();
     }
 
     let roots = (0..doc.levels.len())
@@ -281,6 +288,7 @@ pub(crate) fn package_outline(entry: &str, path: &str, text: &str, format: &str,
             levels: Vec::new(),
             text_hash: hash(text),
             records_hash: hash(&recs),
+            records: records.iter().filter(|r| !is_header(&r.text)).count(),
         }],
         levels: Vec::new(),
         roots: Vec::new(),
@@ -315,6 +323,30 @@ pub(crate) fn records_hash(doc: &HostDocument, file: &str) -> String {
     }
     recs.sort_by_key(|(line, _)| *line);
     hash(&recs.iter().map(|(_, t)| format!("{t}\n")).collect::<String>())
+}
+
+/// Whether a record is a header record, `type="header"` (2.8), read from its header alone: a
+/// record's body can be long, and the outline does not read it.
+fn is_header(text: &str) -> bool {
+    let Some(rest) = text.strip_prefix("@RNL") else { return false };
+    let open = text.len() - rest.trim_start().len();
+    if !text[open..].starts_with('(') {
+        return false;
+    }
+    // the parenthesis that closes the header, past the strings in it, whose quotes are doubled (3.7)
+    let mut quoted = false;
+    for (k, c) in text[open..].char_indices() {
+        match c {
+            '"' => quoted = !quoted,
+            ')' if !quoted => {
+                let head = format!("{} {{}}", &text[..open + k + 1]);
+                let ast = parse_record(&head);
+                return ast.header.as_ref().and_then(|h| h.get("type")) == Some(&Value::Str("header".into()));
+            }
+            _ => {}
+        }
+    }
+    false
 }
 
 fn hash(text: &str) -> String {
@@ -509,11 +541,30 @@ X2 m out inv
     }
 
     #[test]
+    fn a_file_counts_its_records_besides_its_header() {
+        // an entry of includes alone, whose RNL is its header record
+        let top = "* top\n* @RNL(type=\"header\", author=\"a (b) \"\"c)\") { @VERSION(\"0.4\")}\n.include \"cells.inc\"\n.include \"bare.inc\"\n.end\n";
+        // a header, a record of the file and one of a subcircuit, written over two lines
+        let cells = "* cells\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n* @RNL { #X1 @PLACE(0, 0) }\n.subckt inv in out\nM1 out in 0 0 nch\n* @RNL(author=\"x\") { #M1 @PLACE(0, 0);\n*   #M1 @ORIENT(\"R0\") }\n.ends\nX1 a b inv\n";
+        let bare = "* no RNL\nR1 a b 1k\n";
+        let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/cells.inc", cells).with("/w/bare.inc", bare);
+        let o = outline("/w/top.sp", &files, &BuildOptions::default()).unwrap();
+        let records = |name: &str| o.files.iter().find(|f| f.name == name).unwrap().records;
+        assert_eq!((records("top.sp"), records("cells.inc"), records("bare.inc")), (0, 2, 0));
+        // a record of the solver counts as any other
+        let solved = top.replace(".end", "* @RNL(type=\"generated\") { #X9 @PLACE(0, 0) }\n.end");
+        let s = outline("/w/top.sp", &files.with("/w/top.sp", &solved), &BuildOptions::default()).unwrap();
+        assert_eq!(s.files[0].records, 1);
+        assert_eq!(serde_json::to_value(&o.files[0]).unwrap()["records"], 0);
+    }
+
+    #[test]
     fn the_outline_of_a_package_file_is_the_file_alone() {
         let package = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"acme\", version=\"1.0\")}\n@RNL {}\n";
         let files = MemoryProvider::new().with("/p/acme.rnl", package);
         let o = outline("/p/acme.rnl", &files, &BuildOptions::default()).unwrap();
         assert_eq!((o.dialect.as_str(), o.files.len(), o.levels.len()), ("rnl", 1, 0));
+        assert_eq!(o.files[0].records, 1);
         assert!(outline("/p/none.sp", &files, &BuildOptions::default()).is_err());
     }
 }
