@@ -225,6 +225,67 @@ test("collectFile reads what is missing as collect does, and reads one file in t
   }
 });
 
+test("the Worker keeps the texts of the files it was given, and is sent only those it does not hold", async () => {
+  // a Worker that records what the client posts, over a worker thread
+  const { Worker: NodeWorker } = await import("node:worker_threads");
+  const posted = [];
+  class Recording {
+    constructor(url) {
+      this.worker = new NodeWorker(url);
+    }
+    addEventListener(type, handler) {
+      if (type === "message") this.worker.on("message", (data) => handler({ data }));
+      else this.worker.on("error", handler);
+    }
+    postMessage(message) {
+      posted.push(message);
+      this.worker.postMessage(message);
+    }
+    terminate() {
+      return this.worker.terminate();
+    }
+  }
+  const before = globalThis.Worker;
+  globalThis.Worker = Recording;
+  let worker;
+  try {
+    worker = startCore();
+  } finally {
+    if (before === undefined) delete globalThis.Worker;
+    else globalThis.Worker = before;
+  }
+  const pad = "* a long comment of a file that does not change\n".repeat(400);
+  const top = '* top\n.include "a.inc"\n.include "b.inc"\nX1 n1 0 ca\nX2 n1 0 cb\n.end\n';
+  const a = `* a\n${pad}.subckt ca p q\nR1 p q 1k\n.ends\n`;
+  const b = "* b\n.subckt cb p q\nC1 p q 1p\n.ends\n";
+  const entry = "/w/top.sp";
+  const requests = [
+    { entry, files: { [entry]: top, "/w/a.inc": a, "/w/b.inc": b } },
+    // the same files: no text is sent again
+    { entry, files: { [entry]: top, "/w/a.inc": a, "/w/b.inc": b } },
+    // one changed, with a lone surrogate, and one no longer there, which is missing
+    { entry, files: { [entry]: top, "/w/b.inc": `${b}* ${char(0xd800)}\n` } },
+    // and back, the files in another order
+    { entry, files: { "/w/b.inc": b, "/w/a.inc": a, [entry]: top } },
+  ];
+  try {
+    for (const request of requests) {
+      assert.deepEqual(await worker.build(request), core.build(request));
+      assert.deepEqual(await worker.outline(request), core.outline({ ...request, outline: true }));
+    }
+    // texts sent: all three; none; the one changed; the one sent again, a; none for the outlines that follow each
+    const sent = posted.map((m) => Object.keys(JSON.parse(m.request).files ?? {}));
+    assert.deepEqual(sent, [[entry, "/w/a.inc", "/w/b.inc"], [], [], [], ["/w/b.inc"], [], ["/w/b.inc", "/w/a.inc"], []]);
+    assert.ok(posted.slice(1).every((m, k) => k === 5 || !m.request.includes(pad)));
+    assert.deepEqual(posted.map((m) => m.paths), requests.flatMap((r) => [Object.keys(r.files), Object.keys(r.files)]));
+    // a request without files is sent as it was
+    assert.deepEqual(await worker.bundled(), core.respond({ bundled: true }).bundled);
+    assert.equal(posted.at(-1).paths, undefined);
+  } finally {
+    worker.terminate();
+  }
+});
+
 test("the core runs in a Worker", async () => {
   const worker = startCore();
   try {
