@@ -178,9 +178,10 @@ impl Interp<'_> {
         let terms = self.owner_terms(scene, owner);
         let terminals: Vec<ObjId> =
             terms.iter().map(|(number, name)| self.term_obj(scene, owner, *number, name.clone())).collect();
+        let pins = self.pins_by_terminal(symbol, owner, &terms);
         let mut nets = Vec::new();
-        for (terminal, &(number, _)) in terminals.into_iter().zip(&terms) {
-            if self.pins_bound(symbol, owner, &terms, number).contains(&index) {
+        for (terminal, bound) in terminals.into_iter().zip(pins) {
+            if bound.contains(&index) {
                 nets.extend(self.term_nets(scene, terminal));
             }
         }
@@ -925,6 +926,8 @@ pub(super) mod tests {
         pub(in crate::interp) static PIN_NET_LOOKUPS: Cell<usize> = const { Cell::new(0) };
         /// How many times the terminals of an owner were taken, on this thread.
         pub(in crate::interp) static OWNER_TERMS_TAKEN: Cell<usize> = const { Cell::new(0) };
+        /// How many terminal names a pin's names were compared with to bind it, on this thread.
+        pub(in crate::interp) static TERMINAL_NAMES_COMPARED: Cell<usize> = const { Cell::new(0) };
         /// How many times the nets of a pin of an instance were found, on this thread.
         pub(in crate::interp) static PIN_NETS_FOUND: Cell<usize> = const { Cell::new(0) };
         /// How many times a named sub-object other than `::net` was resolved, on this thread.
@@ -1045,6 +1048,57 @@ pub(super) mod tests {
         let errors: Vec<_> = read.sink.all().iter().filter(|d| d.severity == Severity::Error).collect();
         assert!(errors.is_empty(), "{errors:?}");
         OWNER_TERMS_TAKEN.with(Cell::get)
+    }
+
+    /// The terminal names compared to bind pins while a level of 10 instances of a subcircuit of
+    /// `ports` ports, every terminal on a net of its own, is read with a rule that selects the pins
+    /// of every net: the box the subcircuit is drawn with names a pin for each port.
+    fn names_compared(ports: usize) -> usize {
+        let mut sink = Sink::new();
+        let mut main = Level::new(LevelKind::File, "ports.sp", "ports.sp", "ports.sp");
+        main.circuit = true;
+        for k in 0..10 {
+            main.instances.push(Instance {
+                name: format!("X{}", k + 1),
+                letter: Some('X'),
+                nodes: (0..ports).map(|j| format!("n{k}_{j}")).collect(),
+                model: Some("wide".into()),
+                file: "ports.sp".into(),
+                line: k as u32 + 1,
+                order: k,
+                is_subckt: true,
+                ..Instance::default()
+            });
+        }
+        let records = r#"@RNL(type="header") { @VERSION("0.4")}
+@RNL {
+  $TP = @DEFINE(roles=[["t", ["net", "terminal"]]]) {};
+  %pins = # @SELECT-NET(recursive=true) => @SELECT-PIN(recursive=true);
+  $TP @ATTACH %pins
+}"#;
+        main.records = scan_run(&package_lines(records), "ports.sp", &mut sink);
+        let dialect = Dialect { name: "spice".into(), case_sensitive: false, ground_aliases: vec![] };
+        let mut doc = HostDocument::new(main, dialect);
+        let mut level = Level::new(LevelKind::Subckt, "wide", "ports.sp", "ports.sp");
+        level.circuit = true;
+        level.ports = (0..ports).map(|j| format!("p{j}")).collect();
+        let id = doc.add_level(level, Some(0));
+        doc.subckts.insert(doc.key("wide"), id);
+        TERMINAL_NAMES_COMPARED.with(|count| count.set(0));
+        let read = interpret(doc, &MemoryProvider::new(), &Options { std: false, ..Options::default() }, sink);
+        let errors: Vec<_> = read.sink.all().iter().filter(|d| d.severity == Severity::Error).collect();
+        assert!(errors.is_empty(), "{errors:?}");
+        TERMINAL_NAMES_COMPARED.with(Cell::get)
+    }
+
+    #[test]
+    fn binding_the_pins_of_a_terminal_compares_its_names_not_every_terminals() {
+        let (narrow, wide) = (names_compared(4), names_compared(16));
+        // Four times the ports: each terminal asked for its pins, each pin bound by name, grows 16
+        // times when the terminal's own names are compared; scanning every terminal for each pin,
+        // as before, grew 64 times.
+        assert!(narrow > 0, "the pins are bound by name");
+        assert!(wide <= narrow * 24, "{narrow} for 4 terminals, {wide} for 16");
     }
 
     #[test]
