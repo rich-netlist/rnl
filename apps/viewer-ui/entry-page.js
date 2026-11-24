@@ -3,7 +3,8 @@ import { append, m, setAttr, setText } from "./i18n.js";
 // and the subcircuits that nothing calls are in the other files (roots.js). In place of the empty drawing, a card says
 // so and lists those subcircuits, each with its symbol, the file that defines it, its instances, and whether its file's
 // reading is kept, else how long it took the last time (file-reading.js `fileSummaries`); a click opens it, as the index does.
-// With one alone, a file opened opens it at once, and the card shows meanwhile, with no symbols: they are not read for it.
+// With one alone, a file opened opens it at once. When the outline tells so (roots.js `onlyRootOf`), its file is read in
+// place of the entry's and no card shows; otherwise the card shows meanwhile, with no symbols: they are not read for it.
 
 import { current, doc } from "./state.js";
 import { fileSummaries, readsByFile } from "./file-reading.js";

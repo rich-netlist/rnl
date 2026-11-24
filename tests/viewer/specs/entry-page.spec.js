@@ -1,7 +1,7 @@
 // The entry page of the web viewer, which reads the file shown alone (entry-page.js): an entry that only includes other
 // files has an empty top level, and the card in place of its drawing lists the subcircuits nothing calls, with their
 // symbols, files and instances, and whether their files' readings are kept; a click opens one. With one alone, the
-// entry opens it at once.
+// entry opens it at once: when its file holds no record besides its header, that root's file is read in place of its own.
 import { test, expect } from '../viewer.js';
 
 test.skip(!process.env.RNL_WEB_URL, 'the web site is not built');
@@ -81,6 +81,48 @@ const countSymbols = (page) => page.addInitScript(() => {
   };
 });
 const symbolRequests = (page) => page.evaluate(() => window.symbolRequests);
+
+/** Note, from the start, each Document shown and each file the page asks its cores to read alone. */
+const watch = (page) => page.addInitScript(() => {
+  window.filesShown = [];
+  window.filesRead = [];
+  window.addEventListener('document-shown', () => window.filesShown.push(window.viewer.doc.file));
+  const post = Worker.prototype.postMessage;
+  Worker.prototype.postMessage = function (message, ...rest) {
+    const file = typeof message?.request === 'string' ? JSON.parse(message.request).file : undefined;
+    if (typeof file === 'string') window.filesRead.push(file);
+    return post.call(this, message, ...rest);
+  };
+});
+const watched = (page) => page.evaluate(() => ({ shown: window.filesShown, read: window.filesRead }));
+
+test('an entry whose file draws nothing is read as the file of its one root, with no entry page shown', async ({ page }) => {
+  await watch(page);
+  await open(page, { 'top.sp': '* top\n* @RNL(type="header") { @VERSION("0.4") }\n.include "a.inc"\n.end\n', 'a.inc': A });
+  await expect.poll(() => shown(page)).toEqual({ file: 'a.inc', level: 'alpha' });
+  await idle(page);
+  // the entry's own file is neither read nor shown
+  expect(await watched(page)).toEqual({ shown: ['a.inc'], read: ['a.inc'] });
+  await expect(card(page)).toBeHidden();
+  await expect(page.locator('#level-path .crumb .name, #level-path #level-name')).toHaveText(['alpha']);
+  // the entry is there as before: its page lists the root, whose file's reading is kept
+  await page.locator('#tab-hierarchy').click();
+  await page.locator('#index .index-row.top').click();
+  await idle(page);
+  expect(await shown(page)).toEqual({ file: 'top.sp', level: 'top.sp' });
+  await expect(roots(page).locator('.entry-title')).toHaveText(['alpha']);
+  await expect(roots(page).locator('.entry-status')).toHaveText(['Kept: opens at once']);
+});
+
+test('an entry with a record besides its header is read and shown before its one root opens, as before', async ({ page }) => {
+  await watch(page);
+  await open(page, { 'top.sp': '* top\n* @RNL(type="header") { @VERSION("0.4") }\n* @RNL { }\n.include "a.inc"\n.end\n', 'a.inc': A });
+  await expect.poll(() => shown(page)).toEqual({ file: 'a.inc', level: 'alpha' });
+  await idle(page);
+  expect(await watched(page)).toEqual({ shown: ['top.sp', 'a.inc'], read: ['top.sp', 'a.inc'] });
+  await expect(card(page)).toBeHidden();
+  await expect(page.locator('#level-path .crumb .name, #level-path #level-name')).toHaveText(['alpha']);
+});
 
 test('an entry page left at once for its one root reads no symbols; one that stays reads them', async ({ page }) => {
   await countSymbols(page);

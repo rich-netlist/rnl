@@ -32,7 +32,7 @@ import { $ } from "./util.js";
 import { setEnabled } from "./commands.js";
 import { startLoading, nextPaint } from "./loading.js";
 import { offerMissingPackages } from "./package-offers.js";
-import { entrySource } from "./visit-source.js";
+import { entrySource, fileView } from "./visit-source.js";
 import { titleName } from "./window-title.js";
 import { watchShown } from "./disk-changes.js";
 
@@ -67,6 +67,14 @@ export async function openSource(source, keep, edited, fresh = false, navigation
   loading = true;
   document.body.classList.add("busy");
   const progress = startLoading();
+  // the source opened, which joins the Library; and the visit to the one root of its entry page, when its file is read in
+  // place of the entry's (file-reading.js), as the page would go to it at once (entry-page.js `openOnlyRoot`)
+  const opened = source;
+  let toRoot = null;
+  const onlyRoot = !keep && !edited && !navigation && !signal ? (root) => {
+    source = fileView(opened, root.file);
+    toRoot = { entry: source, path: [{ title: root.title, via: null, entry: source }], level: root.title, select: null, reveal: true, netlist: false };
+  } : undefined;
   let d;
   try {
     // (a reading again that keeps the view, such as the Library's, says one line until it is done: `oneLine`)
@@ -74,7 +82,7 @@ export async function openSource(source, keep, edited, fresh = false, navigation
     d = await readDocument(source, edited, stage => {
       if (operation.signal.aborted) throw new Error('Opening superseded');
       if (!options.oneLine) progress.setStage(stage);
-    }, operation.signal, { fresh, bind: options.bind, ...(constraintsWanted ? { constraints: true } : {}) });
+    }, operation.signal, { fresh, bind: options.bind, onlyRoot, ...(constraintsWanted ? { constraints: true } : {}) });
     if (operation.signal.aborted) return;
     if (options.bound) bindings.set(d, options.bound);
     await progress.stage(options.oneLine ? "reading" : "displaying");
@@ -87,9 +95,9 @@ export async function openSource(source, keep, edited, fresh = false, navigation
     if (preview) shell.commitBuild?.(d);
     // an entry page of one root shown now is left at once (the `finally` below)
     setOpensOnlyRoot(!keep && !edited && !navigation && !signal);
-    showBuilt(preview ?? d, keep, navigation);
+    showBuilt(preview ?? d, keep, navigation ?? toRoot);
     // the Library and the manifest bar know the entry; the view of another of its files is no file opened
-    await sourceOpened(entrySource(source), d, !keep && !source.view, !!edited);
+    await sourceOpened(entrySource(source), d, !keep && !opened.view, !!edited);
     await nextPaint();
     return true;
   } catch (e) {
