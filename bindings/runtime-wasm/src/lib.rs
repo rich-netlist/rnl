@@ -130,6 +130,16 @@ pub struct Request {
     /// context of the entry, and give its [`FileResult`] instead of the Document
     /// ([`rnl_view::build_file`]); with `lazy_unplaced`, the drawings are kept as for a Document.
     pub file: Option<String>,
+    /// Read the outline or the file through the reading cache of the module: the host document the
+    /// last such request read is taken when every file it read reads the same, and kept for the
+    /// next ([`rnl_view::ReadingCache`]). The answer is the same as without. A request without it
+    /// neither takes from the cache nor changes it; false when not given.
+    #[serde(default)]
+    pub cache: bool,
+    /// Drop what the reading cache of the module holds before the request is answered; false when
+    /// not given.
+    #[serde(default)]
+    pub forget: bool,
     /// Give the symbols the subcircuits of this file give themselves, as the document names it,
     /// instead of a Document ([`rnl_view::symbols`]). The fields that say how to draw are ignored.
     pub symbols: Option<String>,
@@ -394,6 +404,8 @@ thread_local! {
     /// The drawings of the last build with `lazy_unplaced`. They hold what the model does, which is
     /// not `Send`, so they stay in the thread that built them; a module is one thread.
     static DRAWN: RefCell<Option<Drawings>> = const { RefCell::new(None) };
+    /// The reading cache of the requests with `cache` ([`Request::cache`]).
+    static CACHE: RefCell<rnl_view::ReadingCache> = RefCell::new(rnl_view::ReadingCache::new());
 }
 
 /// Answer a request given as JSON: a write when it has a `write` field, a replace when it has a
@@ -544,8 +556,16 @@ pub fn respond(request: &[u8]) -> Response {
         constraints: request.constraints,
         bind: request.bind,
     };
+    if request.forget {
+        CACHE.with(|cache| cache.borrow_mut().clear());
+    }
     if request.outline {
-        return match rnl_view::outline(&request.entry, &files, &options) {
+        let outline = if request.cache {
+            CACHE.with(|cache| rnl_view::outline_cached(&request.entry, &files, &options, &mut cache.borrow_mut()))
+        } else {
+            rnl_view::outline(&request.entry, &files, &options)
+        };
+        return match outline {
             Ok(o) => Response::Outline(Box::new(o)),
             Err(e) => Response::Error(e),
         };
@@ -557,10 +577,19 @@ pub fn respond(request: &[u8]) -> Response {
         };
     }
     if let Some(file) = &request.file {
-        let built = if request.lazy_unplaced {
-            rnl_view::build_file_drawn(&request.entry, file, &files, &options).map(|(f, d)| (f, Some(d)))
-        } else {
-            rnl_view::build_file(&request.entry, file, &files, &options).map(|f| (f, None))
+        let built = match (request.cache, request.lazy_unplaced) {
+            (true, true) => CACHE.with(|cache| {
+                rnl_view::build_file_drawn_cached(&request.entry, file, &files, &options, &mut cache.borrow_mut())
+                    .map(|(f, d)| (f, Some(d)))
+            }),
+            (true, false) => CACHE.with(|cache| {
+                rnl_view::build_file_cached(&request.entry, file, &files, &options, &mut cache.borrow_mut())
+                    .map(|f| (f, None))
+            }),
+            (false, true) => {
+                rnl_view::build_file_drawn(&request.entry, file, &files, &options).map(|(f, d)| (f, Some(d)))
+            }
+            (false, false) => rnl_view::build_file(&request.entry, file, &files, &options).map(|f| (f, None)),
         };
         return match built {
             Ok((mut f, drawn)) => {
@@ -1039,6 +1068,49 @@ C1 a 0 1p
         assert_eq!(v["outline"]["missing"], json!(["/w/lib/parts.inc"]));
         let v = answer(json!({ "outline": true, "entry": "/w/none.sp", "files": {} }));
         assert_eq!(v["error"], "cannot read /w/none.sp");
+    }
+
+    #[test]
+    fn requests_with_the_cache_answer_as_those_without_and_one_without_leaves_it() {
+        let top = "* top
+.include \"lib/parts.inc\"
+X1 a b part
+.end
+";
+        let parts = ".subckt part p q
+R1 p q 1k
+.ends
+";
+        let sent = json!({ "/w/top.sp": top, "/w/lib/parts.inc": parts });
+        let ask = |extra: Value| {
+            let mut request = json!({ "entry": "/w/top.sp", "files": sent, "svg": false });
+            request.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+            answer(request)
+        };
+        let outline = ask(json!({ "outline": true }));
+        assert_eq!(ask(json!({ "outline": true, "cache": true })), outline);
+        // a request about another entry, without the cache, between two with it
+        let other = answer(json!({ "outline": true, "entry": "/w/o.sp", "files": { "/w/o.sp": "* o
+R1 a 0 1k
+.end
+" } }));
+        assert!(other.get("outline").is_some(), "{other}");
+        for file in ["top.sp", "lib/parts.inc"] {
+            let plain = ask(json!({ "file": file }));
+            assert_eq!(ask(json!({ "file": file, "cache": true })), plain, "{file}");
+            assert_eq!(
+                ask(json!({ "file": file, "cache": true, "lazy_unplaced": true })),
+                ask(json!({ "file": file, "lazy_unplaced": true }))
+            );
+        }
+        // a file changed is read again; forget drops what the cache holds
+        let changed = json!({ "/w/top.sp": top, "/w/lib/parts.inc": parts.replace("1k", "2k") });
+        let read = answer(json!({ "file": "lib/parts.inc", "entry": "/w/top.sp", "files": changed, "svg": false }));
+        let cached = answer(
+            json!({ "file": "lib/parts.inc", "entry": "/w/top.sp", "files": changed, "svg": false, "cache": true }),
+        );
+        assert_eq!(cached, read);
+        assert_eq!(ask(json!({ "outline": true, "cache": true, "forget": true })), outline);
     }
 
     #[test]

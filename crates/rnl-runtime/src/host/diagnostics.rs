@@ -3,7 +3,7 @@ use super::LevelId;
 use crate::diag::{DiagId, Loc};
 
 /// One reading that produced a host diagnostic. Several readings can share a deduplicated id.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Reading {
     pub diagnostic: DiagId,
     /// A document may later be interpreted with a different or empty host diagnostic sink.
@@ -13,7 +13,7 @@ pub struct Reading {
 }
 
 /// Information a host reader knows before the runtime reads each file's language version.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Detail {
     FirstLine,
     AutoIncluded { model: String, file: String },
@@ -61,14 +61,14 @@ impl Detail {
 }
 
 /// A host input issue whose presence depends on the reading's RNL version.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Input {
     pub level: LevelId,
     pub issue: InputIssue,
     pub loc: Loc,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum InputIssue {
     MissingOperand { directive: String, operand: &'static str },
     UnmatchedEnd(String),
