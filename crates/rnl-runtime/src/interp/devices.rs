@@ -11,6 +11,10 @@ use super::obj::{ObjData, ObjId, SceneId};
 use super::unit::DeviceDecl;
 use super::Interp;
 
+/// What the declarations that can act on an instance depend on besides its name: the file level
+/// it is read in, its model, its host's case rule and the languages of its line.
+type CandidateKey = (LevelId, Option<String>, bool, Languages);
+
 #[derive(Clone, Debug)]
 pub(crate) struct DeviceInfo {
     pub terminals: Vec<String>,
@@ -27,6 +31,10 @@ impl Interp<'_> {
         // the file: they are made once, when an instance first needs them.
         let mut packaged: Option<Rc<Vec<DeviceDecl>>> = None;
         let mut chains: HashMap<LevelId, Rc<Vec<DeviceDecl>>> = HashMap::new();
+        // The declarations that can match an instance, by its file, model, case rule and language:
+        // all it takes but its name, which each instance matches on its own. A level of thousands
+        // of instances of a few models matches the model patterns once for each.
+        let mut candidates: HashMap<CandidateKey, Rc<[usize]>> = HashMap::new();
         for object in self.scenes[s].insts.clone() {
             let inst = self.inst_of(object).clone();
             let file = self.doc.file_level_of(&inst).unwrap_or(level);
@@ -60,15 +68,22 @@ impl Interp<'_> {
                 terminals: ports.clone().or_else(|| self.default_terminals(&inst)).unwrap_or_default(),
                 mtype: inst.mtype.clone(),
             };
-            for decl in packaged.iter().chain(chain.iter()) {
-                if !decl.languages.overlaps(language) {
-                    continue;
+            let key = (file, inst.model.clone(), inst.case_sensitive, language);
+            let matching = match candidates.get(&key) {
+                Some(matching) => {
+                    debug_assert_eq!(**matching, *device_candidates(&packaged, &chain, &inst, language));
+                    matching.clone()
                 }
-                if !glob(&decl.name, &inst.name, inst.case_sensitive)
-                    || decl.model.as_ref().is_some_and(|pattern| {
-                        !inst.model.as_ref().is_some_and(|name| glob(pattern, name, inst.case_sensitive))
-                    })
-                {
+                None => {
+                    let matching: Rc<[usize]> = device_candidates(&packaged, &chain, &inst, language).into();
+                    candidates.insert(key, matching.clone());
+                    matching
+                }
+            };
+            for &k in matching.iter() {
+                let decl = if k < packaged.len() { &packaged[k] } else { &chain[k - packaged.len()] };
+                // a pattern of `*` alone takes any name
+                if !(any_name(&decl.name) || glob(&decl.name, &inst.name, inst.case_sensitive)) {
                     continue;
                 }
                 if let Some(terms) = &decl.terminals {
@@ -153,6 +168,34 @@ impl Interp<'_> {
             None => self.inst_of(object).mtype.as_deref(),
         }
     }
+}
+
+/// The declarations of `packaged` then `chain`, by their index in that order, that act on an
+/// instance like `inst` whatever its name: of a language `language` overlaps, and whose model
+/// pattern, if any, takes its model (6.12).
+fn device_candidates(
+    packaged: &[DeviceDecl],
+    chain: &[DeviceDecl],
+    inst: &crate::host::Instance,
+    language: Languages,
+) -> Vec<usize> {
+    packaged
+        .iter()
+        .chain(chain)
+        .enumerate()
+        .filter(|(_, decl)| {
+            decl.languages.overlaps(language)
+                && decl.model.as_ref().is_none_or(|pattern| {
+                    inst.model.as_ref().is_some_and(|name| glob(pattern, name, inst.case_sensitive))
+                })
+        })
+        .map(|(k, _)| k)
+        .collect()
+}
+
+/// Whether a name pattern takes every name: one of `*` alone, as [`glob`] matches it.
+fn any_name(pattern: &str) -> bool {
+    !pattern.is_empty() && pattern.bytes().all(|b| b == b'*')
 }
 
 #[cfg(test)]
