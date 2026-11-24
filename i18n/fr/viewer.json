@@ -831,5 +831,13 @@
   "Readings in memory: {0} ({1} MiB) · {2} hits, {3} misses": "Lectures en mémoire : {0} ({1} Mio) · {2} succès, {3} échecs",
   "Keep the readings in memory": "Conserver les lectures en mémoire",
   "Preload the files below the file shown while idle": "Précharger au repos les fichiers sous le fichier affiché",
-  "Keep the reading of each file in memory while the viewer is open, so that a file shown again is not read again. The least recently used go first. Preloading reads the files of the subcircuits below the file shown while the viewer is idle, into the room that is free.": "Conserve en mémoire la lecture de chaque fichier tant que la visionneuse est ouverte, pour qu’un fichier affiché de nouveau ne soit pas relu. Les moins récemment utilisées partent en premier. Le préchargement lit, quand la visionneuse est au repos, les fichiers des sous-circuits situés sous le fichier affiché, dans la place restée libre."
+  "Keep the reading of each file in memory while the viewer is open, so that a file shown again is not read again. The least recently used go first. Preloading reads the files of the subcircuits below the file shown while the viewer is idle, into the room that is free.": "Conserve en mémoire la lecture de chaque fichier tant que la visionneuse est ouverte, pour qu’un fichier affiché de nouveau ne soit pas relu. Les moins récemment utilisées partent en premier. Le préchargement lit, quand la visionneuse est au repos, les fichiers des sous-circuits situés sous le fichier affiché, dans la place restée libre.",
+  "Unsupported old file format (RNL {0}).": "Ancien format de fichier non pris en charge (RNL {0}).",
+  "RNL Viewer 0.5.3 opens it: download it from {0}.": "RNL Viewer 0.5.3 l’ouvre : téléchargez-le depuis {0}.",
+  "its release page": "sa page des publications",
+  "Or try {0} in a browser: open the file there with File › Open.": "Ou essayez {0} dans un navigateur : ouvrez-y le fichier avec Fichier › Ouvrir un fichier.",
+  "the old web viewer": "l’ancienne visionneuse web",
+  "You can try {0}: open the file there with File › Open, since a file from this computer cannot be passed to it by a link.": "Vous pouvez essayer {0} : ouvrez-y le fichier avec Fichier › Ouvrir un fichier, car un fichier de cet ordinateur ne peut pas lui être transmis par un lien.",
+  "the old viewer": "l’ancienne visionneuse",
+  "You can try opening it in {0}.": "Vous pouvez essayer de l’ouvrir dans {0}."
 }

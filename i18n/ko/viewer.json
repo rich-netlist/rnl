@@ -831,5 +831,13 @@
   "Readings in memory: {0} ({1} MiB) · {2} hits, {3} misses": "메모리의 읽기 결과: {0}개 ({1} MiB) · 적중 {2}회, 실패 {3}회",
   "Keep the readings in memory": "읽기 결과를 메모리에 보관",
   "Preload the files below the file shown while idle": "유휴 상태일 때 표시 중인 파일 아래 단계의 파일을 미리 읽기",
-  "Keep the reading of each file in memory while the viewer is open, so that a file shown again is not read again. The least recently used go first. Preloading reads the files of the subcircuits below the file shown while the viewer is idle, into the room that is free.": "뷰어가 열려 있는 동안 각 파일의 읽기 결과를 메모리에 보관하여, 다시 표시하는 파일은 다시 읽지 않습니다. 가장 오래 사용하지 않은 것부터 제거됩니다. 미리 읽기는 뷰어가 유휴 상태일 때 표시 중인 파일 아래에 있는 서브서킷의 파일을 남은 공간만큼 읽어 둡니다."
+  "Keep the reading of each file in memory while the viewer is open, so that a file shown again is not read again. The least recently used go first. Preloading reads the files of the subcircuits below the file shown while the viewer is idle, into the room that is free.": "뷰어가 열려 있는 동안 각 파일의 읽기 결과를 메모리에 보관하여, 다시 표시하는 파일은 다시 읽지 않습니다. 가장 오래 사용하지 않은 것부터 제거됩니다. 미리 읽기는 뷰어가 유휴 상태일 때 표시 중인 파일 아래에 있는 서브서킷의 파일을 남은 공간만큼 읽어 둡니다.",
+  "Unsupported old file format (RNL {0}).": "지원되지 않는 이전 파일 형식입니다(RNL {0}).",
+  "RNL Viewer 0.5.3 opens it: download it from {0}.": "RNL Viewer 0.5.3에서 열 수 있습니다. {0}에서 내려받으세요.",
+  "its release page": "해당 릴리스 페이지",
+  "Or try {0} in a browser: open the file there with File › Open.": "또는 브라우저에서 {0}를 사용해 보세요. 거기서 파일 › 파일 열기로 파일을 여세요.",
+  "the old web viewer": "이전 웹 뷰어",
+  "You can try {0}: open the file there with File › Open, since a file from this computer cannot be passed to it by a link.": "{0}를 사용해 볼 수 있습니다. 이 컴퓨터의 파일은 링크로 넘길 수 없으므로, 거기서 파일 › 파일 열기로 파일을 여세요.",
+  "the old viewer": "이전 뷰어",
+  "You can try opening it in {0}.": "{0}에서 열어 볼 수 있습니다."
 }
