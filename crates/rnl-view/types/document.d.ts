@@ -1140,7 +1140,8 @@ export type Outline = {
   diagnostics: Array<Diagnostic>,
   /**
    * The files the core asked for and did not get, as [`crate::Document::missing`]: a frontend
-   * that can read them adds them and asks again.
+   * that can read them adds them and asks again. Among them are the package files that records
+   * name by `path=`, read as the reading reads them, so that the reading that follows has them.
    */
   missing: Array<string>,
 };
