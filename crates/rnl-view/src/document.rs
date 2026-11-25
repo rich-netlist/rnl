@@ -242,14 +242,15 @@ struct DrawnLevel {
 }
 
 impl Drawings {
-    /// The drawings of the levels of `doc`, taken from `levels`, which are left without them.
-    pub(crate) fn take(levels: &mut [LevelView], doc: &Document, options: &BuildOptions) -> Drawings {
+    /// The drawings of the levels of `doc`, taken from `levels`, which are left without them, or,
+    /// when `keep`, copied from them.
+    pub(crate) fn take(levels: &mut [LevelView], doc: &Document, options: &BuildOptions, keep: bool) -> Drawings {
         let levels = levels
             .iter_mut()
             .zip(&doc.levels)
             .map(|(lv, level)| DrawnLevel {
-                items: std::mem::take(&mut lv.unplaced_items),
-                symbols: std::mem::take(&mut lv.unplaced_symbols),
+                items: if keep { lv.unplaced_items.clone() } else { std::mem::take(&mut lv.unplaced_items) },
+                symbols: if keep { lv.unplaced_symbols.clone() } else { std::mem::take(&mut lv.unplaced_symbols) },
                 names: level.unplaced.iter().map(|u| u.name.clone()).collect(),
             })
             .collect();
@@ -515,6 +516,53 @@ pub struct Diagnostic {
     pub cause: Option<String>,
 }
 
+/// The geometry hints of the level `lv` of `r`, read with its problems, as [`Level::hints`] gives
+/// them: their files shown by `shown_file` and numbered by `file_index`, as the Document's files.
+fn level_hint_list(
+    r: &Interpretation,
+    lv: &rnl_runtime::model::LevelView,
+    shown_file: &dyn Fn(&str) -> String,
+    file_index: &HashMap<String, usize>,
+) -> Vec<LevelHint> {
+    let problem = r.problems.iter().find(|p| p.level == lv.level && p.title == lv.title);
+    crate::hints::level_hints(lv, problem)
+        .hints
+        .into_iter()
+        .map(|h| {
+            let (file, line) = h.loc.map(|l| (l.file, l.line)).unwrap_or_default();
+            LevelHint {
+                kind: h.kind.as_str(),
+                code: h.kind.code().number(),
+                severity: h.severity.as_str(),
+                message: h.message,
+                file: shown_file(&file),
+                file_index: file_index.get(&file).copied(),
+                line,
+            }
+        })
+        .collect()
+}
+
+/// The geometry hints of the levels of a file of `entry`, given apart from its [`crate::FileResult`]
+/// ([`crate::file_hints_cached`]): those [`Level::hints`] gives with [`BuildOptions::hints`].
+#[derive(Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct FileHints {
+    /// The hints of each level of the file's Document, by its [`Level::host`]: every level is
+    /// there, with an empty list when it has none.
+    #[cfg_attr(test, ts(type = "Record<string, Array<LevelHint>>"))]
+    pub levels: std::collections::BTreeMap<usize, Vec<LevelHint>>,
+}
+
+/// The [`FileHints`] of the levels of `r`, a reading of a file of `entry` with its problems, whose
+/// Document numbers its files by `file_index`.
+pub(crate) fn file_hints(entry: &str, r: &Interpretation, file_index: &HashMap<String, usize>) -> FileHints {
+    let dir = dirname(entry);
+    let shown_file = |file: &str| relative_to(file, &dir).unwrap_or(file).to_string();
+    let levels = r.model.levels.iter().map(|lv| (lv.level, level_hint_list(r, lv, &shown_file, file_index))).collect();
+    FileHints { levels }
+}
+
 /// The Document of `entry` from its interpretation: draw every level as `options` ask and link the
 /// objects to their places. `missing` is [`Document::missing`].
 pub(crate) fn document(
@@ -567,23 +615,7 @@ pub(crate) fn document(
     // the geometry hints, read on the levels as drawn with their problems (BuildOptions::hints)
     if options.hints {
         for (k, lv) in r.model.levels.iter().enumerate() {
-            let problem = r.problems.iter().find(|p| p.level == lv.level && p.title == lv.title);
-            levels[k].hints = crate::hints::level_hints(lv, problem)
-                .hints
-                .into_iter()
-                .map(|h| {
-                    let (file, line) = h.loc.map(|l| (l.file, l.line)).unwrap_or_default();
-                    LevelHint {
-                        kind: h.kind.as_str(),
-                        code: h.kind.code().number(),
-                        severity: h.severity.as_str(),
-                        message: h.message,
-                        file: shown_file(&file),
-                        file_index: file_index.get(&file).copied(),
-                        line,
-                    }
-                })
-                .collect();
+            levels[k].hints = level_hint_list(r, lv, &shown_file, &file_index);
         }
     }
     let (params, notes) = Params::new(&r.doc, options.bind.as_ref());

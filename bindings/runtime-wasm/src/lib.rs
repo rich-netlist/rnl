@@ -140,6 +140,12 @@ pub struct Request {
     /// not given.
     #[serde(default)]
     pub forget: bool,
+    /// Give the geometry hints of this file of the document, as the document names it, from the
+    /// reading the last file request about it with `cache` and without `hints` kept, instead of a
+    /// Document ([`rnl_view::file_hints_cached`]): `{"hints": ...}`, or `{"error": "not kept"}`
+    /// when the cache keeps no such reading over the same files. The fields that say how to read
+    /// the files are those of that request; those that say how to draw are ignored.
+    pub hints_of: Option<String>,
     /// Give the symbols the subcircuits of this file give themselves, as the document names it,
     /// instead of a Document ([`rnl_view::symbols`]). The fields that say how to draw are ignored.
     pub symbols: Option<String>,
@@ -347,8 +353,8 @@ pub struct FolderPaths {
     pub paths: Vec<String>,
 }
 
-/// The answer to a request: `{"document": ...}`, `{"outline": ...}`, `{"file": ...}`, `{"symbols": ...}`,
-/// `{"snapshot": ...}`, `{"written": ...}`,
+/// The answer to a request: `{"document": ...}`, `{"outline": ...}`, `{"file": ...}`, `{"hints": ...}`,
+/// `{"symbols": ...}`, `{"snapshot": ...}`, `{"written": ...}`,
 /// `{"replaced": ...}`, `{"catalog": ...}`, `{"drawings": ...}`, `{"formats": ...}`, `{"bundled": ...}`,
 /// `{"folders": ...}` or `{"error": "..."}`.
 #[derive(Serialize, Debug)]
@@ -361,6 +367,8 @@ pub enum Response {
     Outline(Box<Outline>),
     /// The reading of one file of the entry, when the request names a `file`.
     File(Box<FileResult>),
+    /// The geometry hints of one file of the entry, when the request names a file for `hints_of`.
+    Hints(Box<rnl_view::FileHints>),
     /// The symbols of the subcircuits of a file, when the request names a file for `symbols`.
     Symbols(Box<FileSymbols>),
     /// The snapshot of the entry, when the request asks for `parts`.
@@ -558,6 +566,14 @@ pub fn respond(request: &[u8]) -> Response {
     };
     if request.forget {
         CACHE.with(|cache| cache.borrow_mut().clear());
+    }
+    if let Some(file) = &request.hints_of {
+        let hints = CACHE
+            .with(|cache| rnl_view::file_hints_cached(&request.entry, file, &files, &options, &mut cache.borrow_mut()));
+        return match hints {
+            Ok(h) => Response::Hints(Box::new(h)),
+            Err(e) => Response::Error(e),
+        };
     }
     if request.outline {
         let outline = if request.cache {
@@ -1111,6 +1127,39 @@ R1 a 0 1k
         );
         assert_eq!(cached, read);
         assert_eq!(ask(json!({ "outline": true, "cache": true, "forget": true })), outline);
+    }
+
+    #[test]
+    fn the_hints_of_a_file_are_given_from_the_reading_a_request_with_the_cache_kept() {
+        // R2 drawn over R1
+        let top = "* top\n\
+            * @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
+            R1 a b 1k\n\
+            R2 b 0 1k\n\
+            * @RNL { #R1 @PLACE(0, 0); #R2 @PLACE(0, 0) }\n\
+            .end\n";
+        let ask = |extra: Value| {
+            let mut request = json!({ "entry": "/w/top.sp", "files": { "/w/top.sp": top }, "svg": false });
+            request.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+            answer(request)
+        };
+        let with = ask(json!({ "file": "top.sp", "hints": true }));
+        let want: serde_json::Map<String, Value> = with["file"]["levels"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|l| (l["host"].to_string(), l.get("hints").cloned().unwrap_or(json!([]))))
+            .collect();
+        assert!(want.values().any(|h| !h.as_array().unwrap().is_empty()), "{with}");
+        assert_eq!(ask(json!({ "file": "top.sp", "cache": true })), ask(json!({ "file": "top.sp" })));
+        assert_eq!(ask(json!({ "hints_of": "top.sp" })), json!({ "hints": { "levels": want } }));
+        // given once
+        assert_eq!(ask(json!({ "hints_of": "top.sp" })), json!({ "error": "not kept" }));
+        // none after a request with the hints, or after forget
+        ask(json!({ "file": "top.sp", "cache": true, "hints": true }));
+        assert_eq!(ask(json!({ "hints_of": "top.sp" })), json!({ "error": "not kept" }));
+        ask(json!({ "file": "top.sp", "cache": true }));
+        assert_eq!(ask(json!({ "hints_of": "top.sp", "forget": true })), json!({ "error": "not kept" }));
     }
 
     #[test]

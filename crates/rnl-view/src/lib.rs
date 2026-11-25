@@ -50,9 +50,9 @@ pub use constraints::{
     LevelConstraints, SolverLiteral, SolverSettingView,
 };
 pub use document::{
-    AutoIncludeCandidate, Child, Diagnostic, Document, Drawings, Hit, InspectedLabel, InspectedPin, InspectedSymbol,
-    Level, LevelHint, MemberOf, NetLabel, Object, PinObject, RoleOf, RuleAt, SourceFile, SourceInclude, Span, Unplaced,
-    UnplacedDrawing, Usage, UsageRole,
+    AutoIncludeCandidate, Child, Diagnostic, Document, Drawings, FileHints, Hit, InspectedLabel, InspectedPin,
+    InspectedSymbol, Level, LevelHint, MemberOf, NetLabel, Object, PinObject, RoleOf, RuleAt, SourceFile,
+    SourceInclude, Span, Unplaced, UnplacedDrawing, Usage, UsageRole,
 };
 pub use file_result::{
     core_version, FileCall, FileChild, FileInput, FileInputs, FileOutline, FileResult, FileSymbols, SubcktSymbol,
@@ -178,7 +178,7 @@ impl Default for BuildOptions {
 /// Name the files of a workspace by rooted paths, such as `/w/top.sp`, as the desktop names them
 /// by absolute ones: see [`SourceFile::path`] for what a relative entry in a directory loses.
 pub fn build(entry: &str, files: &dyn Provider, options: &BuildOptions) -> Result<Document, String> {
-    Ok(build_in(entry, files, options, false, &[], None, |_, d| d)?.0)
+    Ok(build_in(entry, files, options, false, &[], None, false, |_, d| d)?.0)
 }
 
 /// [`build`], taking each reading it needs from `taken` where one was read with options that read
@@ -191,7 +191,7 @@ pub fn build_taking(
     options: &BuildOptions,
     taken: &[&DocumentReading],
 ) -> Result<Document, String> {
-    Ok(build_in(entry, files, options, false, taken, None, |_, d| d)?.0)
+    Ok(build_in(entry, files, options, false, taken, None, false, |_, d| d)?.0)
 }
 
 /// A reading of a document, as [`read_noting`] gives it: what it was read with, the interpretation,
@@ -276,7 +276,8 @@ fn build_with(
     options: &BuildOptions,
     lazy: bool,
 ) -> Result<(Document, Option<Drawings>), String> {
-    build_in(entry, files, options, lazy, &[], None, |_, d| d)
+    let (document, drawings, _) = build_in(entry, files, options, lazy, &[], None, false, |_, d| d)?;
+    Ok((document, drawings))
 }
 
 /// The reading of one file of the document `entry`, `file`, as the document names it
@@ -293,7 +294,8 @@ pub fn build_file(entry: &str, file: &str, files: &dyn Provider, options: &Build
 
 /// [`build_file`], taking the host document from `cache` when it would be read the same, and keeping
 /// it there for the calls that follow on the document ([`ReadingCache`]). The result is the one
-/// [`build_file`] gives.
+/// [`build_file`] gives. Without [`BuildOptions::hints`], the reading is kept in `cache` for
+/// [`file_hints_cached`] to give the hints of.
 pub fn build_file_cached(
     entry: &str,
     file: &str,
@@ -317,6 +319,47 @@ pub fn build_file_drawn_cached(
         Ok((result, drawings.expect("drawings were asked for")))
     })
 }
+
+/// The geometry hints of the levels of `file`, a file of `entry`, from the reading of it that the
+/// last [`build_file_cached`] or [`build_file_drawn_cached`] through `cache` made without
+/// [`BuildOptions::hints`], without reading again: those that call would have given with `hints`
+/// ([`Level::hints`]), by level. The reading must be of the same `entry` and `file`, with options
+/// that read alike, and every question it asked of `files` must have the same answer now; else
+/// this fails with [`NOT_KEPT`], and the frontend asks for the file with `hints`. The reading is
+/// given up: a second call fails. In debug builds the file is read again with `hints` and checked.
+pub fn file_hints_cached(
+    entry: &str,
+    file: &str,
+    files: &dyn Provider,
+    options: &BuildOptions,
+    cache: &mut ReadingCache,
+) -> Result<FileHints, String> {
+    let key = reading_cache::ReadingKey {
+        host: host_key(entry, (options.dialect.as_deref(), &options.formats)),
+        file: file.to_string(),
+        runtime: Options { only_file: Some(file.to_string()), ..options.runtime.clone() },
+    };
+    let Some(kept) = cache.take_reading(&key, files) else { return Err(NOT_KEPT.to_string()) };
+    let hints = document::file_hints(entry, &kept.reading, &kept.files);
+    #[cfg(debug_assertions)]
+    {
+        let fresh = build_file(entry, file, files, &BuildOptions { hints: true, ..options.clone() })?;
+        let want: BTreeMap<usize, String> = fresh
+            .document
+            .levels
+            .iter()
+            .map(|l| (l.host, serde_json::to_string(&l.hints).expect("hints serialize")))
+            .collect();
+        let got: BTreeMap<usize, String> =
+            hints.levels.iter().map(|(host, h)| (*host, serde_json::to_string(h).expect("hints serialize"))).collect();
+        assert_eq!(got, want, "the hints of the reading kept of {file} changed");
+    }
+    Ok(hints)
+}
+
+/// The error of [`file_hints_cached`] when the cache keeps no reading of the file to give the hints
+/// of.
+pub const NOT_KEPT: &str = "not kept";
 
 /// `call` with `cache` lent as a cell, which the workspace of a reading holds; it is given back
 /// after, whatever `call` gives.
@@ -362,11 +405,34 @@ fn build_file_with(
 ) -> Result<(FileResult, Option<Drawings>), String> {
     let runtime = Options { only_file: Some(file.to_string()), ..options.runtime.clone() };
     let options = BuildOptions { runtime, ..options.clone() };
-    let (result, drawings) =
-        build_in(entry, files, &options, lazy, taken, cache, |r, d| file_result::file_result(entry, file, r, d))?;
+    // a reading through the cache without the hints is kept for them, with every question it asks
+    // of the files (file_hints_cached)
+    let keep = cache.is_some() && !options.hints;
+    if let Some(cache) = cache {
+        cache.borrow_mut().drop_reading();
+    }
+    let asked = RefCell::new(Vec::new());
+    let noting = keep.then(|| reading_cache::noting(files, &asked));
+    let read_from: &dyn Provider = match &noting {
+        Some(noting) => noting,
+        None => files,
+    };
+    let built = build_in(entry, read_from, &options, lazy, taken, cache, keep, |r, d| {
+        file_result::file_result(entry, file, r, d)
+    });
+    let (result, drawings, reading) = built?;
     // a file not read yet may be among those missing, which a frontend reads to ask again
     if !result.document.files.iter().any(|f| f.path == file) && result.document.missing.is_empty() {
         return Err(format!("{file} is not a file of {entry}"));
+    }
+    if let (Some(cache), Some(reading)) = (cache, reading) {
+        let key = reading_cache::ReadingKey {
+            host: host_key(entry, (options.dialect.as_deref(), &options.formats)),
+            file: file.to_string(),
+            runtime: options.runtime.clone(),
+        };
+        let files = result.document.files.iter().enumerate().map(|(k, f)| (f.path.clone(), k)).collect();
+        cache.borrow_mut().keep_reading(key, asked.into_inner(), reading, files);
     }
     Ok((result, drawings))
 }
@@ -391,10 +457,15 @@ pub fn symbols(entry: &str, file: &str, files: &dyn Provider, options: &BuildOpt
     Ok(file_result::file_symbols(file, &r, missing))
 }
 
+/// What [`build_in`] gives: what `finish` made, the drawings kept apart, and the reading kept.
+type Built<T> = (T, Option<Drawings>, Option<Box<Interpretation>>);
+
 /// The Document of `entry` made into what `finish` makes of it with its interpretation, and when
 /// `lazy` the drawings of the objects without a position. A reading of `taken` made with options
 /// that read alike is taken instead of reading again, but when `lazy`, which takes the drawings out
-/// of the reading.
+/// of the reading. When `keep`, the reading is built with its problems, which change nothing else,
+/// and given too, with its drawings copied rather than taken, for the hints asked for after.
+#[allow(clippy::too_many_arguments)]
 fn build_in<T>(
     entry: &str,
     files: &dyn Provider,
@@ -402,8 +473,9 @@ fn build_in<T>(
     lazy: bool,
     taken: &[&DocumentReading],
     cache: Option<&RefCell<ReadingCache>>,
+    keep: bool,
     finish: impl FnOnce(&Interpretation, Document) -> T,
-) -> Result<(T, Option<Drawings>), String> {
+) -> Result<Built<T>, String> {
     let ws = Workspace::with_formats(files, &options.formats).cached(cache);
     if ws.read(&slashed(entry)).is_none() {
         return Err(format!("cannot read {entry}"));
@@ -427,8 +499,10 @@ fn build_in<T>(
     // the solve status and the constraints take the problems; built in this reading too, they
     // change nothing else
     let solver_view = options.status || options.constraints;
-    let runtime =
-        Options { problems: options.runtime.problems || solver_view || options.hints, ..options.runtime.clone() };
+    let runtime = Options {
+        problems: options.runtime.problems || solver_view || options.hints || keep,
+        ..options.runtime.clone()
+    };
     let without = Options { generated: false, ..runtime.clone() };
     let taking = |o: &Options| !lazy && taken.iter().any(|t| t.options.reads_as(o));
     let (mut r, other) = if solver_view && runtime.generated && !taking(&runtime) && !taking(&without) {
@@ -468,10 +542,15 @@ fn build_in<T>(
     }
     drop(other);
     let drawings = match &mut r {
-        Readed::Read(r) if lazy => Some(Drawings::take(&mut r.model.levels, &d, options)),
+        Readed::Read(r) if lazy => Some(Drawings::take(&mut r.model.levels, &d, options, keep)),
         _ => None,
     };
-    Ok((finish(&r, d), drawings))
+    let out = finish(&r, d);
+    let kept = match r {
+        Readed::Read(r) if keep => Some(r),
+        _ => None,
+    };
+    Ok((out, drawings, kept))
 }
 
 /// The readings of `entry` that [`build_in`] makes with the solve status or the constraints: with
@@ -654,16 +733,16 @@ pub fn read_host_with(
 fn read_host_in(entry: &str, reading: Formats, ws: &Workspace, sink: &mut Sink) -> Result<HostDocument, String> {
     match ws.cache {
         Some(cache) => {
-            let (dialect, formats) = reading;
-            let key = reading_cache::HostKey {
-                entry: slashed(entry),
-                dialect: dialect.map(str::to_string),
-                formats: formats.clone(),
-            };
+            let key = host_key(entry, reading);
             reading_cache::read_host(cache, key, ws, sink, |files, sink| read_host_from(entry, reading, files, sink))
         }
         None => read_host_from(entry, reading, ws, sink),
     }
+}
+
+/// What the host document of `entry` is read with besides its files ([`reading_cache::HostKey`]).
+fn host_key(entry: &str, (dialect, formats): Formats) -> reading_cache::HostKey {
+    reading_cache::HostKey { entry: slashed(entry), dialect: dialect.map(str::to_string), formats: formats.clone() }
 }
 
 /// [`read_host_in`] from `files`, a workspace or what notes the questions a reading asks of one.

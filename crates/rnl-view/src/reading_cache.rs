@@ -13,10 +13,15 @@
 //! later reading takes them instead of counting again when it would count them of the same, as
 //! [`rnl_runtime::interpret_taking`] decides.
 //!
+//! It keeps the reading of the last file asked for without its hints too, with every question
+//! that reading asked of the files and its answer, so that the hints are given after the file
+//! ([`crate::file_hints_cached`]) when every answer is the same, without reading again.
+//!
 //! Nothing is written anywhere: the cache lives as long as the frontend holds it.
 
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 
 use rnl_runtime::diag::Sink;
 use rnl_runtime::host::HostDocument;
@@ -31,6 +36,8 @@ pub struct ReadingCache {
     /// The objects of the authored records the last reading through the cache gave, with what
     /// they were counted of.
     counts: rnl_runtime::AuthoredCounts,
+    /// The reading of the file the last file reading through the cache made without the hints.
+    reading: Option<KeptReading>,
 }
 
 impl ReadingCache {
@@ -42,7 +49,69 @@ impl ReadingCache {
     pub fn clear(&mut self) {
         self.host = None;
         self.counts = rnl_runtime::AuthoredCounts::default();
+        self.reading = None;
     }
+
+    /// Keep the reading of a file of `key`, which asked `asked` of the files, and whose Document
+    /// numbers its files by `files`, in place of the one held.
+    pub(crate) fn keep_reading(
+        &mut self,
+        key: ReadingKey,
+        asked: Vec<Asked>,
+        reading: Box<rnl_runtime::Interpretation>,
+        files: HashMap<String, usize>,
+    ) {
+        self.reading = Some(KeptReading { key, asked: distinct(asked), reading, files });
+    }
+
+    /// Drop the reading held.
+    pub(crate) fn drop_reading(&mut self) {
+        self.reading = None;
+    }
+
+    /// The reading held, given up, when it is one of `key` and every question it asked has the
+    /// same answer from `files` now: reading again would read the same.
+    pub(crate) fn take_reading(&mut self, key: &ReadingKey, files: &dyn Provider) -> Option<KeptReading> {
+        let kept = self.reading.take()?;
+        let same = kept.key.host == key.host
+            && kept.key.file == key.file
+            && kept.key.runtime.reads_as(&key.runtime)
+            && kept.asked.iter().all(|asked| asked.again(files) == *asked);
+        same.then_some(kept)
+    }
+}
+
+/// What a reading of a file through the cache is of besides the files: the settings of its host
+/// document, the file and the runtime's options.
+pub(crate) struct ReadingKey {
+    pub host: HostKey,
+    pub file: String,
+    pub runtime: rnl_runtime::Options,
+}
+
+/// A reading of a file kept for its hints, with each question it asked of the files, once, with
+/// its answer.
+pub(crate) struct KeptReading {
+    key: ReadingKey,
+    asked: Vec<Asked>,
+    pub reading: Box<rnl_runtime::Interpretation>,
+    /// The files of its Document, by path, numbered as the Document numbers them.
+    pub files: HashMap<String, usize>,
+}
+
+/// `asked` with each question asked again with the same answer left out.
+fn distinct(asked: Vec<Asked>) -> Vec<Asked> {
+    let first: Vec<bool> = {
+        let mut seen = HashSet::new();
+        asked.iter().map(|a| seen.insert(a)).collect()
+    };
+    asked.into_iter().zip(first).filter_map(|(a, first)| first.then_some(a)).collect()
+}
+
+/// The files of a reading, through which each question the reading asks of `files` is noted in
+/// `asked` with its answer.
+pub(crate) fn noting<'a>(files: &'a dyn Provider, asked: &'a RefCell<Vec<Asked>>) -> Noting<'a> {
+    Noting { files, asked, library: files.auto_include().map(|library| NotingLibrary { library, asked }) }
 }
 
 /// `read` with the objects of the authored records `cache` keeps, which it takes when they were
@@ -75,9 +144,9 @@ struct KeptHost {
     sink: Sink,
 }
 
-/// A question the reading of a host document asked of the files, with its answer.
-#[derive(PartialEq, Debug)]
-enum Asked {
+/// A question a reading asked of the files, with its answer.
+#[derive(PartialEq, Eq, Debug)]
+pub(crate) enum Asked {
     Read(String, Option<String>),
     PathKey(String, String),
     PackageFiles(Vec<String>),
@@ -86,6 +155,32 @@ enum Asked {
     AutoInclude(bool),
     LibraryCandidates(String, bool, Vec<LibraryDefinition>),
     LibraryDefinitions(String, Vec<LibraryDefinition>),
+}
+
+impl Hash for Asked {
+    fn hash<H: Hasher>(&self, h: &mut H) {
+        let definitions = |found: &[LibraryDefinition], h: &mut H| {
+            for d in found {
+                (&d.name, &d.path, &d.file, &d.source, d.line).hash(h);
+            }
+        };
+        std::mem::discriminant(self).hash(h);
+        match self {
+            Asked::Read(path, text) => (path, text).hash(h),
+            Asked::PathKey(path, key) => (path, key).hash(h),
+            Asked::PackageFiles(found) => found.hash(h),
+            Asked::PackageCandidates(name, found) | Asked::IncludeCandidates(name, found) => (name, found).hash(h),
+            Asked::AutoInclude(some) => some.hash(h),
+            Asked::LibraryCandidates(name, case_sensitive, found) => {
+                (name, case_sensitive).hash(h);
+                definitions(found, h);
+            }
+            Asked::LibraryDefinitions(path, found) => {
+                path.hash(h);
+                definitions(found, h);
+            }
+        }
+    }
 }
 
 impl Asked {
@@ -112,7 +207,7 @@ impl Asked {
 }
 
 /// The files of a reading, each question asked of them noted with its answer.
-struct Noting<'a> {
+pub(crate) struct Noting<'a> {
     files: &'a dyn Provider,
     asked: &'a RefCell<Vec<Asked>>,
     library: Option<NotingLibrary<'a>>,
@@ -207,12 +302,7 @@ pub(crate) fn read_host(
     #[cfg(test)]
     tests::READ_FRESH.with(|count| count.set(count.get() + 1));
     let asked = RefCell::new(Vec::new());
-    let noting = Noting {
-        files,
-        asked: &asked,
-        library: files.auto_include().map(|library| NotingLibrary { library, asked: &asked }),
-    };
-    let doc = read(&noting, sink);
+    let doc = read(&noting(files, &asked), sink);
     let mut held = cache.borrow_mut();
     held.host = match &doc {
         Ok(doc) => Some(KeptHost { key, asked: asked.into_inner(), doc: doc.clone(), sink: sink.clone() }),
@@ -224,9 +314,11 @@ pub(crate) fn read_host(
 #[cfg(test)]
 mod tests {
     use std::cell::Cell;
+    use std::collections::BTreeMap;
 
     use crate::tests::{corpus, Disk};
     use crate::{build_file, build_file_cached, outline, outline_cached, BuildOptions, MemoryProvider, ReadingCache};
+    use crate::{build_file_drawn, build_file_drawn_cached, file_hints_cached, FileResult, NOT_KEPT};
     use rnl_runtime::source::Provider;
 
     thread_local! {
@@ -404,9 +496,82 @@ mod tests {
         assert_eq!(counts(&authored, &plain, &mut cache), 1);
     }
 
+    /// The hints of each level of `r`, by host, as [`crate::FileHints`] gives them.
+    fn hints_of(r: &FileResult) -> String {
+        let levels: BTreeMap<usize, String> = r.document.levels.iter().map(|l| (l.host, json(&l.hints))).collect();
+        json(&levels)
+    }
+
+    /// The hints [`file_hints_cached`] gives, by host.
+    fn hints_given(hints: &crate::FileHints) -> String {
+        let levels: BTreeMap<usize, String> = hints.levels.iter().map(|(host, h)| (*host, json(h))).collect();
+        json(&levels)
+    }
+
+    /// The hints of a file are given from the reading a file request through the cache kept without
+    /// them, once, as the request with them gives them; with no such reading of the file over the
+    /// same answers of the files and options that read alike, there are none.
+    #[test]
+    fn the_hints_of_a_file_are_given_from_the_reading_kept_for_them() {
+        let plain = BuildOptions { svg: false, flylines: true, ..BuildOptions::default() };
+        let hints = BuildOptions { hints: true, ..plain.clone() };
+        // R3 drawn over R2
+        let over = SOLVED.replace("#R3 @PLACE(5, -6)", "#R3 @PLACE(0, -6)");
+        let files = MemoryProvider::new().with("/w/t.sp", &over).with("/w/top.sp", TOP).with("/w/cells.inc", CELLS);
+        let mut cache = ReadingCache::new();
+        let not_kept = |r: Result<crate::FileHints, String>| r.err().as_deref() == Some(NOT_KEPT);
+        let want = hints_of(&build_file("/w/t.sp", "t.sp", &files, &hints).unwrap());
+        assert!(want.contains("RNL"), "the document has hints: {want}");
+        // kept, given once
+        let r = build_file_cached("/w/t.sp", "t.sp", &files, &plain, &mut cache).unwrap();
+        assert_eq!(json(&r), json(&build_file("/w/t.sp", "t.sp", &files, &plain).unwrap()));
+        assert_eq!(hints_given(&file_hints_cached("/w/t.sp", "t.sp", &files, &plain, &mut cache).unwrap()), want);
+        assert!(not_kept(file_hints_cached("/w/t.sp", "t.sp", &files, &plain, &mut cache)));
+        // the drawings kept apart too
+        let (r, drawings) = build_file_drawn_cached("/w/t.sp", "t.sp", &files, &plain, &mut cache).unwrap();
+        let (plain_r, plain_drawings) = build_file_drawn("/w/t.sp", "t.sp", &files, &plain).unwrap();
+        assert_eq!(json(&r), json(&plain_r));
+        let unplaced = |d: &crate::Drawings, r: &FileResult| {
+            let level = r.document.levels.iter().position(|l| !l.unplaced.is_empty());
+            level.map(|k| {
+                json(&d.unplaced(k, &(0..r.document.levels[k].unplaced.len()).collect::<Vec<_>>(), &[]).unwrap())
+            })
+        };
+        assert_eq!(unplaced(&drawings, &r), unplaced(&plain_drawings, &plain_r));
+        assert_eq!(hints_given(&file_hints_cached("/w/t.sp", "t.sp", &files, &plain, &mut cache).unwrap()), want);
+        // none for a file read with its hints, for another file, or with other options
+        build_file_cached("/w/t.sp", "t.sp", &files, &hints, &mut cache).unwrap();
+        assert!(not_kept(file_hints_cached("/w/t.sp", "t.sp", &files, &plain, &mut cache)));
+        build_file_cached("/w/top.sp", "cells.inc", &files, &plain, &mut cache).unwrap();
+        assert!(not_kept(file_hints_cached("/w/top.sp", "top.sp", &files, &plain, &mut cache)));
+        build_file_cached("/w/t.sp", "t.sp", &files, &plain, &mut cache).unwrap();
+        let other =
+            BuildOptions { runtime: rnl_runtime::Options { std: false, ..plain.runtime.clone() }, ..plain.clone() };
+        assert!(not_kept(file_hints_cached("/w/t.sp", "t.sp", &files, &other, &mut cache)));
+        // drawing options read alike
+        build_file_cached("/w/t.sp", "t.sp", &files, &plain, &mut cache).unwrap();
+        let drawn = BuildOptions { svg: true, flylines: false, ..plain.clone() };
+        assert_eq!(hints_given(&file_hints_cached("/w/t.sp", "t.sp", &files, &drawn, &mut cache).unwrap()), want);
+        // none once a file it read changed, or is given, or the cache is cleared
+        build_file_cached("/w/top.sp", "top.sp", &files, &plain, &mut cache).unwrap();
+        let changed = files.clone().with("/w/cells.inc", &CELLS.replace("1k", "2k"));
+        assert!(not_kept(file_hints_cached("/w/top.sp", "top.sp", &changed, &plain, &mut cache)));
+        build_file_cached("/w/top.sp", "top.sp", &files, &plain, &mut cache).unwrap();
+        let given = files.clone().with("/w/gone.inc", "* gone\n");
+        assert!(not_kept(file_hints_cached("/w/top.sp", "top.sp", &given, &plain, &mut cache)));
+        build_file_cached("/w/top.sp", "top.sp", &files, &plain, &mut cache).unwrap();
+        cache.clear();
+        assert!(not_kept(file_hints_cached("/w/top.sp", "top.sp", &files, &plain, &mut cache)));
+        // without the cache, nothing is kept
+        build_file("/w/top.sp", "top.sp", &files, &plain).unwrap();
+        assert!(not_kept(file_hints_cached("/w/top.sp", "top.sp", &files, &plain, &mut cache)));
+    }
+
     #[test]
     fn each_file_of_the_corpus_reads_with_the_cache_as_without() {
         let options = BuildOptions { svg: false, ..BuildOptions::default() };
+        let hints = BuildOptions { hints: true, ..options.clone() };
+        let mut with_hints = 0;
         for dir in ["cases-0.4/from-0.2", "equivalence-0.4"] {
             let dir = corpus(dir);
             let mut entries: Vec<String> = std::fs::read_dir(&dir)
@@ -424,9 +589,20 @@ mod tests {
                     let cached = build_file_cached(&entry, &file, &Disk, &options, &mut cache).map(|r| json(&r));
                     let read = build_file(&entry, &file, &Disk, &options).map(|r| json(&r));
                     assert_eq!(cached, read, "{entry} {file}");
+                    // the hints from the reading kept, as the file with them gives them
+                    let given = file_hints_cached(&entry, &file, &Disk, &options, &mut cache).map(|h| hints_given(&h));
+                    let want = build_file(&entry, &file, &Disk, &hints).map(|r| hints_of(&r));
+                    match (&cached, want) {
+                        (Ok(_), Ok(want)) => {
+                            with_hints += usize::from(want.contains("RNL"));
+                            assert_eq!(given, Ok(want), "{entry} {file}");
+                        }
+                        _ => assert_eq!(given, Err(NOT_KEPT.to_string()), "{entry} {file}"),
+                    }
                 }
                 assert!(Disk.read(&entry).is_some());
             }
         }
+        assert!(with_hints > 0, "some file of the corpus has hints");
     }
 }
