@@ -1196,6 +1196,40 @@ C1 a 0 1p
 .end
 ";
 
+    /// The head of each record of the corpus and of the bundled packages, read alone, is the head
+    /// the whole record gives ([`rnl_runtime::syntax::parse_record_head`]).
+    #[test]
+    fn the_head_of_each_record_read_alone_is_the_head_of_the_whole_record() {
+        use rnl_runtime::syntax::{parse_record, parse_record_head};
+        let mut texts: Vec<String> = Vec::new();
+        for dir in ["cases-0.4/from-0.2", "cases-0.4/from-0.3", "equivalence-0.4"] {
+            let dir = corpus(dir);
+            let mut entries: Vec<String> = std::fs::read_dir(&dir)
+                .unwrap()
+                .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().to_string()))
+                .filter(|f| f.ends_with(".sp") || f.ends_with(".scs"))
+                .map(|f| format!("{dir}/{f}"))
+                .collect();
+            entries.sort();
+            for entry in entries {
+                let Ok(doc) = read_host(&entry, None, &Disk, &mut Sink::new()) else { continue };
+                texts.extend(doc.levels.iter().flat_map(|l| l.records.iter().map(|r| r.text.clone())));
+            }
+        }
+        for (path, text) in bundled().files {
+            let records = rnl_runtime::records::scan_package_run(
+                &rnl_runtime::records::package_lines(&text),
+                &path,
+                &mut Sink::new(),
+            );
+            texts.extend(records.into_iter().map(|r| r.text));
+        }
+        assert!(texts.len() > 200, "{}", texts.len());
+        for text in &texts {
+            assert_eq!(parse_record_head(text), parse_record(text).header, "{text}");
+        }
+    }
+
     #[test]
     fn an_untitled_text_is_an_entry_in_memory() {
         let files = MemoryProvider::new().with("untitled-1", NETLIST);

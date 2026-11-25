@@ -25,7 +25,7 @@ mod replace;
 pub use replace::{find_level, replace_records, Refused, Replaced};
 
 use crate::host::{HostDocument, LevelId, LevelKind, Record};
-use crate::syntax::{parse_record, Value};
+use crate::syntax::{parse_record, parse_record_head, Value};
 
 /// The `type=` of a record's header: "authored" when not written.
 pub fn record_type(rec: &Record) -> String {
@@ -33,9 +33,11 @@ pub fn record_type(rec: &Record) -> String {
 }
 
 /// A string field of a record's header, such as `author`.
+/// Only the head is read; in debug builds the whole record is read too, and its head checked.
 pub fn field(rec: &Record, name: &str) -> Option<String> {
-    let ast = parse_record(&rec.text);
-    let h = ast.header?;
+    let head = parse_record_head(&rec.text);
+    debug_assert_eq!(head, parse_record(&rec.text).header, "the head of a record read alone");
+    let h = head?;
     match h.get(name) {
         Some(Value::Str(s)) => Some(s.clone()),
         _ => None,
