@@ -366,13 +366,21 @@ pub fn file_rest_cached(
 
 /// Leave the texts of `result`'s files out, for a frontend that has them: each [`SourceFile::text`]
 /// is made empty, but those of the bundled packages ([`BUNDLED_DIR`]), which the frontend did not
-/// give. The frontend puts back the texts of the files it gave.
-pub fn leave_out_texts(result: &mut FileResult) {
+/// give. A file's path is relative to the directory of the entry when it is in it, as a bundled
+/// package read as the entry is. The frontend puts back the texts of the files it gave; the texts
+/// left out are given, by [`SourceFile::path`], those that were not empty, for a frontend that keeps
+/// them to put back.
+pub fn leave_out_texts(result: &mut FileResult) -> HashMap<String, String> {
+    let dir = dirname(&result.document.path);
+    let mut taken = HashMap::new();
     for f in &mut result.document.files {
-        if !f.path.starts_with(BUNDLED_DIR) {
-            f.text.clear();
+        let bundled =
+            f.path.starts_with(BUNDLED_DIR) || rnl_runtime::source::join(&dir, &f.path).starts_with(BUNDLED_DIR);
+        if !bundled && !f.text.is_empty() {
+            taken.insert(f.path.clone(), std::mem::take(&mut f.text));
         }
     }
+    taken
 }
 
 /// What a reading of `file` through the cache is of besides the files ([`reading_cache::ReadingKey`]).
