@@ -686,6 +686,28 @@ mod tests {
         assert_eq!(json(&r.document.spans), json(&full.document.spans));
     }
 
+    /// A bundled package read as the entry keeps its text when the texts are left out: the
+    /// frontend did not give it.
+    #[test]
+    fn a_bundled_package_read_as_the_entry_keeps_its_text() {
+        let options = BuildOptions { svg: false, ..BuildOptions::default() };
+        let entry = format!("{}/0.4/rnl-std-basic.rnl", crate::BUNDLED_DIR);
+        let mut r = build_file(&entry, "rnl-std-basic.rnl", &MemoryProvider::new(), &options).unwrap();
+        let texts =
+            |r: &FileResult| r.document.files.iter().map(|f| (f.path.clone(), f.text.len())).collect::<Vec<_>>();
+        let given = texts(&r);
+        assert!(given.iter().all(|(_, len)| *len > 0), "{given:?}");
+        // none taken: the desktop app keeps those taken, to give back
+        assert!(leave_out_texts(&mut r).is_empty());
+        assert_eq!(texts(&r), given);
+        // a file the frontend gave, next to a bundled package, is left out, and its text taken
+        let files = MemoryProvider::new().with("/w/t.sp", SOLVED);
+        let mut r = build_file("/w/t.sp", "t.sp", &files, &options).unwrap();
+        let taken = leave_out_texts(&mut r);
+        assert!(r.document.files.iter().all(|f| f.text.is_empty() != f.path.starts_with(crate::BUNDLED_DIR)));
+        assert_eq!(taken.into_iter().collect::<Vec<_>>(), [("t.sp".to_string(), SOLVED.to_string())]);
+    }
+
     /// The places of the free words of the records are kept by record text, and the files read
     /// through the cache have them as the files read without it.
     #[test]

@@ -15,7 +15,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use rnl_runtime::numbering::{hex, sha256};
 use rnl_runtime::source::Provider;
-use rnl_view::{Bind, BuildOptions, FileResult};
+use rnl_view::{Bind, BuildOptions};
 use tauri::{State, WebviewWindow};
 
 use crate::core_thread::{Core, Drawn};
@@ -72,20 +72,6 @@ impl KeptTexts {
             None
         }
     }
-}
-
-/// Leave the texts of `result`'s files out, as `rnl_view::leave_out_texts` does, and give those left out, by path: those
-/// it has, as the reading of one file has none of the files it does not read.
-fn take_texts(result: &mut FileResult) -> HashMap<String, String> {
-    let texts = result
-        .document
-        .files
-        .iter_mut()
-        .filter(|f| !f.path.starts_with(rnl_view::BUNDLED_DIR) && !f.text.is_empty())
-        .map(|f| (f.path.clone(), std::mem::take(&mut f.text)))
-        .collect();
-    rnl_view::leave_out_texts(result);
-    texts
 }
 
 /// The text of each of `paths`: the one `kept`, else as `read` reads it.
@@ -232,7 +218,7 @@ pub async fn read_file(
                 drawn.keep(drawings);
                 if later {
                     drawn.cache(&key).keep_spans(&mut result);
-                    let texts = take_texts(&mut result);
+                    let texts = rnl_view::leave_out_texts(&mut result);
                     if let Some(open) = open {
                         kept.keep(open, texts);
                     }
@@ -340,7 +326,7 @@ pub async fn file_symbols(
 
 #[cfg(test)]
 mod tests {
-    use rnl_view::MemoryProvider;
+    use rnl_view::{FileResult, MemoryProvider};
 
     use super::*;
 
@@ -351,7 +337,7 @@ mod tests {
     fn read(kept: &KeptTexts, id: &str, files: &MemoryProvider) -> FileResult {
         kept.clear();
         let mut result = rnl_view::build_file("/w/top.sp", "top.sp", files, &Default::default()).unwrap();
-        let texts = take_texts(&mut result);
+        let texts = rnl_view::leave_out_texts(&mut result);
         kept.keep(id.to_string(), texts);
         result
     }
