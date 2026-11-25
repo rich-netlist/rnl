@@ -139,6 +139,17 @@ test('an entry with a record besides its header is read and shown before its one
   await expect(page.locator('#level-path .crumb .name, #level-path #level-name')).toHaveText(['alpha']);
 });
 
+test('an entry with its header and another record on one line is shown, as with them on two lines', async ({ page }) => {
+  await watch(page);
+  // two records on the line of the header: something to draw, not the header alone
+  await open(page, { 'top.sp': '* top\n* @RNL(type="header") { @VERSION("0.4") } @RNL { (0, 0) @TEXT("ENTRY") }\n.include "a.inc"\n.end\n', 'a.inc': A });
+  // time for the root to open, were it opened at once
+  await page.waitForTimeout(500);
+  await idle(page);
+  expect(await shown(page)).toEqual({ file: 'top.sp', level: 'top.sp' });
+  expect(await watched(page)).toEqual({ shown: ['top.sp'], read: ['top.sp'] });
+});
+
 test('an entry page left at once for its one root reads no symbols; one that stays reads them', async ({ page }) => {
   await countSymbols(page);
   await open(page, { 'top.sp': '* top\n.include "a.inc"\n.end\n', 'a.inc': A });
