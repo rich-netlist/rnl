@@ -217,3 +217,58 @@ test('the outline kept holds for the next reader of the entry, also when the ent
   expect(await shown(page)).toMatchObject({ file: 'cells.inc', level: 'cell' });
   expect(await page.evaluate(() => window.outlineRequests)).toBe(opened);
 });
+
+// the outline and file requests to each Worker's core, in the order sent: the entry, the file, and the reading cache's fields
+const watchRequests = (page) => page.addInitScript(() => {
+  window.coreRequests = [];
+  window.coreWorkers = 0;
+  const workers = new WeakMap();
+  const post = Worker.prototype.postMessage;
+  Worker.prototype.postMessage = function (message, ...rest) {
+    const r = typeof message?.request === 'string' ? JSON.parse(message.request) : null;
+    if (r && (r.outline || typeof r.file === 'string')) {
+      if (!workers.has(this)) workers.set(this, ++window.coreWorkers);
+      window.coreRequests.push({ worker: workers.get(this), outline: !!r.outline, file: r.file ?? null, entry: r.entry, cache: r.cache === true, forget: r.forget === true });
+    }
+    return post.call(this, message, ...rest);
+  };
+});
+
+test('the outline and the readings of files go through the reading cache of the core, which a reader of another entry empties first', async ({ page }) => {
+  await watchRequests(page);
+  await open(page);
+  await descendNamed(page, 'X1');
+  expect(await shown(page)).toMatchObject({ file: 'cells.inc', level: 'cell' });
+  // another entry, then the first again
+  await page.locator('#file-input').setInputFiles([{ name: 'leaf.inc', mimeType: 'text/plain', buffer: Buffer.from(LEAF) }]);
+  await idle(page);
+  await page.locator('#file-input').setInputFiles([{ name: 'top.sp', mimeType: 'text/plain', buffer: Buffer.from(TOP) },
+    { name: 'cells.inc', mimeType: 'text/plain', buffer: Buffer.from(CELLS) }, { name: 'leaf.inc', mimeType: 'text/plain', buffer: Buffer.from(LEAF) }]);
+  await idle(page);
+  const requests = await page.evaluate(() => window.coreRequests);
+  expect(requests.length).toBeGreaterThanOrEqual(4);
+  // each asks for the cache; each Worker's cache is emptied by the first request of another entry than its last, only
+  const last = new Map();
+  for (const r of requests) {
+    expect(r.cache).toBe(true);
+    expect(r.forget).toBe(last.has(r.worker) && last.get(r.worker) !== r.entry);
+    last.set(r.worker, r.entry);
+  }
+  expect(requests.map(r => r.entry.split('/').pop())).toEqual(expect.arrayContaining(['top.sp', 'leaf.inc']));
+});
+
+test('what is shown is the same with the reading cache as without it', async ({ page, context }) => {
+  const without = await context.newPage();
+  await without.addInitScript(() => { globalThis.rnlReadingCache = false; });
+  await watchRequests(page);
+  await watchRequests(without);
+  const doc = (p) => p.evaluate(() => JSON.stringify(window.viewer.doc));
+  for (const p of [page, without]) await open(p);
+  expect(await doc(page)).toBe(await doc(without));
+  for (const p of [page, without]) await descendNamed(p, 'X1');
+  expect(await shown(page)).toMatchObject({ file: 'cells.inc', level: 'cell' });
+  expect(await doc(page)).toBe(await doc(without));
+  // the page without asked for no cache
+  expect((await without.evaluate(() => window.coreRequests)).some(r => r.cache || r.forget)).toBe(false);
+  expect((await page.evaluate(() => window.coreRequests)).every(r => r.cache)).toBe(true);
+});

@@ -2,9 +2,10 @@
 //! outline of the whole document, the reading of one file alone in the context of its entry, the hashes and texts of
 //! its files as the core reads them, and the symbols of a file's subcircuits. The page keeps the readings, in memory,
 //! by the rules every shell keeps them by; the app keeps nothing of them but the drawings of what the reading shown
-//! has with no position, which the page asks for as it scrolls (`unplaced_drawings`). Only a reading that keeps them
-//! runs on the core thread; the others, the page's preloading and Check All Files among them, run beside it, so that
-//! they never hold up the reading the page is to show.
+//! has with no position, which the page asks for as it scrolls (`unplaced_drawings`). Only a reading that keeps them,
+//! and the outline of the document it is of, run on the core thread, through its reading cache (`Drawn::cache`); the
+//! others, the page's preloading and Check All Files among them, run beside it, so that they never hold up the reading
+//! the page is to show.
 
 use rnl_runtime::numbering::{hex, sha256};
 use rnl_runtime::source::Provider;
@@ -27,6 +28,12 @@ pub struct Source {
     pool: Option<Vec<String>>,
     auto_include: Option<bool>,
     formats: Option<formats::Formats>,
+}
+
+/// The settings of a reading of `source` besides the texts of its files, which the reading cache is used for: the entry,
+/// the file pool, Auto Include and the formats.
+fn cache_key(source: &Source) -> String {
+    serde_json::json!([source.path, source.name, source.pool, source.auto_include, source.formats]).to_string()
 }
 
 /// The options of a reading: those the page's readings are made with, flylines and the layout hints asked for, not
@@ -86,7 +93,8 @@ pub fn reading_core() -> serde_json::Value {
     serde_json::json!({ "version": rnl_view::core_version(), "format": rnl_view::FILE_RESULT_FORMAT })
 }
 
-/// The outline of the document of `source` (`rnl_view::Outline`).
+/// The outline of the document of `source` (`rnl_view::Outline`). With `cache`, the outline of the document the page is
+/// to show: it runs on the core thread, through the reading cache, for the reading that keeps the drawings to take.
 #[tauri::command]
 pub async fn read_outline(
     window: WebviewWindow,
@@ -94,21 +102,31 @@ pub async fn read_outline(
     settings: State<'_, settings::Settings>,
     library: State<'_, library::Library>,
     source: Source,
+    cache: Option<bool>,
     request_id: Option<String>,
 ) -> Result<tauri::ipc::Response, String> {
     let progress = request_id.map(|id| (window, id));
-    let json = with_files(&core, &settings, &library, source, (false, progress), |_, entry, files, formats| {
-        let outline = rnl_view::outline(entry, files, &options(formats.clone(), None, false))?;
-        serde_json::to_string(&outline).map_err(|e| e.to_string())
-    })
-    .await?;
+    let cache = cache.unwrap_or(false);
+    let key = cache_key(&source);
+    let json =
+        with_files(&core, &settings, &library, source, (cache, progress), move |drawn, entry, files, formats| {
+            let options = options(formats.clone(), None, false);
+            let outline = if cache {
+                rnl_view::outline_cached(entry, files, &options, drawn.cache(&key))?
+            } else {
+                rnl_view::outline(entry, files, &options)?
+            };
+            serde_json::to_string(&outline).map_err(|e| e.to_string())
+        })
+        .await?;
     Ok(tauri::ipc::Response::new(json))
 }
 
 /// The reading of `file` of the document of `source`, alone in the context of its entry (`rnl_view::FileResult`). With
 /// `keep`, the drawings of the objects it lists without a position are kept for `unplaced_drawings`, in place of those
-/// of the last reading kept: the reading is the one the page shows. With `bind`, the parameters of a subcircuit are
-/// built with those values, to show; with `constraints`, the levels have their constraints, which the Solve view lists.
+/// of the last reading kept: the reading is the one the page shows, made through the reading cache. With `bind`, the
+/// parameters of a subcircuit are built with those values, to show; with `constraints`, the levels have their
+/// constraints, which the Solve view lists.
 // Tauri injects the window and managed state alongside the separate IPC arguments.
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
@@ -126,11 +144,13 @@ pub async fn read_file(
 ) -> Result<tauri::ipc::Response, String> {
     let progress = request_id.map(|id| (window, id));
     let drawn = keep.unwrap_or(false);
+    let key = cache_key(&source);
     let json =
         with_files(&core, &settings, &library, source, (drawn, progress), move |drawn, entry, files, formats| {
             let options = options(formats.clone(), bind, constraints.unwrap_or(false));
             let result = if keep.unwrap_or(false) {
-                let (result, drawings) = rnl_view::build_file_drawn(entry, &file, files, &options)?;
+                let (result, drawings) =
+                    rnl_view::build_file_drawn_cached(entry, &file, files, &options, drawn.cache(&key))?;
                 drawn.keep(drawings);
                 result
             } else {

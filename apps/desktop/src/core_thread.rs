@@ -1,5 +1,7 @@
 //! The thread that reads the documents. The reading the page shows keeps the drawings of the objects it lists without
 //! a position ([`rnl_view::build_file_drawn`]) for the page to ask for as it scrolls; they hold what the model does.
+//! The outline and the readings of the document shown go through a reading cache ([`rnl_view::ReadingCache`]), which
+//! keeps in memory the host document read last, so that a reading does not read again what the outline read.
 //! Readings and requests for drawings run in order. Nothing else is kept: the page keeps the readings
 //! (apps/viewer-ui/file-reading.js).
 
@@ -7,18 +9,32 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 
-use rnl_view::{Drawings, UnplacedDrawing};
+use rnl_view::{Drawings, ReadingCache, UnplacedDrawing};
 
-/// The drawings of the reading shown, kept from the last reading that asked to keep them.
+/// The drawings of the reading shown, kept from the last reading that asked to keep them, and the reading cache of the
+/// document shown, with the settings of the reading it was last used for.
 #[derive(Default)]
 pub struct Drawn {
     active: Option<Drawings>,
+    cache: ReadingCache,
+    cached_for: Option<String>,
 }
 
 impl Drawn {
     /// Keep `drawings`, in place of those kept before.
     pub fn keep(&mut self, drawings: Drawings) {
         self.active = Some(drawings);
+    }
+
+    /// The reading cache, for a reading with the settings `key`: what it holds is dropped first when it was last used
+    /// for a reading with other settings, such as another entry. The core takes what it holds only when the files
+    /// answer as they did, and then answers as it does without; this only frees the memory early.
+    pub fn cache(&mut self, key: &str) -> &mut ReadingCache {
+        if self.cached_for.as_deref() != Some(key) {
+            self.cache.clear();
+            self.cached_for = Some(key.to_string());
+        }
+        &mut self.cache
     }
 
     /// The drawings of the objects at `items` of `levels[level].unplaced` of the reading kept, which `names` must name.
@@ -111,6 +127,40 @@ mod tests {
         let wrong = vec!["R9".to_string(); n.len()];
         let e = asked(&core, wrong).unwrap_err();
         assert!(e.contains("built again"), "{e}");
+    }
+
+    #[test]
+    fn the_outline_and_the_reading_kept_through_the_cache_are_those_made_without_it() {
+        let core = Core::new();
+        let files = || {
+            MemoryProvider::new()
+                .with("/a.sp", "* a\n.include 'cell.inc'\nX1 a b cell\n.end\n")
+                .with("/cell.inc", "* cell\n.subckt cell p q\nR1 p q 1k\n.ends\n")
+                .with("/b.sp", TEXT)
+        };
+        // as the page reads them: an outline, the reading of a file kept, of one entry, then another, then the first again
+        let read = move |drawn: &mut Drawn, entry: &str, file: &str, cached: bool| {
+            let options = Default::default();
+            let files = files();
+            let (outline, (result, _)) = if cached {
+                (
+                    rnl_view::outline_cached(entry, &files, &options, drawn.cache(entry)).unwrap(),
+                    rnl_view::build_file_drawn_cached(entry, file, &files, &options, drawn.cache(entry)).unwrap(),
+                )
+            } else {
+                (
+                    rnl_view::outline(entry, &files, &options).unwrap(),
+                    rnl_view::build_file_drawn(entry, file, &files, &options).unwrap(),
+                )
+            };
+            (serde_json::to_string(&outline).unwrap(), serde_json::to_string(&result).unwrap())
+        };
+        for (entry, file) in [("/a.sp", "cell.inc"), ("/b.sp", "b.sp"), ("/a.sp", "a.sp"), ("/a.sp", "cell.inc")] {
+            let (with, without) = core
+                .run(move |drawn| (read(drawn, entry, file, true), read(&mut Drawn::default(), entry, file, false)))
+                .unwrap();
+            assert_eq!(with, without, "{entry} {file}");
+        }
     }
 
     #[test]

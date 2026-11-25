@@ -163,7 +163,7 @@ export default {
    * What the page reads a document file by file with (file-reading.js, shell.js `Reader`): the files of `source`, with
    * `edits` over them, the file pool, PATH and the Library, as the app reads them.
    */
-  async reader(source, edits, { progress, bind = null, constraints = false } = {}) {
+  async reader(source, edits, { progress, bind = null, constraints = false, background = false } = {}) {
     await flushSettings();
     await poolReady;
     const args = { ...reading(source), edits: edits || null, pool, autoInclude: load("auto-include", true) === true, formats: fileFormats() };
@@ -188,9 +188,11 @@ export default {
         }
         return new Map(paths.map((p) => [p, hashes.get(p)]));
       },
+      // the outline of a document to show is made on the core thread, through its reading cache, as the reading that
+      // follows it is (reading.rs); preloading's beside it
       async outline() {
         await listening();
-        return invoke("read_outline", { source: args, requestId });
+        return invoke("read_outline", { source: args, cache: !background, requestId });
       },
       async readFile(file, keep) {
         await listening();

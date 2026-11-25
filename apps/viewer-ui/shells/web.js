@@ -6,8 +6,10 @@ import { append, m, setAttr } from "../i18n.js";
 // module Workers. Each candidate keeps its own lazy drawings until the page accepts it. The page's own
 // opens read the file shown alone, in the context of its entry (`reader`, which file-reading.js reads with):
 // the outline of the whole document, then the reading of that one file (collectOutline, collectFile). What is
-// kept of them, and when, is the page's (file-reading.js); nothing of it is in the browser's storage. An
-// embedded viewer, and the viewer API, read the whole document (`build`).
+// kept of them, and when, is the page's (file-reading.js); nothing of it is in the browser's storage. Those
+// requests go through the reading cache of the Worker's core, which keeps in memory the host document read last,
+// so that the reading of the file does not read again what the outline read (`cache`). An embedded viewer, and
+// the viewer API, read the whole document (`build`).
 
 import { collect, collectFile, collectOutline, coreVersion, decodeText, fileResultFormat, startCore } from "../core/client.js";
 import { removeOldStore } from "../result-cache.js";
@@ -179,6 +181,13 @@ const READING_OPTIONS = ["svg", "primitives", "flylines", "hints", "lazy_unplace
 // them (the package files a header names by `path`, which no outline lists). Only the paths are kept: each reader reads
 // the files itself, as they are now.
 const askedFor = new Map();
+// The reading settings of the document the reading cache of each Worker's core holds, by the Worker: the outline and
+// file requests of a reader go through the cache (`"cache": true`), and the first of them on a Worker whose cache holds
+// a document of another entry, or read with other settings, drops it first (`"forget": true`). The core takes what it
+// holds only when the files answer as they did, and then answers as it does without; this only frees the memory early.
+// A test page turns the cache off with `globalThis.rnlReadingCache = false`, to compare.
+const cachedFor = new WeakMap();
+const readingCache = () => globalThis.rnlReadingCache !== false;
 let lastUrl = ""; // the URL opened last, which Open URL offers again
 // The files of the document shown that a server served, by their workspace paths, and its origin: the
 // format chosen for one of them is kept by its address, as the page can read it again; a file chosen
@@ -1197,12 +1206,17 @@ export default {
         await indexLibrary(worker, library);
         return worker;
       })());
+      // the settings the host document is read with besides the texts (`cachedFor`)
+      const cacheKey = JSON.stringify([entry.path, request.formats, request.dialect ?? null, request.auto_include, request.library_prefix, request.pool, request.package_dirs, request.search_paths]);
       const asking = (name) => async (r) => {
         stopped();
         const w = await useCore();
         stopped();
         progress?.("parsing");
-        return w[name](r);
+        if (!readingCache()) return w[name](r);
+        const forget = cachedFor.has(w) && cachedFor.get(w) !== cacheKey;
+        cachedFor.set(w, cacheKey);
+        return w[name](forget ? { ...r, cache: true, forget: true } : { ...r, cache: true });
       };
       const failing = async (job) => {
         try { return await job(); }
