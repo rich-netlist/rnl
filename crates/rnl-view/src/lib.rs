@@ -563,9 +563,10 @@ fn build_in<T>(
         (Readed::Read(Box::new(r)), other.map(|o| Readed::Read(Box::new(o))))
     } else {
         let r = read(&runtime)?;
-        // a document without records of the solver reads the same with them and without
-        let records = r.doc.levels.iter().any(|l| l.records.iter().any(|rec| record_type(rec) == "generated"));
-        let other = if !solver_view || !records {
+        // a document without records of the solver reads the same with them and without; looked for
+        // only for the solve status and the constraints, as reading each record's head parses it
+        let records = || r.doc.levels.iter().any(|l| l.records.iter().any(|rec| record_type(rec) == "generated"));
+        let other = if !solver_view || !records() {
             None
         } else if runtime.generated {
             Some(read(&without)?)
