@@ -216,4 +216,18 @@ test.describe("the web viewer", () => {
       .toMatch(/^Could not open the netlist: unsupported version 0\.3/);
     await shot(page, "embed", browserName);
   });
+
+  test("an embedded canvas of a file of 0.3 that includes one of a later version shows the error, as the old viewer cannot read the other", async ({ page }) => {
+    const url = new URL("/", base());
+    url.search = new URLSearchParams({ embed: "1", url: "old/mixed-old-top.sp" });
+    await page.route("**/old-embed-host", (route) => route.fulfill({ contentType: "text/html", body: `<!doctype html><html><body><script>window.messages = [];
+      window.addEventListener('message', (e) => { if (e.data?.rnl === 1) window.messages.push(e.data); });</script>
+      <iframe id="viewer" src=${JSON.stringify(url.href)}></iframe></body></html>` }));
+    await page.goto(`${base()}/old-embed-host`);
+    const frame = page.frameLocator("#viewer");
+    await expect.poll(() => page.evaluate(() => window.messages.find((m) => m.type === "error")?.message ?? null))
+      .toMatch(/^Could not open the netlist: unsupported version/);
+    await expect(frame.locator("#empty")).toContainText("Could not open the netlist: unsupported version");
+    await expect(frame.locator("#empty .old-version")).toHaveCount(0);
+  });
 });

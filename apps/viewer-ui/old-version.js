@@ -67,11 +67,12 @@ export function oldVersion(d, i, source) {
 
 /**
  * Of a document that an embedded canvas refused for its errors: the first of its files of an earlier version, when every
- * error is one of the core's errors of a file of an earlier version, else null.
+ * error is one of the core's errors of a file of an earlier version, which the old viewer reads, else null.
  */
 export function oldDocument(d, source) {
   const errors = d.diagnostics.filter((x) => x.severity === "error");
-  if (errors.length === 0 || !errors.every((x) => x.code === UNSUPPORTED && x.file_index !== null)) return null;
+  const earlier = (x) => x.code === UNSUPPORTED && x.file_index !== null && EARLIER.includes(versionOf(d, d.files[x.file_index]?.path));
+  if (errors.length === 0 || !errors.every(earlier)) return null;
   const entry = entryOf(d);
   for (const path of [entry, ...d.files.map((f) => f.path).filter((p) => p !== entry)]) {
     const version = path && versionOf(d, path);
