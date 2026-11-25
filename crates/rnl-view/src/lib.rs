@@ -50,8 +50,8 @@ pub use constraints::{
     LevelConstraints, SolverLiteral, SolverSettingView,
 };
 pub use document::{
-    AutoIncludeCandidate, Child, Diagnostic, Document, Drawings, FileHints, Hit, InspectedLabel, InspectedPin,
-    InspectedSymbol, Level, LevelHint, MemberOf, NetLabel, Object, PinObject, RoleOf, RuleAt, SourceFile,
+    AutoIncludeCandidate, Child, Diagnostic, Document, Drawings, FileHints, FileRest, Hit, InspectedLabel,
+    InspectedPin, InspectedSymbol, Level, LevelHint, MemberOf, NetLabel, Object, PinObject, RoleOf, RuleAt, SourceFile,
     SourceInclude, Span, Unplaced, UnplacedDrawing, Usage, UsageRole,
 };
 pub use file_result::{
@@ -334,27 +334,78 @@ pub fn file_hints_cached(
     options: &BuildOptions,
     cache: &mut ReadingCache,
 ) -> Result<FileHints, String> {
-    let key = reading_cache::ReadingKey {
-        host: host_key(entry, (options.dialect.as_deref(), &options.formats)),
-        file: file.to_string(),
-        runtime: Options { only_file: Some(file.to_string()), ..options.runtime.clone() },
-    };
+    let key = reading_key(entry, file, options);
     let Some(kept) = cache.take_reading(&key, files) else { return Err(NOT_KEPT.to_string()) };
     let hints = document::file_hints(entry, &kept.reading, &kept.files);
     #[cfg(debug_assertions)]
-    {
-        let fresh = build_file(entry, file, files, &BuildOptions { hints: true, ..options.clone() })?;
-        let want: BTreeMap<usize, String> = fresh
-            .document
-            .levels
-            .iter()
-            .map(|l| (l.host, serde_json::to_string(&l.hints).expect("hints serialize")))
-            .collect();
-        let got: BTreeMap<usize, String> =
-            hints.levels.iter().map(|(host, h)| (*host, serde_json::to_string(h).expect("hints serialize"))).collect();
-        assert_eq!(got, want, "the hints of the reading kept of {file} changed");
-    }
+    check_rest(entry, file, files, options, &hints, None);
     Ok(hints)
+}
+
+/// What the answer of `file`, a file of `entry`, was left without, from the reading of it that
+/// the cache keeps with its spans ([`ReadingCache::keep_spans`]), without reading again: its spans,
+/// as [`Document::spans`] has them, and the hints of its levels, as [`file_hints_cached`] gives
+/// them. It needs what [`file_hints_cached`] needs, and fails with [`NOT_KEPT`] as it does, and
+/// when the spans were not kept. The reading is given up. In debug builds the file is read again
+/// with `hints` and checked.
+pub fn file_rest_cached(
+    entry: &str,
+    file: &str,
+    files: &dyn Provider,
+    options: &BuildOptions,
+    cache: &mut ReadingCache,
+) -> Result<FileRest, String> {
+    let key = reading_key(entry, file, options);
+    let Some(mut kept) = cache.take_reading(&key, files) else { return Err(NOT_KEPT.to_string()) };
+    let Some(spans) = kept.spans.take() else { return Err(NOT_KEPT.to_string()) };
+    let hints = document::file_hints(entry, &kept.reading, &kept.files);
+    #[cfg(debug_assertions)]
+    check_rest(entry, file, files, options, &hints, Some(&spans));
+    Ok(FileRest { spans, hints })
+}
+
+/// Leave the texts of `result`'s files out, for a frontend that has them: each [`SourceFile::text`]
+/// is made empty, but those of the bundled packages ([`BUNDLED_DIR`]), which the frontend did not
+/// give. The frontend puts back the texts of the files it gave.
+pub fn leave_out_texts(result: &mut FileResult) {
+    for f in &mut result.document.files {
+        if !f.path.starts_with(BUNDLED_DIR) {
+            f.text.clear();
+        }
+    }
+}
+
+/// What a reading of `file` through the cache is of besides the files ([`reading_cache::ReadingKey`]).
+fn reading_key(entry: &str, file: &str, options: &BuildOptions) -> reading_cache::ReadingKey {
+    reading_cache::ReadingKey {
+        host: host_key(entry, (options.dialect.as_deref(), &options.formats)),
+        file: file.to_string(),
+        runtime: Options { only_file: Some(file.to_string()), ..options.runtime.clone() },
+    }
+}
+
+/// Check the hints, and the spans when given, that a reading kept gave against `file` read again
+/// with `hints`.
+#[cfg(debug_assertions)]
+fn check_rest(
+    entry: &str,
+    file: &str,
+    files: &dyn Provider,
+    options: &BuildOptions,
+    hints: &FileHints,
+    spans: Option<&[Span]>,
+) {
+    let fresh = build_file(entry, file, files, &BuildOptions { hints: true, ..options.clone() })
+        .expect("a file kept reads again");
+    fn json<T: serde::Serialize + ?Sized>(value: &T) -> String {
+        serde_json::to_string(value).expect("serializes")
+    }
+    let want: BTreeMap<usize, String> = fresh.document.levels.iter().map(|l| (l.host, json(&l.hints))).collect();
+    let got: BTreeMap<usize, String> = hints.levels.iter().map(|(host, h)| (*host, json(h))).collect();
+    assert_eq!(got, want, "the hints of the reading kept of {file} changed");
+    if let Some(spans) = spans {
+        assert!(json(spans) == json(&fresh.document.spans), "the spans kept of {file} changed");
+    }
 }
 
 /// The error of [`file_hints_cached`] when the cache keeps no reading of the file to give the hints

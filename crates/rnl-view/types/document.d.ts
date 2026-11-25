@@ -1535,6 +1535,21 @@ export type FileHints = {
 };
 
 /**
+ * What a file's answer was left without, given after it from the reading kept
+ * ([`crate::file_rest_cached`]): its spans and the hints of its levels.
+ */
+export type FileRest = {
+  /**
+   * The spans of the file's Document, as [`Document::spans`] has them.
+   */
+  spans: Array<Span>,
+  /**
+   * The hints of its levels, as [`crate::file_hints_cached`] gives them.
+   */
+  hints: FileHints,
+};
+
+/**
  * One thing drawn on a level: a shape or a text, with the object it draws and its place in the
  * drawing order (11.6). A level lists its primitives in drawing order already.
  */

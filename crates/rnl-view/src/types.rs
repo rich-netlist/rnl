@@ -10,7 +10,7 @@ use crate::{
 };
 use crate::{CurrentArrow, UsageFrame};
 use crate::{
-    FileCall, FileChild, FileHints, FileInput, FileInputs, FileOutline, FileResult, FileSymbols, SubcktSymbol,
+    FileCall, FileChild, FileHints, FileInput, FileInputs, FileOutline, FileRest, FileResult, FileSymbols, SubcktSymbol,
 };
 use crate::{FormatInfo, InspectedLabel, InspectedPin, InspectedSymbol, SourceInclude, Usage, UsageRole};
 use crate::{GroupView, LevelHint, MemberOf, NetLabel, RoleOf, RuleAt, UsageOf};
@@ -188,6 +188,7 @@ fn all() -> Vec<(String, String)> {
         one::<FileSymbols>(&cfg),
         one::<SubcktSymbol>(&cfg),
         one::<FileHints>(&cfg),
+        one::<FileRest>(&cfg),
         one::<Primitive>(&cfg),
         one::<Layer>(&cfg),
         one::<Shape>(&cfg),
