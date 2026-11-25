@@ -5,7 +5,9 @@
 //! has with no position, which the page asks for as it scrolls (`unplaced_drawings`). Only a reading that keeps them,
 //! and the outline of the document it is of, run on the core thread, through its reading cache (`Drawn::cache`); the
 //! others, the page's preloading and Check All Files among them, run beside it, so that they never hold up the reading
-//! the page is to show.
+//! the page is to show. Its answer may be the smaller one, without the texts, which the page asks for apart, the spans
+//! and the geometry hints, which the page asks for right after it (`read_rest`), from what the cache kept of that
+//! reading: the page draws before they come.
 
 use rnl_runtime::numbering::{hex, sha256};
 use rnl_runtime::source::Provider;
@@ -124,9 +126,11 @@ pub async fn read_outline(
 
 /// The reading of `file` of the document of `source`, alone in the context of its entry (`rnl_view::FileResult`). With
 /// `keep`, the drawings of the objects it lists without a position are kept for `unplaced_drawings`, in place of those
-/// of the last reading kept: the reading is the one the page shows, made through the reading cache. With `bind`, the
-/// parameters of a subcircuit are built with those values, to show; with `constraints`, the levels have their
-/// constraints, which the Solve view lists.
+/// of the last reading kept: the reading is the one the page shows, made through the reading cache; with `later` too,
+/// its answer is without the texts of the files, the spans and the geometry hints, which `read_rest` gives next (the
+/// spans when the cache could keep them, else they stay in the answer). With `bind`, the parameters of a subcircuit
+/// are built with those values, to show; with `constraints`, the levels have their constraints, which the Solve view
+/// lists.
 // Tauri injects the window and managed state alongside the separate IPC arguments.
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
@@ -138,6 +142,7 @@ pub async fn read_file(
     source: Source,
     file: String,
     keep: Option<bool>,
+    later: Option<bool>,
     bind: Option<Bind>,
     constraints: Option<bool>,
     request_id: Option<String>,
@@ -147,11 +152,17 @@ pub async fn read_file(
     let key = cache_key(&source);
     let json =
         with_files(&core, &settings, &library, source, (drawn, progress), move |drawn, entry, files, formats| {
-            let options = options(formats.clone(), bind, constraints.unwrap_or(false));
+            let mut options = options(formats.clone(), bind, constraints.unwrap_or(false));
             let result = if keep.unwrap_or(false) {
-                let (result, drawings) =
+                let later = later.unwrap_or(false);
+                options.hints = !later;
+                let (mut result, drawings) =
                     rnl_view::build_file_drawn_cached(entry, &file, files, &options, drawn.cache(&key))?;
                 drawn.keep(drawings);
+                if later {
+                    drawn.cache(&key).keep_spans(&mut result);
+                    rnl_view::leave_out_texts(&mut result);
+                }
                 result
             } else {
                 rnl_view::build_file(entry, &file, files, &options)?
@@ -159,6 +170,30 @@ pub async fn read_file(
             serde_json::to_string(&result).map_err(|e| e.to_string())
         })
         .await?;
+    Ok(tauri::ipc::Response::new(json))
+}
+
+/// What the answer of `file` that `read_file` with `keep` and `later` just made through the reading cache was left
+/// without (`rnl_view::FileRest`): its spans and the geometry hints of its levels, from what the cache kept of that
+/// reading, with the same `source`, `bind` and `constraints`; the error "not kept" when the cache keeps no such
+/// reading over the same files, and the page reads the file again with them. It gives them once.
+#[tauri::command]
+pub async fn read_rest(
+    core: State<'_, Core>,
+    settings: State<'_, settings::Settings>,
+    library: State<'_, library::Library>,
+    source: Source,
+    file: String,
+    bind: Option<Bind>,
+    constraints: Option<bool>,
+) -> Result<tauri::ipc::Response, String> {
+    let key = cache_key(&source);
+    let json = with_files(&core, &settings, &library, source, (true, None), move |drawn, entry, files, formats| {
+        let options = BuildOptions { hints: false, ..options(formats.clone(), bind, constraints.unwrap_or(false)) };
+        let rest = rnl_view::file_rest_cached(entry, &file, files, &options, drawn.cache(&key))?;
+        serde_json::to_string(&rest).map_err(|e| e.to_string())
+    })
+    .await?;
     Ok(tauri::ipc::Response::new(json))
 }
 

@@ -194,11 +194,18 @@ export default {
         await listening();
         return invoke("read_outline", { source: args, cache: !background, requestId });
       },
-      async readFile(file, keep) {
+      // a reading kept, of the document to show, may answer without the texts, the spans and the geometry hints, which
+      // `restOf` gets from what the core thread's reading cache kept of it: the page draws before they come (reading.rs)
+      restLater: !background,
+      async readFile(file, keep, later = false) {
         await listening();
-        const result = await invoke("read_file", { source: args, file, keep, bind, constraints, requestId });
+        const result = await invoke("read_file", { source: args, file, keep, later: !!(keep && later), bind, constraints, requestId });
         if (keep) drawn = ++kept;
         return result;
+      },
+      async restOf(file) {
+        try { return await invoke("read_rest", { source: args, file, bind, constraints }); }
+        catch (e) { if (String(e) === "not kept") return null; throw e; }
       },
       // the texts of the other files, which the reading of one leaves out, for the netlist pane
       async texts(doc) {

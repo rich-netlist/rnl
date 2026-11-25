@@ -23,6 +23,15 @@ export { coreVersion, fileResultFormat } from "./version.js";
  *   request's `file`, one file of the document, in the context of its entry (`FileResult` of
  *   document.d.ts). Packages the Worker classified for an earlier request are read again; keep one
  *   Worker for a run of them all the same, as later versions keep them.
+ * @property {(request: import("./core.js").Request) => Promise<object>} hintsOf The geometry hints
+ *   of the request's `hints_of`, a file of the document, from the reading of it that the last file
+ *   request with `cache` and without `hints` kept (`FileHints` of document.d.ts). Rejects with the
+ *   message "not kept" when the Worker keeps no such reading; it gives them once.
+ * @property {(request: import("./core.js").Request) => Promise<object>} restOf What the answer of
+ *   the request's `rest_of`, a file of the document, was left without: its spans, which the last
+ *   file request with `cache`, `"spans": false` and without `hints` kept, and its geometry hints
+ *   (`FileRest` of document.d.ts). Rejects with the message "not kept" when the Worker keeps no
+ *   such reading; it gives them once.
  * @property {(request: import("./core.js").Request) => Promise<object>} symbols The symbols the
  *   subcircuits of the request's `symbols`, a file of the document, give themselves (`FileSymbols`
  *   of document.d.ts).
@@ -155,6 +164,8 @@ export function startCore(options = {}) {
     snapshot: (request) => send(request, "snapshot"),
     outline: (request) => send({ ...request, outline: true }, "outline"),
     buildFile: (request) => send(request, "file"),
+    hintsOf: (request) => send(request, "hints"),
+    restOf: (request) => send(request, "rest"),
     symbols: (request) => send(request, "symbols"),
     write: (request) => send(request, "written"),
     replaceRecords: (request) => send(request, "replaced"),

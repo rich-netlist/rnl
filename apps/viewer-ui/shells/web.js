@@ -8,8 +8,10 @@ import { append, m, setAttr } from "../i18n.js";
 // the outline of the whole document, then the reading of that one file (collectOutline, collectFile). What is
 // kept of them, and when, is the page's (file-reading.js); nothing of it is in the browser's storage. Those
 // requests go through the reading cache of the Worker's core, which keeps in memory the host document read last,
-// so that the reading of the file does not read again what the outline read (`cache`). An embedded viewer, and
-// the viewer API, read the whole document (`build`).
+// so that the reading of the file does not read again what the outline read (`cache`). The first answer of the file
+// to show is the smaller one: without the texts, which the page has, the spans and the geometry hints, which the
+// Worker gives from what it kept of that reading right after (`restOf`); the page draws before they come. An
+// embedded viewer, and the viewer API, read the whole document (`build`).
 
 import { collect, collectFile, collectOutline, coreVersion, decodeText, fileResultFormat, startCore } from "../core/client.js";
 import { removeOldStore } from "../result-cache.js";
@@ -1222,6 +1224,8 @@ export default {
         try { return await job(); }
         catch (e) { failed = true; throw e instanceof Error ? e.message : String(e); }
       };
+      // the last reading made with `later`, for its rest to be asked for (`restOf`): its request, with the files it was made from
+      let partial = null;
       return {
         core: coreVersion === null ? null : { version: coreVersion, format: fileResultFormat },
         entry: entry.path,
@@ -1240,12 +1244,29 @@ export default {
           Object.assign(texts, got.files);
           return got.outline;
         }),
-        readFile: (file) => failing(async () => {
+        // with `later`, the reading is made through the core's reading cache and its answer is the smaller one: without the
+        // texts of the files (`texts`), the spans and the geometry hints, which `restOf` then gives from what the cache
+        // kept of it; the core answers sooner, and the page draws before they come
+        restLater: readingCache(),
+        readFile: (file, _keep, later = false) => failing(async () => {
           await readBefore();
-          const got = await collectFile({ buildFile: asking("buildFile") }, { ...request, file, files: texts }, readAsked);
+          const asked = later && readingCache()
+            ? { ...request, file, files: texts, hints: false, spans: false, texts: false } : { ...request, file, files: texts };
+          const got = await collectFile({ buildFile: asking("buildFile") }, asked, readAsked);
           Object.assign(texts, got.files);
+          partial = asked.spans === false ? { ...asked, files: got.files } : null;
           return got.result;
         }),
+        // what the answer of `file` just read with `later` was left without (a FileRest: its spans and hints), asked for at
+        // once, before the Worker is asked anything else through the cache; null when the core kept no such reading
+        async restOf(file) {
+          const made = partial?.file === file ? partial : null;
+          partial = null;
+          if (!made || !worker) return null;
+          const { file: _, ...rest } = made;
+          try { return await worker.restOf({ ...rest, rest_of: file }); }
+          catch (e) { if (e instanceof Error && e.message === "not kept") return null; throw e; }
+        },
         // the texts of the other files, which the reading of one leaves out, for the netlist pane
         async texts(doc) {
           for (const f of doc.files) {

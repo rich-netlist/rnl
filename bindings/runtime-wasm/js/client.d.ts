@@ -5,6 +5,8 @@ import type {
   CatalogRequest,
   Document,
   DrawingsRequest,
+  FileHints,
+  FileRest,
   FileResult,
   FileSymbols,
   FolderListing,
@@ -29,9 +31,11 @@ export type {
   DrawingsRequest,
   FileCall,
   FileChild,
+  FileHints,
   FileInput,
   FileInputs,
   FileOutline,
+  FileRest,
   FileResult,
   FileSymbols,
   FolderListing,
@@ -80,6 +84,19 @@ export interface CoreWorker {
    * one Worker for a run of them: later versions keep the packages it classified.
    */
   buildFile(request: Request & { file: string }): Promise<FileResult>;
+  /**
+   * The geometry hints of the request's `hints_of`, a file of the document, from the reading of it that
+   * the last file request with `cache` and without `hints` kept. Rejects with the message "not kept"
+   * when the Worker keeps no such reading; it gives them once.
+   */
+  hintsOf(request: Request & { hints_of: string }): Promise<FileHints>;
+  /**
+   * What the answer of the request's `rest_of`, a file of the document, was left without: its spans,
+   * which the last file request with `cache`, `"spans": false` and without `hints` kept, and its
+   * geometry hints. Rejects with the message "not kept" when the Worker keeps no such reading; it
+   * gives them once.
+   */
+  restOf(request: Request & { rest_of: string }): Promise<FileRest>;
   /** The symbols the subcircuits of the request's `symbols`, a file of the document, give themselves. */
   symbols(request: Request & { symbols: string }): Promise<FileSymbols>;
   /** Write and build. Refusals reject with EditError, carrying a code and host diagnostics. */

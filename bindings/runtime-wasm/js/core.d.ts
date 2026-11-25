@@ -9,9 +9,11 @@ import type {
   Document,
   FileCall,
   FileChild,
+  FileHints,
   FileInput,
   FileInputs,
   FileOutline,
+  FileRest,
   FileResult,
   FileSymbols,
   FormatInfo,
@@ -29,9 +31,11 @@ export type {
   Document,
   FileCall,
   FileChild,
+  FileHints,
   FileInput,
   FileInputs,
   FileOutline,
+  FileRest,
   FileResult,
   FileSymbols,
   FormatInfo,
@@ -171,6 +175,32 @@ export interface Request {
   cache?: boolean;
   /** Drop what the module's reading cache holds before the request is answered; false when not given. */
   forget?: boolean;
+  /**
+   * Give the geometry hints of this file of the document, as the document names it, from the reading
+   * that the last file request about it with `cache` and without `hints` kept, instead of a Document
+   * (`FileHints`). The fields that say how to read the files are those of that request; the answer
+   * is the error "not kept" when the cache keeps no such reading over the same files.
+   */
+  hints_of?: string;
+  /**
+   * Give the texts of the files in a file request's answer; true when not given. With false, each
+   * `SourceFile.text` is empty but those of the bundled packages, and the frontend puts back the
+   * texts of the files it gave.
+   */
+  texts?: boolean;
+  /**
+   * Give the spans in a file request's answer; true when not given. With false and `cache`, when
+   * the request keeps its reading (without `hints`), `Document.spans` is empty and the spans are
+   * kept with the reading, for `rest_of`; otherwise the answer has them.
+   */
+  spans?: boolean;
+  /**
+   * Give what the answer of this file of the document, as the document names it, was left without
+   * (`FileRest`): the spans that the last file request about it with `cache` and `"spans": false`
+   * kept, and the geometry hints as `hints_of` gives them. It needs what `hints_of` needs, and the
+   * spans kept; the answer is the error "not kept" otherwise.
+   */
+  rest_of?: string;
 }
 
 export type Point = [number, number];

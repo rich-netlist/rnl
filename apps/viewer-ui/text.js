@@ -135,6 +135,29 @@ export function clearSource(message) {
   append(source, p);
 }
 
+// the spans of the Document shown, by its files (`spansByFile`), which a file's lines are made with when it is first shown
+let fileSpans = [];
+
+/** The spans of the Document shown, by the file they are in, but none in a file that is plain text. */
+function spansByFile() {
+  const spans = doc.files.map(() => []);
+  for (const span of doc.spans) if (!plainFiles[span.file]) spans[span.file]?.push(span);
+  return spans;
+}
+
+/**
+ * The spans of the Document shown came after its text was shown (open.js `restShown`): the lines of the files shown
+ * so far are made with them, and the others will be.
+ */
+export function spansCame() {
+  fileSpans = spansByFile();
+  fileViews.forEach((view, f) => {
+    if (!view._model) return;
+    view._model.setSpans(fileSpans[f]);
+    view.rerender();
+  });
+}
+
 export function renderFiles(shown = 0) {
   for (const view of fileViews) view.destroy();
   source.replaceChildren();
@@ -152,15 +175,15 @@ export function renderFiles(shown = 0) {
   fileName.hidden = !doc.files.length;
   // a file that is no netlist is plain text: none of the reading of it as one is shown in it
   plainFiles = doc.files.map(isPlainFile);
-  const spans = doc.files.map(() => []), folds = doc.files.map(() => []);
-  for (const span of doc.spans) if (!plainFiles[span.file]) spans[span.file]?.push(span);
+  fileSpans = spansByFile();
+  const folds = doc.files.map(() => []);
   for (const level of doc.levels) if (level.lines) {
     const [f, from, to] = level.lines;
     if (!plainFiles[f]) folds[f]?.push([from, to]);
   }
   doc.files.forEach((file, f) => {
     const dialect = doc.dialect;
-    const view = new LineWindow(source, () => lineModel(file, f, spans[f], dialect, plainFiles[f]), (el, n) => decorateLine(f, n, el), folds[f]);
+    const view = new LineWindow(source, () => lineModel(file, f, fileSpans[f], dialect, plainFiles[f]), (el, n) => decorateLine(f, n, el), folds[f]);
     Object.assign(view, sourceFilters());
     fileViews.push(view);
     append(source, view.el);

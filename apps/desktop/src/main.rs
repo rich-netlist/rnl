@@ -337,6 +337,7 @@ fn main() {
             reading::reading_core,
             reading::read_outline,
             reading::read_file,
+            reading::read_rest,
             reading::file_hashes,
             reading::file_texts,
             reading::file_symbols,
