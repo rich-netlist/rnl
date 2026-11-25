@@ -130,13 +130,15 @@ impl Regions {
             return Some(TITLE);
         }
         let text = raw.trim();
-        let low = text.to_ascii_lowercase();
-        let first = low.split_whitespace().next().unwrap_or("");
-        let pragma = text.strip_prefix("//").map(str::trim_start).unwrap_or("");
-        let pragma = pragma.split_whitespace().collect::<Vec<_>>();
-        let protection = pragma.starts_with(&["pragma", "protect"]);
+        // the first word, in lowercase
+        let first = text.split_whitespace().next().unwrap_or("").to_ascii_lowercase();
+        let first = first.as_str();
+        // the first three words of a `//` comment
+        let mut pragma = text.strip_prefix("//").map(str::trim_start).unwrap_or("").split_whitespace();
+        let pragma = [pragma.next(), pragma.next(), pragma.next()];
+        let protection = pragma[0] == Some("pragma") && pragma[1] == Some("protect");
         if let Some(start) = self.encrypted {
-            if protection && pragma.get(2) == Some(&"end_protected") {
+            if protection && pragma[2] == Some("end_protected") {
                 self.spans.push((start, no));
                 self.encrypted = None;
             }
@@ -234,7 +236,7 @@ impl Regions {
         if self.conditionals.iter().any(|c| !c.active) {
             return Some(CONDITIONAL);
         }
-        if protection && pragma.get(2) == Some(&"begin_protected") && self.block.is_none() && self.braces.is_none() {
+        if protection && pragma[2] == Some("begin_protected") && self.block.is_none() && self.braces.is_none() {
             self.encrypted = Some(no);
             return Some(ENCRYPTED);
         }
