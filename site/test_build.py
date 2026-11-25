@@ -177,6 +177,7 @@ class ReleaseDownloads(unittest.TestCase):
     def test_bilingual_downloads_for_old_new_and_no_release(self):
         for version, linux in [("0.1.1", False), ("0.1.2", True), (None, False)]:
             with self.subTest(version=version), patch.object(build, "has_linux_release", return_value=linux), \
+                    patch.object(build, "has_local_release", return_value=True), \
                     patch.object(build, "has_local_packages_release", return_value=True):
                 pages = build.build(version)
                 for language in ["zh", "en"]:
@@ -221,6 +222,7 @@ class ReleaseDownloads(unittest.TestCase):
     def test_the_local_viewer_with_the_packages_is_linked_only_for_tags_that_made_it(self):
         for linux, local, shown in [(True, False, False), (True, True, True), (False, True, False)]:
             with self.subTest(linux=linux, local=local), patch.object(build, "has_linux_release", return_value=linux), \
+                    patch.object(build, "has_local_release", return_value=True), \
                     patch.object(build, "has_local_packages_release", return_value=local):
                 pages = build.build("0.6.1")
                 for language in ["zh", "en", "de"]:
@@ -231,6 +233,41 @@ class ReleaseDownloads(unittest.TestCase):
                     # the local viewer's other two archives stay with the Linux downloads
                     for name in ["-linux-x86_64.tar.gz\"", "-linux-x86_64-with-firefox.tar.gz\""]:
                         self.assertEqual(name in html, linux, name)
+
+    def test_the_local_viewer_needs_its_packing_script_in_the_selected_tag(self):
+        with patch.object(build.subprocess, "run", return_value=SimpleNamespace(stdout="")) as run:
+            self.assertTrue(build.has_local_release("0.6.0"))
+            self.assertEqual(run.call_args.args[0], ["git", "cat-file", "-e", "viewer-v0.6.0:apps/local/ci/package.sh"])
+        with patch.object(build.subprocess, "run", side_effect=subprocess.CalledProcessError(128, "git")):
+            self.assertFalse(build.has_local_release("0.5.2"))
+        with patch.object(build.subprocess, "run") as run:
+            self.assertFalse(build.has_local_release(None))
+            run.assert_not_called()
+
+    def test_the_local_viewer_is_linked_only_for_tags_that_packed_it(self):
+        # a tag with the Linux files but before the local viewer (0.5.2) links the desktop viewer's alone; the local
+        # viewer with the packages follows the local viewer, whatever its own check says
+        archives = ["-linux-x86_64.tar.gz\"", "-linux-x86_64-with-packages.tar.gz\"", "-linux-x86_64-with-firefox.tar.gz\""]
+        for linux, local, shown in [(True, False, False), (True, True, True), (False, True, False)]:
+            with self.subTest(linux=linux, local=local), patch.object(build, "has_linux_release", return_value=linux), \
+                    patch.object(build, "has_local_release", return_value=local), \
+                    patch.object(build, "has_local_packages_release", return_value=True):
+                pages = build.build("0.5.2")
+                for language in ["zh", "en", "de"]:
+                    html = pages[f"{language}/tools.html"]
+                    self.assertNotIn("local-release", html)
+                    self.assertNotIn("{{viewer-", html)
+                    for name in archives:
+                        self.assertEqual("rnl-viewer-local-0.5.2" + name in html, shown, name)
+                    self.assertEqual('id="linux-local"' in html, shown or not linux)
+                    # the desktop viewer's Linux files stay with the Linux downloads
+                    for name in ["RNL-Viewer-0.5.2-linux-x86_64.AppImage\"", "RNL-Viewer-0.5.2-linux-x86_64.deb\""]:
+                        self.assertEqual(name in html, linux, name)
+
+    def test_the_blocks_of_the_local_viewer_obey_the_release_markup_rules(self):
+        self.assertEqual(build.check_release("<!--local-release-->{{viewer-tag}}<!--/local-release-->", "test"), [])
+        self.assertTrue(build.check_release("<!--local-release-->{{viewer-tag}}", "test"))
+        self.assertTrue(build.check_release("<!--no-local-release-->{{viewer-tag}}<!--/no-local-release-->", "test"))
 
     def test_the_blocks_of_the_local_viewer_with_the_packages_obey_the_release_markup_rules(self):
         self.assertEqual(build.check_release("<!--local-packages-release-->{{viewer-tag}}<!--/local-packages-release-->", "test"), [])

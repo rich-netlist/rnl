@@ -266,19 +266,19 @@
         <li>
           <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/RNL-Viewer-{{viewer-version}}-linux-x86_64.deb"><svg class="ico"><use href="#i-download"/></svg><span><b><en>Debian package</en></b><code>RNL-Viewer-{{viewer-version}}-linux-x86_64.deb</code></span></a>
           <p><en>Ubuntu 22.04 or newer; other Debian-based distributions need compatible glibc and WebKitGTK 4.1. In the download directory, run <code>sudo apt install ./RNL-Viewer-{{viewer-version}}-linux-x86_64.deb</code>, then open RNL Viewer from the application menu or run <code>rnl-viewer</code>. Uninstall with <code>sudo apt remove rnl-viewer</code>.</en></p>
-        </li>
+        </li><!--/linux-release--><!--local-release-->
         <li id="linux-local">
           <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/rnl-viewer-local-{{viewer-version}}-linux-x86_64.tar.gz"><svg class="ico"><use href="#i-download"/></svg><span><b><en>Older Linux: the local viewer</en></b><code>rnl-viewer-local-{{viewer-version}}-linux-x86_64.tar.gz</code></span></a>
           <p><en>For older enterprise Linux (CentOS 7, RHEL 8 and 9), where the desktop viewer’s libraries are not to be had. The local viewer is the desktop viewer for Linux, shown in a browser window: one static program, with nothing to install, with the desktop viewer’s menus and rules. It reads and saves files by their paths and solves on the machine’s own cores. As on the desktop, it opens no URL and no manifest and looks for no packages online: it uses the packages it has with it. It needs Firefox 115 ESR or newer, Chrome, Chromium or Edge 89 or newer, or Safari 15 or newer. Extract it, then run <code>rnl-viewer-local</code> in the folder it makes, with the netlist’s path if you like.</en></p>
-        </li><!--/linux-release--><!--local-packages-release-->
+        </li><!--/local-release--><!--local-packages-release-->
         <li>
           <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/rnl-viewer-local-{{viewer-version}}-linux-x86_64-with-packages.tar.gz"><svg class="ico"><use href="#i-download"/></svg><span><b><en>The local viewer with the packages</en></b><code>rnl-viewer-local-{{viewer-version}}-linux-x86_64-with-packages.tar.gz</code></span></a>
           <p><en>The same, with the public packages in a <code>public-packages</code> folder beside the program. It finds them there with no network, and lists them in the Library and in Help › Public Packages.</en></p>
-        </li><!--/local-packages-release--><!--linux-release-->
+        </li><!--/local-packages-release--><!--local-release-->
         <li>
           <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/rnl-viewer-local-{{viewer-version}}-linux-x86_64-with-firefox.tar.gz"><svg class="ico"><use href="#i-download"/></svg><span><b><en>The local viewer with the packages and Firefox</en></b><code>rnl-viewer-local-{{viewer-version}}-linux-x86_64-with-firefox.tar.gz</code></span></a>
           <p><en>The same with the public packages, and with Mozilla’s Firefox ESR, unmodified, in a folder beside the program: nothing else to get or install, for a machine whose browser is older. Firefox needs a desktop’s GTK 3 and X libraries; without them, run the program with <code>--no-browser</code> and open its address over <code>ssh -L</code>.</en></p>
-        </li>
+        </li><!--/local-release--><!--linux-release-->
         <li>
           <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/SHA256SUMS.txt"><svg class="ico"><use href="#i-check"/></svg><span><b><en>Checksums</en></b><code>SHA256SUMS.txt</code></span></a>
           <p><en>Download the checksums and the package you want into one directory, then run <code>sha256sum --check --ignore-missing SHA256SUMS.txt</code>.</en></p>
