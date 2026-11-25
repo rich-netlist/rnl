@@ -18,6 +18,8 @@ import { $, span } from "./util.js";
 const card = $("entry-card");
 // whether the open under way opens the one root of its entry page at once (open.js `openOnlyRoot`)
 let opensOnlyRoot = false;
+// the entry page shown with no symbols, as its one root was to open at once: its Document, roots and rows
+let unsummarized = null;
 
 /** Say whether the open under way opens the one root of the entry page it shows at once (open.js). */
 export function setOpensOnlyRoot(on) {
@@ -58,7 +60,9 @@ export function showEntryPage(level) {
   append(card, heading, note, list);
   card.hidden = false;
   // (a root opened at once needs no symbol, nor the core to read its file for one)
+  unsummarized = null;
   if (!(roots.length === 1 && opensOnlyRoot)) void summarize(roots, items);
+  else unsummarized = { shown: doc, roots, items };
   return true;
 }
 
@@ -124,12 +128,24 @@ function drawn(text) {
 /** Take the entry page away, as a level is drawn. */
 export function hideEntryPage() {
   card.hidden = true;
+  unsummarized = null;
 }
 
 /** A file opened on the entry page of one root alone: open that root, as the page did before it read files alone. */
 export function openOnlyRoot() {
   const roots = card.hidden ? [] : entryRoots(current);
   if (roots.length === 1) enterHost(roots[0]);
+  else summarizeShown();
+}
+
+/**
+ * The entry page shown with no symbols, as its one root was to open at once, stays, such as when another open took
+ * over before the root opened: fill in its symbols and the state of its file's reading, as for an entry page that stays.
+ */
+export function summarizeShown() {
+  const left = unsummarized;
+  unsummarized = null;
+  if (left && left.shown === doc && !card.hidden) void summarize(left.roots, left.items);
 }
 
 // the card is no drawing: the wheel scrolls it, and a press or a double click on it is not one on the drawing

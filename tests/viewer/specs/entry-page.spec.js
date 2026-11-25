@@ -154,6 +154,47 @@ test('an entry page left at once for its one root reads no symbols; one that sta
   expect(await symbolRequests(page)).toBe(1);
 });
 
+test('an entry page whose one root was not opened, as another open took over, reads the symbols then', async ({ page }) => {
+  const C = `* c
+.subckt gamma a b
+* @RNL { %s = @DEFINE-SYMBOL(box=[-1, -1, 1, 1]) {@LINE {(-1, 0) (1, 0)}; @LINE {(0, -1) (0, 1)}; (-1, 0) @PIN(terminal="a"); (1, 0) @PIN(terminal="b")}; # @SET-SYMBOL %s }
+R1 a b 1k
+.ends
+`;
+  await countSymbols(page);
+  // the spans and the hints of the entry are held back, so the open is under way with its entry page shown
+  await page.addInitScript(() => {
+    let held = true;
+    const waiting = [];
+    window.releaseRest = () => { held = false; for (const go of waiting.splice(0)) go(); };
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (message, ...rest) {
+      const r = typeof message?.request === 'string' ? JSON.parse(message.request) : null;
+      if (held && typeof r?.rest_of === 'string') { waiting.push(() => post.call(this, message, ...rest)); return; }
+      return post.call(this, message, ...rest);
+    };
+  });
+  await page.route('https://rich-netlist.github.io/rnl-packages/**', route => route.abort());
+  await page.addInitScript(() => localStorage.setItem('file-preload', 'false'));
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
+  await expect(page.locator('#menubar')).toBeVisible();
+  // a record besides the header: the entry is read and shown before its one root would open
+  await page.locator('#file-input').setInputFiles([
+    { name: 'top.sp', mimeType: 'text/plain', buffer: Buffer.from('* top\n* @RNL { }\n.include "c.inc"\n.end\n') },
+    { name: 'c.inc', mimeType: 'text/plain', buffer: Buffer.from(C) }]);
+  await expect(card(page)).toBeVisible();
+  // another open takes over, as one the Viewer API asks for whose file cannot be read, and leaves the entry shown
+  await page.evaluate(() => import('./open.js').then((o) => o.beginOpenOperation()));
+  await page.evaluate(() => window.releaseRest());
+  await page.waitForTimeout(500);
+  expect(await shown(page)).toEqual({ file: 'top.sp', level: 'top.sp' });
+  await expect(card(page)).toBeVisible();
+  // the card shown has the symbol gamma gives itself
+  await expect.poll(() => symbolRequests(page)).toBe(1);
+  await expect(roots(page).nth(0).locator('.entry-symbol svg')).toHaveCount(1);
+  await expect(roots(page).nth(0).locator('.entry-symbol svg.module-symbol')).toHaveCount(0);
+});
+
 test('an entry with something to draw, or a subcircuit of its own nothing calls, has no entry page', async ({ page }) => {
   await open(page, { 'top.sp': '* top\n.include "a.inc"\n.subckt own p\nR1 p 0 1k\n.ends\n.end\n', 'a.inc': A });
   // the subcircuit of its own file opens, as before
