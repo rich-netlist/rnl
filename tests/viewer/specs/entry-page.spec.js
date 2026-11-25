@@ -71,6 +71,21 @@ test('an entry that only includes a subcircuit nothing calls opens it at once', 
   await expect(page.locator('#level-path .crumb .name, #level-path #level-name')).toHaveText(['alpha']);
 });
 
+test('an entry of an earlier version that only includes a subcircuit nothing calls stays, with the notice of its version', async ({ page }) => {
+  await open(page, {
+    'old.sp': '* old\n* @RNL(type="header") { @VERSION("0.3") }\n.include "cell.inc"\n.end\n',
+    'cell.inc': '* cell\n* @RNL(type="header") { @VERSION("0.4") }\n.subckt cell a b\nR1 a b 1k\n.ends\n',
+  });
+  // time for the root to open, were it opened at once
+  await page.waitForTimeout(500);
+  await idle(page);
+  expect(await shown(page)).toEqual({ file: 'old.sp', level: 'old.sp' });
+  // the page of the entry says which viewer reads it, in place of the entry page, and nothing solves it
+  await expect(page.locator('#empty .old-version')).toBeVisible();
+  await expect(card(page)).toBeHidden();
+  expect(await page.evaluate(async () => (await import('./commands.js')).isEnabled('solve'))).toBe(false);
+});
+
 /** Count the requests for the symbols of a file (`FileSymbols`) that the page sends its cores, from the start. */
 const countSymbols = (page) => page.addInitScript(() => {
   window.symbolRequests = 0;
