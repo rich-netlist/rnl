@@ -1703,9 +1703,31 @@ pub fn parse_record(text: &str) -> RecordAst {
 /// The head of one record, `@RNL(…)`, as [`parse_record`] gives it ([`RecordAst::header`]),
 /// without reading the body: None when the record has none, or when it does not read up to the end
 /// of the head. `text` starts with `@RNL`.
+///
+/// A head touches `@RNL` (2.4): when anything else follows it, white space or a comment included,
+/// the record has none. The head is read from the first [`HEAD_PREFIX`] bytes of the record first,
+/// and from the whole record when it does not end in them: read to its `)` there, it is the head the
+/// whole record gives, since the parser reads nothing after that `)`, and nothing before it differs.
+/// A debug build reads it from the whole record too, and checks that the two are the same.
 pub fn parse_record_head(text: &str) -> Option<Params> {
-    Parser::new(text, false).record_head().ok().flatten()
+    let whole = || Parser::new(text, false).record_head().ok().flatten();
+    let head = if text.get(4..5) != Some("(") {
+        None
+    } else {
+        let mut end = text.len().min(HEAD_PREFIX);
+        while !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        let start = (end < text.len()).then(|| Parser::new(&text[..end], false).record_head().ok().flatten());
+        start.flatten().or_else(whole)
+    };
+    debug_assert_eq!(head, whole(), "the head of a record read from its start");
+    head
 }
+
+/// The bytes of a record that its head is read from first ([`parse_record_head`]): a head is
+/// usually far shorter, and a record of the solver far longer.
+const HEAD_PREFIX: usize = 4096;
 
 /// Parse one record, with `numbers` reading `%#` and a number as a reference, as a file of the
 /// draft 0.3 does (5.9); without, `%#` is a lexical error, as in 0.2.
@@ -2065,6 +2087,40 @@ mod tests {
             Some(Value::Str("generated".into()))
         );
         assert_eq!(parse_record_head("@RNL(type=\"generated\" { }"), None);
+    }
+
+    /// A head read from the start of a long record is the head the whole record gives, wherever
+    /// the start ends: in the head, in a string, a comment or a number of it, in a character of
+    /// several bytes, or just after its `)`.
+    #[test]
+    fn the_head_of_a_long_record_read_from_its_start_is_the_head_of_the_whole_record() {
+        let body = format!(" {{ #R1 @PLACE(0, 0); {} }}", "#R2 @PLACE(1, 1); ".repeat(400));
+        for pad in HEAD_PREFIX - 40..HEAD_PREFIX + 10 {
+            let fill = "x".repeat(pad.saturating_sub(40));
+            let heads = [
+                format!("@RNL(type=\"generated\", note=\"{fill}\")"),
+                format!("@RNL(type=\"generated\" /* {fill} ) */, hash=\"h\")"),
+                format!("@RNL(type=\"generated\", n={}1.5e3)", "0".repeat(pad.saturating_sub(40))),
+                format!("@RNL(note=\"{fill}é\", type=\"generated\")"),
+                format!("@RNL(type=\"generated\", note=\"{fill}\" "),
+                format!("@RNL(type=\"generated\", note=\"{fill}"),
+            ];
+            for head in heads {
+                let text = format!("{head}{body}");
+                assert_eq!(parse_record_head(&text), parse_record(&text).header, "{pad} {}", &head[..40]);
+            }
+        }
+        // the head ends at the start's last byte, or the one before
+        for cut in [HEAD_PREFIX - 1, HEAD_PREFIX, HEAD_PREFIX + 1] {
+            let head = format!("@RNL(type=\"generated\", note=\"{}\")", "y".repeat(cut - 35));
+            let text = format!("{head}{body}");
+            assert_eq!(parse_record_head(&text), parse_record(&text).header, "{cut}");
+            assert!(parse_record_head(&text).is_some());
+        }
+        // a head that does not touch @RNL, in a long record
+        let text = format!("@RNL /* x */ (type=\"generated\"){body}");
+        assert_eq!(parse_record_head(&text), None);
+        assert_eq!(parse_record(&text).header, None);
     }
 
     #[test]
