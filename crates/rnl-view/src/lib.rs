@@ -731,8 +731,9 @@ fn outline_in(
     }
     let mut sink = Sink::new();
     let doc = read_host_in(entry, reading, &ws, &mut sink)?;
-    outline::read_named_packages(&doc, &ws);
-    Ok(outline::outline(entry, doc, sink, ws.missing.into_inner()))
+    let (doc, sink, versions) = rnl_runtime::interp::read_file_versions(doc, sink);
+    outline::read_named_packages(&doc, &versions, &ws);
+    Ok(outline::outline(entry, doc, sink, &versions, ws.missing.into_inner()))
 }
 
 /// The catalog of the packages the core has: those of the package directories of `files`, the

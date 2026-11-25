@@ -5,12 +5,12 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use rnl_runtime::diag::{Diag, Sink};
-use rnl_runtime::host::{dialect_key, file_name, package, HostDocument, LevelKind};
-use rnl_runtime::interp::unit::{header_packages, is_package_named, package_paths, PackagePath};
+use rnl_runtime::host::{dialect_key, file_name, package, HostDocument, LevelKind, Record};
+use rnl_runtime::interp::unit::{header_packages, is_package_named, is_read_version, package_paths, PackagePath};
 use rnl_runtime::numbering::{hex, sha256};
 use rnl_runtime::records::{package_lines, scan_package_run};
 use rnl_runtime::source::{dirname, join, relative_to, Provider};
-use rnl_runtime::syntax::{parse_record, Value};
+use rnl_runtime::syntax::{parse_record_head, Value};
 use serde::Serialize;
 
 use crate::document::diagnostic;
@@ -138,9 +138,16 @@ pub struct OutlineCall {
     pub lines: Vec<u32>,
 }
 
-/// The outline of a host document read with the host reader's diagnostics in `sink`.
-pub(crate) fn outline(entry: &str, doc: HostDocument, sink: Sink, missing: Vec<String>) -> Outline {
-    let (doc, sink, versions) = rnl_runtime::interp::read_file_versions(doc, sink);
+/// The outline of a host document read with the host reader's diagnostics in `sink`, and the
+/// language versions of its file levels in `versions`
+/// ([`rnl_runtime::interp::read_file_versions`]).
+pub(crate) fn outline(
+    entry: &str,
+    doc: HostDocument,
+    sink: Sink,
+    versions: &[Option<String>],
+    missing: Vec<String>,
+) -> Outline {
     let dir = dirname(entry);
     let shown = |file: &str| relative_to(file, &dir).unwrap_or(file).to_string();
 
@@ -232,18 +239,18 @@ pub(crate) fn outline(entry: &str, doc: HostDocument, sink: Sink, missing: Vec<S
     }
 
     // the records of each file once, though it may be read more than once, in the order of the file
-    let mut records: Vec<Vec<(u32, &str)>> = vec![Vec::new(); files.len()];
+    let mut records: Vec<Vec<((u32, i64), &str)>> = vec![Vec::new(); files.len()];
     for lv in &doc.levels {
         for rec in &lv.records {
             if let Some(&f) = file_index.get(&rec.file) {
-                if !records[f].iter().any(|(line, _)| *line == rec.lines.0) {
-                    records[f].push((rec.lines.0, &rec.text));
+                if !records[f].iter().any(|(at, _)| *at == start(rec)) {
+                    records[f].push((start(rec), &rec.text));
                 }
             }
         }
     }
     for (f, mut recs) in records.into_iter().enumerate() {
-        recs.sort_by_key(|(line, _)| *line);
+        recs.sort_by_key(|(at, _)| *at);
         let text: String = recs.iter().map(|(_, t)| format!("{t}\n")).collect();
         files[f].records_hash = hash(&text);
         files[f].records = recs.iter().filter(|(_, t)| !is_header(t)).count();
@@ -275,10 +282,16 @@ pub(crate) fn outline(entry: &str, doc: HostDocument, sink: Sink, missing: Vec<S
 /// (16.2, 16.5): joined to the directory of the file that holds the record. Of each that is the
 /// package it names, the packages its header record names by path are read in turn, joined to its
 /// own directory. A file `files` does not have is then among the missing files of the outline,
-/// before any RNL is interpreted. Only records that write USE-PACKAGE or USE-ALIASES are parsed.
-pub(crate) fn read_named_packages(doc: &HostDocument, files: &dyn Provider) {
+/// before any RNL is interpreted. Only records that write USE-PACKAGE or USE-ALIASES are parsed,
+/// and only those of a file whose language version, of `versions`, the reading reads: no RNL of
+/// the others is interpreted (16.1).
+pub(crate) fn read_named_packages(doc: &HostDocument, versions: &[Option<String>], files: &dyn Provider) {
     let mut named: Vec<(String, PackagePath)> = Vec::new();
     for (k, lv) in doc.levels.iter().enumerate() {
+        let read = versions.get(file_level(doc, k)).and_then(Option::as_deref).is_none_or(is_read_version);
+        if !read {
+            continue;
+        }
         let mut dir = None;
         for rec in lv.records.iter().filter(|r| r.text.contains("USE-PACKAGE") || r.text.contains("USE-ALIASES")) {
             let dir = dir.get_or_insert_with(|| file_dir(doc, k));
@@ -308,17 +321,22 @@ pub(crate) fn read_named_packages(doc: &HostDocument, files: &dyn Provider) {
 }
 
 /// The directory of the file a level's records are read in, as the reading joins a path to it: of
-/// the file level that holds the level, or of the main file.
+/// the file level that holds the level ([`file_level`]).
 fn file_dir(doc: &HostDocument, level: usize) -> String {
+    dirname(&doc.levels[file_level(doc, level)].path)
+}
+
+/// The file level that holds a level, itself when it is one; else the main file's.
+fn file_level(doc: &HostDocument, level: usize) -> usize {
     let mut at = Some(level);
     while let Some(k) = at {
         let lv = &doc.levels[k];
         if lv.kind == LevelKind::File {
-            return dirname(&lv.path);
+            return k;
         }
         at = lv.parent;
     }
-    dirname(&doc.levels[0].path)
+    0
 }
 
 /// The outline of a package file, which is checked on its own and has no netlist: the file alone.
@@ -365,40 +383,30 @@ fn end_line(doc: &HostDocument, level: usize) -> u32 {
 /// The first 16 hexadecimal digits of the SHA-256 of a text, as the numbering's check is made (5.9).
 /// The hash of the records of `file` in `doc`, as [`OutlineFile::records_hash`] gives it.
 pub(crate) fn records_hash(doc: &HostDocument, file: &str) -> String {
-    let mut recs: Vec<(u32, &str)> = Vec::new();
+    let mut recs: Vec<((u32, i64), &str)> = Vec::new();
     for lv in &doc.levels {
         for rec in lv.records.iter().filter(|rec| rec.file == file) {
-            if !recs.iter().any(|(line, _)| *line == rec.lines.0) {
-                recs.push((rec.lines.0, &rec.text));
+            if !recs.iter().any(|(at, _)| *at == start(rec)) {
+                recs.push((start(rec), &rec.text));
             }
         }
     }
-    recs.sort_by_key(|(line, _)| *line);
+    recs.sort_by_key(|(at, _)| *at);
     hash(&recs.iter().map(|(_, t)| format!("{t}\n")).collect::<String>())
 }
 
-/// Whether a record is a header record, `type="header"` (2.8), read from its header alone: a
-/// record's body can be long, and the outline does not read it.
+/// Where a record starts in its file, its line and column: two records of a file may start on one
+/// line (2.4), and a file read more than once has its records once for each reading.
+fn start(rec: &Record) -> (u32, i64) {
+    (rec.lines.0, rec.segs.first().map_or(0, |seg| seg.col))
+}
+
+/// Whether a record is a header record, `type="header"` (2.8), read from its head alone, as the
+/// parser reads it ([`parse_record_head`]): a record's body can be long, and the outline does not
+/// read it.
 fn is_header(text: &str) -> bool {
-    let Some(rest) = text.strip_prefix("@RNL") else { return false };
-    let open = text.len() - rest.trim_start().len();
-    if !text[open..].starts_with('(') {
-        return false;
-    }
-    // the parenthesis that closes the header, past the strings in it, whose quotes are doubled (3.7)
-    let mut quoted = false;
-    for (k, c) in text[open..].char_indices() {
-        match c {
-            '"' => quoted = !quoted,
-            ')' if !quoted => {
-                let head = format!("{} {{}}", &text[..open + k + 1]);
-                let ast = parse_record(&head);
-                return ast.header.as_ref().and_then(|h| h.get("type")) == Some(&Value::Str("header".into()));
-            }
-            _ => {}
-        }
-    }
-    false
+    text.starts_with("@RNL")
+        && parse_record_head(text).and_then(|h| h.get("type").cloned()) == Some(Value::Str("header".into()))
 }
 
 fn hash(text: &str) -> String {
@@ -499,6 +507,65 @@ X2 m out inv
 .ends
 * @RNL { #M1 @PLACE(0, 0) }
 ";
+
+    /// Two records on one line are two records (2.4): a header, then a record that draws.
+    #[test]
+    fn two_records_on_one_line_are_both_counted() {
+        let entry = "* entry\n\
+            * @RNL(type=\"header\") { @VERSION(\"0.4\") } @RNL { (0, 0) @TEXT(\"ENTRY\") }\n\
+            .include \"root.inc\"\n\
+            .end\n";
+        let root = "* root\n.subckt root a\nR1 a 0 1k\n.ends\n";
+        let files = MemoryProvider::new().with("/w/e.sp", entry).with("/w/root.inc", root);
+        let o = outline("/w/e.sp", &files, &BuildOptions::default()).unwrap();
+        let d = build("/w/e.sp", &files, &BuildOptions::default()).unwrap();
+        agree(&o, &d);
+        assert_eq!(o.files[0].records, 1);
+        // the same records on two lines: the same count
+        let apart = entry.replace("} @RNL {", "}\n* @RNL {");
+        let files = files.with("/w/e.sp", &apart);
+        assert_eq!(outline("/w/e.sp", &files, &BuildOptions::default()).unwrap().files[0].records, 1);
+    }
+
+    /// A header record is told by its head as the parser reads it: a `)` in a comment in the head
+    /// does not end it.
+    #[test]
+    fn a_header_is_told_by_its_head_as_the_parser_reads_it() {
+        let entry = "* entry\n* @RNL(/* ) */ type=\"header\") { @VERSION(\"0.4\") }\nR1 a 0 1k\n.end\n";
+        let files = MemoryProvider::new().with("/w/e.sp", entry);
+        let o = outline("/w/e.sp", &files, &BuildOptions::default()).unwrap();
+        agree(&o, &build("/w/e.sp", &files, &BuildOptions::default()).unwrap());
+        assert_eq!(o.files[0].records, 0);
+        // the header of a package file named by path: the packages it names by path are read
+        let top = "* top\n\
+            * @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\", path=\"pkg/acme.rnl\") }\n\
+            R1 a 0 1k\n\
+            .end\n";
+        let acme = "@RNL(/* ) */ type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"acme\", version=\"1.0\"); \
+            @USE-PACKAGE(name=\"base\", version=\"1.0\", path=\"base.rnl\") }\n";
+        let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/pkg/acme.rnl", acme);
+        let o = outline("/w/top.sp", &files, &BuildOptions::default()).unwrap();
+        agree(&o, &build("/w/top.sp", &files, &BuildOptions::default()).unwrap());
+        assert_eq!(o.missing, ["/w/pkg/base.rnl"]);
+    }
+
+    /// A file of a version the reading does not read names a package file by path: the outline
+    /// does not read it, as the reading does not (16.1).
+    #[test]
+    fn a_file_of_a_version_not_read_names_no_package_file() {
+        let top = "* top\n\
+            * @RNL(type=\"header\") { @VERSION(\"0.4\") }\n\
+            .include \"old.inc\"\n\
+            R1 a 0 1k\n\
+            .end\n";
+        let old = "* old\n\
+            * @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"old\", version=\"1.0\", path=\"gone.rnl\") }\n\
+            R2 a 0 1k\n";
+        let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/old.inc", old);
+        let o = outline("/w/top.sp", &files, &BuildOptions::default()).unwrap();
+        agree(&o, &build("/w/top.sp", &files, &BuildOptions::default()).unwrap());
+        assert_eq!(o.missing, Vec::<String>::new());
+    }
 
     #[test]
     fn an_outline_lists_the_files_levels_and_calls() {
