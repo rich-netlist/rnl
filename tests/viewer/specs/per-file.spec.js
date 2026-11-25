@@ -347,3 +347,40 @@ test('a reading whose spans and hints could not be had is shown without them, an
   expect(d.levels.flatMap(l => l.hints ?? []).length).toBeGreaterThan(0);
   await expect(page.locator('#diags > li.diag.geo')).not.toHaveCount(0);
 });
+
+test('the spans and hints of a reading again of a file that changed are not put into the reading shown', async ({ page }) => {
+  // the rest of the first reading is not kept, and the file changes before it is read again in its place: a line
+  // before R1 and another resistor, as when a file on disk is saved between the two
+  await page.addInitScript(() => {
+    let step = 0;
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (message, ...rest) {
+      const r = typeof message?.request === 'string' ? JSON.parse(message.request) : null;
+      if (step === 0 && typeof r?.rest_of === 'string') {
+        step = 1;
+        setTimeout(() => this.dispatchEvent(new MessageEvent('message', { data: { id: message.id, error: 'not kept' } })));
+        return;
+      }
+      if (step === 1 && typeof r?.file === 'string' && r.hints !== false) {
+        step = 2;
+        r.files = { ...r.files, [r.entry]: '* changed\n* a line\nR2 m n 2k\nR1 n 0 1k\n.end\n' };
+        return post.call(this, { ...message, request: JSON.stringify(r) }, ...rest);
+      }
+      return post.call(this, message, ...rest);
+    };
+  });
+  await open(page, { top: '* first\nR1 n 0 1k\n.end\n' });
+  // each span names the object it marks, in the text shown
+  const d = await page.evaluate(() => window.viewer.doc);
+  const text = d.files.find((f) => f.path === 'top.sp').text.split('\n');
+  for (const s of d.spans.filter((s) => s.kind === 'name' && d.files[s.file]?.path === 'top.sp')) {
+    expect((text[s.line - 1] ?? '').slice(s.col - 1, s.col - 1 + s.len)).toBe(d.objects[s.object].name);
+  }
+  // shown without them, and not kept
+  expect(d.spans).toEqual([]);
+  await page.locator('#file-input').setInputFiles([{ name: 'top.sp', mimeType: 'text/plain', buffer: Buffer.from('* first\nR1 n 0 1k\n.end\n') },
+    { name: 'cells.inc', mimeType: 'text/plain', buffer: Buffer.from(CELLS) }, { name: 'leaf.inc', mimeType: 'text/plain', buffer: Buffer.from(LEAF) }]);
+  await idle(page);
+  expect(await kept(page)).toMatchObject({ hits: 0, misses: 2 });
+  expect((await page.evaluate(() => window.viewer.doc)).spans.length).toBeGreaterThan(0);
+});

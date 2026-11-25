@@ -87,9 +87,11 @@ async function outlineOf(reader, lib, fresh) {
 /**
  * Put what `result`, the smaller answer of `file` that `reader` read with `later`, was left without into it, before
  * anything else has it: the spans and the geometry hints the core kept of that reading (`reader.restOf`), or, when it
- * kept none, those of a reading of the file again with them. A level with no hints has none, as a reading with them
- * gives it; spans the answer has already are its own. False when neither could be had, such as when the open was
- * superseded and its core stopped: `result` is then left without them.
+ * kept none, those of a reading of the file again with them, when it read the files the answer read, as they were. A
+ * level with no hints has none, as a reading with them gives it; spans the answer has already are its own. False when
+ * neither could be had, such as when the open was superseded and its core stopped, or when a file changed before the
+ * reading again: `result` is then left without them, as the spans and the hints of another reading are of other
+ * objects.
  */
 async function addRest(reader, file, result) {
   let rest = null;
@@ -97,6 +99,7 @@ async function addRest(reader, file, result) {
   if (!rest) {
     try {
       const again = await reader.readFile(file, false);
+      if (JSON.stringify(again.inputs) !== JSON.stringify(result.inputs)) return false;
       rest = { spans: again.spans, hints: { levels: Object.fromEntries(again.levels.map((l) => [l.host, l.hints ?? []])) } };
     } catch {
       return false;
