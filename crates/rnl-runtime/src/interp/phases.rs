@@ -188,6 +188,8 @@ impl Interp<'_> {
         self.scenes[s].pin_nets.clear();
         // a bundle keeps only the members no later bundle takes: its nets are taken again
         self.scenes[s].bundle_nets.clear();
+        // and its members are set to it: the instances of the scene are taken again
+        self.scenes[s].inst_like = None;
         let mut bundles = self.scenes[s].bundles.clone();
         bundles.sort_by(|a, b| self.scenes[s].created_order[a].cmp(&self.scenes[s].created_order[b]));
         let mut owner: HashMap<ObjId, ObjId> = HashMap::new();
