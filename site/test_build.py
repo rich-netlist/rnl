@@ -176,7 +176,8 @@ class ReleaseDownloads(unittest.TestCase):
 
     def test_bilingual_downloads_for_old_new_and_no_release(self):
         for version, linux in [("0.1.1", False), ("0.1.2", True), (None, False)]:
-            with self.subTest(version=version), patch.object(build, "has_linux_release", return_value=linux):
+            with self.subTest(version=version), patch.object(build, "has_linux_release", return_value=linux), \
+                    patch.object(build, "has_local_packages_release", return_value=True):
                 pages = build.build(version)
                 for language in ["zh", "en"]:
                     for page in ["tools.html", "rnl-tools-standalone.html"]:
@@ -202,6 +203,40 @@ class ReleaseDownloads(unittest.TestCase):
         self.assertEqual(build.check_release("<!--linux-release-->{{viewer-tag}}<!--/linux-release-->", "test"), [])
         self.assertTrue(build.check_release("<!--linux-release-->{{viewer-tag}}", "test"))
         self.assertTrue(build.check_release("<!--no-linux-release-->{{viewer-tag}}<!--/no-linux-release-->", "test"))
+
+    def test_the_local_viewer_with_the_packages_needs_its_archive_in_the_selected_tag(self):
+        # 0.6.1's script made the plain archive and the one with Firefox; 0.6.2's also the one with the packages
+        old = 'made="$name.tar.gz"\n(cd "$out" && sha256sum "$name.tar.gz" ${firefox:+"$name-with-firefox.tar.gz"})\n'
+        new = old + 'made="$made $name-with-packages.tar.gz"\n'
+        for script, expected in [(old, False), (new, True)]:
+            with self.subTest(expected=expected), patch.object(build.subprocess, "run", return_value=SimpleNamespace(stdout=script)) as run:
+                self.assertEqual(build.has_local_packages_release("0.6.2"), expected)
+                self.assertEqual(run.call_args.args[0], ["git", "show", "viewer-v0.6.2:apps/local/ci/package.sh"])
+        with patch.object(build.subprocess, "run", side_effect=subprocess.CalledProcessError(128, "git")):
+            self.assertFalse(build.has_local_packages_release("0.5.2"))
+        with patch.object(build.subprocess, "run") as run:
+            self.assertFalse(build.has_local_packages_release(None))
+            run.assert_not_called()
+
+    def test_the_local_viewer_with_the_packages_is_linked_only_for_tags_that_made_it(self):
+        for linux, local, shown in [(True, False, False), (True, True, True), (False, True, False)]:
+            with self.subTest(linux=linux, local=local), patch.object(build, "has_linux_release", return_value=linux), \
+                    patch.object(build, "has_local_packages_release", return_value=local):
+                pages = build.build("0.6.1")
+                for language in ["zh", "en", "de"]:
+                    html = pages[f"{language}/tools.html"]
+                    self.assertNotIn("local-packages-release", html)
+                    self.assertNotIn("{{viewer-", html)
+                    self.assertEqual("rnl-viewer-local-0.6.1-linux-x86_64-with-packages.tar.gz\"" in html, shown)
+                    # the local viewer's other two archives stay with the Linux downloads
+                    for name in ["-linux-x86_64.tar.gz\"", "-linux-x86_64-with-firefox.tar.gz\""]:
+                        self.assertEqual(name in html, linux, name)
+
+    def test_the_blocks_of_the_local_viewer_with_the_packages_obey_the_release_markup_rules(self):
+        self.assertEqual(build.check_release("<!--local-packages-release-->{{viewer-tag}}<!--/local-packages-release-->", "test"), [])
+        self.assertTrue(build.check_release("<!--local-packages-release-->{{viewer-tag}}", "test"))
+        self.assertTrue(build.check_release("<!--no-local-packages-release-->{{viewer-tag}}<!--/no-local-packages-release-->", "test"))
+        self.assertTrue(build.check_release("<!--linux-release--><!--local-packages-release-->x<!--/local-packages-release--><!--/linux-release-->", "test"))
 
 
 class SiteExamples(unittest.TestCase):
