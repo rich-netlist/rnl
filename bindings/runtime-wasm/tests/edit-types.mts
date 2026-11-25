@@ -1,5 +1,5 @@
 // Compile consumer requests against the declarations shipped beside the built core.
-import type { Core, Op, SymbolPin, Vertex, WriteRequest } from "../dist/core.js";
+import type { Core, FileHints, FileRest, Op, SymbolPin, Vertex, WriteRequest } from "../dist/core.js";
 import { startCore } from "../dist/client.js";
 
 export const pins: SymbolPin[] = [
@@ -69,4 +69,13 @@ export async function writeInWorker() {
   } finally {
     worker.terminate();
   }
+}
+
+// the answers of `respond` to `hints_of` and `rest_of`
+export function restOf(core: Core): FileRest | FileHints | null {
+  const rest = core.respond({ entry: "/w/top.sp", files: {}, rest_of: "/w/top.sp" });
+  if ("rest" in rest) return rest.rest;
+  const hints = core.respond({ entry: "/w/top.sp", files: {}, hints_of: "/w/top.sp" });
+  if ("hints" in hints) return hints.hints;
+  return null;
 }
