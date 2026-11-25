@@ -580,7 +580,16 @@ fn build_in<T>(
         Some(o) => (o, &r),
     };
     let solve = if options.status { solve_statuses(with, without) } else { HashMap::new() };
-    let mut d = document::document(entry, &r, ws.missing.into_inner(), options, lazy);
+    let missing = ws.missing.into_inner();
+    let mut d = match cache {
+        Some(cache) => {
+            let mut kept = std::mem::take(&mut cache.borrow_mut().semantics);
+            let d = document::document(entry, &r, missing, options, lazy, Some(&mut kept));
+            cache.borrow_mut().semantics = kept;
+            d
+        }
+        None => document::document(entry, &r, missing, options, lazy, None),
+    };
     for level in &mut d.levels {
         level.solve = solve.get(&level.host).map(|s| s.as_str());
     }
@@ -677,7 +686,7 @@ pub fn snapshot(entry: &str, files: &dyn Provider, options: &BuildOptions, parts
     // without the drawing, the Document is built only for its files, levels and diagnostics
     let draw =
         if parts.drawing { options.clone() } else { BuildOptions { svg: false, primitives: false, ..options.clone() } };
-    let document = document::document(entry, &r, ws.missing.into_inner(), &draw, false);
+    let document = document::document(entry, &r, ws.missing.into_inner(), &draw, false, None);
     Ok(snapshot::snapshot(&r, document, parts, &options.runtime, !options.formats.is_empty()))
 }
 

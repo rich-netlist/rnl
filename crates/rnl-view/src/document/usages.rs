@@ -730,7 +730,7 @@ R1 out 0 1k
             vec![("pin".into(), Attach::Object("%ground:\"pin-name\"".into()))];
         lv.objects.iter_mut().find(|o| o.id == "%signal").unwrap().attach =
             vec![("signal".into(), Attach::Object("%wire".into()))];
-        let d = crate::document::document("usages.sp", &r, Vec::new(), &BuildOptions::default(), false);
+        let d = crate::document::document("usages.sp", &r, Vec::new(), &BuildOptions::default(), false, None);
         let lv = &d.levels[0];
         let wire = &lv.usages.iter().find(|u| u.id == "%signal").unwrap().roles[0];
         assert_eq!(wire.bounds, Some([0., 0., 11. * lv.scale, 0.]));
