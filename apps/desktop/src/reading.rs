@@ -7,11 +7,15 @@
 //! others, the page's preloading and Check All Files among them, run beside it, so that they never hold up the reading
 //! the page is to show. Its answer may be the smaller one, without the texts, which the page asks for apart, the spans
 //! and the geometry hints, which the page asks for right after it (`read_rest`), from what the cache kept of that
-//! reading: the page draws before they come.
+//! reading: the page draws before they come. The texts it left out are kept in memory until the page asks for them
+//! (`KeptTexts`), so that they are those the reading was made from, also when a file is saved in between.
+
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use rnl_runtime::numbering::{hex, sha256};
 use rnl_runtime::source::Provider;
-use rnl_view::{Bind, BuildOptions};
+use rnl_view::{Bind, BuildOptions, FileResult};
 use tauri::{State, WebviewWindow};
 
 use crate::core_thread::{Core, Drawn};
@@ -30,6 +34,67 @@ pub struct Source {
     pool: Option<Vec<String>>,
     auto_include: Option<bool>,
     formats: Option<formats::Formats>,
+}
+
+/// The texts of the files that the answer of the reading to show left out (`read_file` with `keep` and `later`), by path
+/// as the document names them, kept for the open that made it, by its id, until the page asks for them (`file_texts`):
+/// the netlist pane then shows the texts that the objects and the spans were read from, not those of a file saved in
+/// between. Only those of the last reading to show are kept, in memory; they are given once, and dropped when the next
+/// reading to show starts, so that an open taken over keeps none.
+#[derive(Clone, Default)]
+pub struct KeptTexts(Arc<Mutex<Option<Kept>>>);
+
+/// The id of an open and the texts kept for it, by path.
+type Kept = (String, HashMap<String, String>);
+
+impl KeptTexts {
+    fn lock(&self) -> MutexGuard<'_, Option<Kept>> {
+        self.0.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Drop the texts kept, as another reading to show starts.
+    fn clear(&self) {
+        *self.lock() = None;
+    }
+
+    /// Keep `texts` for the open `id`, in place of any kept before.
+    fn keep(&self, id: String, texts: HashMap<String, String>) {
+        *self.lock() = Some((id, texts));
+    }
+
+    /// The texts kept for the open `id`, which are kept no longer; None when none are kept for it, and those of another
+    /// open stay.
+    fn take(&self, id: &str) -> Option<HashMap<String, String>> {
+        let mut kept = self.lock();
+        if kept.as_ref().is_some_and(|(of, _)| of == id) {
+            kept.take().map(|(_, texts)| texts)
+        } else {
+            None
+        }
+    }
+}
+
+/// Leave the texts of `result`'s files out, as `rnl_view::leave_out_texts` does, and give those left out, by path: those
+/// it has, as the reading of one file has none of the files it does not read.
+fn take_texts(result: &mut FileResult) -> HashMap<String, String> {
+    let texts = result
+        .document
+        .files
+        .iter_mut()
+        .filter(|f| !f.path.starts_with(rnl_view::BUNDLED_DIR) && !f.text.is_empty())
+        .map(|f| (f.path.clone(), std::mem::take(&mut f.text)))
+        .collect();
+    rnl_view::leave_out_texts(result);
+    texts
+}
+
+/// The text of each of `paths`: the one `kept`, else as `read` reads it.
+fn texts_of(
+    paths: &[String],
+    mut kept: HashMap<String, String>,
+    read: impl Fn(&str) -> Option<String>,
+) -> Vec<Option<String>> {
+    paths.iter().map(|p| kept.remove(p).or_else(|| read(p))).collect()
 }
 
 /// The settings of a reading of `source` besides the texts of its files, which the reading cache is used for: the entry,
@@ -130,7 +195,8 @@ pub async fn read_outline(
 /// its answer is without the texts of the files, the spans and the geometry hints, which `read_rest` gives next (the
 /// spans when the cache could keep them, else they stay in the answer). With `bind`, the parameters of a subcircuit
 /// are built with those values, to show; with `constraints`, the levels have their constraints, which the Solve view
-/// lists.
+/// lists. The texts the answer leaves out are kept for the open of `request_id` (`KeptTexts`); a reading with `keep`
+/// drops those kept before.
 // Tauri injects the window and managed state alongside the separate IPC arguments.
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
@@ -139,6 +205,7 @@ pub async fn read_file(
     core: State<'_, Core>,
     settings: State<'_, settings::Settings>,
     library: State<'_, library::Library>,
+    kept: State<'_, KeptTexts>,
     source: Source,
     file: String,
     keep: Option<bool>,
@@ -147,13 +214,17 @@ pub async fn read_file(
     constraints: Option<bool>,
     request_id: Option<String>,
 ) -> Result<tauri::ipc::Response, String> {
+    let open = request_id.clone();
     let progress = request_id.map(|id| (window, id));
     let drawn = keep.unwrap_or(false);
     let key = cache_key(&source);
+    let kept = kept.inner().clone();
     let json =
         with_files(&core, &settings, &library, source, (drawn, progress), move |drawn, entry, files, formats| {
             let mut options = options(formats.clone(), bind, constraints.unwrap_or(false));
             let result = if keep.unwrap_or(false) {
+                // (on the core thread, as the readings to show are made in order)
+                kept.clear();
                 let later = later.unwrap_or(false);
                 options.hints = !later;
                 let (mut result, drawings) =
@@ -161,7 +232,10 @@ pub async fn read_file(
                 drawn.keep(drawings);
                 if later {
                     drawn.cache(&key).keep_spans(&mut result);
-                    rnl_view::leave_out_texts(&mut result);
+                    let texts = take_texts(&mut result);
+                    if let Some(open) = open {
+                        kept.keep(open, texts);
+                    }
                 }
                 result
             } else {
@@ -227,17 +301,21 @@ pub async fn file_hashes(
 }
 
 /// The text of each of `paths`, files of the document of `source` as it names them, as the core reads them; None for
-/// one that is not there. For the netlist pane: a reading of one file leaves out the texts of the others.
+/// one that is not there. For the netlist pane: a reading of one file leaves out the texts of the others. Those that
+/// the reading to show of the open `request_id` left out are the texts it was made from (`KeptTexts`), given once.
 #[tauri::command]
 pub async fn file_texts(
     core: State<'_, Core>,
     settings: State<'_, settings::Settings>,
     library: State<'_, library::Library>,
+    kept: State<'_, KeptTexts>,
     source: Source,
     paths: Vec<String>,
+    request_id: Option<String>,
 ) -> Result<Vec<Option<String>>, String> {
+    let kept = request_id.and_then(|id| kept.take(&id)).unwrap_or_default();
     with_files(&core, &settings, &library, source, (false, None), move |_, entry, files, _| {
-        Ok(paths.iter().map(|p| read_named(entry, p, files)).collect())
+        Ok(texts_of(&paths, kept, |p| read_named(entry, p, files)))
     })
     .await
 }
@@ -258,4 +336,67 @@ pub async fn file_symbols(
     })
     .await?;
     Ok(tauri::ipc::Response::new(json))
+}
+
+#[cfg(test)]
+mod tests {
+    use rnl_view::MemoryProvider;
+
+    use super::*;
+
+    const FIRST: &str = "* first\n.include 'cell.inc'\nR1 a 0 1k\nX1 a 0 cell\n.end\n";
+    const CELL: &str = "* cell\n.subckt cell p q\nR1 p q 1k\n.ends\n";
+
+    /// The answer of the reading to show, with the texts it leaves out kept for the open `id`, as `read_file` makes it.
+    fn read(kept: &KeptTexts, id: &str, files: &MemoryProvider) -> FileResult {
+        kept.clear();
+        let mut result = rnl_view::build_file("/w/top.sp", "top.sp", files, &Default::default()).unwrap();
+        let texts = take_texts(&mut result);
+        kept.keep(id.to_string(), texts);
+        result
+    }
+
+    #[test]
+    fn the_texts_left_out_are_those_the_reading_was_made_from_though_a_file_is_saved_after() {
+        let kept = KeptTexts::default();
+        let disk = MemoryProvider::new().with("/w/top.sp", FIRST).with("/w/cell.inc", CELL);
+        let result = read(&kept, "open-1", &disk);
+        // the answer has none of the texts, as rnl_view::leave_out_texts leaves them out
+        let paths: Vec<String> = result.document.files.iter().map(|f| f.path.clone()).collect();
+        assert_eq!(paths, ["top.sp", "cell.inc"]);
+        assert!(result.document.files.iter().all(|f| f.text.is_empty()));
+        // the file is saved before the page asks: a line before R1
+        let after = format!("* saved\n{FIRST}");
+        let saved = MemoryProvider::new().with("/w/top.sp", &after).with("/w/cell.inc", CELL);
+        let from_disk = |p: &str| saved.read(&format!("/w/{p}"));
+        let texts = texts_of(&paths, kept.take("open-1").unwrap(), from_disk);
+        // (the file included is not read by the reading of the entry: its text is read from the disk)
+        assert_eq!(texts, [Some(FIRST.to_string()), Some(CELL.to_string())]);
+        // given once: asked again, they are read from the disk
+        assert!(kept.take("open-1").is_none());
+        let again = texts_of(&paths, kept.take("open-1").unwrap_or_default(), from_disk);
+        assert_eq!(again[0].as_deref(), Some(after.as_str()));
+        // a path not left out is read from the disk too
+        let disk_only = texts_of(&["other.inc".to_string()], HashMap::new(), |_| Some("x".to_string()));
+        assert_eq!(disk_only, [Some("x".to_string())]);
+    }
+
+    #[test]
+    fn only_the_texts_of_the_last_reading_to_show_are_kept_and_only_for_its_open() {
+        let kept = KeptTexts::default();
+        let disk = MemoryProvider::new().with("/w/top.sp", FIRST).with("/w/cell.inc", CELL);
+        read(&kept, "open-1", &disk);
+        // another open does not take them, and they stay for their own
+        assert!(kept.take("open-2").is_none());
+        // the next reading to show starts: those of the open taken over are dropped
+        kept.clear();
+        assert!(kept.take("open-1").is_none());
+        // the next reading's own, kept for its open alone
+        read(&kept, "open-2", &disk);
+        assert!(kept.take("open-1").is_none());
+        let texts = kept.take("open-2").unwrap();
+        assert_eq!(texts.get("top.sp").map(String::as_str), Some(FIRST));
+        assert_eq!(texts.len(), 1);
+        assert!(kept.take("open-2").is_none());
+    }
 }

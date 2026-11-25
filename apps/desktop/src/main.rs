@@ -305,6 +305,7 @@ fn main() {
         .manage(project::Choices::default())
         .manage(Watcher::default())
         .manage(menu::Drawn::default())
+        .manage(reading::KeptTexts::default())
         .manage(startup)
         .setup(|app| {
             public_packages::init(app.handle());
