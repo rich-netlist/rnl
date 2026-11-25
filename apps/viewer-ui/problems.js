@@ -15,7 +15,7 @@ import { append, m, setAttr, setText, tr } from "./i18n.js";
 
 import { fileShown, markSourceDiagnostics, revealLine } from "./text.js";
 import { current, doc } from "./state.js";
-import { canCheckAll, checkAllFiles, otherFiles, readFileIndex, shownFileProblems } from "./file-checks.js";
+import { canCheckAll, checkAllFiles, isUnchecked, otherFiles, readFileIndex, shownFileProblems } from "./file-checks.js";
 import { $, span } from "./util.js";
 import { shell } from "./shell.js";
 import { includePublicPackage } from "./pool.js";
@@ -207,7 +207,13 @@ function refresh() {
   rows = listed();
   ul.replaceChildren();
   body.scrollTop = 0;
-  if (diagnosticList.length === 0 && hints.length === 0) {
+  if (isUnchecked(doc)) {
+    // the hints of the file could not be had: what is listed is not all there is
+    const li = document.createElement("li");
+    li.className = "unchecked";
+    setText(li, m("The geometry checks of this file could not be made. Open it again to check it."));
+    append(ul, li);
+  } else if (diagnosticList.length === 0 && hints.length === 0) {
     const li = document.createElement("li");
     li.className = "nothing";
     setText(li, m("No errors, warnings or hints."));
@@ -286,7 +292,7 @@ function renderCounts() {
     const k = every.filter((r) => r.severity === s).length;
     if (k) append(counts, count(s, m(k === 1 ? one : many, k)));
   }
-  if (every.length === 0) append(counts, span("none", m("none")));
+  if (every.length === 0 && !isUnchecked(doc)) append(counts, span("none", m("none")));
 }
 
 // the levels of diagnostics (7.6), as a row names them

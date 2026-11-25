@@ -925,7 +925,7 @@ body[data-background="dark"] .module-card, body[data-background="dark"] .entry-c
   .diag { grid-column: 1 / -1; grid-template-columns: subgrid; }
   .diags > :not(.diag) { grid-column: 1 / -1; }
 }
-.diags .nothing { padding: 6px 10px; color: var(--muted); }
+.diags .nothing, .diags .unchecked { padding: 6px 10px; color: var(--muted); }
 .diagnostics-more { padding: 6px 10px; }
 .diagnostics-more button { color: var(--muted); text-align: left; }
 /* The counts of the problems' heading are switches (problems.js), and the geometry hints are rows of the list with a tag */
