@@ -88,7 +88,8 @@ async function outlineOf(reader, lib, fresh) {
  * Put what `result`, the smaller answer of `file` that `reader` read with `later`, was left without into it, before
  * anything else has it: the spans and the geometry hints the core kept of that reading (`reader.restOf`), or, when it
  * kept none, those of a reading of the file again with them. A level with no hints has none, as a reading with them
- * gives it; spans the answer has already are its own.
+ * gives it; spans the answer has already are its own. False when neither could be had, such as when the open was
+ * superseded and its core stopped: `result` is then left without them.
  */
 async function addRest(reader, file, result) {
   let rest = null;
@@ -98,7 +99,7 @@ async function addRest(reader, file, result) {
       const again = await reader.readFile(file, false);
       rest = { spans: again.spans, hints: { levels: Object.fromEntries(again.levels.map((l) => [l.host, l.hints ?? []])) } };
     } catch {
-      return;
+      return false;
     }
   }
   if (result.spans.length === 0) for (const span of rest.spans) result.spans.push(span);
@@ -106,6 +107,7 @@ async function addRest(reader, file, result) {
     const list = rest.hints.levels[level.host];
     if (list?.length) level.hints = list;
   }
+  return true;
 }
 
 /**
@@ -114,7 +116,7 @@ async function addRest(reader, file, result) {
  * the drawings of what it has with no position, for the Document shown (`shell.unplacedDrawings`). `hit` says which,
  * and `stored` whether a new reading was kept. A reading `preload`ed counts as no hit or miss, and is kept only into
  * the room that is free. With `later`, where the shell can, the core's answer is the smaller one, and `rest` brings
- * the spans and the hints into it, after which the reading is kept (`stored` is false).
+ * the spans and the hints into it, after which the reading is kept (`stored` is false); one left without them is not.
  */
 async function readOne(reader, outline, file, lib, { fresh = false, keep = false, unkept = false, preload = false, constraints = false, later = false } = {}) {
   const shape = rules.outlineShape(outline);
@@ -136,7 +138,7 @@ async function readOne(reader, outline, file, lib, { fresh = false, keep = false
     const value = { result, shape, library: lib.all, took: performance.now() - started };
     return kept().put(key, value, value, { evict: !preload });
   };
-  if (rest) return { result: shown(result), hit: false, stored: false, rest: rest.then(keepIt).catch(() => false) };
+  if (rest) return { result: shown(result), hit: false, stored: false, rest: rest.then((came) => came && keepIt()).catch(() => false) };
   const stored = await keepIt();
   return { result: preload ? result : shown(result), hit: false, stored };
 }

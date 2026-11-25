@@ -315,3 +315,35 @@ test('the first answer of the file shown has no texts, spans or geometry hints, 
   expect(await objects(page)).toBeGreaterThan(0);
   expect(await objects(page)).toBe(await objects(without));
 });
+
+test('a reading whose spans and hints could not be had is shown without them, and not kept', async ({ page }) => {
+  // the rest of the first reading fails, and so does the reading of the file again in its place: as when the open is
+  // superseded and its core stopped before the rest came
+  await page.addInitScript(() => {
+    let failing = 2;
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (message, ...rest) {
+      const r = typeof message?.request === 'string' ? JSON.parse(message.request) : null;
+      const fail = failing === 2 ? typeof r?.rest_of === 'string' : failing === 1 && typeof r?.file === 'string' && r.hints !== false;
+      if (!fail) return post.call(this, message, ...rest);
+      failing--;
+      const error = failing === 1 ? 'not kept' : 'The core was stopped.';
+      setTimeout(() => this.dispatchEvent(new MessageEvent('message', { data: { id: message.id, error } })));
+    };
+  });
+  await open(page, { top: HINTED });
+  // shown without them, with the problems listed all the same
+  let d = await page.evaluate(() => window.viewer.doc);
+  expect(d.spans).toEqual([]);
+  expect(d.levels.flatMap(l => l.hints ?? [])).toEqual([]);
+  await expect(page.locator('#counts')).not.toBeEmpty();
+  // not kept: opened again, the file is read again, whole
+  await page.locator('#file-input').setInputFiles([{ name: 'top.sp', mimeType: 'text/plain', buffer: Buffer.from(HINTED) },
+    { name: 'cells.inc', mimeType: 'text/plain', buffer: Buffer.from(CELLS) }, { name: 'leaf.inc', mimeType: 'text/plain', buffer: Buffer.from(LEAF) }]);
+  await idle(page);
+  expect(await kept(page)).toMatchObject({ hits: 0, misses: 2 });
+  d = await page.evaluate(() => window.viewer.doc);
+  expect(d.spans.length).toBeGreaterThan(0);
+  expect(d.levels.flatMap(l => l.hints ?? []).length).toBeGreaterThan(0);
+  await expect(page.locator('#diags > li.diag.geo')).not.toHaveCount(0);
+});
