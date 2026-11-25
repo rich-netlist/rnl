@@ -134,10 +134,11 @@ A frontend that reads the outline of the document it shows and then its files on
 - **What it keeps:** the host document, with the diagnostics of reading it, and every question the reading asked of `files`, in order, with its answer. The questions are the texts of the files, the files a name may be included from, the package files, the keys of paths and the libraries of Auto Include.
 - **When it reuses it:** a later call with the same entry, `dialect` and `formats` asks the questions again, in the same order. When every answer is the same, the reading would be the same, so the host document kept is taken. Otherwise the document is read, and kept in place of the old one.
 - **Missing files:** the files the frontend does not have are asked for again, so they are missing as they were.
+- **The objects of the authored records:** a document whose records of the solver use numbers is read twice, once without those records to count the objects of the authored records (5.9). The cache keeps the objects the last reading through it counted, with what they were counted of (`rnl_runtime::AuthoredCounts`). A later reading through it takes them, instead of counting, when it would count them of the same: the same options but `generated` and `problems`, the same records but those of the solver, the same texts but the lines of those records, and the same package files (`rnl_runtime::interpret_taking`). So a file asked for again, with other hints, or after its records of the solver were written again on the same lines, is read once.
 - **What a call gives:** the same as `outline`, `build_file` or `build_file_drawn`.
 - **Calls without the cache:** they neither take from it nor change it.
-- **Holding and clearing:** it holds one document, and `ReadingCache::clear` drops it. Nothing is written anywhere.
-- **Debug builds:** a document taken is read again and checked.
+- **Holding and clearing:** it holds one document, and one count of its objects, and `ReadingCache::clear` drops both. Nothing is written anywhere.
+- **Debug builds:** a document taken is read again and checked, and so are the objects taken: they are counted again.
 
 The WebAssembly core holds one for the requests with `cache` (see [runtime-wasm](../../bindings/runtime-wasm/README.md)).
 
