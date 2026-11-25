@@ -520,6 +520,66 @@ mod tests {
         assert_eq!(counts(&authored, &plain, &mut cache), 1);
     }
 
+    /// A document whose header names a package file by path, whose symbol an authored record
+    /// attaches without a name, and whose record of the solver places that object by its number.
+    const NUMBERED: &str = "* numbered\n\
+        * @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\"); @USE-PACKAGE(name=\"p\", version=\"1.0\", path=\"p.rnl\") }\n\
+        R1 a 0 1k\n\
+        * @RNL { #R1 @PLACE(0, 0); $D @ATTACH #R1::p }\n\
+        * @RNL(type=\"generated\", priority=\"high\", author=\"rnl-solver 0.1\", hash=\"sig2:606d74f585ced2a4.fbaeddf165fc2077\", numbering=\"98bd0b9d3f870978\") {\n\
+        *   %ground_stub_R1_n = $GROUND_STUB @ATTACH(gap=3) #R1::n;\n\
+        *   %net_label_stub_R1_p = $NET_LABEL_STUB @ATTACH #R1::p;\n\
+        *   #R1 @PLACE(-6, 0) => @ORIENT(\"R0\");\n\
+        *   %#1 @PLACE(0, 0) => @ORIENT(\"R0\");\n\
+        *   %ground_stub_R1_n @PLACE(0, 0);\n\
+        *   %ground_stub_R1_n::g @PLACE(5, 1) => @ORIENT(\"R0\");\n\
+        *   %net_label_stub_R1_p @PLACE(0, 0);\n\
+        *   %net_label_stub_R1_p::l @PLACE(11, 0) => @ORIENT(\"R0\");\n\
+        *   %#2 @WIRE(mode=\"straight\") {#R1::n (-0.5, -2) (-0.5, 1) %ground_stub_R1_n::g::pin}\n\
+        * }\n\
+        .end\n";
+
+    /// The package file `NUMBERED` names, defining `symbol`.
+    fn package(symbol: &str) -> String {
+        format!(
+            "@RNL(type=\"header\") {{ @VERSION(\"0.4\"); @PACKAGE(name=\"p\", version=\"1.0\"); \
+             @USE-PACKAGE(name=\"rnl-std-basic\", version=\"0.4\") }}\n\
+             @RNL {{ ${symbol} = @DEFINE(roles=[[\"t\", \"terminal\"]]) {{}} }}\n"
+        )
+    }
+
+    /// A package file missing when the objects of the authored records were counted, then given:
+    /// the next reading through the cache counts again, and its answer is the one without the cache.
+    #[test]
+    fn a_package_file_given_after_a_count_is_counted_again() {
+        let plain = BuildOptions { svg: false, ..BuildOptions::default() };
+        let mut cache = ReadingCache::new();
+        let missing = MemoryProvider::new().with("/w/t.sp", NUMBERED);
+        let r = build_file_cached("/w/t.sp", "t.sp", &missing, &plain, &mut cache).unwrap();
+        assert_eq!(json(&r), json(&build_file("/w/t.sp", "t.sp", &missing, &plain).unwrap()));
+        let given = missing.clone().with("/w/p.rnl", &package("D"));
+        let r = build_file_cached("/w/t.sp", "t.sp", &given, &plain, &mut cache).unwrap();
+        let want = build_file("/w/t.sp", "t.sp", &given, &plain).unwrap();
+        assert!(!json(&want).contains("RNL2605"), "{}", json(&want.document.diagnostics));
+        assert_eq!(json(&r), json(&want));
+    }
+
+    /// A package file whose text changed after a count: the next reading through the cache counts
+    /// again, in a debug build too, and its answer is the one without the cache.
+    #[test]
+    fn a_package_file_changed_after_a_count_is_counted_again() {
+        let plain = BuildOptions { svg: false, ..BuildOptions::default() };
+        let mut cache = ReadingCache::new();
+        let first = MemoryProvider::new().with("/w/t.sp", NUMBERED).with("/w/p.rnl", &package("E"));
+        let r = build_file_cached("/w/t.sp", "t.sp", &first, &plain, &mut cache).unwrap();
+        assert_eq!(json(&r), json(&build_file("/w/t.sp", "t.sp", &first, &plain).unwrap()));
+        let changed = first.clone().with("/w/p.rnl", &package("D"));
+        let r = build_file_cached("/w/t.sp", "t.sp", &changed, &plain, &mut cache).unwrap();
+        let want = build_file("/w/t.sp", "t.sp", &changed, &plain).unwrap();
+        assert!(!json(&want).contains("RNL2605"), "{}", json(&want.document.diagnostics));
+        assert_eq!(json(&r), json(&want));
+    }
+
     /// The hints of each level of `r`, by host, as [`crate::FileHints`] gives them.
     fn hints_of(r: &FileResult) -> String {
         let levels: BTreeMap<usize, String> = r.document.levels.iter().map(|l| (l.host, json(&l.hints))).collect();

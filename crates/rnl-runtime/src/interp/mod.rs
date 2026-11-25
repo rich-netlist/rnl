@@ -1486,12 +1486,11 @@ fn interpret_counted(
         _ => None,
     };
     #[cfg(debug_assertions)]
-    if let Some(given) = &taken {
-        check_taken(&doc, provider, options, &host, &given.counts);
-    }
+    let as_given = taken.is_some().then(|| doc.clone());
     let mut run = NumberRun { authored: taken.as_ref().map(|t| t.counts.clone()), give, ..NumberRun::default() };
     let mut out = read(doc, provider, options, sink, &host, &mut run);
-    // a package file read otherwise than when they were counted: counted again
+    // a package file read otherwise than when they were counted, or read now and not then, such as
+    // one missing then: counted again
     let packages_hold = |given: &Given, out: &Interpretation| {
         given.of.as_ref().is_none_or(|of| package_files_hold(&of.packages, &out.package_files))
     };
@@ -1499,6 +1498,10 @@ fn interpret_counted(
         taken = None;
         run = NumberRun { give, ..NumberRun::default() };
         out = read(out.doc, provider, options, host.clone(), &host, &mut run);
+    }
+    #[cfg(debug_assertions)]
+    if let (Some(given), Some(doc)) = (&taken, &as_given) {
+        check_taken(doc, provider, options, &host, &given.counts);
     }
     if give {
         let of = |packages: Vec<(String, String)>| {
@@ -1586,11 +1589,12 @@ fn counting_reading(doc: &HostDocument, provider: &dyn Provider, without: &ReadO
     first
 }
 
-/// Whether every package file of `counted`, by its path and text, was read, `read`, with the same
-/// text.
+/// Whether the package files `read` are those of `counted`, each by its path with the same text:
+/// one read now and not when counted, such as one missing then, may change the count.
 fn package_files_hold(counted: &[(String, String)], read: &[(String, String)]) -> bool {
     let read: HashMap<&str, &str> = read.iter().map(|(path, text)| (path.as_str(), text.as_str())).collect();
-    counted.iter().all(|(path, text)| read.get(path.as_str()) == Some(&text.as_str()))
+    let counted: HashMap<&str, &str> = counted.iter().map(|(path, text)| (path.as_str(), text.as_str())).collect();
+    read == counted
 }
 
 /// What the count of the objects of the authored records of `doc` depends on in the host document
