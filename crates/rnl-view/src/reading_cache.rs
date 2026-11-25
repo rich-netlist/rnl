@@ -40,6 +40,8 @@ pub struct ReadingCache {
     counts: rnl_runtime::AuthoredCounts,
     /// The reading of the file the last file reading through the cache made without the hints.
     reading: Option<KeptReading>,
+    /// The places of the free words of the records of the last Document built through the cache.
+    pub(crate) semantics: crate::document::Semantics,
 }
 
 impl ReadingCache {
@@ -52,6 +54,7 @@ impl ReadingCache {
         self.host = None;
         self.counts = rnl_runtime::AuthoredCounts::default();
         self.reading = None;
+        self.semantics = crate::document::Semantics::default();
     }
 
     /// Keep the reading of a file of `key`, which asked `asked` of the files, and whose Document
@@ -621,6 +624,54 @@ mod tests {
         let mut r = build_file_cached("/w/t.sp", "t.sp", &files, &hints, &mut cache).unwrap();
         assert!(!cache.keep_spans(&mut r));
         assert_eq!(json(&r.document.spans), json(&full.document.spans));
+    }
+
+    /// The places of the free words of the records are kept by record text, and the files read
+    /// through the cache have them as the files read without it.
+    #[test]
+    fn the_free_words_of_the_records_are_kept_and_placed_as_without_the_cache() {
+        let options = BuildOptions { svg: false, ..BuildOptions::default() };
+        let top = "* t
+.include \"cells.inc\"
+* @RNL { #X1 @PLACE(0, 0) the amplifier }
+X1 a b cell
+.end
+";
+        let cells = "* cells
+.subckt cell p n
+* @RNL { #R1 @PLACE(0, 0) a load }
+R1 p n 1k
+.ends
+";
+        let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/cells.inc", cells);
+        let mut cache = ReadingCache::new();
+        let semantics = |r: &FileResult| r.document.files.iter().map(|f| f.semantics.clone()).collect::<Vec<_>>();
+        let read = |files: &MemoryProvider, cache: &mut ReadingCache| {
+            for file in ["top.sp", "cells.inc"] {
+                let cached = build_file_cached("/w/top.sp", file, files, &options, cache).unwrap();
+                let plain = build_file("/w/top.sp", file, files, &options).unwrap();
+                assert_eq!(json(&cached), json(&plain), "{file}");
+                assert!(semantics(&cached).iter().any(|lines| lines == &[3]), "{file}");
+            }
+        };
+        read(&files, &mut cache);
+        read(&files, &mut cache);
+        // a record moved down a line keeps the places in its text, on other lines
+        let moved = files.clone().with(
+            "/w/top.sp",
+            &top.replace(
+                "* t
+", "* t
+
+",
+            ),
+        );
+        for file in ["top.sp", "cells.inc"] {
+            let cached = build_file_cached("/w/top.sp", file, &moved, &options, &mut cache).unwrap();
+            assert_eq!(json(&cached), json(&build_file("/w/top.sp", file, &moved, &options).unwrap()), "{file}");
+        }
+        cache.clear();
+        read(&files, &mut cache);
     }
 
     #[test]

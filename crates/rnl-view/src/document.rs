@@ -582,6 +582,7 @@ pub(crate) fn document(
     missing: Vec<String>,
     options: &BuildOptions,
     lazy: bool,
+    kept: Option<&mut Semantics>,
 ) -> Document {
     let dir = dirname(entry);
     let shown_file = |file: &str| relative_to(file, &dir).unwrap_or(file).to_string();
@@ -602,7 +603,7 @@ pub(crate) fn document(
     } else {
         None
     };
-    let mut files = source_files(package_doc.as_ref().unwrap_or(&r.doc), &shown_file);
+    let mut files = source_files(package_doc.as_ref().unwrap_or(&r.doc), &shown_file, kept);
     for f in &r.failed {
         if let Some(file) = files.iter_mut().find(|x| x.path == f.start.file) {
             file.failed.push([f.start.line, f.start.col, f.end.line, f.end.col, u32::from(f.conflict)]);
@@ -781,8 +782,14 @@ pub(crate) fn diagnostic(
     }
 }
 
-/// The host files with the places of their records; the opened file comes first.
-fn source_files(doc: &HostDocument, shown: &dyn Fn(&str) -> String) -> Vec<SourceFile> {
+/// The host files with the places of their records; the opened file comes first. The places of
+/// the free words of each record are taken from `kept` when it has them for the record's text, and
+/// kept there.
+fn source_files(
+    doc: &HostDocument,
+    shown: &dyn Fn(&str) -> String,
+    mut kept: Option<&mut Semantics>,
+) -> Vec<SourceFile> {
     let mut files: Vec<SourceFile> = doc
         .sources
         .iter()
@@ -819,10 +826,15 @@ fn source_files(doc: &HostDocument, shown: &dyn Fn(&str) -> String) -> Vec<Sourc
             let n = rec.text.chars().count();
             let (a, b) = (rec.loc(0), rec.loc(n.saturating_sub(1)));
             f.records.push([a.line, a.col, b.line, b.col]);
-            if let Some(body) = rnl_runtime::syntax::parse_record(&rec.text).body {
-                semantic_lines(&body, rec, &mut f.semantics);
-            }
+            let offsets = match kept.as_deref_mut() {
+                Some(kept) => kept.offsets(&rec.text),
+                None => semantic_offsets(&rec.text),
+            };
+            f.semantics.extend(offsets.iter().map(|&off| rec.loc(off).line));
         }
+    }
+    if let Some(kept) = kept {
+        kept.finish();
     }
     for f in &mut files {
         f.records.sort();
@@ -833,23 +845,68 @@ fn source_files(doc: &HostDocument, shown: &dyn Fn(&str) -> String) -> Vec<Sourc
     files
 }
 
-fn semantic_lines(set: &rnl_runtime::syntax::SetExpr, rec: &rnl_runtime::host::Record, out: &mut Vec<u32>) {
-    for member in &set.members {
-        if member.error.is_some() {
-            continue;
-        }
-        out.extend(
-            member
-                .free_words
-                .iter()
-                .filter(|(word, _)| word.chars().any(char::is_alphanumeric))
-                .map(|(_, off)| rec.loc(*off).line),
-        );
-        for arg in member.segments.iter().flat_map(|s| &s.args) {
-            if let rnl_runtime::syntax::ObjExpr::Set(body) = &arg.obj {
-                semantic_lines(body, rec, out);
+/// Where in the text of a record its free words with a letter or a digit are, in the members that
+/// read, in the order of the record ([`SourceFile::semantics`] has their lines).
+fn semantic_offsets(text: &str) -> Vec<usize> {
+    fn walk(set: &rnl_runtime::syntax::SetExpr, out: &mut Vec<usize>) {
+        for member in &set.members {
+            if member.error.is_some() {
+                continue;
+            }
+            out.extend(
+                member
+                    .free_words
+                    .iter()
+                    .filter(|(word, _)| word.chars().any(char::is_alphanumeric))
+                    .map(|(_, off)| *off),
+            );
+            for arg in member.segments.iter().flat_map(|s| &s.args) {
+                if let rnl_runtime::syntax::ObjExpr::Set(body) = &arg.obj {
+                    walk(body, out);
+                }
             }
         }
+    }
+    let mut out = Vec::new();
+    if let Some(body) = rnl_runtime::syntax::parse_record(text).body {
+        walk(&body, &mut out);
+    }
+    out
+}
+
+/// The places of the free words of records ([`semantic_offsets`]), by the text of the record, kept
+/// between the readings of a document through the reading cache ([`crate::ReadingCache`]): those
+/// of the records of the last Document built, which a record of the same text takes instead of
+/// parsing it again.
+#[derive(Default)]
+pub(crate) struct Semantics {
+    /// Those of the last Document.
+    kept: HashMap<String, Vec<usize>>,
+    /// Those of the Document being built.
+    now: HashMap<String, Vec<usize>>,
+}
+
+impl Semantics {
+    /// The places of the free words of the record `text`, taken when kept, else found; kept for
+    /// the next Document. In debug builds a place taken is found again and checked.
+    fn offsets(&mut self, text: &str) -> Vec<usize> {
+        if let Some(found) = self.now.get(text) {
+            return found.clone();
+        }
+        let found = match self.kept.remove(text) {
+            Some(found) => {
+                debug_assert_eq!(found, semantic_offsets(text), "the free words kept of a record changed");
+                found
+            }
+            None => semantic_offsets(text),
+        };
+        self.now.insert(text.to_string(), found.clone());
+        found
+    }
+
+    /// Keep those of the Document built, and drop the others.
+    fn finish(&mut self) {
+        self.kept = std::mem::take(&mut self.now);
     }
 }
 
@@ -1880,7 +1937,7 @@ R1 a b 1k
         let host =
             rnl_host_spice::read_with_includes("/w/top.sp", &files, &mut Sink::default(), &["/w/auto.inc".into()])
                 .unwrap();
-        let shown = source_files(&host, &str::to_string);
+        let shown = source_files(&host, &str::to_string, None);
         let targets: Vec<_> = shown[0].includes.iter().map(|i| (i.line, shown[i.file].path.as_str())).collect();
         assert_eq!(targets, [(2, "a/x.inc"), (3, "b/x.inc"), (4, "lib.inc")]);
 
@@ -1889,7 +1946,7 @@ R1 a b 1k
             .with("/w/a/x.scs", "section tt\nmodel n mos1\nendsection\n")
             .with("/w/b/x.scs", "subckt b p n\nends b\n");
         let host = rnl_host_spectre::read("/w/top.scs", &files, &mut Sink::default()).unwrap();
-        let shown = source_files(&host, &str::to_string);
+        let shown = source_files(&host, &str::to_string, None);
         let targets: Vec<_> = shown[0].includes.iter().map(|i| (i.line, shown[i.file].path.as_str())).collect();
         assert_eq!(targets, [(2, "a/x.scs"), (3, "b/x.scs")]);
     }
