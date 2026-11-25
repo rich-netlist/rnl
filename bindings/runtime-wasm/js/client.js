@@ -107,7 +107,8 @@ export function startCore(options = {}) {
    * sent. The message has its JSON text, as `requestText` makes it. A request with `files`
    * gives the Worker only the texts that are not those it holds, with the paths of all of them in their order: the
    * Worker keeps the texts, and builds the request with them, the same files in the same order (worker.js). The texts
-   * of a large document are then not written out and sent again for each request.
+   * of a large document are then not written out and sent again for each request. The request is read when the call is
+   * made, its nested parts too, as a request without files is.
    */
   function message(request) {
     const files = request?.files;
@@ -116,9 +117,13 @@ export function startCore(options = {}) {
       return () => [{ request: text }, () => {}];
     }
     // (a file whose text is undefined is left out, as JSON leaves it out)
-    const paths = Object.keys(files).filter((path) => files[path] !== undefined);
-    const texts = paths.map((path) => files[path]);
-    const rest = { ...request };
+    const named = Object.keys(files).filter((path) => files[path] !== undefined);
+    const texts = named.map((path) => files[path]);
+    // the paths as the JSON text names them, where a lone surrogate is U+FFFD (`requestText`): the Worker finds the
+    // texts by them
+    const paths = named.map((path) => JSON.parse(requestText(path)));
+    // the rest of the request as it is now, its files in their place (JSON.parse gives a lone surrogate back as it was)
+    const rest = JSON.parse(JSON.stringify({ ...request, files: 0 }));
     // (made when it is sent, after those sent before it: what the Worker holds is what they left; and what it holds
     // then is told once it was sent)
     return () => {
