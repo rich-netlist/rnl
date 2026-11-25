@@ -26,7 +26,7 @@ import { clearSelection, select } from "./selection.js";
 import { endPreview, previewOnOpen, previewing, solve } from "./solve.js";
 import { levelNamed, namedPath, restorePath, visitView } from "./subcircuits.js";
 import { showModule } from "./module-view.js";
-import { openOnlyRoot, setOpensOnlyRoot } from "./entry-page.js";
+import { openOnlyRoot, setOpensOnlyRoot, summarizeShown } from "./entry-page.js";
 import { clearSource, fileShown, fileViews, renderFiles, revealDefinition, showFile, spansCame } from "./text.js";
 import { $ } from "./util.js";
 import { setEnabled } from "./commands.js";
@@ -130,6 +130,9 @@ export async function openSource(source, keep, edited, fresh = false, navigation
       // an entry that only includes other files, with one subcircuit nothing calls: that subcircuit (entry-page.js)
       if (d === doc && !keep && !edited && !navigation && !signal) openOnlyRoot();
       window.dispatchEvent(new Event("open-finished"));
+    } else if (d && d === doc) {
+      // another open took over before the one root of the entry page shown opened: the page stays, with its symbols
+      summarizeShown();
     }
   }
 }
