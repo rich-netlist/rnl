@@ -207,11 +207,12 @@ export default {
         try { return await invoke("read_rest", { source: args, file, bind, constraints }); }
         catch (e) { if (String(e) === "not kept") return null; throw e; }
       },
-      // the texts of the other files, which the reading of one leaves out, for the netlist pane
+      // the texts of the other files, which the reading of one leaves out, for the netlist pane: those the reading of
+      // this open left out are those it was read from, which the app kept for it (reading.rs `KeptTexts`)
       async texts(doc) {
         const missing = doc.files.filter((f) => !f.text);
         if (!missing.length) return;
-        const got = await invoke("file_texts", { source: args, paths: missing.map((f) => f.path) });
+        const got = await invoke("file_texts", { source: args, paths: missing.map((f) => f.path), requestId });
         missing.forEach((f, k) => { f.text = got[k] ?? ""; });
       },
       symbols: (file) => invoke("file_symbols", { source: args, file }),
