@@ -8,6 +8,7 @@
 import { doc } from "./state.js";
 import { m } from "./i18n.js";
 import { levelTree, localLevel, outlineTree } from "./level-tree.js";
+import { isEarlier } from "./old-version.js";
 
 let cached = { doc: null, roots: [] };
 
@@ -33,6 +34,8 @@ export function uncalledRoots() {
 export function onlyRootOf(outline) {
   const top = outline?.levels[0];
   if (!top || top.file !== 0 || top.instances !== 0 || outline.files[0]?.records !== 0) return null;
+  // an entry of an earlier version stays, as its page says which viewer reads it
+  if (isEarlier(top.version)) return null;
   const tree = outlineTree(outline);
   const roots = compute(tree).filter((h) => !tree.nodes[h].module);
   const level = roots.length === 1 ? outline.levels[roots[0]] : null;

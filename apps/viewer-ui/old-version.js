@@ -22,6 +22,8 @@ export const OLD_VIEWER = "https://rich-netlist.github.io/rnl/viewer-0.3/";
 export const OLD_RELEASE = "https://github.com/rich-netlist/rnl/releases/tag/viewer-v0.5.3";
 /** The versions the old viewer reads and this one does not. */
 const EARLIER = ["0.2", "0.3"];
+/** Whether `version`, a file's language version, is one the old viewer reads and this one does not. */
+export const isEarlier = (version) => EARLIER.includes(version);
 /** The parameters of the page's address that the old viewer reads too, carried over to it. */
 const CARRIED = ["background", "grid", "names", "usages", "currents"];
 const UNSUPPORTED = "RNL2102";
