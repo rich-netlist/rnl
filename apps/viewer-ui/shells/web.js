@@ -15,7 +15,7 @@ import { append, m, setAttr } from "../i18n.js";
 
 import { collect, collectFile, collectOutline, coreVersion, decodeText, fileResultFormat, startCore } from "../core/client.js";
 import { removeOldStore } from "../result-cache.js";
-import { libraryStamps, requestPath, textHash } from "../file-results.js";
+import { libraryStamps, outlinePaths, requestPath, textHash } from "../file-results.js";
 import { loadManifest, readManifest } from "../manifest.js";
 import { ask, choose, inform, modal } from "../dialog.js";
 import { libraryZip } from "../zip.js";
@@ -1183,12 +1183,17 @@ export default {
       const asked = askedFor.get(entry.path);
       let before = null;
       const readBefore = () => (before ??= Promise.all([...asked].map(textOf)));
+      // the files the request was made with, and those the core asked this reader for: what it read besides them, to
+      // hash them or before the first request, is what a reading may no longer name (`finish`)
+      const given = new Set(Object.keys(texts));
+      const askedHere = new Set();
       // (an error reading a file the core asks for fails the reading, as it did)
       const readAsked = async (path) => {
         const t = texts[path] !== undefined ? texts[path] : await read(path);
         if (typeof t === "string") {
           texts[path] = t;
           asked.add(path);
+          askedHere.add(path);
         }
         return t;
       };
@@ -1291,7 +1296,12 @@ export default {
           if (worker) candidates.set(doc, worker);
           // a Document given from a reading kept: the core holds no drawings of it until it reads it again
           if (hit) kept.add(doc);
-          builtRequests.set(doc, { ...request, file: doc.file, files: texts });
+          // what the solve, Export Image and the drawings are read again from: the files read, but of those read to hash
+          // them or before the first request, only those the outline or the reading names, not an include since removed
+          const named = new Set([...(doc.outline ? outlinePaths(doc.outline) : []), ...(doc.inputs?.files ?? []).map((i) => i.path)]
+            .map((path) => requestPath(entry.path, path)));
+          const files = Object.fromEntries(Object.entries(texts).filter(([path]) => given.has(path) || askedHere.has(path) || named.has(path)));
+          builtRequests.set(doc, { ...request, file: doc.file, files });
           servedFiles = served(prepared.source, doc);
         },
       };

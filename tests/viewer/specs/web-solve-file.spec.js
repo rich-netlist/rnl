@@ -166,3 +166,19 @@ test('a module of Verilog-A opened from the preview of a solve, and the way back
   expect(await shown(page)).toEqual(top);
   expect(await requests(page)).toHaveLength(1);
 });
+
+test('an include removed from the file is not solved or saved with it, though an earlier open read it', async ({ page }) => {
+  const UNUSED = `* unused\n.subckt u p\nR1 p 0 1k\n.ends\n`;
+  await open(page, [['a.sp', `* a\n.include "unused.inc"\nR1 a 0 1k\n.end\n`], ['unused.inc', UNUSED]]);
+  // the same file again, without its include; the included file is still there
+  await page.locator('#file-input').setInputFiles([['a.sp', `* a\nR1 a 0 1k\n.end\n`], ['unused.inc', UNUSED]]
+    .map(([name, text]) => ({ name, mimeType: 'text/plain', buffer: Buffer.from(text) })));
+  await idle(page);
+  expect(await page.evaluate(() => window.viewer.doc.files.map((f) => f.path))).toEqual(['a.sp']);
+  await page.keyboard.press('F9');
+  await solved(page);
+  expect((await requests(page)).at(-1).files).not.toContain('/unused.inc');
+  const download = page.waitForEvent('download');
+  await page.evaluate(() => { void window.viewer.command('solve-save'); });
+  expect((await download).suggestedFilename()).toBe('a-solved.sp');
+});
