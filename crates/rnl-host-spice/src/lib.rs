@@ -32,6 +32,10 @@ pub fn dialect() -> Dialect {
 /// `slash_comments` selects Spectre comments; otherwise use SPICE's `;`/`$` comments.
 /// Quoted strings and SPICE braced expressions are host code, not comment text.
 pub fn hint_comment_compatibility(raw: &str, slash_comments: bool, file: &str, line: u32, sink: &mut Sink) -> bool {
+    // a line of ASCII alone has no non-ASCII comment
+    if raw.is_ascii() {
+        return false;
+    }
     let chars: Vec<char> = raw.chars().collect();
     let first = chars.iter().position(|c| !c.is_whitespace()).unwrap_or(chars.len());
     let mut comment = None;
@@ -1247,6 +1251,23 @@ fn finish(cx: &mut Reading) {
 mod tests {
     use super::*;
     use rnl_runtime::source::MemoryProvider;
+
+    #[test]
+    fn only_a_comment_with_non_ascii_text_gets_the_hint() {
+        let hinted = |raw: &str, slash: bool| {
+            let mut sink = Sink::new();
+            let found = hint_comment_compatibility(raw, slash, "a.sp", 3, &mut sink);
+            assert_eq!(found, !sink.all().is_empty(), "{raw:?}");
+            found
+        };
+        assert!(!hinted("R1 a b 1k ; load", false));
+        assert!(!hinted("* a comment", false));
+        assert!(!hinted("// a comment", true));
+        assert!(hinted("R1 a b 1k ; charge é", false));
+        assert!(hinted("* é", false));
+        assert!(hinted("R1 (a b) resistor // é", true));
+        assert!(!hinted("Ré a b 1k", false));
+    }
 
     #[test]
     fn levels_records_and_instances() {

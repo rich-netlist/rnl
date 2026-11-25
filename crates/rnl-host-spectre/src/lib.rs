@@ -374,6 +374,10 @@ fn tokens(s: &str) -> Vec<String> {
 
 /// Remove an end-of-line comment: `//` after whitespace.
 fn strip_comment(s: &str) -> String {
+    // a comment begins at a `//`
+    if !s.contains("//") {
+        return s.trim().to_string();
+    }
     let chars: Vec<char> = s.chars().collect();
     let mut in_str = false;
     for k in 0..chars.len() {
@@ -606,7 +610,8 @@ impl Reader<'_, '_> {
                 }
                 continue;
             }
-            if st.mode == Mode::Spectre && section.is_none() {
+            // a `section` statement begins with its keyword
+            if st.mode == Mode::Spectre && section.is_none() && stripped.starts_with("section") {
                 let card = strip_comment(stripped);
                 let words: Vec<&str> = card.split_whitespace().collect();
                 if words.first() == Some(&"section") && words.len() == 2 {
@@ -1459,6 +1464,40 @@ fn read_as(
 mod tests {
     use super::*;
     use rnl_runtime::source::MemoryProvider;
+
+    /// A line without its comment, char by char: a `//` outside a string, at the start or after
+    /// whitespace, begins it.
+    fn scanned(s: &str) -> String {
+        let chars: Vec<char> = s.chars().collect();
+        let mut in_str = false;
+        for k in 0..chars.len() {
+            if chars[k] == '"' {
+                in_str = !in_str;
+            }
+            if !in_str && chars[k] == '/' && chars.get(k + 1) == Some(&'/') && (k == 0 || chars[k - 1].is_whitespace())
+            {
+                return chars[..k].iter().collect::<String>().trim().to_string();
+            }
+        }
+        s.trim().to_string()
+    }
+
+    #[test]
+    fn a_line_without_a_comment_marker_is_only_trimmed() {
+        for line in [
+            "",
+            "  R1 (a b) resistor r=1k  ",
+            "R1 (a b) resistor r=1k // load",
+            "// all a comment",
+            "x \"a // b\" c // d",
+            "path=a//b",
+            "C1 (a b) capacitor\u{3000}// wide space",
+            "réglage é=1 // é",
+            "section tt",
+        ] {
+            assert_eq!(strip_comment(line), scanned(line), "{line:?}");
+        }
+    }
 
     #[test]
     fn instances_models_and_subckts() {
