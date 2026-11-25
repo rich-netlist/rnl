@@ -609,6 +609,8 @@ export interface Core {
     | { document: Document }
     | { outline: Outline }
     | { file: FileResult }
+    | { hints: FileHints }
+    | { rest: FileRest }
     | { symbols: FileSymbols }
     | { snapshot: Snapshot }
     | { written: Written }
