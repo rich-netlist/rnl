@@ -286,6 +286,36 @@ test("the Worker keeps the texts of the files it was given, and is sent only tho
   }
 });
 
+test("a request to the Worker is the request as it was when it was made, its nested parts too", async () => {
+  const worker = startCore();
+  try {
+    const entry = "/w/t.sp";
+    const text = "* t\nR1 a 0 1k\n.end\n";
+    const formats = { [entry]: "spice" };
+    const expected = core.outline({ entry, files: { [entry]: text }, formats, outline: true });
+    // changed once the call was made, before the Worker started
+    const answer = worker.outline({ entry, files: { [entry]: text }, formats });
+    formats[entry] = "spectre";
+    assert.deepEqual(await answer, expected);
+  } finally {
+    worker.terminate();
+  }
+});
+
+test("a path with a lone surrogate is read in the Worker as the core reads it", async () => {
+  const worker = startCore();
+  try {
+    const entry = `/w/input-${char(0xd800)}.sp`;
+    const request = { entry, files: { [entry]: NETLIST } };
+    assert.deepEqual(await worker.outline(request), core.outline({ ...request, outline: true }));
+    assert.deepEqual(await worker.build(request), core.build(request));
+    // and again, with the text the Worker holds
+    assert.deepEqual(await worker.build(request), core.build(request));
+  } finally {
+    worker.terminate();
+  }
+});
+
 test("the core runs in a Worker", async () => {
   const worker = startCore();
   try {
