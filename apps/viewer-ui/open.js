@@ -99,7 +99,8 @@ export async function openSource(source, keep, edited, fresh = false, navigation
     // the Library and the manifest bar know the entry; the view of another of its files is no file opened
     await sourceOpened(entrySource(source), d, !keep && !opened.view, !!edited);
     await nextPaint();
-    await restShown(d);
+    // (the page is busy until the spans and the hints are in: `restShown`)
+    await restIn(d);
     return true;
   } catch (e) {
     if (operation.signal.aborted) return;
@@ -172,7 +173,7 @@ export async function applyEdits() {
     if (ended) fit();
     await sourceOpened(entrySource(lastSource), d, false, true);
     await nextPaint();
-    await restShown(d);
+    await restIn(d);
   } catch (e) {
     if (operation.signal.aborted) return false;
     failed = e instanceof Error ? e.message : String(e);
@@ -347,17 +348,13 @@ function problemsOf(d) {
   return diags;
 }
 
-// the Documents shown before their spans and hints came (file-reading.js `restToCome`), whose problems are listed then
-const listedLater = new WeakSet();
-
 /**
- * The spans and the geometry hints of `d`, a Document read and shown, are in it, when they come after it was shown: the
- * text pane shows the spans, and the problems list is made, once, with the hints, while `d` is still the one shown.
+ * The spans and the geometry hints of `d`, a Document shown before they came (file-reading.js `restToCome`), are in
+ * it, or could not be had: the text pane shows the spans, and the problems list is made, once, with the hints, while
+ * `d` is still the one shown. It waits from when `d` is shown, whatever becomes of the open that read it.
  */
 async function restShown(d) {
   await restIn(d);
-  if (!listedLater.has(d)) return;
-  listedLater.delete(d);
   if (d !== doc) return;
   spansCame();
   renderDiagnostics(problemsOf(d));
@@ -381,8 +378,8 @@ function showDocument(before, navigation) {
   noteShown(doc);
   // the problems are listed once the hints of the levels are in too (`restShown`)
   if (restToCome(doc)) {
-    listedLater.add(doc);
     problemsToCome();
+    void restShown(doc);
   } else renderDiagnostics(problemsOf(doc));
   $("search").value = "";
 
