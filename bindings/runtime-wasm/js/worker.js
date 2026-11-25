@@ -9,7 +9,8 @@
 // gives only the texts of its files that the Worker does not hold: it keeps the texts of the last such message, and
 // the request's files are those of `paths`, in that order, each with the text given or kept. Every request gets
 // the packages this build brings (packages.js): their files under the request's own, their
-// directories after the request's; an outline, which loads no package, gets none. It runs in browsers and, for the tests, as a Node worker thread.
+// directories after the request's; an outline too, which reads the package files its records name by
+// path. It runs in browsers and, for the tests, as a Node worker thread.
 
 import { loadCore } from "./core.js";
 import { files as packageFiles, packageDirs } from "./packages.js";
@@ -24,9 +25,8 @@ const port = node ? (await import("node:worker_threads")).parentPort : globalThi
 function withPackages(request) {
   if (packageDirs.length === 0) return request;
   const r = typeof request === "string" ? JSON.parse(request) : request;
-  // the drawings of the last build need no files, nor does an outline, which loads no package
-  // unless it is the outline of one; a folders request reads no file
-  if (r.drawings !== undefined || r.folders !== undefined || (r.outline && !(r.entry in packageFiles))) return request;
+  // the drawings of the last build need no files; a folders request reads no file
+  if (r.drawings !== undefined || r.folders !== undefined) return request;
   return { ...r, files: { ...packageFiles, ...r.files }, package_dirs: [...(r.package_dirs ?? []), ...packageDirs] };
 }
 
