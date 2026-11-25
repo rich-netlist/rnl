@@ -127,6 +127,7 @@ The WebAssembly core gives them for a request with `file` or `symbols` set to th
 pub fn outline_cached(entry: &str, files: &dyn Provider, options: &BuildOptions, cache: &mut ReadingCache) -> Result<Outline, String>
 pub fn build_file_cached(entry: &str, file: &str, files: &dyn Provider, options: &BuildOptions, cache: &mut ReadingCache) -> Result<FileResult, String>
 pub fn build_file_drawn_cached(entry: &str, file: &str, files: &dyn Provider, options: &BuildOptions, cache: &mut ReadingCache) -> Result<(FileResult, Drawings), String>
+pub fn file_hints_cached(entry: &str, file: &str, files: &dyn Provider, options: &BuildOptions, cache: &mut ReadingCache) -> Result<FileHints, String>
 ```
 
 A frontend that reads the outline of the document it shows and then its files one by one reads the same host document each time. A `ReadingCache`, which the frontend holds in memory, keeps the host document read last.
@@ -135,10 +136,11 @@ A frontend that reads the outline of the document it shows and then its files on
 - **When it reuses it:** a later call with the same entry, `dialect` and `formats` asks the questions again, in the same order. When every answer is the same, the reading would be the same, so the host document kept is taken. Otherwise the document is read, and kept in place of the old one.
 - **Missing files:** the files the frontend does not have are asked for again, so they are missing as they were.
 - **The objects of the authored records:** a document whose records of the solver use numbers is read twice, once without those records to count the objects of the authored records (5.9). The cache keeps the objects the last reading through it counted, with what they were counted of (`rnl_runtime::AuthoredCounts`). A later reading through it takes them, instead of counting, when it would count them of the same: the same options but `generated` and `problems`, the same records but those of the solver, the same texts but the lines of those records, and the same package files (`rnl_runtime::interpret_taking`). So a file asked for again, with other hints, or after its records of the solver were written again on the same lines, is read once.
+- **The hints after the file:** a file read through the cache without `hints` is read with the problems of its levels, which change nothing else, and the reading is kept, with every question it asked of `files` and its answer. `file_hints_cached` then gives the hints of each level of the file (`FileHints`, by `Level::host`), as `build_file` with `hints` gives them in `Level::hints`, without reading again. It needs the same entry and file, options that read alike, and the same answer to every question. The reading is given up after, so a second call fails with `NOT_KEPT`, and so does a call with no such reading kept: the frontend then asks for the file with `hints`. A file read through the cache with `hints` keeps no reading.
 - **What a call gives:** the same as `outline`, `build_file` or `build_file_drawn`.
 - **Calls without the cache:** they neither take from it nor change it.
-- **Holding and clearing:** it holds one document, and one count of its objects, and `ReadingCache::clear` drops both. Nothing is written anywhere.
-- **Debug builds:** a document taken is read again and checked, and so are the objects taken: they are counted again.
+- **Holding and clearing:** it holds one document, one count of its objects and one reading of a file, and `ReadingCache::clear` drops them. Nothing is written anywhere.
+- **Debug builds:** a document taken is read again and checked, and so are the objects taken: they are counted again. Hints given from a reading kept are checked against the file read again with `hints`.
 
 The WebAssembly core holds one for the requests with `cache` (see [runtime-wasm](../../bindings/runtime-wasm/README.md)).
 

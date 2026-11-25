@@ -1523,6 +1523,18 @@ export type SubcktSymbol = {
 };
 
 /**
+ * The geometry hints of the levels of a file of `entry`, given apart from its [`crate::FileResult`]
+ * ([`crate::file_hints_cached`]): those [`Level::hints`] gives with [`BuildOptions::hints`].
+ */
+export type FileHints = {
+  /**
+   * The hints of each level of the file's Document, by its [`Level::host`]: every level is
+   * there, with an empty list when it has none.
+   */
+  levels: Record<string, Array<LevelHint>>,
+};
+
+/**
  * One thing drawn on a level: a shape or a text, with the object it draws and its place in the
  * drawing order (11.6). A level lists its primitives in drawing order already.
  */
