@@ -226,9 +226,10 @@ const watchRequests = (page) => page.addInitScript(() => {
   const post = Worker.prototype.postMessage;
   Worker.prototype.postMessage = function (message, ...rest) {
     const r = typeof message?.request === 'string' ? JSON.parse(message.request) : null;
-    if (r && (r.outline || typeof r.file === 'string')) {
+    if (r && (r.outline || typeof r.file === 'string' || typeof r.rest_of === 'string')) {
       if (!workers.has(this)) workers.set(this, ++window.coreWorkers);
-      window.coreRequests.push({ worker: workers.get(this), outline: !!r.outline, file: r.file ?? null, entry: r.entry, cache: r.cache === true, forget: r.forget === true });
+      window.coreRequests.push({ worker: workers.get(this), outline: !!r.outline, file: r.file ?? null, restOf: r.rest_of ?? null,
+        hints: r.hints ?? null, spans: r.spans ?? null, texts: r.texts ?? null, entry: r.entry, cache: r.cache === true, forget: r.forget === true });
     }
     return post.call(this, message, ...rest);
   };
@@ -245,7 +246,8 @@ test('the outline and the readings of files go through the reading cache of the 
   await page.locator('#file-input').setInputFiles([{ name: 'top.sp', mimeType: 'text/plain', buffer: Buffer.from(TOP) },
     { name: 'cells.inc', mimeType: 'text/plain', buffer: Buffer.from(CELLS) }, { name: 'leaf.inc', mimeType: 'text/plain', buffer: Buffer.from(LEAF) }]);
   await idle(page);
-  const requests = await page.evaluate(() => window.coreRequests);
+  // (the rest of the file shown is asked for after it: below)
+  const requests = (await page.evaluate(() => window.coreRequests)).filter(r => !r.restOf);
   expect(requests.length).toBeGreaterThanOrEqual(4);
   // each asks for the cache; each Worker's cache is emptied by the first request of another entry than its last, only
   const last = new Map();
@@ -270,5 +272,46 @@ test('what is shown is the same with the reading cache as without it', async ({ 
   expect(await doc(page)).toBe(await doc(without));
   // the page without asked for no cache
   expect((await without.evaluate(() => window.coreRequests)).some(r => r.cache || r.forget)).toBe(false);
-  expect((await page.evaluate(() => window.coreRequests)).every(r => r.cache)).toBe(true);
+  expect((await page.evaluate(() => window.coreRequests)).every(r => r.cache || r.restOf)).toBe(true);
+});
+
+// R2 drawn over R1: the level has geometry hints
+const HINTED = `* hinted
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4") }
+R1 a b 1k
+R2 b 0 1k
+* @RNL { #R1 @PLACE(0, 0); #R2 @PLACE(0, 0) }
+.end
+`;
+
+test('the first answer of the file shown has no texts, spans or geometry hints, which its Worker gives right after, into the Document, the text and the problems list', async ({ page, context }) => {
+  const without = await context.newPage();
+  await without.addInitScript(() => { globalThis.rnlReadingCache = false; });
+  await watchRequests(page);
+  await watchRequests(without);
+  for (const p of [page, without]) await open(p, { top: HINTED });
+  // the reading of the file shown asks for the smaller answer; its Worker is asked for the rest next, before anything else
+  const requests = await page.evaluate(() => window.coreRequests);
+  const read = requests.findLastIndex(r => r.file === 'top.sp');
+  expect(requests[read]).toMatchObject({ hints: false, spans: false, texts: false, cache: true });
+  const next = requests.slice(read + 1).find(r => r.worker === requests[read].worker);
+  expect(next).toMatchObject({ restOf: 'top.sp', entry: requests[read].entry, forget: false });
+  // the page without the reading cache asks for the whole answer, as before
+  const plain = await without.evaluate(() => window.coreRequests);
+  expect(plain.some(r => r.restOf)).toBe(false);
+  expect(plain.filter(r => r.file === 'top.sp').every(r => r.hints === true && r.spans === null && r.texts === null)).toBe(true);
+  // the Document shown is the whole one: its texts, its spans and the hints of its levels
+  const doc = (p) => p.evaluate(() => window.viewer.doc);
+  const shownDoc = await doc(page);
+  expect(shownDoc.levels.flatMap(l => l.hints ?? []).length).toBeGreaterThan(0);
+  expect(shownDoc.spans.length).toBeGreaterThan(0);
+  expect(shownDoc.files.find(f => f.path === 'top.sp').text).toBe(HINTED);
+  expect(shownDoc).toEqual(await doc(without));
+  // the problems list lists the hints of the level shown, and the text has the spans
+  const listed = await page.evaluate(() => window.viewer.doc.levels[window.viewer.level].hints?.length ?? 0);
+  expect(listed).toBeGreaterThan(0);
+  for (const p of [page, without]) await expect(p.locator('#diags > li.diag.geo')).toHaveCount(listed);
+  const objects = (p) => p.locator('#source [data-obj]:not([data-obj=""])').count();
+  expect(await objects(page)).toBeGreaterThan(0);
+  expect(await objects(page)).toBe(await objects(without));
 });

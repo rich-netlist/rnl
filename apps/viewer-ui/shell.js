@@ -15,9 +15,15 @@
  * @property {(paths: string[]) => Promise<Map<string, string | null>>} hashes The hash of the text of each file, as the
  *   core reads it and hashes it (`OutlineFile.text_hash`), null for one that is not there. No core is started.
  * @property {() => Promise<object>} outline The outline of the whole document (`Outline`), which the core makes.
- * @property {(file: string, keep: boolean) => Promise<object>} readFile The reading of `file` alone, in the context of the
- *   entry (`FileResult`); with `keep`, the core keeps the drawings of what it lists with no position, for
- *   `unplacedDrawings` once the page shows it.
+ * @property {(file: string, keep: boolean, later?: boolean) => Promise<object>} readFile The reading of `file` alone, in
+ *   the context of the entry (`FileResult`); with `keep`, the core keeps the drawings of what it lists with no position,
+ *   for `unplacedDrawings` once the page shows it. With `later`, when `restLater`, the answer is without the texts of
+ *   the files (`texts` puts them back), the spans and the geometry hints: `restOf` gives those next.
+ * @property {boolean} [restLater] Whether a reading with `later` leaves the spans and the geometry hints for `restOf`.
+ * @property {(file: string) => Promise<{ spans: object[], hints: { levels: Record<string, object[]> } } | null>} [restOf]
+ *   What the answer of `file` just read with `later` was left without (`FileRest`): its spans, and the geometry hints
+ *   of each level by its `host`; asked for before anything else is read. Null when the core kept no such reading, and
+ *   the file is to be read again with them.
  * @property {(doc: object) => Promise<void>} texts Fill in the texts of the files of a reading that it leaves out.
  * @property {(file: string) => Promise<{ subckts: object[] }>} symbols The symbols the subcircuits of `file` give themselves (`FileSymbols`).
  * @property {(doc: object | null, hit: boolean) => void} finish The reading is done: `doc` the Document it gave (a

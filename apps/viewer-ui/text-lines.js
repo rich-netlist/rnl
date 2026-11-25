@@ -29,7 +29,10 @@ export function lineModel(file, f, allSpans, dialect, plain = false) {
         to: n === l1 ? unit(n, c1) : texts[n - 1].length, first: n === l0 });
     }
   }
-  for (const span of allSpans) if (span.file === f && texts[span.line - 1] !== undefined) add(spans, span.line - 1, span);
+  const addSpans = (list) => {
+    for (const span of list) if (span.file === f && texts[span.line - 1] !== undefined) add(spans, span.line - 1, span);
+  };
+  addSpans(allSpans);
   for (const [l0, c0, l1, c1, overridden] of file.failed) {
     for (let n = l0; n <= l1 && n <= texts.length; n++) {
       add(failed, n - 1, { from: n === l0 ? unit(n, c0 - 1) : leadingCarrier(texts[n - 1]),
@@ -79,6 +82,11 @@ export function lineModel(file, f, allSpans, dialect, plain = false) {
   for (const from of blocks) folds.push([from, texts.length - 1]);
   return {
     texts, columns, longest, folds, semantics, rnl, failed, text: file.text.replace(/\r\n/g, "\n"),
+    /** The spans of the file are `list` now, as the reading gave them after its text (text.js `spansCame`). */
+    setSpans(list) {
+      spans.clear();
+      addSpans(list);
+    },
     render(i) {
       const text = texts[i], { cls } = syntax(i, states[i], stacks.get(i));
       const fail = new Array(text.length).fill("");

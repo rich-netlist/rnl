@@ -11,7 +11,7 @@ import { append, m, setAttr, setText, tr } from "./i18n.js";
 
 import { form, inform, modal } from "./dialog.js";
 import { sourceOpened } from "./pool.js";
-import { readDocument } from "./file-reading.js";
+import { readDocument, restIn, restToCome } from "./file-reading.js";
 import { adoptBuffers, changes, resetBuffers } from "./edits.js";
 import { confirmLeave } from "./editor.js";
 import { shell } from "./shell.js";
@@ -19,7 +19,7 @@ import { bindings, constraintsWanted, current, doc, expanded, selected, selected
 import { clearDrawing, fit, notice, showLevel, view } from "./drawing.js";
 import { renderHierarchy, rootPath } from "./hierarchy.js";
 import { setProblems } from "./panels.js";
-import { renderDiagnostics } from "./problems.js";
+import { problemsToCome, renderDiagnostics } from "./problems.js";
 import { noteShown } from "./file-checks.js";
 import { startLevel, uncalledRoots } from "./roots.js";
 import { clearSelection, select } from "./selection.js";
@@ -27,7 +27,7 @@ import { endPreview, previewOnOpen, previewing, solve } from "./solve.js";
 import { levelNamed, namedPath, restorePath, visitView } from "./subcircuits.js";
 import { showModule } from "./module-view.js";
 import { openOnlyRoot, setOpensOnlyRoot } from "./entry-page.js";
-import { clearSource, fileShown, fileViews, renderFiles, revealDefinition, showFile } from "./text.js";
+import { clearSource, fileShown, fileViews, renderFiles, revealDefinition, showFile, spansCame } from "./text.js";
 import { $ } from "./util.js";
 import { setEnabled } from "./commands.js";
 import { startLoading, nextPaint } from "./loading.js";
@@ -99,6 +99,7 @@ export async function openSource(source, keep, edited, fresh = false, navigation
     // the Library and the manifest bar know the entry; the view of another of its files is no file opened
     await sourceOpened(entrySource(source), d, !keep && !opened.view, !!edited);
     await nextPaint();
+    await restShown(d);
     return true;
   } catch (e) {
     if (operation.signal.aborted) return;
@@ -171,6 +172,7 @@ export async function applyEdits() {
     if (ended) fit();
     await sourceOpened(entrySource(lastSource), d, false, true);
     await nextPaint();
+    await restShown(d);
   } catch (e) {
     if (operation.signal.aborted) return false;
     failed = e instanceof Error ? e.message : String(e);
@@ -338,6 +340,29 @@ function snapshot() {
   };
 }
 
+/** The problems of `d` to list: its diagnostics, and why it failed, when it did. */
+function problemsOf(d) {
+  const diags = d.diagnostics.slice();
+  if (d.failed) diags.unshift({ severity: "error", message: d.failed, file: "", line: 0, col: 0, origin: "" });
+  return diags;
+}
+
+// the Documents shown before their spans and hints came (file-reading.js `restToCome`), whose problems are listed then
+const listedLater = new WeakSet();
+
+/**
+ * The spans and the geometry hints of `d`, a Document read and shown, are in it, when they come after it was shown: the
+ * text pane shows the spans, and the problems list is made, once, with the hints, while `d` is still the one shown.
+ */
+async function restShown(d) {
+  await restIn(d);
+  if (!listedLater.has(d)) return;
+  listedLater.delete(d);
+  if (d !== doc) return;
+  spansCame();
+  renderDiagnostics(problemsOf(d));
+}
+
 function showDocument(before, navigation) {
   setSelected(null);
   setEnabled("descend-new-window", false);
@@ -352,11 +377,13 @@ function showDocument(before, navigation) {
   const again = before ? doc.files.findIndex((f) => f.path === before.file) : -1;
   const file = again >= 0 ? again : read;
   renderFiles(file);
-  const diags = doc.diagnostics.slice();
-  if (doc.failed) diags.unshift({ severity: "error", message: doc.failed, file: "", line: 0, col: 0, origin: "" });
   // the problems of a file read alone are kept, for those of every file (file-checks.js)
   noteShown(doc);
-  renderDiagnostics(diags);
+  // the problems are listed once the hints of the levels are in too (`restShown`)
+  if (restToCome(doc)) {
+    listedLater.add(doc);
+    problemsToCome();
+  } else renderDiagnostics(problemsOf(doc));
   $("search").value = "";
 
   if (before) {

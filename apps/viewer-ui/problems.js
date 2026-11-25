@@ -108,6 +108,7 @@ let given = []; // the problems of the Document shown, as renderDiagnostics was 
 let diagnosticList = []; // those listed: of the file shown, and with All Files those of the other files
 let hints = []; // the geometry hints of the level shown
 let hintsOf = undefined; // the `hints` of the level they are from, to tell whether another level is shown
+let coming = false; // whether the problems of the Document shown are still to come (`problemsToCome`)
 let filter = null; // the severity whose count is on, so that only its rows are listed; null shows all
 let allFiles = false; // whether the problems of the other files of a document read one file at a time are listed
 let others = null; // what file-checks.js gives of those files: { list, checked, total, checking }, or null
@@ -125,11 +126,32 @@ function scoped() {
 /** List the problems of the Document shown, `list`, and colour the numbers of their lines. */
 export function renderDiagnostics(list) {
   ++renderVersion;
+  coming = false;
   given = list;
   diagnosticList = scoped();
   hintsOf = hintsOfLevel();
   hints = hintsOf ?? [];
   refresh();
+}
+
+/**
+ * The problems of the Document shown come with the rest of its reading (open.js `restShown`): the list is emptied, and
+ * made once, when renderDiagnostics gives them.
+ */
+export function problemsToCome() {
+  ++renderVersion;
+  coming = true;
+  given = [];
+  diagnosticList = [];
+  hints = [];
+  hintsOf = undefined;
+  cancelAnimationFrame(frame);
+  frame = 0;
+  more = null;
+  shown = 0;
+  rows = [];
+  ul.replaceChildren();
+  $("counts").replaceChildren();
 }
 
 /** Edit > Check All Files: the problems of every file listed, and the files not read yet read for theirs (file-checks.js). */
@@ -145,7 +167,7 @@ export function checkAll() {
 
 /** The problems of the other files have changed: those of a file read, or Check All Files going on. */
 window.addEventListener("file-checks", () => {
-  if (!doc) return;
+  if (!doc || coming) return;
   ++renderVersion;
   diagnosticList = scoped();
   if (!allFiles) return renderScope();
@@ -158,7 +180,7 @@ window.addEventListener("file-checks", () => {
 
 /** The geometry hints of another level, when one is shown. */
 function levelChanged() {
-  if (hintsOfLevel() === hintsOf) return;
+  if (coming || hintsOfLevel() === hintsOf) return;
   hintsOf = hintsOfLevel();
   hints = hintsOf ?? [];
   refresh();

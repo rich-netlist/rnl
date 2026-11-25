@@ -10,6 +10,12 @@
 // under a key of its own: the same file read with them and without them are two readings. Check All Files, the
 // preloading and the entry page read and look for them as the readings shown are made then, so that all find the same.
 //
+// The first answer of the file to show is the smaller one, where the shell can (`restLater`): without the texts of the
+// files, which the page has (`reader.texts`), the spans and the geometry hints of its levels. The core answers sooner,
+// and the page draws it; the spans and the hints come next, from what the core kept of that reading (`restOf`), into
+// the reading, and the page shows them then (open.js `restIn`). The reading is kept only then, with them, so that what
+// is kept is what a reading with them gives.
+//
 // While the viewer is idle, the files of the subcircuits below the file shown are read too, one at a time, and kept
 // into the room that is free, nothing else going for them (`preloadFile`, preload.js): the same in every shell, the
 // desktop reading the files from disk, the web from where they were opened. The Library and PATH are not read so.
@@ -50,6 +56,9 @@ async function library(entry) {
 // what each Document given was read with: its reader and the outline, for the entry page (fileSummaries)
 const readWith = new WeakMap();
 
+// the Documents given whose spans and hints are still to come, each with what brings them, and whether they came
+const restToComeOf = new WeakMap();
+
 /** The options a reading is kept by: the reader's, and the constraints when the reading has them (a key of its own). */
 const keyOptions = (reader, constraints) => (constraints ? { ...reader.options, constraints: true } : reader.options);
 
@@ -76,13 +85,38 @@ async function outlineOf(reader, lib, fresh) {
 }
 
 /**
+ * Put what `result`, the smaller answer of `file` that `reader` read with `later`, was left without into it, before
+ * anything else has it: the spans and the geometry hints the core kept of that reading (`reader.restOf`), or, when it
+ * kept none, those of a reading of the file again with them. A level with no hints has none, as a reading with them
+ * gives it; spans the answer has already are its own.
+ */
+async function addRest(reader, file, result) {
+  let rest = null;
+  try { rest = await reader.restOf(file); } catch { /* read again */ }
+  if (!rest) {
+    try {
+      const again = await reader.readFile(file, false);
+      rest = { spans: again.spans, hints: { levels: Object.fromEntries(again.levels.map((l) => [l.host, l.hints ?? []])) } };
+    } catch {
+      return;
+    }
+  }
+  if (result.spans.length === 0) for (const span of rest.spans) result.spans.push(span);
+  for (const level of result.levels) {
+    const list = rest.hints.levels[level.host];
+    if (list?.length) level.hints = list;
+  }
+}
+
+/**
  * The reading of `file` of the document `reader` reads, whose outline is `outline`: the one kept, while it holds, or one
  * the core makes, which is kept when nothing was missing and `unkept` does not say otherwise. With `keep`, the core keeps
  * the drawings of what it has with no position, for the Document shown (`shell.unplacedDrawings`). `hit` says which,
  * and `stored` whether a new reading was kept. A reading `preload`ed counts as no hit or miss, and is kept only into
- * the room that is free.
+ * the room that is free. With `later`, where the shell can, the core's answer is the smaller one, and `rest` brings
+ * the spans and the hints into it, after which the reading is kept (`stored` is false).
  */
-async function readOne(reader, outline, file, lib, { fresh = false, keep = false, unkept = false, preload = false, constraints = false } = {}) {
+async function readOne(reader, outline, file, lib, { fresh = false, keep = false, unkept = false, preload = false, constraints = false, later = false } = {}) {
   const shape = rules.outlineShape(outline);
   const hash = reader.core && !unkept ? (await reader.hashes([file])).get(file) : null;
   const key = hash ? await rules.readingKey(reader.core, reader.entry, keyOptions(reader, constraints), file, hash) : null;
@@ -92,14 +126,30 @@ async function readOne(reader, outline, file, lib, { fresh = false, keep = false
     if (found) return { result: preload ? found.result : shown(found.result), hit: true, stored: false };
   }
   const started = performance.now();
-  const result = await reader.readFile(file, keep);
+  const restLater = later && reader.restLater === true;
+  const result = await reader.readFile(file, keep, restLater);
+  // the rest asked for at once, before the core is asked anything else
+  const rest = restLater ? addRest(reader, file, result) : null;
   // kept when the document has every file it asks for, with how long it took to read (the entry page tells it)
-  let stored = false;
-  if (key && result.missing.length === 0) {
+  const keepIt = async () => {
+    if (!key || result.missing.length > 0) return false;
     const value = { result, shape, library: lib.all, took: performance.now() - started };
-    stored = await kept().put(key, value, value, { evict: !preload });
-  }
+    return kept().put(key, value, value, { evict: !preload });
+  };
+  if (rest) return { result: shown(result), hit: false, stored: false, rest: rest.then(keepIt).catch(() => false) };
+  const stored = await keepIt();
   return { result: preload ? result : shown(result), hit: false, stored };
+}
+
+/** Whether the spans and the hints of `doc`, a Document `readDocument` gave, are still to come (`restIn`). */
+export const restToCome = (doc) => !!doc && restToComeOf.get(doc)?.came === false;
+
+/**
+ * The spans and the hints of `doc`, a Document `readDocument` gave, are in it: at once, unless they come after it.
+ * The page waits for this before it is done opening.
+ */
+export async function restIn(doc) {
+  await (doc && restToComeOf.get(doc))?.coming;
 }
 
 /** The file a source shows: its view, or the entry's own file, the outline's first. */
@@ -126,8 +176,14 @@ export async function readDocument(source, edits, progress, signal, options = {}
     // the entry's file draws nothing and its page would only open the one root: the root's file, read in its place
     const root = onlyRoot && !source.view ? onlyRootOf(outline) : null;
     if (root) onlyRoot(root);
-    ({ result: doc, hit } = await readOne(reader, outline, root?.file ?? fileOf(source, outline, reader), lib,
-      { fresh, keep: true, unkept: !!bind, constraints: !!constraints }));
+    let rest;
+    ({ result: doc, hit, rest } = await readOne(reader, outline, root?.file ?? fileOf(source, outline, reader), lib,
+      { fresh, keep: true, unkept: !!bind, constraints: !!constraints, later: true }));
+    if (rest) {
+      const to = { coming: rest, came: false };
+      restToComeOf.set(doc, to);
+      rest.then(() => { to.came = true; });
+    }
     // the loading indicator says so, in every shell
     if (hit) progress?.("cached");
     doc.outline = outline;

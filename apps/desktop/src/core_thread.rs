@@ -164,6 +164,52 @@ mod tests {
     }
 
     #[test]
+    fn the_smaller_answer_kept_and_the_rest_given_after_it_are_the_reading_with_the_hints() {
+        let core = Core::new();
+        // R2 drawn over R1: the level has hints
+        let top = "* top\n\
+            * @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
+            R1 a b 1k\n\
+            R2 b 0 1k\n\
+            * @RNL { #R1 @PLACE(0, 0); #R2 @PLACE(0, 0) }\n\
+            .end\n";
+        let files = move || MemoryProvider::new().with("/top.sp", top);
+        let hints = rnl_view::BuildOptions { hints: true, ..Default::default() };
+        let (later, full) = core
+            .run(move |drawn| {
+                let files = files();
+                // as reading.rs makes them for the page: the smaller answer of the reading kept, then its rest
+                let options = rnl_view::BuildOptions { hints: false, ..hints.clone() };
+                let (mut result, _) =
+                    rnl_view::build_file_drawn_cached("/top.sp", "top.sp", &files, &options, drawn.cache("top"))
+                        .unwrap();
+                assert!(drawn.cache("top").keep_spans(&mut result));
+                rnl_view::leave_out_texts(&mut result);
+                assert!(result.document.spans.is_empty());
+                assert!(result.document.levels.iter().all(|l| l.hints.is_empty()));
+                assert!(result.document.files.iter().filter(|f| !f.path.starts_with('<')).all(|f| f.text.is_empty()));
+                let mut rest =
+                    rnl_view::file_rest_cached("/top.sp", "top.sp", &files, &options, drawn.cache("top")).unwrap();
+                // given once
+                let again = rnl_view::file_rest_cached("/top.sp", "top.sp", &files, &options, drawn.cache("top"));
+                assert_eq!(again.unwrap_err(), rnl_view::NOT_KEPT);
+                // put back as the page puts it back: the spans, the hints, and the texts it has
+                result.document.spans = rest.spans;
+                for level in &mut result.document.levels {
+                    level.hints = rest.hints.levels.remove(&level.host).unwrap();
+                }
+                for f in result.document.files.iter_mut().filter(|f| !f.path.starts_with('<')) {
+                    f.text = rnl_runtime::source::Provider::read(&files, &format!("/{}", f.path)).unwrap();
+                }
+                let (full, _) = rnl_view::build_file_drawn("/top.sp", "top.sp", &files, &hints).unwrap();
+                (serde_json::to_string(&result).unwrap(), serde_json::to_string(&full).unwrap())
+            })
+            .unwrap();
+        assert!(full.contains("\"hints\""), "{full}");
+        assert_eq!(later, full);
+    }
+
+    #[test]
     fn a_job_that_panics_is_an_error_and_the_thread_goes_on() {
         let core = Core::new();
         let e = core.run(|_| -> u8 { panic!("on purpose") }).unwrap_err();

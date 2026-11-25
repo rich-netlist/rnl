@@ -246,6 +246,14 @@ export class LineWindow {
     this.selection?.paint();
   }
 
+  /** Make the rows on screen again, from what the model gives now (text.js `spansCame`). */
+  rerender() {
+    for (const el of this.rendered.values()) el.remove();
+    this.rendered.clear();
+    this.lines = new Array(this.lines.length);
+    this.refresh(true);
+  }
+
   reveal(line, atTop = false) {
     let n = Math.max(0, Math.min(this.model.texts.length - 1, line - 1));
     if (this.filtered) {
