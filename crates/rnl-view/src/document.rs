@@ -554,6 +554,17 @@ pub struct FileHints {
     pub levels: std::collections::BTreeMap<usize, Vec<LevelHint>>,
 }
 
+/// What a file's answer was left without, given after it from the reading kept
+/// ([`crate::file_rest_cached`]): its spans and the hints of its levels.
+#[derive(Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct FileRest {
+    /// The spans of the file's Document, as [`Document::spans`] has them.
+    pub spans: Vec<Span>,
+    /// The hints of its levels, as [`crate::file_hints_cached`] gives them.
+    pub hints: FileHints,
+}
+
 /// The [`FileHints`] of the levels of `r`, a reading of a file of `entry` with its problems, whose
 /// Document numbers its files by `file_index`.
 pub(crate) fn file_hints(entry: &str, r: &Interpretation, file_index: &HashMap<String, usize>) -> FileHints {

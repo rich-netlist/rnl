@@ -146,6 +146,23 @@ pub struct Request {
     /// when the cache keeps no such reading over the same files. The fields that say how to read
     /// the files are those of that request; those that say how to draw are ignored.
     pub hints_of: Option<String>,
+    /// Give the texts of the files in a file request's answer; true when not given. With false,
+    /// each `SourceFile.text` is empty but those of the bundled packages
+    /// ([`rnl_view::leave_out_texts`]): the frontend puts back those of the files it gave.
+    #[serde(default = "yes")]
+    pub texts: bool,
+    /// Give the spans in a file request's answer; true when not given. With false and `cache`,
+    /// when the request keeps its reading (without `hints`), `Document.spans` is empty and the
+    /// spans are kept with the reading, for `rest_of` ([`rnl_view::ReadingCache::keep_spans`]);
+    /// otherwise the answer has them.
+    #[serde(default = "yes")]
+    pub spans: bool,
+    /// Give what the answer of this file of the document, as the document names it, was left
+    /// without, from the reading the last file request about it with `cache` and `"spans": false`
+    /// kept ([`rnl_view::file_rest_cached`]): `{"rest": {"spans": ..., "hints": ...}}`, or
+    /// `{"error": "not kept"}` when the cache keeps no such reading over the same files. The fields
+    /// that say how to read the files are those of that request.
+    pub rest_of: Option<String>,
     /// Give the symbols the subcircuits of this file give themselves, as the document names it,
     /// instead of a Document ([`rnl_view::symbols`]). The fields that say how to draw are ignored.
     pub symbols: Option<String>,
@@ -354,7 +371,7 @@ pub struct FolderPaths {
 }
 
 /// The answer to a request: `{"document": ...}`, `{"outline": ...}`, `{"file": ...}`, `{"hints": ...}`,
-/// `{"symbols": ...}`, `{"snapshot": ...}`, `{"written": ...}`,
+/// `{"rest": ...}`, `{"symbols": ...}`, `{"snapshot": ...}`, `{"written": ...}`,
 /// `{"replaced": ...}`, `{"catalog": ...}`, `{"drawings": ...}`, `{"formats": ...}`, `{"bundled": ...}`,
 /// `{"folders": ...}` or `{"error": "..."}`.
 #[derive(Serialize, Debug)]
@@ -369,6 +386,8 @@ pub enum Response {
     File(Box<FileResult>),
     /// The geometry hints of one file of the entry, when the request names a file for `hints_of`.
     Hints(Box<rnl_view::FileHints>),
+    /// What a file's answer was left without, when the request names a file for `rest_of`.
+    Rest(Box<rnl_view::FileRest>),
     /// The symbols of the subcircuits of a file, when the request names a file for `symbols`.
     Symbols(Box<FileSymbols>),
     /// The snapshot of the entry, when the request asks for `parts`.
@@ -575,6 +594,14 @@ pub fn respond(request: &[u8]) -> Response {
             Err(e) => Response::Error(e),
         };
     }
+    if let Some(file) = &request.rest_of {
+        let rest = CACHE
+            .with(|cache| rnl_view::file_rest_cached(&request.entry, file, &files, &options, &mut cache.borrow_mut()));
+        return match rest {
+            Ok(r) => Response::Rest(Box::new(r)),
+            Err(e) => Response::Error(e),
+        };
+    }
     if request.outline {
         let outline = if request.cache {
             CACHE.with(|cache| rnl_view::outline_cached(&request.entry, &files, &options, &mut cache.borrow_mut()))
@@ -616,6 +643,13 @@ pub fn respond(request: &[u8]) -> Response {
                 }
                 if let Some(drawn) = drawn {
                     DRAWN.with(|slot| *slot.borrow_mut() = Some(drawn));
+                }
+                // a smaller answer, when asked for: the spans kept for rest_of, the texts left to the frontend
+                if !request.spans && request.cache {
+                    CACHE.with(|cache| cache.borrow_mut().keep_spans(&mut f));
+                }
+                if !request.texts {
+                    rnl_view::leave_out_texts(&mut f);
                 }
                 Response::File(Box::new(f))
             }
@@ -1160,6 +1194,35 @@ R1 a 0 1k
         assert_eq!(ask(json!({ "hints_of": "top.sp" })), json!({ "error": "not kept" }));
         ask(json!({ "file": "top.sp", "cache": true }));
         assert_eq!(ask(json!({ "hints_of": "top.sp", "forget": true })), json!({ "error": "not kept" }));
+        // a smaller first answer, and the rest after it
+        let mut full = ask(json!({ "file": "top.sp" }));
+        let small = ask(json!({ "file": "top.sp", "cache": true, "texts": false, "spans": false }));
+        let spans = full["file"]["spans"].take();
+        assert!(!spans.as_array().unwrap().is_empty(), "{full}");
+        full["file"]["spans"] = json!([]);
+        let mut put_back = small.clone();
+        for f in put_back["file"]["files"].as_array_mut().unwrap() {
+            if f["path"].as_str().unwrap().starts_with("<bundled>") {
+                continue;
+            }
+            assert_eq!(f["text"], "", "{small}");
+            if f["path"] == "top.sp" {
+                f["text"] = json!(top);
+            }
+        }
+        assert_eq!(put_back, full);
+        assert_eq!(
+            ask(json!({ "rest_of": "top.sp" })),
+            json!({ "rest": { "spans": spans, "hints": { "levels": want } } })
+        );
+        assert_eq!(ask(json!({ "rest_of": "top.sp" })), json!({ "error": "not kept" }));
+        // without the cache, or with the hints, the spans stay in the answer
+        assert_eq!(ask(json!({ "file": "top.sp", "spans": false }))["file"]["spans"], spans);
+        assert_eq!(
+            ask(json!({ "file": "top.sp", "cache": true, "hints": true, "spans": false }))["file"]["spans"],
+            spans
+        );
+        assert_eq!(ask(json!({ "rest_of": "top.sp" })), json!({ "error": "not kept" }));
     }
 
     #[test]

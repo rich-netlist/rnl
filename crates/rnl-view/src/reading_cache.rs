@@ -15,7 +15,9 @@
 //!
 //! It keeps the reading of the last file asked for without its hints too, with every question
 //! that reading asked of the files and its answer, so that the hints are given after the file
-//! ([`crate::file_hints_cached`]) when every answer is the same, without reading again.
+//! ([`crate::file_hints_cached`]) when every answer is the same, without reading again. The spans
+//! of that file's answer can be kept with it, and given after with the hints
+//! ([`ReadingCache::keep_spans`], [`crate::file_rest_cached`]).
 //!
 //! Nothing is written anywhere: the cache lives as long as the frontend holds it.
 
@@ -61,7 +63,23 @@ impl ReadingCache {
         reading: Box<rnl_runtime::Interpretation>,
         files: HashMap<String, usize>,
     ) {
-        self.reading = Some(KeptReading { key, asked: distinct(asked), reading, files });
+        self.reading = Some(KeptReading { key, asked: distinct(asked), reading, files, spans: None });
+    }
+
+    /// Keep the spans of `result` with the reading of its file that the cache keeps, and leave
+    /// `result` without them ([`crate::Document::spans`]), for [`crate::file_rest_cached`] to give:
+    /// `result` must be the answer of the file reading through the cache that kept it, the last
+    /// one ([`crate::build_file_cached`] without [`crate::BuildOptions::hints`]). False, and
+    /// `result` left as it is, when the cache keeps no reading of `result`'s file, or keeps its
+    /// spans already.
+    pub fn keep_spans(&mut self, result: &mut crate::FileResult) -> bool {
+        match &mut self.reading {
+            Some(kept) if kept.key.file == result.file && kept.spans.is_none() => {
+                kept.spans = Some(std::mem::take(&mut result.document.spans));
+                true
+            }
+            _ => false,
+        }
     }
 
     /// Drop the reading held.
@@ -97,6 +115,8 @@ pub(crate) struct KeptReading {
     pub reading: Box<rnl_runtime::Interpretation>,
     /// The files of its Document, by path, numbered as the Document numbers them.
     pub files: HashMap<String, usize>,
+    /// The spans its answer was left without ([`ReadingCache::keep_spans`]).
+    pub spans: Option<Vec<crate::Span>>,
 }
 
 /// `asked` with each question asked again with the same answer left out.
@@ -318,7 +338,8 @@ mod tests {
 
     use crate::tests::{corpus, Disk};
     use crate::{build_file, build_file_cached, outline, outline_cached, BuildOptions, MemoryProvider, ReadingCache};
-    use crate::{build_file_drawn, build_file_drawn_cached, file_hints_cached, FileResult, NOT_KEPT};
+    use crate::{build_file_drawn, build_file_drawn_cached, file_hints_cached, file_rest_cached, leave_out_texts};
+    use crate::{FileResult, NOT_KEPT};
     use rnl_runtime::source::Provider;
 
     thread_local! {
@@ -567,6 +588,41 @@ mod tests {
         assert!(not_kept(file_hints_cached("/w/top.sp", "top.sp", &files, &plain, &mut cache)));
     }
 
+    /// A file's answer is left without its spans, kept with the reading, and without the texts of
+    /// the files given; the spans are given after with the hints, once.
+    #[test]
+    fn the_spans_of_a_file_are_kept_and_given_after_with_its_hints() {
+        let plain = BuildOptions { svg: false, ..BuildOptions::default() };
+        let hints = BuildOptions { hints: true, ..plain.clone() };
+        let over = SOLVED.replace("#R3 @PLACE(5, -6)", "#R3 @PLACE(0, -6)");
+        let files = MemoryProvider::new().with("/w/t.sp", &over);
+        let mut cache = ReadingCache::new();
+        let full = build_file("/w/t.sp", "t.sp", &files, &hints).unwrap();
+        assert!(!full.document.spans.is_empty());
+        let mut r = build_file_cached("/w/t.sp", "t.sp", &files, &plain, &mut cache).unwrap();
+        assert!(cache.keep_spans(&mut r));
+        assert!(r.document.spans.is_empty());
+        assert!(!cache.keep_spans(&mut r), "kept once");
+        leave_out_texts(&mut r);
+        // the texts of the bundled packages stay, those given are left out
+        assert!(r.document.files.iter().all(|f| f.text.is_empty() != f.path.starts_with(crate::BUNDLED_DIR)));
+        let rest = file_rest_cached("/w/t.sp", "t.sp", &files, &plain, &mut cache).unwrap();
+        assert_eq!(json(&rest.spans), json(&full.document.spans));
+        assert_eq!(hints_given(&rest.hints), hints_of(&full));
+        assert!(file_rest_cached("/w/t.sp", "t.sp", &files, &plain, &mut cache).is_err());
+        // without the spans kept, or once the hints were given, there is no rest
+        build_file_cached("/w/t.sp", "t.sp", &files, &plain, &mut cache).unwrap();
+        assert_eq!(file_rest_cached("/w/t.sp", "t.sp", &files, &plain, &mut cache).err().as_deref(), Some(NOT_KEPT));
+        let mut r = build_file_cached("/w/t.sp", "t.sp", &files, &plain, &mut cache).unwrap();
+        assert!(cache.keep_spans(&mut r));
+        file_hints_cached("/w/t.sp", "t.sp", &files, &plain, &mut cache).unwrap();
+        assert_eq!(file_rest_cached("/w/t.sp", "t.sp", &files, &plain, &mut cache).err().as_deref(), Some(NOT_KEPT));
+        // a reading with the hints keeps none
+        let mut r = build_file_cached("/w/t.sp", "t.sp", &files, &hints, &mut cache).unwrap();
+        assert!(!cache.keep_spans(&mut r));
+        assert_eq!(json(&r.document.spans), json(&full.document.spans));
+    }
+
     #[test]
     fn each_file_of_the_corpus_reads_with_the_cache_as_without() {
         let options = BuildOptions { svg: false, ..BuildOptions::default() };
@@ -591,13 +647,21 @@ mod tests {
                     assert_eq!(cached, read, "{entry} {file}");
                     // the hints from the reading kept, as the file with them gives them
                     let given = file_hints_cached(&entry, &file, &Disk, &options, &mut cache).map(|h| hints_given(&h));
-                    let want = build_file(&entry, &file, &Disk, &hints).map(|r| hints_of(&r));
-                    match (&cached, want) {
+                    let want = build_file(&entry, &file, &Disk, &hints);
+                    match (&cached, &want) {
                         (Ok(_), Ok(want)) => {
-                            with_hints += usize::from(want.contains("RNL"));
-                            assert_eq!(given, Ok(want), "{entry} {file}");
+                            with_hints += usize::from(hints_of(want).contains("RNL"));
+                            assert_eq!(given, Ok(hints_of(want)), "{entry} {file}");
                         }
                         _ => assert_eq!(given, Err(NOT_KEPT.to_string()), "{entry} {file}"),
+                    }
+                    // the spans kept, and given after with the hints
+                    if let Ok(want) = &want {
+                        let mut r = build_file_cached(&entry, &file, &Disk, &options, &mut cache).unwrap();
+                        assert!(cache.keep_spans(&mut r), "{entry} {file}");
+                        let rest = file_rest_cached(&entry, &file, &Disk, &options, &mut cache).unwrap();
+                        assert_eq!(json(&rest.spans), json(&want.document.spans), "{entry} {file}");
+                        assert_eq!(hints_given(&rest.hints), hints_of(want), "{entry} {file}");
                     }
                 }
                 assert!(Disk.read(&entry).is_some());
