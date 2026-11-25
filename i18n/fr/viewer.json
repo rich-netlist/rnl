@@ -272,6 +272,7 @@
   "This package is published. ": "Ce paquet est publié. ",
   "Include": "Inclure",
   "No errors, warnings or hints.": "Aucune erreur, aucun avertissement ni aucune indication.",
+  "The geometry checks of this file could not be made. Open it again to check it.": "Les vérifications géométriques de ce fichier n’ont pas pu être faites. Rouvrez-le pour le vérifier.",
   "Show only these; click again for all": "Afficher seulement ceux-ci ; cliquer à nouveau pour tout afficher",
   "The kind of problem: its number and its short name": "Le type de problème : son numéro et son nom court",
   "Show or hide the explanation": "Afficher ou masquer l’explication",
