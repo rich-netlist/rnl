@@ -8,6 +8,11 @@
 //! answer is the same, the reading would be the same, and the host document kept is taken. The
 //! files the frontend does not have are asked for again too, so they are missing as they were.
 //!
+//! It keeps the objects of the authored records that the last reading of a document with records
+//! of the solver counted too ([`rnl_runtime::AuthoredCounts`]), with what they were counted of: a
+//! later reading takes them instead of counting again when it would count them of the same, as
+//! [`rnl_runtime::interpret_taking`] decides.
+//!
 //! Nothing is written anywhere: the cache lives as long as the frontend holds it.
 
 use std::cell::RefCell;
@@ -23,6 +28,9 @@ use rnl_runtime::source::{LibraryDefinition, LibraryLookup, Provider};
 #[derive(Default)]
 pub struct ReadingCache {
     host: Option<KeptHost>,
+    /// The objects of the authored records the last reading through the cache gave, with what
+    /// they were counted of.
+    counts: rnl_runtime::AuthoredCounts,
 }
 
 impl ReadingCache {
@@ -33,7 +41,21 @@ impl ReadingCache {
     /// Drop all it holds.
     pub fn clear(&mut self) {
         self.host = None;
+        self.counts = rnl_runtime::AuthoredCounts::default();
     }
+}
+
+/// `read` with the objects of the authored records `cache` keeps, which it takes when they were
+/// counted of what it would count of ([`rnl_runtime::interpret_taking`]); `cache` then keeps those
+/// it gives in their place.
+pub(crate) fn with_counts<T>(
+    cache: &RefCell<ReadingCache>,
+    read: impl FnOnce(&mut rnl_runtime::AuthoredCounts) -> T,
+) -> T {
+    let mut counts = std::mem::take(&mut cache.borrow_mut().counts);
+    let out = read(&mut counts);
+    cache.borrow_mut().counts = counts;
+    out
 }
 
 /// The settings a host document is read with besides its files: the entry, the dialect asked for
@@ -291,6 +313,95 @@ mod tests {
         cache.clear();
         check(&other, &mut cache);
         assert_eq!(fresh() - before, 6);
+    }
+
+    /// A document whose record of the solver uses a number (5.9): reading it with its records of
+    /// the solver counts the objects of the authored records, by reading it without them first.
+    const SOLVED: &str = "* counted\n\
+        * @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
+        R1 a b 1k\n\
+        R2 b 0 1k\n\
+        R3 b 0 1k\n\
+        C1 a 0 1p\n\
+        R4 a 0 1k\n\
+        C2 a 0 1p\n\
+        * @RNL { #R1 @PLACE(0, 0); {#R4 #C2} @AS $PARALLEL_HORIZONTAL; {#R1:2 #R2:1 #R3:1} @ROUTE-OBJECT }\n\
+        * @RNL(type=\"generated\", priority=\"high\", author=\"rnl-solver 0.1\", hash=\"sig2:56b05b841fd87eed.93f2018247edcd14\", numbering=\"b42673d973bb674b\") {\n\
+        *   %ground_stub_R2_n = $GROUND_STUB @ATTACH(gap=3) #R2::n;\n\
+        *   %ground_stub_R3_n = $GROUND_STUB @ATTACH(gap=3) #R3::n;\n\
+        *   %ground_stub_C1_n = $GROUND_STUB @ATTACH(gap=3) #C1::n;\n\
+        *   %ground_stub_R4_n = $GROUND_STUB @ATTACH(gap=3) #R4::n;\n\
+        *   %ground_stub_C2_n = $GROUND_STUB @ATTACH(gap=3) #C2::n;\n\
+        *   %net_label_stub_R1_p = $NET_LABEL_STUB @ATTACH #R1::p;\n\
+        *   %net_label_stub_C1_p = $NET_LABEL_STUB @ATTACH #C1::p;\n\
+        *   %rt1 = (0, -3);\n\
+        *   #R1 @PLACE(0, 0) => @ORIENT(\"R0\");\n\
+        *   #R2 @PLACE(0, -6) => @ORIENT(\"R0\");\n\
+        *   #R3 @PLACE(5, -6) => @ORIENT(\"R0\");\n\
+        *   #C1 @PLACE(-5, -6) => @ORIENT(\"R0\");\n\
+        *   #R4 @PLACE(10, -6) => @ORIENT(\"R0\");\n\
+        *   #C2 @PLACE(15, -6) => @ORIENT(\"R0\");\n\
+        *   %#1 @PLACE(12.5, -6);\n\
+        *   %#2 @PLACE(0, 0);\n\
+        *   %ground_stub_R2_n @PLACE(0, 0);\n\
+        *   %ground_stub_R2_n::g @PLACE(0, -10) => @ORIENT(\"R0\");\n\
+        *   %ground_stub_R3_n @PLACE(0, 0);\n\
+        *   %ground_stub_R3_n::g @PLACE(5, -10) => @ORIENT(\"R0\");\n\
+        *   %ground_stub_C1_n @PLACE(0, 0);\n\
+        *   %ground_stub_C1_n::g @PLACE(-5, -10) => @ORIENT(\"R0\");\n\
+        *   %ground_stub_R4_n @PLACE(0, 0);\n\
+        *   %ground_stub_R4_n::g @PLACE(10, -10) => @ORIENT(\"R0\");\n\
+        *   %ground_stub_C2_n @PLACE(0, 0);\n\
+        *   %ground_stub_C2_n::g @PLACE(15, -10) => @ORIENT(\"R0\");\n\
+        *   %net_label_stub_R1_p @PLACE(0, 0);\n\
+        *   %net_label_stub_R1_p::l @PLACE(0, 2) => @ORIENT(\"R270\");\n\
+        *   %net_label_stub_C1_p @PLACE(0, 0);\n\
+        *   %net_label_stub_C1_p::l @PLACE(-5, -4) => @ORIENT(\"R270\");\n\
+        *   &a @WIRE(mode=\"straight\") {#R4::p (10, -3) (15, -3) #C2::p};\n\
+        *   &b @WIRE(mode=\"straight\") {#R2::p %rt1};\n\
+        *   &b @WIRE(mode=\"straight\") {%rt1 #R1::n};\n\
+        *   &b @WIRE(mode=\"straight\") {%rt1 (5, -3) #R3::p};\n\
+        *   $JUNCTION @ATTACH %rt1 => @PLACE(0, -3)\n\
+        * }\n\
+        .end\n";
+
+    /// The objects of the authored records that a reading through the cache counted are taken by
+    /// the next reading through it that would count them of the same, though its host document was
+    /// read again; a reading that would count others counts, and so does a reading without the
+    /// cache, or with one cleared. Each answer is the one without the cache.
+    #[test]
+    fn a_reading_through_the_cache_takes_the_objects_the_one_before_counted() {
+        let plain = BuildOptions { svg: false, ..BuildOptions::default() };
+        let hints = BuildOptions { hints: true, ..plain.clone() };
+        let files = MemoryProvider::new().with("/w/t.sp", SOLVED);
+        let mut cache = ReadingCache::new();
+        let counts = |files: &MemoryProvider, options: &BuildOptions, cache: &mut ReadingCache| {
+            let before = rnl_runtime::countings();
+            let r = build_file_cached("/w/t.sp", "t.sp", files, options, cache).unwrap();
+            let counted = rnl_runtime::countings() - before;
+            assert_eq!(json(&r), json(&build_file("/w/t.sp", "t.sp", files, options).unwrap()));
+            counted
+        };
+        let before = rnl_runtime::countings();
+        build_file("/w/t.sp", "t.sp", &files, &plain).unwrap();
+        assert_eq!(rnl_runtime::countings() - before, 1, "a reading without the cache counts");
+        assert_eq!(counts(&files, &plain, &mut cache), 1);
+        assert_eq!(counts(&files, &plain, &mut cache), 0);
+        // the problems built too: counted of the same
+        assert_eq!(counts(&files, &hints, &mut cache), 0);
+        // the record of the solver changed on its own lines: the host document is read again, and
+        // the objects are taken
+        let fresh_before = fresh();
+        let moved = files.clone().with("/w/t.sp", &SOLVED.replace("#R3 @PLACE(5, -6)", "#R3 @PLACE(6, -6)"));
+        assert_eq!(counts(&moved, &plain, &mut cache), 0);
+        assert_eq!(fresh() - fresh_before, 1);
+        // an authored record changed: counted again, then taken
+        let authored = moved.clone().with("/w/t.sp", &SOLVED.replace("#R1 @PLACE(0, 0); {", "#R1 @PLACE(0, 1); {"));
+        assert_eq!(counts(&authored, &plain, &mut cache), 1);
+        assert_eq!(counts(&authored, &plain, &mut cache), 0);
+        // a cache cleared holds none
+        cache.clear();
+        assert_eq!(counts(&authored, &plain, &mut cache), 1);
     }
 
     #[test]

@@ -493,10 +493,15 @@ fn read_both(
     if !doc.levels.iter().any(|l| l.records.iter().any(|rec| record_type(rec) == "generated")) {
         return Ok((rnl_runtime::interpret(doc, ws, with, sink), None));
     }
-    let mut counts = rnl_runtime::AuthoredCounts::default();
-    let other = rnl_runtime::interpret_taking(doc.clone(), ws, without, sink.clone(), &mut counts);
-    let r = rnl_runtime::interpret_taking(doc, ws, with, sink, &mut counts);
-    Ok((r, Some(other)))
+    let both = move |counts: &mut rnl_runtime::AuthoredCounts| {
+        let other = rnl_runtime::interpret_taking(doc.clone(), ws, without, sink.clone(), counts);
+        let r = rnl_runtime::interpret_taking(doc, ws, with, sink, counts);
+        (r, Some(other))
+    };
+    Ok(match ws.cache {
+        Some(cache) => reading_cache::with_counts(cache, both),
+        None => both(&mut rnl_runtime::AuthoredCounts::default()),
+    })
 }
 
 /// A reading [`build_in`] made, or one it took.
@@ -795,7 +800,14 @@ fn interpret_in(entry: &str, reading: Formats, ws: &Workspace, options: &Options
     }
     let mut sink = Sink::new();
     let doc = read_host_in(entry, reading, ws, &mut sink)?;
-    Ok(rnl_runtime::interpret(doc, ws, options, sink))
+    // through the reading cache, the objects of the authored records taken from the reading of the
+    // document it kept, when they were counted of the same
+    Ok(match ws.cache {
+        Some(cache) => {
+            reading_cache::with_counts(cache, |counts| rnl_runtime::interpret_taking(doc, ws, options, sink, counts))
+        }
+        None => rnl_runtime::interpret(doc, ws, options, sink),
+    })
 }
 
 /// The record of the solver of a level, finished, with the bundled packages under `files` as
