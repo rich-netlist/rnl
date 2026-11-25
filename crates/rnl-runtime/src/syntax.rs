@@ -551,19 +551,9 @@ impl Parser {
 
     fn record(&mut self) -> RecordAst {
         debug_assert!(self.starts_with("@RNL"));
-        self.i = 4;
         let mut header = None;
         let r = (|| -> PResult<Rc<SetExpr>> {
-            self.skip_ws()?;
-            if self.peek() == Some('(') {
-                if self.i != 4 {
-                    return self.err(
-                        codes::SYNTAX_HEAD_NOT_TOUCHING,
-                        "the record head must touch @RNL; remove the white space or comment (2.4)",
-                    );
-                }
-                header = Some(self.params(true, "RNL")?);
-            }
+            header = self.record_head()?;
             self.skip_ws()?;
             if self.peek() != Some('{') {
                 return self.err(codes::SYNTAX_NO_BRACES, "the record has no braces: write @RNL {…} (2.4)");
@@ -580,6 +570,23 @@ impl Parser {
                 notes,
             },
         }
+    }
+
+    /// The head of the record, `@RNL(…)`, read from after `@RNL`: None when it has none. The body
+    /// is read after it ([`Parser::record`]), and nothing in the body changes it.
+    fn record_head(&mut self) -> PResult<Option<Params>> {
+        self.i = 4;
+        self.skip_ws()?;
+        if self.peek() == Some('(') {
+            if self.i != 4 {
+                return self.err(
+                    codes::SYNTAX_HEAD_NOT_TOUCHING,
+                    "the record head must touch @RNL; remove the white space or comment (2.4)",
+                );
+            }
+            return Ok(Some(self.params(true, "RNL")?));
+        }
+        Ok(None)
     }
 
     // ---------------- sets and members
@@ -1693,6 +1700,13 @@ pub fn parse_record(text: &str) -> RecordAst {
     parse_record_with(text, false)
 }
 
+/// The head of one record, `@RNL(…)`, as [`parse_record`] gives it ([`RecordAst::header`]),
+/// without reading the body: None when the record has none, or when it does not read up to the end
+/// of the head. `text` starts with `@RNL`.
+pub fn parse_record_head(text: &str) -> Option<Params> {
+    Parser::new(text, false).record_head().ok().flatten()
+}
+
 /// Parse one record, with `numbers` reading `%#` and a number as a reference, as a file of the
 /// draft 0.3 does (5.9); without, `%#` is a lexical error, as in 0.2.
 pub fn parse_record_with(text: &str, numbers: bool) -> RecordAst {
@@ -2006,6 +2020,52 @@ pub enum RefOrHole<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The head of a record read alone is the head the whole record gives, whatever is wrong with
+    /// the record: its body, its head, or both.
+    #[test]
+    fn the_head_of_a_record_read_alone_is_the_head_of_the_whole_record() {
+        let records = [
+            "@RNL",
+            "@RNL {}",
+            "@RNL { #R1 @PLACE(0, 0) }",
+            // the body broken, the head fine
+            "@RNL(type=\"generated\") { #R1 @PLACE(0, ; }",
+            "@RNL(type=\"generated\") { #R1 @PLACE(0, 0)",
+            "@RNL(type=\"generated\") { \"an unclosed string }",
+            "@RNL(type=\"generated\") { %#1 @PLACE(0, 0) }",
+            "@RNL(type=\"generated\") { <0, 0> }",
+            "@RNL(type=\"header\") { @VERSION(\"0.4\") } trailing",
+            "@RNL(type=\"generated\")",
+            "@RNL(type=\"generated\") /* unclosed",
+            // the head broken
+            "@RNL(type=\"generated\" { }",
+            "@RNL(type=\"generated\", { }",
+            "@RNL(type=) { }",
+            "@RNL(type=\"generated) { }",
+            "@RNL (type=\"header\") { }",
+            "@RNL/* c */(type=\"header\") { }",
+            "@RNL /* unclosed",
+            // no type, or not a string
+            "@RNL() { }",
+            "@RNL(priority=\"high\", author=\"x\") { }",
+            "@RNL(type=1) { }",
+            "@RNL(type=header) { }",
+            "@RNL(type=[\"generated\"]) { }",
+            "@RNL(type=\"header\", type=\"generated\") { }",
+            "@RNL(type=\"a\\\"b\") { }",
+            "@RNL(TYPE=\"generated\") { }",
+            "@RNL(\n  type = \"generated\" ,\n  hash=\"x\"\n) {\n #R1 @PLACE(0, 0)\n}",
+        ];
+        for text in records {
+            assert_eq!(parse_record_head(text), parse_record(text).header, "{text:?}");
+        }
+        assert_eq!(
+            parse_record_head("@RNL(type=\"generated\") { #R1 @PLACE(0, ; }").and_then(|h| h.get("type").cloned()),
+            Some(Value::Str("generated".into()))
+        );
+        assert_eq!(parse_record_head("@RNL(type=\"generated\" { }"), None);
+    }
 
     #[test]
     fn a_subscript_range_counts_on_the_whole_range_of_its_numbers() {
