@@ -2225,8 +2225,9 @@ impl Interp<'_> {
                 header.clone()
             } else {
                 let text = self.provider.read(&f).unwrap_or_default();
-                let header = scan_package_decl(&text);
-                let language = scan_language_decl(&text).unwrap_or_else(|| DEFAULT_VERSION.to_string());
+                // the PACKAGE and the VERSION of its header, read once for both
+                let (header, language) = header_decls(&text);
+                let language = language.unwrap_or_else(|| DEFAULT_VERSION.to_string());
                 self.pkg_languages.insert(f.clone(), language);
                 self.pkg_headers.insert(f.clone(), header.clone());
                 header
@@ -2277,8 +2278,8 @@ impl Interp<'_> {
         if let Some(path) = &decl.path {
             let target = join(&base.unwrap_or_else(|| self.file_dir(decl.unit)), path);
             let mut reason = format!("path={path:?} for {kind} {} cannot be read", decl.name);
-            if let Some(text) = self.provider.read(&target) {
-                if let Some((n, v)) = scan_package_decl(&text) {
+            if let Some(header) = self.path_header(&target) {
+                if let Some((n, v)) = header {
                     let requested = decl.version.as_ref().map(|v| format!(" {v}")).unwrap_or_default();
                     reason = format!(
                         "path={path:?} declares {kind} {n} {v}, but this reference requests {}{requested}",
@@ -2380,6 +2381,19 @@ impl Interp<'_> {
             return Some(u);
         }
         Some(self.load_package_file(&path, Some((n, v))))
+    }
+
+    /// What reading the package file at `target`, named by path=, gives ([`Interp::path_headers`]):
+    /// None when it cannot be read, else the PACKAGE its header declares, if any. Read once per
+    /// reading; in debug builds, read again on each later call and checked.
+    fn path_header(&mut self, target: &str) -> Option<Option<(String, String)>> {
+        if let Some(header) = self.path_headers.get(target) {
+            debug_assert_eq!(*header, self.provider.read(target).map(|text| scan_package_decl(&text)), "{target}");
+            return header.clone();
+        }
+        let header = self.provider.read(target).map(|text| scan_package_decl(&text));
+        self.path_headers.insert(target.to_string(), header.clone());
+        header
     }
 
     pub(super) fn use_writer(&self, decl: &UseDecl) -> UnitId {
