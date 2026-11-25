@@ -516,6 +516,11 @@ test("the Worker writes, and gives every request the packages its build brings",
     const worker = startCore({ worker: pathToFileURL(join(to, "worker.js")) });
     try {
       assert.deepEqual(errors(await worker.build(request)), []);
+      // a package file of the build named by path: the outline does not miss it, as the build does not
+      const named = header.replace('version="1.0")', 'version="1.0", path="/rnl-bundled/packages/acme.rnl")');
+      const byPath = { entry: "/w/t.sp", files: { "/w/t.sp": named } };
+      assert.deepEqual((await worker.outline(byPath)).missing, []);
+      assert.deepEqual((await worker.buildFile({ ...byPath, file: "t.sp" })).missing, []);
       const use = { level: "subckt:rc", op: "use-package", name: "acme", version: "1.0" };
       assert.deepEqual(errors((await worker.write(rcWrite([use, placeR1]))).document), []);
     } finally {
