@@ -272,6 +272,7 @@
   "This package is published. ": "此包已公开发布。",
   "Include": "引入",
   "No errors, warnings or hints.": "没有任何错误、警告或提示。",
+  "The geometry checks of this file could not be made. Open it again to check it.": "未能对此文件进行几何检查。请重新打开它以进行检查。",
   "Show only these; click again for all": "仅显示这些；再次点击显示全部",
   "The kind of problem: its number and its short name": "问题的类别：编号和简称",
   "Show or hide the explanation": "显示或隐藏说明",
