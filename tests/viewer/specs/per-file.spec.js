@@ -276,6 +276,9 @@ test('what is shown is the same with the reading cache as without it', async ({ 
 });
 
 // R2 drawn over R1: the level has geometry hints
+/** What the problems list says of a file shown whose geometry checks could not be made. */
+const UNCHECKED = 'The geometry checks of this file could not be made. Open it again to check it.';
+
 const HINTED = `* hinted
 * @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4") }
 R1 a b 1k
@@ -332,11 +335,13 @@ test('a reading whose spans and hints could not be had is shown without them, an
     };
   });
   await open(page, { top: HINTED });
-  // shown without them, with the problems listed all the same
+  // shown without them, with the problems listed all the same, and the list says the checks were not made
   let d = await page.evaluate(() => window.viewer.doc);
   expect(d.spans).toEqual([]);
   expect(d.levels.flatMap(l => l.hints ?? [])).toEqual([]);
   await expect(page.locator('#counts')).not.toBeEmpty();
+  await expect(page.locator('#diags > li.unchecked')).toHaveText(UNCHECKED);
+  await expect(page.locator('#diags > li.nothing')).toHaveCount(0);
   // not kept: opened again, the file is read again, whole
   await page.locator('#file-input').setInputFiles([{ name: 'top.sp', mimeType: 'text/plain', buffer: Buffer.from(HINTED) },
     { name: 'cells.inc', mimeType: 'text/plain', buffer: Buffer.from(CELLS) }, { name: 'leaf.inc', mimeType: 'text/plain', buffer: Buffer.from(LEAF) }]);
@@ -346,6 +351,7 @@ test('a reading whose spans and hints could not be had is shown without them, an
   expect(d.spans.length).toBeGreaterThan(0);
   expect(d.levels.flatMap(l => l.hints ?? []).length).toBeGreaterThan(0);
   await expect(page.locator('#diags > li.diag.geo')).not.toHaveCount(0);
+  await expect(page.locator('#diags > li.unchecked')).toHaveCount(0);
 });
 
 test('the spans and hints of a reading again of a file that changed are not put into the reading shown', async ({ page }) => {
@@ -376,11 +382,35 @@ test('the spans and hints of a reading again of a file that changed are not put 
   for (const s of d.spans.filter((s) => s.kind === 'name' && d.files[s.file]?.path === 'top.sp')) {
     expect((text[s.line - 1] ?? '').slice(s.col - 1, s.col - 1 + s.len)).toBe(d.objects[s.object].name);
   }
-  // shown without them, and not kept
+  // shown without them, the list saying the checks were not made, in place of "No errors…", and not kept
   expect(d.spans).toEqual([]);
+  await expect(page.locator('#diags > li.unchecked')).toHaveText(UNCHECKED);
+  await expect(page.locator('#diags > li.nothing')).toHaveCount(0);
   await page.locator('#file-input').setInputFiles([{ name: 'top.sp', mimeType: 'text/plain', buffer: Buffer.from('* first\nR1 n 0 1k\n.end\n') },
     { name: 'cells.inc', mimeType: 'text/plain', buffer: Buffer.from(CELLS) }, { name: 'leaf.inc', mimeType: 'text/plain', buffer: Buffer.from(LEAF) }]);
   await idle(page);
   expect(await kept(page)).toMatchObject({ hits: 0, misses: 2 });
   expect((await page.evaluate(() => window.viewer.doc)).spans.length).toBeGreaterThan(0);
+});
+
+test('a file shown whose checks could not be made is not counted as checked, and Check All Files is not offered for it', async ({ page }) => {
+  // the rest of the first reading fails, and so does the reading of the file again in its place
+  await page.addInitScript(() => {
+    let failing = 2;
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (message, ...rest) {
+      const r = typeof message?.request === 'string' ? JSON.parse(message.request) : null;
+      const fail = failing === 2 ? typeof r?.rest_of === 'string' : failing === 1 && typeof r?.file === 'string' && r.hints !== false;
+      if (!fail) return post.call(this, message, ...rest);
+      failing--;
+      setTimeout(() => this.dispatchEvent(new MessageEvent('message', { data: { id: message.id, error: failing === 1 ? 'not kept' : 'The core was stopped.' } })));
+    };
+  });
+  await open(page);
+  await expect(page.locator('#diags > li.unchecked')).toHaveText(UNCHECKED);
+  const scope = page.locator('#problems-scope');
+  await scope.locator('.all-files').click();
+  await expect(scope.locator('.checked')).toHaveText('0 of 3 files checked');
+  await expect(scope.locator('.check-all')).toHaveCount(0);
+  expect(await page.evaluate(async () => (await import('./commands.js')).isEnabled('check-all-files'))).toBe(false);
 });

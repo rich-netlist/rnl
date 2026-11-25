@@ -20,6 +20,8 @@ import { isPreview } from "./solve.js";
 let kept = null;
 /** Check All Files while it reads: { controller, done, total }. */
 let running = null;
+/** The Document shown, the reading of one file, whose geometry checks could not be made (`shownUnchecked`). */
+let unchecked = null;
 
 const fingerprint = (d) => JSON.stringify([d.path, d.outline.files.map((f) => [f.path, f.text_hash])]);
 
@@ -124,9 +126,22 @@ export function otherFiles(d) {
   return { list, checked, total: d.outline.files.length, checking: running && { done: running.done, total: running.total } };
 }
 
+/**
+ * The Document shown, `d`, came without its geometry hints, which could not be had (open.js `restShown`): its file is
+ * not checked, and Check All Files is not offered for it; opened again, it is read whole.
+ */
+export function shownUnchecked(d) {
+  unchecked = d;
+  if (readFileIndex(d) >= 0) keptFor(d).files.delete(d.file);
+  changed();
+}
+
+/** Whether the geometry checks of the Document `d` shown could not be made (`shownUnchecked`). */
+export const isUnchecked = (d) => !!d && unchecked === d;
+
 /** Whether Check All Files has files to read for the document shown, and is not reading them already. */
 export function canCheckAll() {
-  if (!readsByFile() || running || readFileIndex(doc) < 0) return false;
+  if (!readsByFile() || running || readFileIndex(doc) < 0 || isUnchecked(doc)) return false;
   const into = keptFor(doc);
   return doc.outline.files.some((f) => !into.files.has(f.path));
 }

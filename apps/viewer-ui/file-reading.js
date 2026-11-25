@@ -120,6 +120,7 @@ async function addRest(reader, file, result) {
  * and `stored` whether a new reading was kept. A reading `preload`ed counts as no hit or miss, and is kept only into
  * the room that is free. With `later`, where the shell can, the core's answer is the smaller one, and `rest` brings
  * the spans and the hints into it, after which the reading is kept (`stored` is false); one left without them is not.
+ * `rest` promises whether they came.
  */
 async function readOne(reader, outline, file, lib, { fresh = false, keep = false, unkept = false, preload = false, constraints = false, later = false } = {}) {
   const shape = rules.outlineShape(outline);
@@ -141,7 +142,7 @@ async function readOne(reader, outline, file, lib, { fresh = false, keep = false
     const value = { result, shape, library: lib.all, took: performance.now() - started };
     return kept().put(key, value, value, { evict: !preload });
   };
-  if (rest) return { result: shown(result), hit: false, stored: false, rest: rest.then((came) => came && keepIt()).catch(() => false) };
+  if (rest) return { result: shown(result), hit: false, stored: false, rest: rest.then((came) => (came ? keepIt().then(() => true, () => true) : false), () => false) };
   const stored = await keepIt();
   return { result: preload ? result : shown(result), hit: false, stored };
 }
@@ -149,12 +150,16 @@ async function readOne(reader, outline, file, lib, { fresh = false, keep = false
 /** Whether the spans and the hints of `doc`, a Document `readDocument` gave, are still to come (`restIn`). */
 export const restToCome = (doc) => !!doc && restToComeOf.get(doc)?.came === false;
 
+/** Whether the spans and the hints of `doc`, a Document `readDocument` gave, could not be had, and it is without them. */
+export const restMissing = (doc) => !!doc && restToComeOf.get(doc)?.whole === false;
+
 /**
  * The spans and the hints of `doc`, a Document `readDocument` gave, are in it: at once, unless they come after it.
- * The page waits for this before it is done opening.
+ * The page waits for this before it is done opening. False when they could not be had (`addRest`): `doc` is without them.
  */
 export async function restIn(doc) {
-  await (doc && restToComeOf.get(doc))?.coming;
+  const to = doc && restToComeOf.get(doc);
+  return to ? to.coming : true;
 }
 
 /** The file a source shows: its view, or the entry's own file, the outline's first. */
@@ -185,9 +190,9 @@ export async function readDocument(source, edits, progress, signal, options = {}
     ({ result: doc, hit, rest } = await readOne(reader, outline, root?.file ?? fileOf(source, outline, reader), lib,
       { fresh, keep: true, unkept: !!bind, constraints: !!constraints, later: true }));
     if (rest) {
-      const to = { coming: rest, came: false };
+      const to = { coming: rest, came: false, whole: null };
       restToComeOf.set(doc, to);
-      rest.then(() => { to.came = true; });
+      rest.then((whole) => { to.came = true; to.whole = whole; });
     }
     // the loading indicator says so, in every shell
     if (hit) progress?.("cached");

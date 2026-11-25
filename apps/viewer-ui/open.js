@@ -11,7 +11,7 @@ import { append, m, setAttr, setText, tr } from "./i18n.js";
 
 import { form, inform, modal } from "./dialog.js";
 import { sourceOpened } from "./pool.js";
-import { readDocument, restIn, restToCome } from "./file-reading.js";
+import { readDocument, restIn, restMissing, restToCome } from "./file-reading.js";
 import { adoptBuffers, changes, resetBuffers } from "./edits.js";
 import { confirmLeave } from "./editor.js";
 import { shell } from "./shell.js";
@@ -20,7 +20,7 @@ import { clearDrawing, fit, notice, showLevel, view } from "./drawing.js";
 import { renderHierarchy, rootPath } from "./hierarchy.js";
 import { setProblems } from "./panels.js";
 import { problemsToCome, renderDiagnostics } from "./problems.js";
-import { noteShown } from "./file-checks.js";
+import { noteShown, shownUnchecked } from "./file-checks.js";
 import { startLevel, uncalledRoots } from "./roots.js";
 import { clearSelection, select } from "./selection.js";
 import { endPreview, previewOnOpen, previewing, solve } from "./solve.js";
@@ -354,9 +354,11 @@ function problemsOf(d) {
  * `d` is still the one shown. It waits from when `d` is shown, whatever becomes of the open that read it.
  */
 async function restShown(d) {
-  await restIn(d);
+  const came = await restIn(d);
   if (d !== doc) return;
   spansCame();
+  // without the hints, the file is not checked: the list says so, not that it has no problems
+  if (!came) shownUnchecked(d);
   renderDiagnostics(problemsOf(d));
 }
 
@@ -380,7 +382,11 @@ function showDocument(before, navigation) {
   if (restToCome(doc)) {
     problemsToCome();
     void restShown(doc);
-  } else renderDiagnostics(problemsOf(doc));
+  } else {
+    // (they could not be had before it was shown: as `restShown` says it)
+    if (restMissing(doc)) shownUnchecked(doc);
+    renderDiagnostics(problemsOf(doc));
+  }
   $("search").value = "";
 
   if (before) {
