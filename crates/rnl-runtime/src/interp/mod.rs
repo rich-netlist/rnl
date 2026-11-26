@@ -1601,17 +1601,28 @@ fn package_files_hold(counted: &[(String, String)], read: &[(String, String)]) -
 /// ([`AuthoredCounts`]), with the texts of `like` where they are the same; None when a record of
 /// the solver is on a line that holds anything else but a comment marker before it.
 fn doc_key(doc: &HostDocument, like: Option<&DocKey>) -> Option<DocKey> {
+    let key = doc_key_made(doc, like);
+    debug_assert!(key == doc_key_scanned(doc), "the key of a document made by scanning its lines");
+    key
+}
+
+/// [`doc_key`], each file's lines split once.
+fn doc_key_made(doc: &HostDocument, like: Option<&DocKey>) -> Option<DocKey> {
     let mut dialects: Vec<String> = doc.file_dialects.iter().map(|(f, x)| format!("{f}={x:?}")).collect();
     dialects.sort();
     let formats = format!("{:?}|{:?}|{}", doc.dialect, doc.file_formats, dialects.join(","));
     let texts: HashMap<&str, &str> = doc.sources.iter().map(|(file, text)| (file.as_str(), text.as_str())).collect();
+    // the lines of each file a record of the solver is in, split once
+    let mut lines_of: HashMap<&str, Vec<&str>> = HashMap::new();
     let mut left_out: HashMap<&str, Vec<(u32, u32)>> = HashMap::new();
     let mut records = Vec::new();
     let mut place = 0usize;
     for (level, lv) in doc.levels.iter().enumerate() {
         for r in &lv.records {
-            if r.text.contains("generated") && unit::is_generated_record(&crate::syntax::parse_record(&r.text)) {
-                if !alone_on_its_lines(r, texts.get(r.file.as_str())?) {
+            if r.text.contains("generated") && is_generated(&r.text) {
+                let text = texts.get(r.file.as_str())?;
+                let lines = lines_of.entry(r.file.as_str()).or_insert_with(|| text.split('\n').collect());
+                if !alone_on_its_lines(r, lines) {
                     return None;
                 }
                 left_out.entry(r.file.as_str()).or_default().push(r.lines);
@@ -1629,16 +1640,21 @@ fn doc_key(doc: &HostDocument, like: Option<&DocKey>) -> Option<DocKey> {
         .map(|(k, (file, text))| {
             let kept: std::borrow::Cow<str> = match left_out.get(file.as_str()) {
                 None => text.into(),
-                Some(spans) => text
-                    .split_inclusive('\n')
-                    .enumerate()
-                    .filter(|(k, _)| {
-                        let no = *k as u32 + 1;
-                        !spans.iter().any(|&(first, last)| first <= no && no <= last)
-                    })
-                    .map(|(_, line)| line)
-                    .collect::<String>()
-                    .into(),
+                Some(spans) => {
+                    // each line once: whether a record of the solver is on it, by its number
+                    let mut out = vec![false; text.split_inclusive('\n').count() + 1];
+                    for &(first, last) in spans {
+                        for no in first..=last.min(out.len() as u32 - 1) {
+                            out[no as usize] = true;
+                        }
+                    }
+                    text.split_inclusive('\n')
+                        .enumerate()
+                        .filter(|(k, _)| !out[*k + 1])
+                        .map(|(_, line)| line)
+                        .collect::<String>()
+                        .into()
+                }
             };
             let same = like.and_then(|l| l.texts.get(k)).filter(|(f, t)| f == file && **t == *kept);
             (file.clone(), same.map_or_else(|| Rc::from(kept.as_ref()), |(_, t)| t.clone()))
@@ -1647,15 +1663,77 @@ fn doc_key(doc: &HostDocument, like: Option<&DocKey>) -> Option<DocKey> {
     Some(DocKey { formats, records, texts })
 }
 
-/// Whether record `r` is alone on its lines of `text`, the text of its file: each of them holds a
-/// part of it and before that nothing but a comment marker, which no letter or digit is in.
-fn alone_on_its_lines(r: &crate::host::Record, text: &str) -> bool {
+/// [`doc_key`] as it was made before, a debug build's check of it: each record of the solver
+/// looked for from the start of its file, and each line checked against every record of the
+/// solver.
+#[cfg(debug_assertions)]
+fn doc_key_scanned(doc: &HostDocument) -> Option<DocKey> {
+    let mut dialects: Vec<String> = doc.file_dialects.iter().map(|(f, x)| format!("{f}={x:?}")).collect();
+    dialects.sort();
+    let formats = format!("{:?}|{:?}|{}", doc.dialect, doc.file_formats, dialects.join(","));
+    let texts: HashMap<&str, &str> = doc.sources.iter().map(|(file, text)| (file.as_str(), text.as_str())).collect();
+    let mut left_out: HashMap<&str, Vec<(u32, u32)>> = HashMap::new();
+    let mut records = Vec::new();
+    let mut place = 0usize;
+    for (level, lv) in doc.levels.iter().enumerate() {
+        for r in &lv.records {
+            if r.text.contains("generated") && unit::is_generated_record(&crate::syntax::parse_record(&r.text)) {
+                let lines: Vec<&str> = texts.get(r.file.as_str())?.split('\n').collect();
+                if !alone_on_its_lines(r, &lines) {
+                    return None;
+                }
+                left_out.entry(r.file.as_str()).or_default().push(r.lines);
+            } else {
+                let at = r.loc(0);
+                records.push((level, place, r.file.clone(), at.line, at.col, r.lines, r.text.clone()));
+            }
+            place += 1;
+        }
+    }
+    let texts = doc
+        .sources
+        .iter()
+        .map(|(file, text)| {
+            let kept: String = match left_out.get(file.as_str()) {
+                None => text.clone(),
+                Some(spans) => text
+                    .split_inclusive('\n')
+                    .enumerate()
+                    .filter(|(k, _)| {
+                        let no = *k as u32 + 1;
+                        !spans.iter().any(|&(first, last)| first <= no && no <= last)
+                    })
+                    .map(|(_, line)| line)
+                    .collect(),
+            };
+            (file.clone(), Rc::from(kept.as_str()))
+        })
+        .collect();
+    Some(DocKey { formats, records, texts })
+}
+
+#[cfg(not(debug_assertions))]
+fn doc_key_scanned(_: &HostDocument) -> Option<DocKey> {
+    None
+}
+
+/// Whether a record is a record of the solver, `type="generated"` (2.8), read from its head alone.
+fn is_generated(text: &str) -> bool {
+    let head = crate::syntax::parse_record_head(text);
+    debug_assert_eq!(head, crate::syntax::parse_record(text).header, "the head of a record read alone");
+    head.and_then(|h| h.get("type").cloned()) == Some(crate::syntax::Value::Str("generated".into()))
+}
+
+/// Whether record `r` is alone on its lines of the text of its file, `lines`, split at each line
+/// feed: each of them holds a part of it and before that nothing but a comment marker, which no
+/// letter or digit is in.
+fn alone_on_its_lines(r: &crate::host::Record, lines: &[&str]) -> bool {
     let chars: Vec<char> = r.text.chars().collect();
     let (first, last) = r.lines;
     if last < first || r.segs.len() != (last - first + 1) as usize {
         return false;
     }
-    let lines: Vec<&str> = text.split('\n').skip(first as usize - 1).take(r.segs.len()).collect();
+    let lines: Vec<&str> = lines.iter().skip(first as usize - 1).take(r.segs.len()).copied().collect();
     lines.len() == r.segs.len()
         && r.segs.iter().zip(&lines).enumerate().all(|(k, (seg, line))| {
             let end = r.segs.get(k + 1).map_or(chars.len(), |next| next.off.saturating_sub(1));
