@@ -154,7 +154,7 @@
       </div>
     </div>
     <h3 class="sub-h"><en>Edit, apply, save</en></h3>
-    <p class="sub-lead"><en>Both viewers edit the netlist’s text. A change does nothing by itself: it is drawn when you apply it and written when you save it. Only opening a netlist with components not drawn asks whether to solve it, and the answer is a preview that changes no file.</en></p>
+    <p class="sub-lead"><en>Both viewers edit the netlist’s text. A change does nothing by itself: it is drawn when you apply it and written when you save it. Nothing asks when a netlist is opened: while the circuit shown has components with no position yet, a bar over the drawing offers Solve (F9), whose result is a preview that changes no file.</en></p>
     <div class="facts tools-facts">
       <div class="fact">
         <h3><svg class="ico"><use href="#i-pencil"/></svg><en>Edit the text</en></h3>
@@ -347,7 +347,7 @@
     <div class="facts tools-facts">
       <div class="fact">
         <h3><svg class="ico"><use href="#i-solver"/></svg><en>A solved preview</en></h3>
-        <p><en>Solve › Solve (F9) solves the applied text of the circuit shown, with the files it includes, the same way as <code>rnl solve</code>; Solve › Solve All Circuits solves every circuit. A progress panel over the drawing shows the circuit being solved, the stage, the time and the candidates tried, with a Cancel button. The result is a preview: the files are unchanged, and the Solve view in the side panel shows the solver’s report—click any entry to jump to its line in the netlist. Solve › Close Preview returns to the file as written. A netlist opened with components not drawn asks whether to solve it; Solve › Ask to Solve on Open turns the question off.</en></p>
+        <p><en>Solve › Solve (F9) solves the applied text of the circuit shown, with the files it includes, the same way as <code>rnl solve</code>; Solve › Solve All Circuits solves every circuit. A progress panel over the drawing shows the circuit being solved, the stage, the time and the candidates tried, with a Cancel button. The result is a preview: the files are unchanged, and the Solve view in the side panel shows the solver’s report—click any entry to jump to its line in the netlist. Solve › Close Preview returns to the file as written. While the circuit shown has components with no position yet, a bar over the top of the drawing says so, and its Solve (F9) link solves that circuit, as Solve › Solve does; a circuit with nothing drawn yet says so in place of the drawing, with the same link. Nothing asks when a netlist is opened.</en></p>
       </div>
       <div class="fact">
         <h3><svg class="ico"><use href="#i-download"/></svg><en>Save a solved copy</en></h3>
