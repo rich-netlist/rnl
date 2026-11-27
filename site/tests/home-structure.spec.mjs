@@ -1,4 +1,4 @@
-import { test, expect } from '../../tests/viewer/node_modules/@playwright/test/index.mjs';
+import { test, expect } from './fixtures.mjs';
 
 // The structure of the introduction page: the order of the scenarios, and the design flow of
 // the vision section, drawn the same way at every width (the arrows between the boxes are kept on a phone).

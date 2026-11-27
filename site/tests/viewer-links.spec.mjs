@@ -1,4 +1,4 @@
-import { test, expect } from '../../tests/viewer/node_modules/@playwright/test/index.mjs';
+import { test, expect } from './fixtures.mjs';
 import { readFileSync } from 'node:fs';
 
 // Every link on the site that opens the web viewer opens it in a new tab, so that the page that sent the reader stays.

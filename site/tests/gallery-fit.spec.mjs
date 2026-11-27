@@ -1,6 +1,6 @@
 import { publicPackagesAvailable } from "../../scripts/packages.mjs";
 const hasPublicPackages = publicPackagesAvailable();
-import { test, expect } from "../../tests/viewer/node_modules/@playwright/test/index.mjs";
+import { test, expect } from "./fixtures.mjs";
 import { readFileSync } from "node:fs";
 
 const index = JSON.parse(readFileSync(new URL("../dist/gallery/index.js", import.meta.url), "utf8").match(/^RNLGallery.index\((.*)\);/s)[1]);

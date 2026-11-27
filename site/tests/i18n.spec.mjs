@@ -1,4 +1,4 @@
-import { test, expect } from '../../tests/viewer/node_modules/@playwright/test/index.mjs';
+import { test, expect, quietAnalytics } from './fixtures.mjs';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -62,6 +62,7 @@ test('standard and comparison menus preserve the document, query and section', a
 
 test('native language picker works without JavaScript', async ({ browser, baseURL }) => {
   const context = await browser.newContext({ javaScriptEnabled: false });
+  await quietAnalytics(context);
   try {
     const page = await context.newPage();
     await page.goto(`${baseURL}/zh/agents.html`);

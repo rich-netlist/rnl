@@ -1,6 +1,6 @@
 import { publicPackagesAvailable } from "../../scripts/packages.mjs";
 const hasPublicPackages = publicPackagesAvailable();
-import { test, expect } from "../../tests/viewer/node_modules/@playwright/test/index.mjs";
+import { test, expect } from "./fixtures.mjs";
 import { readFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 

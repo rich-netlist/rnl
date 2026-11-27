@@ -1,4 +1,4 @@
-import { test, expect } from '../../tests/viewer/node_modules/@playwright/test/index.mjs';
+import { test, expect } from './fixtures.mjs';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
