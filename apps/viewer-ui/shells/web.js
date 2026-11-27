@@ -105,13 +105,17 @@ function stopSolver(why = "the solver was stopped") {
 }
 /**
  * A call to the solver's Worker, which a first call starts: `message` is `{ request }` (a solve) or `{ table: true }`;
- * the events of a solve go to `onEvent` as they happen; what it gives is the answer of a solve or the table.
+ * the events of a solve go to `onEvent` as they happen; what it gives is the answer of a solve or the table. Each
+ * message has the size of the solver's module that `solver.json` says, and how the Worker's first load of it goes is
+ * told to the page's handler of the solve's events, as the event `load` (apps/web/solver-worker.js), whichever call
+ * made it load.
  */
 function callSolver(info, message, onEvent) {
   return new Promise((resolve, reject) => {
     if (!solverWorker) {
       const worker = new Worker(new URL(info.worker, location.href), { type: "module" });
       worker.onmessage = ({ data }) => {
+        if (data.load) return solveProgress?.({ event: "load", ...data.load });
         const call = solverCalls.get(data.id);
         if (!call) return;
         if (data.event) return call.onEvent?.(data.event);
@@ -124,7 +128,7 @@ function callSolver(info, message, onEvent) {
     }
     const id = ++solverCallId;
     solverCalls.set(id, { resolve, reject, onEvent });
-    solverWorker.postMessage({ id, ...message });
+    solverWorker.postMessage({ id, ...message, size: info.bytes });
   });
 }
 let solveProgress = null; // the page's handler of the events of the solve under way

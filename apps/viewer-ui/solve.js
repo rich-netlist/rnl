@@ -39,6 +39,7 @@ let shown = null;
 let running = false; // whether a solve is under way
 let cancelAsked = false; // whether Cancel was pressed since the solve began
 let progressHooked = false;
+let solvingLine = ""; // what the status bar says of the solve under way as it begins
 
 /**
  * Whether the page shows a solve, not the file as written: its Document, or another file of the same document visited
@@ -140,7 +141,8 @@ export async function solve({ all = false, respace = false } = {}) {
   if (editing && !await stopEditing()) return; // do not solve stale text if applying failed
   running = true;
   document.body.classList.add("solving");
-  status(respace ? m`Respacing ${source.name}…` : m`Solving ${source.name}…`, true);
+  solvingLine = respace ? m`Respacing ${source.name}…` : m`Solving ${source.name}…`;
+  status(solvingLine, true);
   // the file's own name, not the address or the folders it was read from, until the solver names the first circuit
   progressBegin(source.name.split(/[\\/]/).pop() || source.name);
   try {
@@ -305,6 +307,8 @@ function hookProgress() {
     if (!running) return;
     const step = progressEvent(event);
     if (!step) return;
+    // the solver loading, in the web viewer's first solve; then the line the solve began with again
+    if (step.load) return status(step.text ?? solvingLine, true);
     const again = step.again ? m(", again after the upgrade to RNL 0.3") : "";
     status(m`Solving ${step.title} (${step.level + 1} of ${step.levels}${again})…`, true);
   });

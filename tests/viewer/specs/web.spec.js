@@ -1951,6 +1951,8 @@ test("a solve in the browser is cancelled by stopping its Worker, and the next S
   await page.keyboard.press("F9");
   await expect(page.locator("#solve-cancel")).toBeVisible();
   await expect.poll(() => held !== null).toBe(true);
+  // Cancel stops the download too
+  await expect(page.locator("#solve-step")).toHaveText("Downloading the solver…");
   await page.locator("#solve-cancel").click();
   await expect(page.locator("#solve-step")).toContainText("canceled");
   await expect(page.locator("#preview-badge")).toBeHidden();
@@ -1960,6 +1962,123 @@ test("a solve in the browser is cancelled by stopping its Worker, and the next S
   await page.keyboard.press("F9");
   await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"), null, { timeout: 90000 });
   expect(await page.evaluate(() => window.__solver.started)).toBe(2);
+});
+
+/** Note, from the start, the phases of the solver's loading that its Worker tells the page, and what the panel of the solve says. */
+async function watchSolverLoading(page) {
+  await page.addInitScript(() => {
+    window.__loads = [];
+    window.__panel = [];
+    const Base = window.Worker;
+    window.Worker = class extends Base {
+      constructor(url, options) {
+        super(url, options);
+        this.addEventListener("message", (e) => { if (e.data?.load) window.__loads.push(e.data.load); });
+      }
+    };
+    addEventListener("DOMContentLoaded", () => {
+      const host = document.getElementById("solve-progress-host");
+      new MutationObserver(() => {
+        const stage = host.querySelector(".solve-progress-stage")?.textContent ?? "";
+        const time = host.querySelector(".solve-progress-time")?.textContent ?? "";
+        const last = window.__panel.at(-1);
+        if (!last || last[0] !== stage || last[1] !== time) window.__panel.push([stage, time]);
+      }).observe(host, { subtree: true, childList: true, characterData: true });
+    });
+  });
+}
+const LOADING = ["Downloading the solver…", "Preparing the solver…"];
+
+test("the first solve in the browser says it downloads the solver, with how much of it came, then prepares it; a later solve does neither", async ({ page, browserName }) => {
+  test.skip(browserName !== "chromium", "only Chromium routes the requests of a Worker, which holds the solver's module back here");
+  test.setTimeout(120000);
+  await watchSolverLoading(page);
+  let held = null;
+  await page.route("**/core/rnl_solver_wasm.wasm", async (route) => {
+    if (!held) await new Promise((resolve) => (held = resolve));
+    await route.continue();
+  });
+  await page.goto(`${process.env.RNL_WEB_URL}/?url=samples/cases/04-hierarchy.sp`);
+  await expect(page).toHaveTitle(/^04-hierarchy\.sp/);
+  await page.waitForFunction(() => !document.body.classList.contains("busy"));
+  const bytes = await page.evaluate(() => fetch("solver.json").then((r) => r.json()).then((j) => j.bytes));
+  await page.keyboard.press("F9");
+  await expect.poll(() => held !== null).toBe(true);
+  // while it downloads: the line, the panel, and a bar of the share come, of the size solver.json gives
+  const panel = page.locator("#solve-progress");
+  await expect(page.locator("#solve-step")).toHaveText("Downloading the solver…");
+  await expect(panel.locator(".solve-progress-stage")).toHaveText("Downloading the solver…");
+  await expect(panel.locator(".solve-progress-time")).toHaveText(`0.0 of ${(bytes / 1e6).toFixed(1)} MB`);
+  await expect(panel.locator(".solve-progress-bar")).toHaveAttribute("aria-valuenow", "0");
+  await expect(panel).not.toHaveClass(/indeterminate/);
+  await page.waitForTimeout(1500);
+  held();
+  await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"), null, { timeout: 90000 });
+  // downloaded to the last byte, prepared, ready; and the solve's clock started after
+  const loads = await page.evaluate(() => window.__loads);
+  expect(loads.map((l) => l.phase).filter((p, k, all) => p !== all[k - 1])).toEqual(["download", "compile", "ready"]);
+  const last = loads.filter((l) => l.phase === "download").at(-1);
+  expect(last).toEqual({ phase: "download", done: bytes, total: bytes });
+  const said = await page.evaluate(() => window.__panel);
+  const after = said.findIndex(([stage], k) => k > 0 && !LOADING.includes(stage) && LOADING.includes(said[k - 1][0]));
+  expect(after).toBeGreaterThan(0);
+  expect(parseFloat(said[after][1])).toBeLessThan(1);
+  await expect(page.locator("#solve-step")).toContainText("Solved:");
+  // a later solve of the same page: the solver is loaded, and nothing says it loads
+  await page.evaluate(() => { window.__panel = []; });
+  await page.evaluate(() => window.viewer.command("solve-all"));
+  await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving") && document.querySelector("#solve-step").textContent.startsWith("Solved:"), null, { timeout: 90000 });
+  expect((await page.evaluate(() => window.__loads)).length).toBe(loads.length);
+  expect((await page.evaluate(() => window.__panel)).some(([stage]) => LOADING.includes(stage))).toBe(false);
+});
+
+test("a solver that cannot be downloaded says so, and the next Solve downloads it again", async ({ page, browserName }) => {
+  test.skip(browserName !== "chromium", "only Chromium routes the requests of a Worker");
+  test.setTimeout(120000);
+  let refused = 0;
+  await page.route("**/core/rnl_solver_wasm.wasm", async (route) => {
+    if (refused++ === 0) return route.fulfill({ status: 503, body: "busy" });
+    await route.continue();
+  });
+  await page.goto(`${process.env.RNL_WEB_URL}/?url=samples/cases/04-hierarchy.sp`);
+  await expect(page).toHaveTitle(/^04-hierarchy\.sp/);
+  await page.waitForFunction(() => !document.body.classList.contains("busy"));
+  await page.keyboard.press("F9");
+  const dialog = page.locator("dialog.dialog");
+  await expect(dialog).toContainText("The netlist could not be solved: the solver could not be downloaded (HTTP 503)");
+  await dialog.getByRole("button").first().click();
+  await expect(page.locator("#solve-progress")).toBeHidden();
+  await page.keyboard.press("F9");
+  await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"), null, { timeout: 90000 });
+  expect(refused).toBe(2);
+});
+
+test("the panel of a solve while the solver loads: a moving bar when its size is not known, then preparing, and the solve's clock from when it is ready", async ({ page }) => {
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
+  await expect(page.locator("#menubar")).toBeVisible();
+  const panel = page.locator("#solve-progress");
+  await page.evaluate(async () => {
+    const p = await import("./solve-progress.js");
+    window.__progress = p;
+    p.progressBegin("top.sp");
+    p.progressEvent({ event: "load", phase: "download", done: 1200000, total: null });
+  });
+  await expect(panel.locator(".solve-progress-stage")).toHaveText("Downloading the solver…");
+  await expect(panel.locator(".solve-progress-time")).toHaveText("1.2 MB");
+  await expect(panel).toHaveClass(/indeterminate/);
+  await expect(panel.locator(".solve-progress-bar")).not.toHaveAttribute("aria-valuenow", /.*/);
+  await page.evaluate(() => window.__progress.progressEvent({ event: "load", phase: "compile" }));
+  await expect(panel.locator(".solve-progress-stage")).toHaveText("Preparing the solver…");
+  await expect(panel.locator(".solve-progress-time")).toHaveText("");
+  await expect(panel).toHaveClass(/indeterminate/);
+  // the loading took a while: the solve's time does not count it
+  await page.waitForTimeout(1200);
+  await page.evaluate(() => window.__progress.progressEvent({ event: "load", phase: "ready" }));
+  await expect(panel.locator(".solve-progress-stage")).toHaveText("Starting");
+  expect(parseFloat(await panel.locator(".solve-progress-time").textContent())).toBeLessThan(0.5);
+  await expect(panel).not.toHaveClass(/indeterminate/);
+  await page.evaluate(() => window.__progress.progressEnd());
+  await expect(panel).toBeHidden();
 });
 
 test("Respace in the browser asks the solver's module for a respace of the file, and a level it cannot respace is left as it is, with the reason", async ({ page }) => {
