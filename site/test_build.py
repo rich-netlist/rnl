@@ -61,6 +61,32 @@ class SiteNavigation(unittest.TestCase):
         with patch.object(build, "has_linux_release", return_value=False):
             cls.built = build.build(None)
 
+    def test_each_page_has_the_analytics_beacon_once_and_nothing_else_has_it(self):
+        beacon = build.BEACON
+        self.assertIn("static.cloudflareinsights.com/beacon.min.js", beacon)
+        self.assertIn('{"token": "3bf33d274933451cb7da368d04902cdb"}', beacon)
+        published = [prefix for code, prefix in build.LANGS if code in build.I18N.published]
+        self.assertGreaterEqual(len(published), 2)
+        pages = {prefix + page for prefix in published for page in build.PAGES}
+        for path in sorted(pages):
+            html = self.built[path]
+            self.assertEqual(html.count("cloudflareinsights"), 1, path)
+            self.assertEqual(html.count(beacon), 1, path)
+            self.assertTrue(html.endswith(beacon + "\n</body>\n</html>\n") or (beacon + "\n</body>") in html, path)
+        # the single-file versions are read offline, and the pages that lead elsewhere only lead: none
+        others = [path for path, text in self.built.items() if path.endswith(".html") and path not in pages]
+        self.assertTrue(any(path.endswith("-standalone.html") for path in others))
+        self.assertTrue(any("/" not in path for path in others))
+        for path in others:
+            self.assertNotIn("cloudflareinsights", self.built[path], path)
+
+    def test_a_page_without_one_body_end_has_no_place_for_the_beacon(self):
+        with self.assertRaises(build.BuildError):
+            build.with_beacon("<html><body></body><body></body></html>", "x.html")
+        with self.assertRaises(build.BuildError):
+            build.with_beacon("<html></html>", "x.html")
+        self.assertEqual(build.with_beacon("<body>x</body>", "x.html"), "<body>x" + build.BEACON + "\n</body>")
+
     def test_primary_navigation_matches_the_standard_in_both_languages(self):
         pages = list(build.PAGES)
         for lang in ("zh", "en"):

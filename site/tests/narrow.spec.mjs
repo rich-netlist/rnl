@@ -1,4 +1,4 @@
-import { test, expect } from '../../tests/viewer/node_modules/@playwright/test/index.mjs';
+import { test, expect } from './fixtures.mjs';
 
 // A translation is often longer than the English: at 375px, the width of a small phone, chips, segmented buttons and
 // the buttons of the gallery wrap onto more lines, and a title that is one long word breaks, instead of widening the page.

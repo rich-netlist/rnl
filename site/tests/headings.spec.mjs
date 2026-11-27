@@ -1,4 +1,4 @@
-import { test, expect } from '../../tests/viewer/node_modules/@playwright/test/index.mjs';
+import { test, expect } from './fixtures.mjs';
 
 // No heading of the site ends with a full stop, in any language: the headings h1 to h6, the one-line subtitle under the title of
 // a page, the titles of cards and of the lists of contents, the tabs, the questions of the FAQ. (A text that is a sentence of the

@@ -1,4 +1,4 @@
-import { test, expect } from '../../tests/viewer/node_modules/@playwright/test/index.mjs';
+import { test, expect } from './fixtures.mjs';
 
 // The example of the introduction: a five-transistor OTA that is reviewed by what it says. Picking an item of the
 // checklist, or a statement of the file, marks what it is about in the drawing (the RNL core's own drawing) as an RNL
