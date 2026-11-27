@@ -840,5 +840,9 @@
   "the old web viewer": "舊版網頁版檢視器",
   "You can try {0}: open the file there with File › Open, since a file from this computer cannot be passed to it by a link.": "可以試用{0}：在那裡透過「檔案 › 開啟檔案」開啟該檔案，因為這台電腦上的檔案無法透過連結傳給它。",
   "the old viewer": "舊版檢視器",
-  "You can try opening it in {0}.": "可以嘗試在{0}中開啟它。"
+  "You can try opening it in {0}.": "可以嘗試在{0}中開啟它。",
+  "Downloading the solver…": "正在下載求解器…",
+  "Preparing the solver…": "正在準備求解器…",
+  "{0} of {1} MB": "{0} / {1} MB",
+  "{0} MB": "{0} MB"
 }
