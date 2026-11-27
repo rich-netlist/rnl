@@ -43,7 +43,9 @@ Output (site/dist/ by default, ignored by Git), for each page in PAGES:
 The standalone files have the styles and scripts inlined and link the other pages to the published
 site; packages.html, the gallery of the standard packages, has none. The pages of the standard (zh/spec/
 and en/spec/, one folder for each version), the web viewer (viewer/) and the gallery's data (gallery/),
-which the pages link to and load, are added by .github/workflows/pages.yml.
+which the pages link to and load, are added by .github/workflows/pages.yml. Each page of PAGES, in each
+language, has Cloudflare Web Analytics' beacon (BEACON) before its </body>; the standalone files, the
+pages that lead elsewhere and what pages.yml adds have none.
 
 Until 2026-10-18 the Chinese pages were at the root of the site, where their addresses still lead: the
 pages at the root that lead elsewhere keep the query and the section of the address, so that an old
@@ -128,6 +130,11 @@ LANG_ATTRIBUTE = re.compile(r"\blang=\"([^\"]*)\"")
 STYLE_TAG = re.compile(r'<link rel="stylesheet" href="assets/([\w.-]+\.css)">')
 SCRIPT_TAG = re.compile(r'<script src="assets/([\w.-]+\.js)"></script>')
 NOTICE = "<!-- Built by site/build.py from site/src/. Edit the source, not this file. -->\n"
+# Cloudflare Web Analytics, before </body> of each page of PAGES in each language: not of the single-file versions,
+# which are read offline, of the pages that only lead elsewhere, or of the web viewer. The token names the site; it is
+# not a secret.
+BEACON = ("<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' "
+          "data-cf-beacon='{\"token\": \"3bf33d274933451cb7da368d04902cdb\"}'></script><!-- End Cloudflare Web Analytics -->")
 
 # The desktop viewer's releases: a tag viewer-vX.Y.Z and a GitHub release of that name with the files
 # the page of the tools links to (.github/workflows/viewer-release.yml makes them).
@@ -946,7 +953,16 @@ def build_language(files, index, version, linux=False, macos=False, packages=Fal
         out[page] = out[page].replace("<!doctype html>\n", "<!doctype html>\n" + NOTICE, 1)
         if single:
             out[single] = standalone(page, out, SITE_URL + prefix)
+        out[page] = with_beacon(out[page], page)
     return out
+
+
+def with_beacon(html, page):
+    """The page with the analytics' beacon (BEACON) just before its </body>."""
+    at = html.rfind("</body>")
+    if at < 0 or html.count("</body>") != 1:
+        raise BuildError("src/%s needs exactly one </body>, before which the analytics' beacon goes" % page)
+    return html[:at] + BEACON + "\n" + html[at:]
 
 
 def standalone(page, out, page_url):
