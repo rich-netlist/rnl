@@ -5,6 +5,9 @@
 // `level`, `stage`, `work`, `best`, `level-done`; `done` and `error` end the solve, which solve.js knows
 // of by the promise. A field or an event it does not know is ignored, and a stage it has no words for is
 // shown by its name. Between two events the clock goes on from the last one told, so that the time moves.
+// Before them, the web viewer's first solve loads the solver (the event `load`, apps/web/solver-worker.js):
+// its download, with the share of the bytes come, and its preparing; the clock of the solve starts once it is
+// ready, so that the time it took is not the solve's.
 
 import { m, setAttr, setText } from "./i18n.js";
 import { $, span } from "./util.js";
@@ -40,6 +43,33 @@ let timer = 0;
 let run = null; // the state of the solve under way, null when none
 
 const now = () => performance.now() / 1000;
+
+/** What the loading of the solver does, by its phase (the event `load`). */
+const LOADING = {
+  download: m("Downloading the solver…"),
+  compile: m("Preparing the solver…"),
+};
+
+/** Bytes as megabytes, with one decimal. */
+const megabytes = (bytes) => (bytes / 1e6).toFixed(1);
+
+/** The panel while the solver loads: what it does, the share of its bytes come, or a bar that moves when that is not known. */
+function paintLoading(load) {
+  setText(parts.title, run.name);
+  setText(parts.of, "");
+  setText(parts.stage, LOADING[load.phase] ?? load.phase);
+  const known = load.phase === "download" && load.total > 0;
+  const share = known ? Math.min(1, load.done / load.total) : null;
+  if (load.phase !== "download") setText(parts.time, "");
+  else if (known) setText(parts.time, m`${megabytes(load.done)} of ${megabytes(load.total)} MB`);
+  else setText(parts.time, m`${megabytes(load.done)} MB`);
+  panel.classList.remove("unknown");
+  panel.classList.toggle("indeterminate", share === null);
+  parts.fill.style.width = share === null ? "" : `${(share * 100).toFixed(1)}%`;
+  if (share === null) parts.bar.removeAttribute("aria-valuenow");
+  else parts.bar.setAttribute("aria-valuenow", String(Math.round(share * 100)));
+  parts.tried.hidden = true;
+}
 
 function build() {
   panel = document.createElement("div");
@@ -79,6 +109,8 @@ const seconds = (s) => (Math.round(s * 10) / 10).toFixed(1);
 /** The text and bar of the level under way, from the last events and the clock since. */
 function paint() {
   if (!run) return;
+  if (run.load) return paintLoading(run.load);
+  panel.classList.remove("indeterminate");
   const level = run.level;
   const elapsed = level ? level.elapsed + (now() - level.at) : now() - run.startedAt;
   setText(parts.title, level?.title ?? run.name);
@@ -123,7 +155,7 @@ function listDone() {
 /** A solve of the file called `name` begins. */
 export function progressBegin(name) {
   if (!panel) build();
-  run = { name, levels: 1, level: null, done: [], startedAt: now() };
+  run = { name, levels: 1, level: null, done: [], startedAt: now(), load: null };
   parts.done.replaceChildren();
   parts.done.hidden = true;
   panel.hidden = false;
@@ -133,11 +165,22 @@ export function progressBegin(name) {
 }
 
 /** One event of the solve under way (docs/solver-progress.md). Returns the level's title and its place, for the
- * status bar, when the event begins a level, else null. */
+ * status bar, when the event begins a level; the loading's phase and its words, when the event is the solver's
+ * loading (`load`); else null. */
 export function progressEvent(event) {
   if (!run || !event || typeof event !== "object") return null;
   const level = run.level;
   switch (event.event) {
+    case "load":
+      if (event.phase === "ready") {
+        // the solve's clock starts now: the loading is not the solve's time
+        run.load = null;
+        run.startedAt = now();
+      } else {
+        run.load = { phase: event.phase, done: typeof event.done === "number" ? event.done : 0, total: typeof event.total === "number" ? event.total : null };
+      }
+      paint();
+      return { load: event.phase, text: event.phase === "ready" ? null : (LOADING[event.phase] ?? null) };
     case "run":
       if (typeof event.levels === "number" && event.levels > 0) run.levels = event.levels;
       break;
@@ -190,5 +233,8 @@ export function progressEnd() {
   clearInterval(timer);
   timer = 0;
   run = null;
-  if (panel) panel.hidden = true;
+  if (panel) {
+    panel.hidden = true;
+    panel.classList.remove("indeterminate");
+  }
 }

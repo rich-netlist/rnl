@@ -1195,6 +1195,10 @@ mark { background: rgba(255, 196, 61, 0.55); color: inherit; border-radius: 2px;
 .solve-progress-bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .solve-progress-bar > div { height: 100%; background: var(--accent); }
 .solve-progress.unknown .solve-progress-bar { display: none; }
+/* the solver loading, how far not known: a part of the bar that goes along it */
+.solve-progress.indeterminate .solve-progress-bar > div { width: 30%; animation: solve-progress-along 1.2s linear infinite; }
+@keyframes solve-progress-along { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+@media (prefers-reduced-motion: reduce) { .solve-progress.indeterminate .solve-progress-bar > div { width: 100%; animation: none; opacity: 0.5; } }
 .solve-progress-done { margin: 2px 0 0; padding: 5px 0 0; border-top: 1px solid var(--line); list-style: none; display: flex; flex-direction: column; gap: 2px; }
 .solve-progress-done[hidden] { display: none; }
 .solve-progress-done li { display: flex; align-items: baseline; gap: 8px; color: var(--muted); }
