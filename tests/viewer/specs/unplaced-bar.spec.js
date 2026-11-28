@@ -19,6 +19,8 @@ test("a netlist opened with objects not drawn asks nothing: the bar over the dra
   await expect(bar(page)).toBeVisible();
   await expect(bar(page)).toHaveText(BAR);
   await expect(bar(page).getByRole("button")).toHaveText([VIEW, "Solve (F9)"]);
+  // what clicks the link that solves from outside (apps/local/ci/drive.mjs) finds it, and only it, by its class
+  await expect(bar(page).locator(".solve-now")).toHaveText(["Solve (F9)"]);
   // the drawing keeps its size: the bar lies over it
   expect(await page.evaluate(() => getComputedStyle(document.getElementById("unplaced-bar")).position)).toBe("absolute");
   // opened again: the bar again, and still no question
@@ -84,6 +86,7 @@ test("a level that draws nothing keeps its page, and the page has the link that 
   await empty.getByRole("button", { name: VIEW }).click();
   await expect(page.locator("#pane-unplaced")).toBeVisible();
   expect(await viewer.calls("solve")).toEqual([]);
+  await expect(empty.locator(".solve-now")).toHaveText(["Solve (F9)"]);
   await empty.getByRole("button", { name: "Solve (F9)" }).click();
   await expect.poll(async () => (await viewer.calls("solve")).length).toBe(1);
   await expect(page.locator("#preview-badge")).toBeVisible();
