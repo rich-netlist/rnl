@@ -150,6 +150,41 @@ export const UNPLACED = [
 ];
 
 /**
+ * Usages without a position, by the name of the fixture and the file it is built from, each file's lines: in
+ * `unplaced-ground.sp`, a ground that no PLACE fixes is all that is not drawn; in `unplaced-ground-device.sp`, a
+ * capacitor is not drawn either.
+ */
+export const UNPLACED_USAGES = {
+  "unplaced-ground": [
+    "unplaced-ground.sp",
+    [
+      "* a ground not drawn",
+      "R1 a b 1k",
+      '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-basic", version="0.4") }',
+      "* @RNL {",
+      "*   #R1 @PLACE(0, 0);",
+      "*   %g = $GROUND @ATTACH &a;",
+      "* }",
+      ".end",
+    ],
+  ],
+  "unplaced-ground-device": [
+    "unplaced-ground-device.sp",
+    [
+      "* a capacitor and a ground not drawn",
+      "R1 a b 1k",
+      "C1 b c 1p",
+      '* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-basic", version="0.4") }',
+      "* @RNL {",
+      "*   #R1 @PLACE(0, 0);",
+      "*   %g = $GROUND @ATTACH &a;",
+      "* }",
+      ".end",
+    ],
+  ],
+};
+
+/**
  * Two resistors and a capacitor for what a click and the pointer find: R2 is placed so that its box
  * overlaps R1's, and R1's name label is inside R2's box; a text is attached to R1's first terminal,
  * which is no instance or net, so that clicking it selects nothing; and a wire of net c runs
@@ -346,7 +381,7 @@ function view(rnl, file, cwd) {
  * the netlist of NESTED, and "nested-changed", the same file after XB2 was named XB3;
  * "continued" and "continued-spectre", the netlists of CONTINUED; "edit", "edit-changed", the
  * same file after the edit, and "edit-crlf", the same with CRLF line ends, from EDITED; "unicode",
- * the netlist of UNICODE; the netlists of UNCALLED; "unplaced", the netlist of UNPLACED; "pick", the netlist of PICK; "long", a title, LONG lines of a bare
+ * the netlist of UNICODE; the netlists of UNCALLED; "unplaced", the netlist of UNPLACED, and the netlists of UNPLACED_USAGES; "pick", the netlist of PICK; "long", a title, LONG lines of a bare
  * `*`, R1, a record that places it and `.end`; and those of SOLVED, from the files `rnl solve` wrote;
  * and those of PREVIEWS.
  */
@@ -441,6 +476,10 @@ export function writeFixtures(rnl, dir) {
 
   fs.writeFileSync(path.join(dir, "unplaced.sp"), UNPLACED.concat("").join("\n"));
   fs.writeFileSync(path.join(dir, "unplaced.json"), view(rnl, "unplaced.sp", dir));
+  for (const [name, [file, lines]] of Object.entries(UNPLACED_USAGES)) {
+    fs.writeFileSync(path.join(dir, file), lines.concat("").join("\n"));
+    fs.writeFileSync(path.join(dir, `${name}.json`), view(rnl, file, dir));
+  }
   fs.writeFileSync(path.join(dir, "pick.sp"), PICK.concat("").join("\n"));
   fs.writeFileSync(path.join(dir, "pick.json"), view(rnl, "pick.sp", dir));
 

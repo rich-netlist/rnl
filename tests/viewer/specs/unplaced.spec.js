@@ -52,11 +52,11 @@ test.describe("the objects not drawn", () => {
     await viewer.open("unplaced");
   });
 
-  test("the tab counts components and the list names all undrawn objects in netlist order", async ({ page }) => {
+  test("the tab counts the undrawn objects as the list does and the list names them all in netlist order", async ({ page }) => {
     const n = await unplacedCount(page);
     // the three instances, the 60 resistors, and the grounds of net 0 that nothing places either
-    expect(n).toBeGreaterThanOrEqual(63);
-    await expect(page.locator("#tab-unplaced")).toHaveAccessibleName('Not drawn (63)');
+    expect(n).toBeGreaterThan(63);
+    await expect(page.locator("#tab-unplaced")).toHaveAccessibleName(`Not drawn (${n})`);
     await show(page);
     await expect(page.locator("#unplaced-count")).toHaveText(String(n));
     const shown = await names(page);
@@ -168,14 +168,14 @@ test.describe("the objects not drawn", () => {
 
   test("the greyed statements are those of the level shown", async ({ page, viewer }) => {
     // X1's subcircuit has R1 placed, and only its two ports, which no statement writes: going down
-    // into it greys none of the statements, and its list is theirs
+    // into it greys none of the statements, and its list, which the tab counts, is theirs
     await show(page);
     await rows(page).filter({ has: page.locator(".name", { hasText: /^X1$/ }) }).click();
     await viewer.selected("instance X1 in unplaced.sp");
     await page.evaluate(() => window.viewer.command("descend"));
     await expect.poll(() => page.evaluate(() => window.viewer.path.length)).toBe(2);
     await expect(page.locator("#source .ln.not-drawn")).toHaveCount(0);
-    await expect(page.locator("#tab-unplaced")).toHaveAccessibleName("Not drawn");
+    await expect(page.locator("#tab-unplaced")).toHaveAccessibleName("Not drawn (2)");
     await show(page);
     await expect(rows(page)).toHaveCount(2);
     await expect(rows(page).locator(".symbol")).toHaveText([/^usage · /, /^usage · /]);
@@ -297,6 +297,21 @@ test.describe("the drawings of the objects not drawn", () => {
     expect(await asked(viewer)).toEqual([]);
   });
 });
+
+for (const [fixture, names] of [["unplaced-ground", ["g"]], ["unplaced-ground-device", ["C1", "g"]]]) {
+  test(`a usage not drawn is counted in the tab and listed: ${names.join(" and ")}`, async ({ page, viewer }) => {
+    await viewer.open(fixture);
+    const listed = await page.evaluate(() => window.viewer.doc.levels[0].unplaced.map((u) => [u.kind, u.name]));
+    expect(listed).toEqual(names.map((n) => (n === "g" ? ["usage", "%g"] : ["instance", n])));
+    await expect(page.locator("#unplaced-tab-count")).toHaveText(` (${names.length})`);
+    await expect(page.locator("#tab-unplaced")).toHaveAccessibleName(`Not drawn (${names.length})`);
+    await show(page);
+    // the tab and the list's header say the same
+    await expect(page.locator("#unplaced-count")).toHaveText(String(names.length));
+    await expect(rows(page)).toHaveCount(names.length);
+    await expect(rows(page).last().locator(".name")).toHaveText("%g");
+  });
+}
 
 test("a level with everything placed has no count and says so", async ({ page, viewer }) => {
   await viewer.open("04-hierarchy");
