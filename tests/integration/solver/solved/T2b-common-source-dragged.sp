@@ -22,7 +22,7 @@ VIN in 0 DC 0.6 AC 1
 *   {#VDD #VIN} @ORIENT("R0")
 * }
 * @RNL(author="rnl-editor 0.1") { #VIN @PLACE(x=-4, priority="high")}
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:7e5f62816c3ac64c.f0060f7d29d4b0a9", numbering="e01fe77925c0d466") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:7e5f62816c3ac64c.a5995ad059c3a370", numbering="e01fe77925c0d466") {
 *   %ground_stub_M1_s = $GROUND_STUB @ATTACH(gap=3) #M1::s;
 *   %ground_stub_VDD_n = $GROUND_STUB @ATTACH(gap=3) #VDD::n;
 *   %ground_stub_VIN_n = $GROUND_STUB @ATTACH(gap=3) #VIN::n;
@@ -32,19 +32,19 @@ VIN in 0 DC 0.6 AC 1
 *   #RD @PLACE(5, 7) => @ORIENT("R0");
 *   #VDD @PLACE(-4, 11) => @ORIENT("R0");
 *   #VIN @PLACE(-4, -3) => @ORIENT("R0");
-*   %amp @PLACE(0, 13);
-*   %flow @PLACE(0, 13);
+*   %amp @PLACE(-4, 13);
+*   %flow @PLACE(-4, 13);
 *   %branch @PLACE(5, 5);
-*   %#1 @PLACE(0, 13);
-*   %ground_stub_M1_s @PLACE(0, 13);
+*   %#1 @PLACE(-4, 13);
+*   %ground_stub_M1_s @PLACE(-4, 13);
 *   %ground_stub_M1_s::g @PLACE(5, -3) => @ORIENT("R0");
-*   %ground_stub_VDD_n @PLACE(0, 13);
+*   %ground_stub_VDD_n @PLACE(-4, 13);
 *   %ground_stub_VDD_n::g @PLACE(-4, 7) => @ORIENT("R0");
-*   %ground_stub_VIN_n @PLACE(0, 13);
+*   %ground_stub_VIN_n @PLACE(-4, 13);
 *   %ground_stub_VIN_n::g @PLACE(-4, -7) => @ORIENT("R0");
-*   %supply_stub_RD_p @PLACE(0, 13);
+*   %supply_stub_RD_p @PLACE(-4, 13);
 *   %supply_stub_RD_p::s @PLACE(5, 11) => @ORIENT("R0");
-*   %supply_stub_VDD_p @PLACE(0, 13);
+*   %supply_stub_VDD_p @PLACE(-4, 13);
 *   %supply_stub_VDD_p::s @PLACE(-4, 15) => @ORIENT("R0");
 *   &out @WIRE(mode="straight") {#M1::d #RD::n};
 *   &in @WIRE(mode="straight") {#VIN::p (-4, 1) #M1::g}
