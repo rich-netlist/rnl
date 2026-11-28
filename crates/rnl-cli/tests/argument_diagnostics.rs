@@ -28,6 +28,7 @@ fn options_that_used_to_be_ignored_identify_the_option_and_command() {
         vec!["--previous"],
         vec!["--png"],
         vec!["--scale", "2"],
+        vec!["--font", "f.otf"],
         vec!["--primitives"],
         vec!["--no-svg"],
         vec!["--status"],

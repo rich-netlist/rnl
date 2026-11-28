@@ -68,8 +68,13 @@ view options:
                       Only the Document's lists of parameters change; nothing drawn does
 render options:
   --png               write a PNG image of each level instead of its SVG, drawn by the command
-                      itself with the fonts it holds, so that it needs no font of the computer;
-                      CJK text is drawn in it as empty boxes
+                      itself with the fonts it holds, so that it needs no font of the computer:
+                      Latin, Greek, the signs of schematics, CJK punctuation and the 3755 common
+                      hanzi of GB 2312; a character they do not map is drawn as an empty box, with
+                      a warning that names it
+  --font FILE         with --png, draw the characters the fonts held do not map in the font of
+                      FILE (OpenType, TrueType or a collection), so that the image is the same
+                      wherever that file is; repeatable, the first that maps a character draws it
   --scale N           the pixels of the PNG image for a unit of the SVG, 2 by default; at most 16
 render options for inspection (all disabled by default):
   --usages MODE       usage frames: semantic (no drawing of their own) or all
@@ -171,7 +176,7 @@ g.sp · language 0.4 · 2 groups, 4 outside the tree
 
 What the command says of its own, on the standard error, is written the same way, without a place: `error: RNL8010 cli-option-needs-value: --level needs a title`, `warning: RNL8007 cli-format-path-unused: …`, and the line `rnl solve` prints for a file with no drawing level, `hint: RNL8026 cli-solve-no-level: …`. Such an error exits with 2: an unknown command, said so with a FILE or without one, an unknown option, an option without its value or given to a command that does not take it, and an error reading or writing a file. An error that a library of the toolkit gives, such as a netlist that cannot be read or an edit that `write` cannot make, is printed as `error: …` without a kind for now. `rnl --help` prints the usage on the standard output and exits with 0.
 
-`render --png` writes a PNG image of each level instead of its SVG, for a reader that takes images, such as a model: the command rasterizes the SVG itself with [resvg](https://github.com/linebender/resvg), in Rust, on white, `--scale` pixels for a unit of it, 2 by default. It draws text in the faces it holds in [`fonts/`](fonts/), Noto Sans SC Regular and Bold subset to Latin, Greek and the signs of schematics (OFL-1.1, [decision 0009](../../docs/decisions/0009-fonts-shipped-with-the-core.md)), whatever family a drawing names and with no font of the computer, so an image is the same offline and everywhere; a CJK character is drawn as an empty box.
+`render --png` writes a PNG image of each level instead of its SVG, for a reader that takes images, such as a model: the command rasterizes the SVG itself with [resvg](https://github.com/linebender/resvg), in Rust, on white, `--scale` pixels for a unit of it, 2 by default. It draws text in the faces it holds in [`fonts/`](fonts/), Noto Sans SC Regular and Bold subset to Latin, Greek, the signs of schematics, CJK punctuation and the 3755 common hanzi of GB 2312 level 1 (OFL-1.1, [decision 0009](../../docs/decisions/0009-fonts-shipped-with-the-core.md)), whatever family a drawing names and with no font of the computer, so an image is the same offline and everywhere. `--font FILE`, repeatable, gives fonts for the characters those faces do not map, such as the other hanzi, hangul or kana: the first that maps a character draws it, so the image is the same wherever those files are. A file that cannot be read, or holds no font, is an error (RNL8039), and `--font` without `--png` is one too. A character no font maps is drawn as an empty box, and a warning (RNL8040) names the first eight of them in each image, with how many more.
 
 Without a solver, `render` draws only what has coordinates. `check` says what is missing: after the diagnostics it prints, for each drawing level, how many objects have no position and how many constraints hold, need a solver to move something, or could not be checked. `view` prints the Document of [`rnl-view`](../rnl-view/README.md), what the desktop viewer shows, for tools and for comparing builds; with `--primitives` each level has its primitives as well, with `--no-svg` no SVG, with `--status` its solve status, `solve`: `fixed`, `unsolved`, `solved` or `stale`, with `--flylines` the flylines of every net, each with a hit of kind `flyline` (off by default, as in `render` and `snapshot`), and with `--constraints` its constraints after expansion ([`rnl-view`](../rnl-view/README.md#the-constraints-of-a-level), experimental). The standard packages in [`libraries/standard`](../../libraries/standard/README.md) are built into the command through `rnl-view`; this crate adds the files and package directories on disk (`FsProvider`).
 

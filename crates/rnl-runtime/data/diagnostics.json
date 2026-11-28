@@ -4038,6 +4038,20 @@
    "sections": []
   },
   {
+   "number": "RNL8039",
+   "name": "cli-font-unreadable",
+   "severity": "error",
+   "message": "no font is drawn with: {file}: {reason}",
+   "sections": []
+  },
+  {
+   "number": "RNL8040",
+   "name": "cli-png-missing-glyphs",
+   "severity": "warning",
+   "message": "{file}: no font maps {count} of its characters, drawn as empty boxes: {characters}; give a font that has them with --font FILE",
+   "sections": []
+  },
+  {
    "number": "RNL8100",
    "name": "solve-cancelled",
    "severity": "error",

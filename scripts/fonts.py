@@ -52,6 +52,7 @@ METRICS = ROOT / "crates" / "rnl-render" / "fonts" / "noto-sans-sc.metrics"
 WEB = ROOT / "apps" / "viewer-ui" / "fonts"
 LICENSE = ROOT / "LICENSES" / "OFL-1.1.txt"
 PNG = ROOT / "crates" / "rnl-cli" / "fonts"
+PNG_TEST_FONT = ROOT / "crates" / "rnl-cli" / "tests" / "fonts" / "noto-sans-sc-9f98.otf"
 
 FAMILY = "Noto Sans SC"
 TAG = "Sans2.004"
@@ -319,19 +320,27 @@ def web(out):
         "%d: %s" % (w, kib(sizes["ui-%s-%d.woff2" % (code, w)])) for _, w, _ in FACES)) for code, n in ui.items()))
 
 
-# The characters of the faces the command line draws PNG images with: Latin, Greek, and the
-# punctuation, arrows, mathematical and technical signs of schematics. CJK is left out, to keep the
-# command small; a PNG image draws CJK text as empty boxes.
+# The characters of the faces the command line draws PNG images with: Latin, Greek, the punctuation,
+# arrows, mathematical and technical signs of schematics, and CJK punctuation with its full-width
+# forms (PNG_RANGES); and the 3755 common hanzi of GB 2312 level 1 (decision 0009, point 7, as
+# amended 2026-11-28). The other hanzi are left out, to keep the command small: `rnl render --png
+# --font FILE` takes a font for them.
 PNG_RANGES = [
     (0x0020, 0x007E), (0x00A0, 0x024F), (0x0370, 0x03FF), (0x2000, 0x206F), (0x2070, 0x209F),
     (0x20A0, 0x20CF), (0x2100, 0x214F), (0x2150, 0x218F), (0x2190, 0x21FF), (0x2200, 0x22FF),
     (0x2300, 0x23FF), (0x2460, 0x24FF), (0x2500, 0x257F), (0x25A0, 0x25FF),
+    (0x3000, 0x303F), (0xFF00, 0xFFEF),
 ]
+
+
+def png_code_points():
+    """The code points of the faces of PNG images: PNG_RANGES and GB 2312 level 1."""
+    return sorted({cp for lo, hi in PNG_RANGES for cp in range(lo, hi + 1)} | set(gb2312(1)))
 
 
 def png(check):
     """Write the faces the command line draws PNG images with, crates/rnl-cli/fonts/: each face of
-    the fonts subset to PNG_RANGES, its outlines as they are and without the layout tables, so that
+    the fonts subset to png_code_points(), its outlines as they are and without the layout tables, so that
     a text is as wide in an image as the renderer lays it out (it lays out by advances alone).
     With `check`, fail when they are not what the pinned fonts give."""
     from fontTools import subset
@@ -346,17 +355,30 @@ def png(check):
         options.drop_tables += ["GSUB", "GPOS", "GDEF", "BASE", "VORG", "vhea", "vmtx"]
         font = subset.load_font(str(path), options)
         sub = subset.Subsetter(options)
-        sub.populate(unicodes=[cp for lo, hi in PNG_RANGES for cp in range(lo, hi + 1)])
+        sub.populate(unicodes=png_code_points())
         sub.subset(font)
         buf = io.BytesIO()
         font.save(buf)
-        out = PNG / ("noto-sans-sc-latin-%d.otf" % weight)
-        if check:
-            if not out.exists() or out.read_bytes() != buf.getvalue():
-                stale.append(out)
-        else:
-            out.write_bytes(buf.getvalue())
-            print("%s: %d bytes" % (out.relative_to(ROOT), len(buf.getvalue())))
+        out = PNG / ("noto-sans-sc-common-%d.otf" % weight)
+        outputs = [(out, buf.getvalue())]
+        if weight == 400:
+            # the font the tests give with --font: the Regular face with 龘 (U+9F98) alone, which
+            # the faces held do not map
+            font = subset.load_font(str(path), options)
+            sub = subset.Subsetter(options)
+            sub.populate(unicodes=[0x9F98])
+            sub.subset(font)
+            extra = io.BytesIO()
+            font.save(extra)
+            outputs.append((PNG_TEST_FONT, extra.getvalue()))
+        for out, data in outputs:
+            if check:
+                if not out.exists() or out.read_bytes() != data:
+                    stale.append(out)
+            else:
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_bytes(data)
+                print("%s: %d bytes" % (out.relative_to(ROOT), len(data)))
     if stale:
         sys.exit("not current, run python scripts/fonts.py png: " + ", ".join(str(p.relative_to(ROOT)) for p in stale))
 
