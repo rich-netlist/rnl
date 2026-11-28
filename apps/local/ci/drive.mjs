@@ -121,8 +121,8 @@ try {
     console.log("before the solve:", summary.beforeSolve);
     // a solve in the program, through its solver service. A netlist with components not drawn, as this one, has a bar over
     // the drawing (apps/viewer-ui/unplaced-bar.js), or the page of a level that draws nothing, whose link solves the level
-    // shown; nothing asks on opening
-    const link = "#unplaced-bar:not([hidden]) .solve-link, .empty .solve-link";
+    // shown (its class solve-now: the other link opens the Not drawn view); nothing asks on opening
+    const link = "#unplaced-bar:not([hidden]) .solve-now, .empty .solve-now";
     const offered = await until(client, `return !!document.querySelector(${JSON.stringify(link)})`, 30);
     check("a link offers to solve the objects not placed", offered === true, String(offered));
     if (offered === true) await client.script(`document.querySelector(${JSON.stringify(link)}).click(); return true`);

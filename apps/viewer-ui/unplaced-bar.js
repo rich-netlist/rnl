@@ -35,7 +35,8 @@ function fill(span) {
   // (panels.js and solve.js draw through the page's modules, which draw this: they are looked up when a link is clicked)
   // the view by the name of its tab and its key, as the tab shows them
   const view = link(String(m("Not drawn (6)")), "solve-link unplaced-link", () => void import("./panels.js").then((p) => p.showPane("unplaced")));
-  const solve = link(String(m("Solve (F9)")), "solve-link", () => void import("./solve.js").then((s) => s.solve()));
+  // (solve-now marks the one that solves, for what clicks it from outside, as apps/local/ci/drive.mjs does)
+  const solve = link(String(m("Solve (F9)")), "solve-link solve-now", () => void import("./solve.js").then((s) => s.solve()));
   const parts = [];
   for (const piece of text.split(/(\u0001|\u0002)/)) parts.push(piece === VIEW ? view : piece === SOLVE ? solve : piece);
   span.replaceChildren(...parts);
