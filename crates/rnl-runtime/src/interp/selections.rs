@@ -84,6 +84,8 @@ impl Interp<'_> {
             scope: Option<Scope>,
             seen: &mut HashSet<(ObjId, Option<Scope>)>,
         ) -> bool {
+            #[cfg(test)]
+            tests::SYMBOL_DEPENDENCY_STEPS.with(|count| count.set(count.get() + 1));
             if !seen.insert((object, scope.clone())) {
                 return false;
             }
@@ -97,6 +99,72 @@ impl Interp<'_> {
                 }
                 return visit(it, input.source, scope, seen);
             }
+            if let ObjData::Set(set) = it.o(object) {
+                // Borrowed, not cloned: a set edited in every scene holds an edit per scene. Its
+                // edits are walked by source, each once: a source walked again in this walk is
+                // in `seen` and gives false, so the answer is the same.
+                debug_assert_eq!(set.mod_sources, {
+                    let mut once = Vec::new();
+                    for m in &set.mods {
+                        if !once.contains(&m.source) {
+                            once.push(m.source);
+                        }
+                    }
+                    once
+                });
+                let select = match &set.kind {
+                    SetKind::Select { keyword, scope: selected_scope, params, writer, .. } => Some((
+                        keyword.clone(),
+                        *selected_scope,
+                        params.get("role").and_then(Lit::str).map(String::from),
+                        match params.get("role") {
+                            Some(Lit::Str(s)) => s.unit.unwrap_or(*writer),
+                            _ => *writer,
+                        },
+                        keyword == "SELECT-PIN" || params.contains_key("symbol") || params.contains_key("drawn"),
+                    )),
+                    _ => None,
+                };
+                let union = match &set.kind {
+                    SetKind::Union { source } => Some(*source),
+                    _ => None,
+                };
+                let blocked = match (select, union) {
+                    (Some((keyword, selected_scope, role, unit, pins)), _) => {
+                        pins || visit(it, selected_scope, Some(Scope { keyword, role, unit }), seen)
+                    }
+                    (None, Some(source)) => visit(it, source, scope.clone(), seen),
+                    _ => false,
+                };
+                if blocked {
+                    return true;
+                }
+                // the members, then the sources of the edits, read one at a time: nothing here
+                // edits a set
+                let member = |it: &Interp<'_>, i: usize| match it.o(object) {
+                    ObjData::Set(set) => set.items.get(i).map(|(item, _)| *item),
+                    _ => None,
+                };
+                let mut i = 0;
+                while let Some(item) = member(it, i) {
+                    if visit(it, item, scope.clone(), seen) {
+                        return true;
+                    }
+                    i += 1;
+                }
+                let source = |it: &Interp<'_>, i: usize| match it.o(object) {
+                    ObjData::Set(set) => set.mod_sources.get(i).copied(),
+                    _ => None,
+                };
+                let mut i = 0;
+                while let Some(source) = source(it, i) {
+                    if visit(it, source, scope.clone(), seen) {
+                        return true;
+                    }
+                    i += 1;
+                }
+                return false;
+            }
             match it.o(object).clone() {
                 ObjData::NamedSubobject { .. } | ObjData::ScenePin { .. } if scope.is_some() => true,
                 ObjData::Pos { parent } if scope.is_some() => {
@@ -104,29 +172,6 @@ impl Interp<'_> {
                         || (matches!(it.o(parent), ObjData::NamedSubobject { .. } | ObjData::Pos { .. })
                             || it.role_inputs.contains_key(&parent))
                             && visit(it, parent, scope, seen)
-                }
-                ObjData::Set(set) => {
-                    let blocked = match &set.kind {
-                        SetKind::Select { keyword, scope: selected_scope, params, writer, .. } => {
-                            let selected = Scope {
-                                keyword: keyword.clone(),
-                                role: params.get("role").and_then(Lit::str).map(String::from),
-                                unit: match params.get("role") {
-                                    Some(Lit::Str(s)) => s.unit.unwrap_or(*writer),
-                                    _ => *writer,
-                                },
-                            };
-                            keyword == "SELECT-PIN"
-                                || params.contains_key("symbol")
-                                || params.contains_key("drawn")
-                                || visit(it, *selected_scope, Some(selected), seen)
-                        }
-                        SetKind::Union { source } => visit(it, *source, scope.clone(), seen),
-                        _ => false,
-                    };
-                    blocked
-                        || set.items.iter().any(|(item, _)| visit(it, *item, scope.clone(), seen))
-                        || set.mods.iter().any(|edit| visit(it, edit.source, scope.clone(), seen))
                 }
                 ObjData::Usage(usage) => {
                     let Some(mut scope) = scope else { return false };
@@ -490,6 +535,8 @@ pub(super) mod tests {
     thread_local! {
         /// How many pins SELECT-PIN took from every drawable object of the level, on this thread.
         pub(in crate::interp) static LEVEL_PINS_TAKEN: Cell<usize> = const { Cell::new(0) };
+        /// How many objects the check of a selection of SET-SYMBOL went to, on this thread.
+        pub(in crate::interp) static SYMBOL_DEPENDENCY_STEPS: Cell<usize> = const { Cell::new(0) };
     }
 
     /// The pins of the whole level that SELECT-PIN takes while a level of `n` instances of five
@@ -525,6 +572,78 @@ pub(super) mod tests {
         let errors: Vec<_> = read.sink.all().iter().filter(|d| d.severity == Severity::Error).collect();
         assert!(errors.is_empty(), "{errors:?}");
         LEVEL_PINS_TAKEN.with(Cell::get)
+    }
+
+    fn resistor(name: &str, a: &str, b: &str, order: usize) -> Instance {
+        Instance {
+            name: name.into(),
+            letter: Some('R'),
+            nodes: vec![a.into(), b.into()],
+            value: Some("1k".into()),
+            file: "cells.sp".into(),
+            line: 1,
+            order,
+            default_terminals: Some(vec!["p".into(), "n".into()]),
+            ..Instance::default()
+        }
+    }
+
+    /// The steps of the checks of the selections of SET-SYMBOL while a main file with `n`
+    /// subcircuits of two resistors is read, whose rules, as the standard package's do, edit the
+    /// selection that SET-SYMBOL takes in every level: the selection then holds an edit of each
+    /// level read so far.
+    fn symbol_dependency_steps(n: usize) -> usize {
+        let mut sink = Sink::new();
+        let mut main = Level::new(LevelKind::File, "cells.sp", "cells.sp", "cells.sp");
+        main.circuit = true;
+        main.instances.push(resistor("R1", "n1", "n2", 0));
+        for k in 0..n {
+            main.instances.push(Instance {
+                name: format!("X{k}"),
+                letter: Some('X'),
+                nodes: vec![format!("a{k}"), format!("b{k}")],
+                model: Some(format!("cell{k}")),
+                file: "cells.sp".into(),
+                line: 2,
+                order: k + 1,
+                is_subckt: true,
+                ..Instance::default()
+            });
+        }
+        let records = r#"@RNL(type="header") { @VERSION("0.4")}
+@RNL {
+  $BAR = @DEFINE-SYMBOL { (0, 2) @PIN(terminal="p", direction="up"); (0, -2) @PIN(terminal="n", direction="down"); @LINE {(0, 2) (0, -2)} };
+  %rs = # @SELECT-INSTANCE(name="R*", recursive=true);
+  # @SELECT-INSTANCE(name="R2", recursive=true) => @REMOVE-FROM %rs;
+  %rs @SET-SYMBOL $BAR
+}"#;
+        main.records = scan_run(&package_lines(records), "cells.sp", &mut sink);
+        let dialect = Dialect { name: "spice".into(), case_sensitive: false, ground_aliases: vec![] };
+        let mut doc = HostDocument::new(main, dialect);
+        for k in 0..n {
+            let name = format!("cell{k}");
+            let mut level = Level::new(LevelKind::Subckt, &name, "cells.sp", "cells.sp");
+            level.circuit = true;
+            level.ports = vec!["a".into(), "b".into()];
+            level.instances.push(resistor("R1", "a", "m", 0));
+            level.instances.push(resistor("R2", "m", "b", 1));
+            let id = doc.add_level(level, Some(0));
+            doc.subckts.insert(doc.key(&name), id);
+        }
+        SYMBOL_DEPENDENCY_STEPS.with(|count| count.set(0));
+        let read = interpret(doc, &MemoryProvider::new(), &Options { std: false, ..Options::default() }, sink);
+        let errors: Vec<_> = read.sink.all().iter().filter(|d| d.severity == Severity::Error).collect();
+        assert!(errors.is_empty(), "{errors:?}");
+        SYMBOL_DEPENDENCY_STEPS.with(Cell::get)
+    }
+
+    #[test]
+    fn the_check_of_a_symbol_selection_edited_in_every_level_grows_with_the_levels_not_their_square() {
+        let (small, large) = (symbol_dependency_steps(20), symbol_dependency_steps(40));
+        assert!(small > 0, "SET-SYMBOL checks the selection it takes");
+        // Twice the levels: the checks of each level's own reading double; going through the edit
+        // of every level read so far, as before, they would grow four times.
+        assert!(large <= small * 5 / 2, "{small} steps for 20 levels, {large} for 40");
     }
 
     #[test]

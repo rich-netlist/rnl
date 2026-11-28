@@ -634,6 +634,13 @@ pub struct SetData {
     /// A written `{…}` stays a member inside another set.
     pub explicit: bool,
     pub mods: Vec<SetMod>,
+    /// The sources of `mods`, each once, in the order of their first edit; `add_mod` keeps it. A
+    /// set edited in every scene, such as one a package rule adds to, has an edit per scene and
+    /// few sources.
+    pub mod_sources: Vec<ObjId>,
+    /// The same sources as a set, to tell a new one at once, once there are many of them
+    /// ([`SetData::MANY_SOURCES`]); none before.
+    pub mod_source_set: Option<Box<HashSet<ObjId>>>,
     /// The indexes in `mods` of the edits made in each scene, in order, and under `None` those read
     /// before any scene, when the statements without a circuit are classified; `add_mod` keeps it.
     pub mods_by_scene: HashMap<Option<SceneId>, Vec<usize>>,
@@ -656,12 +663,17 @@ pub struct SetData {
 }
 
 impl SetData {
+    /// How many sources of edits a set looks through one by one before it keeps them in a hash set.
+    const MANY_SOURCES: usize = 16;
+
     pub fn plain(items: Vec<(ObjId, bool)>, explicit: bool) -> SetData {
         SetData {
             items,
             item_dependencies: Vec::new(),
             explicit,
             mods: Vec::new(),
+            mod_sources: Vec::new(),
+            mod_source_set: None,
             mods_by_scene: HashMap::new(),
             lazy_sources: Vec::new(),
             lazy_busy: Cell::new(false),
@@ -682,6 +694,16 @@ impl SetData {
             self.lazy_sources = Vec::new();
         } else if lazy && !self.not_lazy {
             self.lazy_sources.push(m.source);
+        }
+        let new = if self.mod_sources.len() < Self::MANY_SOURCES {
+            !self.mod_sources.contains(&m.source)
+        } else {
+            self.mod_source_set
+                .get_or_insert_with(|| Box::new(self.mod_sources.iter().copied().collect()))
+                .insert(m.source)
+        };
+        if new {
+            self.mod_sources.push(m.source);
         }
         self.mods.push(m);
     }
