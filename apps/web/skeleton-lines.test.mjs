@@ -68,31 +68,53 @@ test("skeletonLines builds component crosses, directional pin lines and extended
   assert.deepEqual(xEighty.owners, ["x of #R2", "pin #R2::p"]);
 });
 
-test("skeletonLines deduplicates coincident component/pin and wire lines, counts collinear segments, and clips diagonal wires", () => {
+test("skeletonLines deduplicates coincident component/pin and wire lines, counts collinear segments, and leaves out diagonal wires", () => {
   const wireOnly = skeletonLines(level, doc, { symbols: false, wires: true });
-  // Wire segments: y=0 (2 segments), x=80 (1 segment), and diagonal x + y = 80 -> 3 distinct lines
-  assert.equal(wireOnly.lines.length, 3);
+  // Wire segments: y=0 (2 segments), x=80 (1 segment); the diagonal x + y = 80 gives no line -> 2 distinct lines
+  assert.equal(wireOnly.lines.length, 2);
   assert.ok(wireOnly.lines.every((l) => l.kind === "wire"));
 
   const both = skeletonLines(level, doc, { symbols: true, wires: true });
-  // 5 symbol lines + 3 wire lines - 2 shared (y=0 and x=80) = 6 lines total
-  assert.equal(both.lines.length, 6);
+  // 5 symbol lines + 2 wire lines - 2 shared (y=0 and x=80) = 5 lines total
+  assert.equal(both.lines.length, 5);
   const shared = both.lines.filter((l) => l.kind === "shared");
   assert.equal(shared.length, 2);
+  assert.equal(both.lines.filter((l) => l.kind === "wire").length, 0);
 
-  // Diagonal wire line spans the padded extent boundary
-  const diag = both.lines.find((l) => l.kind === "wire");
-  assert.ok(diag);
-  assert.deepEqual(diag.owners, ["wire &mid"]);
+  // Each line spans the padded extent, from border to border
   const [x0, y0, x1, y1] = both.extent;
-  for (const [px, py] of [diag.a, diag.b]) {
-    const onBorder =
-      Math.abs(px - x0) < 1e-5 ||
-      Math.abs(px - x1) < 1e-5 ||
-      Math.abs(py - y0) < 1e-5 ||
-      Math.abs(py - y1) < 1e-5;
-    assert.ok(onBorder);
+  for (const line of both.lines) {
+    for (const [px, py] of [line.a, line.b]) {
+      const onBorder =
+        Math.abs(px - x0) < 1e-5 ||
+        Math.abs(px - x1) < 1e-5 ||
+        Math.abs(py - y0) < 1e-5 ||
+        Math.abs(py - y1) < 1e-5;
+      assert.ok(onBorder);
+    }
   }
+});
+
+test("a wire with slanted segments gives skeleton lines only for its horizontal and vertical ones, which alone are named and counted", () => {
+  const net = { objects: [{ kind: "net", name: "x", level: 0 }] };
+  const crossing = {
+    hits: [
+      // (0, 0) -> (40, 0), a 45° corner to (60, 20), down to (60, 60), and a slant back to (20, 100); then a segment
+      // that leans by less than the tolerance, which is horizontal
+      { kind: "wire", points: [[0, 0], [40, 0], [60, 20], [60, 60], [20, 100]], objects: [0] },
+      { kind: "wire", points: [[0, 60], [30, 60 + 1e-9]], objects: [0] },
+    ],
+  };
+  const { lines } = skeletonLines(crossing, net, { symbols: false, wires: true });
+  const along = (l) => (Math.abs(l.a[1] - l.b[1]) < 1e-6 ? `y=${Math.round(l.a[1])}` : Math.abs(l.a[0] - l.b[0]) < 1e-6 ? `x=${Math.round(l.a[0])}` : "slanted");
+  assert.deepEqual(lines.map(along).sort(), ["x=60", "y=0", "y=60"]);
+  assert.ok(lines.every((l) => l.kind === "wire" && l.owners.length === 1 && l.owners[0] === "wire &x"));
+  // the segments of the corners are not counted: one segment on each line
+  assert.ok(lines.every((l) => !l.owners[0].includes("segments")));
+  // on the line of the 45° corner, past the wire, nothing is named; on that of a straight segment, the wire is
+  assert.equal(skeletonHit(lines, 80, 40, 2), null);
+  assert.equal(skeletonHit(lines, 20, 100, 2), null);
+  assert.equal(skeletonHit(lines, 60, 90, 2), "wire &x");
 });
 
 test("skeletonHit reports all owners on hovered lines and falls back to box-edge pin inference when PinObjects are absent", () => {

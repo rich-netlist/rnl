@@ -1,10 +1,16 @@
 // Pure geometry and hover hit-testing for the Solve skeleton-line overlays (skeleton-lines.js).
 // Computed directly from the level's hits and objects so any placed drawing can show them, with no
-// solver report and no package or definition names hardcoded.
+// solver report and no package or definition names hardcoded. A wire gives a skeleton line only for
+// its horizontal and vertical segments: a slanted segment, such as the 45° corner of a crossing,
+// gives none, and is neither named on hover nor counted among a wire's segments.
 
 import { attachments } from "./group-tree.js";
 
 const PAD = 24; // SVG pixels the skeleton lines reach beyond the drawing
+const STRAIGHT = 1e-6; // SVG pixels a segment may lean and still be horizontal or vertical
+
+/** Whether the segment `(dx, dy)` is horizontal or vertical, within STRAIGHT. */
+const straight = (dx, dy) => Math.abs(dx) <= STRAIGHT || Math.abs(dy) <= STRAIGHT;
 
 function levelExtent(level) {
   let x0 = Infinity;
@@ -61,7 +67,8 @@ function objectLabel(level, doc, k, usageByObj, depth = 0) {
  * Compute deduplicated skeleton lines of `level` in SVG pixels:
  * - component coordinate crosses (horizontal + vertical through each non-mark box's `origin`);
  * - pin directional lines (along each pin's direction across the drawing);
- * - wire segment lines (each segment's straight line extended across the drawing).
+ * - wire segment lines (each horizontal or vertical segment's line extended across the drawing; slanted
+ *   segments give none).
  */
 export function skeletonLines(level, doc = null, { symbols = true, wires = true } = {}) {
   const extent = levelExtent(level);
@@ -175,6 +182,7 @@ export function skeletonLines(level, doc = null, { symbols = true, wires = true 
       for (let i = 1; i < h.points.length; i++) {
         const [ax, ay] = h.points[i - 1];
         const [bx, by] = h.points[i];
+        if (!straight(bx - ax, by - ay)) continue;
         addLine(ax, ay, bx - ax, by - ay, "wires", label, true);
       }
     }
