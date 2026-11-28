@@ -34,13 +34,13 @@ function unplaced() {
 
 /**
  * Show the objects of the level shown, from the first, with an empty search; the count in the tab
- * and the status bar's way to the list follow the level.
+ * and the status bar's way to the list follow the level. The tab counts the rows of the list, as its
+ * header does: the instances, the bundles and the usages, such as a ground, that are not drawn.
  */
 export function renderUnplaced() {
   search.value = "";
   const n = unplaced().length;
-  const components = new Set(unplaced().flatMap(u => u.objects).filter(o => doc?.objects[o]?.kind === "instance")).size;
-  setText($("unplaced-tab-count"), components ? ` (${components})` : "");
+  setText($("unplaced-tab-count"), n ? ` (${n})` : "");
   const status = $("status");
   status.classList.toggle("opens-unplaced", n > 0);
   if (n > 0) setAttr(status, "title", m("Show the objects that are not drawn"));

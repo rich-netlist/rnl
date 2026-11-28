@@ -87,7 +87,8 @@ test('symbol viewport keeps application shortcuts available', async ({page,viewe
 
 test('symbol follows parent assignment, package source and direct subcircuit entry', async ({ page, viewer }) => {
   await viewer.open('symbol-inspector');
-  await expect(page.locator('#unplaced-tab-count')).toHaveText(' (1)');
+  // Xunplaced and the grounds that nothing places
+  await expect(page.locator('#unplaced-tab-count')).toHaveText(' (5)');
   await viewer.click('Xparent');
   await page.keyboard.press('Enter');
   await page.locator('#tab-symbol').click();
@@ -128,7 +129,8 @@ test('symbol follows parent assignment, package source and direct subcircuit ent
   await page.locator('#tab-symbol').click();
   await expect(page.locator('.symbol-bounds')).toHaveText('Box = [-2, -1, 2, 1]');
   await expect(page.locator('.symbol-context')).toContainText('own symbol');
-  await expect(page.locator('#unplaced-tab-count')).toHaveText('');
+  // the leaf's two ports, which nothing places
+  await expect(page.locator('#unplaced-tab-count')).toHaveText(' (2)');
   await page.locator('#tab-hierarchy').click();
   await page.locator('#tree .tree-row[data-path="0"]').click();
   await viewer.click('Xpackage');
