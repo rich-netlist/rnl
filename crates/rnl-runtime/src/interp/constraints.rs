@@ -272,6 +272,8 @@ impl Interp<'_> {
         };
         if let ObjData::Set(previous) = self.o(root) {
             data.mods = previous.mods.clone();
+            data.mod_sources = previous.mod_sources.clone();
+            data.mod_source_set = previous.mod_source_set.clone();
             data.mods_by_scene = previous.mods_by_scene.clone();
             data.lazy_sources = previous.lazy_sources.clone();
         }
