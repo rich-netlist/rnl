@@ -191,6 +191,7 @@ mod text_orientation04;
 mod timeall;
 mod topology;
 mod topology_members04;
+mod translation04;
 mod type_patterns04;
 mod undefined_subckts;
 mod unused_names04;

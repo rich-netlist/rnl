@@ -38,11 +38,13 @@ fn every_object_is_placed_where_the_facts_put_it() {
     );
     let solved = crate::solve(&p, &SolverOptions::without_time_limit());
     assert_eq!(solved.report.kept, vec![0, 1, 2, 3]);
+    // the point, which no fact puts on x, goes with the instance there: the one coordinate on x is
+    // the instance's, so the level is drawn alike wherever it puts it
     assert_eq!(
         solved.solution.placements,
         vec![
             Placement { object: 0, x: Some(4.0), y: Some(2.5), orient: Some(Orient::MY) },
-            Placement { object: 1, x: Some(0.0), y: Some(2.5), orient: None },
+            Placement { object: 1, x: Some(4.0), y: Some(2.5), orient: None },
         ]
     );
     assert!(solved.report.work.resolve_nodes > 0);

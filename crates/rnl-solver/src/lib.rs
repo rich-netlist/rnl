@@ -52,6 +52,7 @@ mod coords;
 mod driver;
 pub mod experimental;
 mod fixed;
+mod gauge;
 mod group_tree;
 mod holds;
 mod lines;
@@ -377,7 +378,15 @@ pub fn solve(problem: &LevelProblem, options: &SolverOptions) -> Solved {
 /// when hashing the persisted result, so time-to-work replay includes the same hash.
 /// Released input versions retain their resolution-only time limit.
 pub fn solve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Solved {
-    budget::without(|| solve_isolated(problem, options, clock, true, driver::solve))
+    // in the level's gauge, so that where its absolute coordinates put it moves the drawing alone
+    for single in [true, false] {
+        let Some((p, gauge)) = gauge::of(problem, options, single) else { break };
+        let mut solved = budget::without(|| solve_isolated(&p, Some(problem), options, clock, true, driver::solve));
+        if gauge.restore(&mut solved) {
+            return solved;
+        }
+    }
+    budget::without(|| solve_isolated(problem, None, options, clock, true, driver::solve))
 }
 
 /// The level as its previous result has it, spaced again to the options' spacing: each object
@@ -403,8 +412,9 @@ pub fn respace_with_clock(
         return Err("the record of the solver places nothing".into());
     }
     let from = driver::Respace { previous, refused: std::cell::RefCell::new(None) };
-    let mut solved =
-        budget::without(|| solve_isolated(problem, options, clock, true, |p, o, c| driver::respace(p, o, c, &from)));
+    let mut solved = budget::without(|| {
+        solve_isolated(problem, None, options, clock, true, |p, o, c| driver::respace(p, o, c, &from))
+    });
     if let Some(why) = from.refused.into_inner() {
         return Err(why);
     }
@@ -415,8 +425,11 @@ pub fn respace_with_clock(
 
 /// `by_layout` says that `run` lays the level out by the layout of the options, as a solve does:
 /// the skeleton experiment has an engine of its own, whatever the layout is.
+/// `given` is the level as the caller gave it, when `problem` is that level in its gauge
+/// ([`gauge`]): the profile names the level by its hash.
 fn solve_isolated(
     problem: &LevelProblem,
+    given: Option<&LevelProblem>,
     options: &SolverOptions,
     clock: &dyn Clock,
     by_layout: bool,
@@ -441,7 +454,7 @@ fn solve_isolated(
                 facts: problem.facts.len(),
                 routes: problem.routes.len(),
                 options: options.canonical(),
-                hash: rnl_runtime::problem::sig2(problem, &options.canonical()),
+                hash: rnl_runtime::problem::sig2(given.unwrap_or(problem), &options.canonical()),
             });
         }
         if profile::enabled() {
