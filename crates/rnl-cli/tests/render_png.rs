@@ -106,3 +106,41 @@ R2 b c 1k
     let out = render(&d, &["--net-names", "--png"]);
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
 }
+
+/// A level whose text has a common hanzi, 龘 (U+9F98), which is not among the common hanzi, and a
+/// hangul syllable, which no font held maps.
+const TEXTS: &str =
+    "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nR1 a b 1k\n* @RNL { (0, 4) @TEXT(\"电阻 龘 한\") }\n.end\n";
+
+/// The font the tests give with `--font`: Noto Sans SC with 龘 alone (`scripts/fonts.py png`).
+const EXTRA: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fonts/noto-sans-sc-9f98.otf");
+
+#[test]
+fn a_character_no_font_maps_is_named_in_a_warning_and_a_font_given_draws_it() {
+    let d = dir("render-png-fonts");
+    std::fs::write(d.join("t.sp"), TEXTS).unwrap();
+    let out = render(&d, &["--png"]);
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        err.contains("warning: RNL8040 cli-png-missing-glyphs: t.png: no font maps 2 of its characters, drawn as empty boxes: 龘 한;"),
+        "{err}"
+    );
+    let out = render(&d, &["--png", "--font", EXTRA]);
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("no font maps 1 of its characters, drawn as empty boxes: 한;"), "{err}");
+}
+
+#[test]
+fn a_font_that_cannot_be_read_and_a_font_without_png_are_errors() {
+    let d = dir("render-png-font-errors");
+    let out = render(&d, &["--png", "--font", "no-such-font.otf"]);
+    assert_eq!(out.status.code(), Some(2));
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.starts_with("error: RNL8039 cli-font-unreadable: no font is drawn with: no-such-font.otf: "), "{err}");
+    let out = render(&d, &["--font", EXTRA]);
+    assert_eq!(out.status.code(), Some(2));
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("render needs --png, as --font gives the fonts of the PNG images"), "{err}");
+}

@@ -95,8 +95,13 @@ dump options:
                       print the differences and the times as JSON, and exit 1 on any difference
 render options:
   --png               write a PNG image of each level instead of its SVG, drawn by the command
-                      itself with the fonts it holds, so that it needs no font of the computer;
-                      CJK text is drawn in it as empty boxes
+                      itself with the fonts it holds, so that it needs no font of the computer:
+                      Latin, Greek, the signs of schematics, CJK punctuation and the 3755 common
+                      hanzi of GB 2312; a character they do not map is drawn as an empty box, with
+                      a warning that names it
+  --font FILE         with --png, draw the characters the fonts held do not map in the font of
+                      FILE (OpenType, TrueType or a collection), so that the image is the same
+                      wherever that file is; repeatable, the first that maps a character draws it
   --scale N           the pixels of the PNG image for a unit of the SVG, 2 by default; at most 16
   --net-names         write the name of each connected part of every net over the drawing, as a
                       viewer's View > Show Net Names does: grey, in a group of class \"net-labels\"
@@ -178,6 +183,8 @@ struct Args {
     /// `render`'s `--png`, and its `--scale`.
     png: bool,
     scale: f32,
+    /// `render`'s `--font` files, in order.
+    fonts: Vec<PathBuf>,
     /// `view`'s `--hints`.
     hints: bool,
     status: bool,
@@ -319,6 +326,7 @@ fn parse_args() -> Result<Args, Said> {
     let (mut svg, mut primitives, mut status) = (true, false, false);
     let (mut flylines, mut hints, mut net_names) = (false, false, false);
     let (mut png, mut scale) = (false, None);
+    let mut fonts = Vec::new();
     let mut level = None;
     let mut solver = solver_args::SolverArgs::default();
     let mut author = None;
@@ -399,6 +407,7 @@ fn parse_args() -> Result<Args, Said> {
             "--flylines" => flylines = true,
             "--net-names" => net_names = true,
             "--png" => png = true,
+            "--font" => fonts.push(PathBuf::from(it.next().ok_or_else(|| needs("--font needs a font file"))?)),
             "--scale" => {
                 let n = it.next().ok_or_else(|| needs("--scale needs a number, such as 2"))?;
                 scale = match n.parse::<f32>() {
@@ -466,7 +475,7 @@ fn parse_args() -> Result<Args, Said> {
             "--confine" | "--request" => &["preview"],
             "--progress" | "--check" | "--external-solver" | "--external-arg" | "--external-timeout" => &["solve"],
             "--previous" | "--solver-input" => &["problem"],
-            "--png" | "--scale" | "--net-names" => &["render"],
+            "--png" | "--scale" | "--font" | "--net-names" => &["render"],
             "--layout" => &["solver-defaults"],
             "--all" => &["groups"],
             "--file" => &["dump", "view", "solve", "preview"],
@@ -567,6 +576,7 @@ fn parse_args() -> Result<Args, Said> {
         net_names,
         png,
         scale: scale.unwrap_or(2.0),
+        fonts,
         hints,
         status,
         constraints,
@@ -915,6 +925,20 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
                 None
             };
             let out = args.out.clone().ok_or_else(|| Said::new(codes::CLI_NEEDS_OUT, "render needs -o DIR"))?;
+            if !args.fonts.is_empty() && !args.png {
+                return Err(Said::new(
+                    codes::CLI_COMMAND_NEEDS_OPTION,
+                    "render needs --png, as --font gives the fonts of the PNG images",
+                ));
+            }
+            let fonts = if args.png {
+                Some(
+                    rnl_cli::png::Fonts::with_files(&args.fonts)
+                        .map_err(|e| Said::new(codes::CLI_FONT_UNREADABLE, format!("no font is drawn with: {e}")))?,
+                )
+            } else {
+                None
+            };
             std::fs::create_dir_all(&out).map_err(io)?;
             let stem = args.file.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "out".into());
             for (k, lv) in r.model.levels.iter().enumerate() {
@@ -941,11 +965,19 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
                 } else {
                     format!("{stem}.{}.{suffix}", sanitize(&lv.title))
                 };
-                if args.png {
-                    let image = rnl_cli::png::png(&svg, args.scale).map_err(|e| {
+                if let Some(fonts) = &fonts {
+                    let image = rnl_cli::png::draw(&svg, args.scale, fonts).map_err(|e| {
                         Said::new(codes::CLI_RENDER_PNG_FAILED, format!("{name}: no PNG image is drawn: {e}"))
                     })?;
-                    std::fs::write(out.join(&name), image).map_err(io)?;
+                    std::fs::write(out.join(&name), image.png).map_err(io)?;
+                    if !image.missing.is_empty() {
+                        eprintln!(
+                            "warning: {}: {name}: no font maps {} of its characters, drawn as empty boxes: {}; give a font that has them with --font FILE",
+                            codes::CLI_PNG_MISSING_GLYPHS,
+                            image.missing.len(),
+                            rnl_cli::png::named(&image.missing)
+                        );
+                    }
                 } else {
                     std::fs::write(out.join(&name), svg).map_err(io)?;
                 }
